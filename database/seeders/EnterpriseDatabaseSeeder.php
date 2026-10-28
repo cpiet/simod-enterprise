@@ -35,27 +35,87 @@ class EnterpriseDatabaseSeeder extends Seeder
             'updated_at'       => now(),
         ]);
 
-        // 2. SEED POLRES SULBAR
+        // 2. SEED POLRES SULBAR (DENGAN GEOSPATIAL COORDINATES KAMTIBMAS MAP)
         $sulbarPolres = [
-            ['code' => 'MAMUJU', 'name' => 'Polresta Mamuju'],
-            ['code' => 'MAJENE', 'name' => 'Polres Majene'],
-            ['code' => 'POLMAN', 'name' => 'Polres Polewali Mandar'],
-            ['code' => 'PASANGKAYU', 'name' => 'Polres Pasangkayu'],
-            ['code' => 'MAMASA', 'name' => 'Polres Mamasa'],
-            ['code' => 'MATENG', 'name' => 'Polres Mamuju Tengah'],
+            [
+                'code'       => 'MAMUJU',
+                'name'       => 'Polresta Mamuju',
+                'short_name' => 'Mamuju',
+                'tag_desc'   => 'Pusat Ibukota Provinsi',
+                'latitude'   => -2.6718000,
+                'longitude'  => 118.8872000,
+                'map_x'      => 37,
+                'map_y'      => 52,
+            ],
+            [
+                'code'       => 'MAJENE',
+                'name'       => 'Polres Majene',
+                'short_name' => 'Majene',
+                'tag_desc'   => 'Pesisir Barat / Jalur Trans',
+                'latitude'   => -3.5414000,
+                'longitude'  => 118.9712000,
+                'map_x'      => 31,
+                'map_y'      => 74,
+            ],
+            [
+                'code'       => 'POLMAN',
+                'name'       => 'Polres Polewali Mandar',
+                'short_name' => 'Polewali Mandar',
+                'tag_desc'   => 'Wilayah Selatan / Pintu Gerbang',
+                'latitude'   => -3.4328000,
+                'longitude'  => 119.3435000,
+                'map_x'      => 50,
+                'map_y'      => 88,
+            ],
+            [
+                'code'       => 'PASANGKAYU',
+                'name'       => 'Polres Pasangkayu',
+                'short_name' => 'Pasangkayu',
+                'tag_desc'   => 'Perbatasan Palu/Utara',
+                'latitude'   => -1.1925000,
+                'longitude'  => 119.3789000,
+                'map_x'      => 58,
+                'map_y'      => 15,
+            ],
+            [
+                'code'       => 'MAMASA',
+                'name'       => 'Polres Mamasa',
+                'short_name' => 'Mamasa',
+                'tag_desc'   => 'Kawasan Pegunungan',
+                'latitude'   => -2.9340000,
+                'longitude'  => 119.3175000,
+                'map_x'      => 66,
+                'map_y'      => 67,
+            ],
+            [
+                'code'       => 'MATENG',
+                'name'       => 'Polres Mamuju Tengah',
+                'short_name' => 'Mamuju Tengah',
+                'tag_desc'   => 'Tobadak & Jalur Logistik',
+                'latitude'   => -2.0392000,
+                'longitude'  => 119.2885000,
+                'map_x'      => 56,
+                'map_y'      => 34,
+            ],
         ];
         $firstSulbarPolresId = null;
         foreach ($sulbarPolres as $p) {
-            $id = DB::table('polres')->insertGetId([
-                'polda_id'   => $sulbarId,
-                'code'       => $p['code'],
-                'name'       => $p['name'],
-                'is_active'  => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $id = DB::table('polres')->updateOrInsert(
+                ['polda_id' => $sulbarId, 'code' => $p['code']],
+                [
+                    'name'       => $p['name'],
+                    'short_name' => $p['short_name'],
+                    'tag_desc'   => $p['tag_desc'],
+                    'latitude'   => $p['latitude'],
+                    'longitude'  => $p['longitude'],
+                    'map_x'      => $p['map_x'],
+                    'map_y'      => $p['map_y'],
+                    'is_active'  => true,
+                    'updated_at' => now(),
+                ]
+            );
             if (! $firstSulbarPolresId) {
-                $firstSulbarPolresId = $id;
+                $firstSulbarPolresId = DB::table('polres')->where('polda_id', $sulbarId)->where('code', $p['code'])->value('id');
             }
         }
 
