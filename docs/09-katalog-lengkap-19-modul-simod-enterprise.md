@@ -52,3 +52,4 @@ Sidebar dirancang dengan prinsip **Command Center Kontras Tinggi**:
 - **WITA Realtime Clock**: Mengikuti zona waktu resmi Indonesia Tengah (`Asia/Makassar`).
 - **Lonceng Notifikasi**: Memberikan alert cepat terhadap jumlah laporan lapangan yang menunggu verifikasi pimpinan.
 - **Profil Pimpinan**: Menampilkan avatar, pangkat, nama, jabatan, serta tautan cepat ke profil dan pusat keamanan.
+

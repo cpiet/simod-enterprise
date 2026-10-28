@@ -18,6 +18,11 @@ Route::post('/login', [AuthController::class, 'login'])->name('login.post');
 Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
 Route::get('/media-intelligence', [MediaIntelligenceController::class, 'index'])->name('media-intelligence');
+Route::post('/media-intelligence/ai-briefing', [MediaIntelligenceController::class, 'storeAiBriefing'])->name('media-intelligence.briefing');
+Route::post('/media-intelligence/rss-sources', [MediaIntelligenceController::class, 'storeRssSource'])->name('media-intelligence.rss.store');
+Route::post('/media-intelligence/rss-sources/{id}/toggle', [MediaIntelligenceController::class, 'toggleRssSource'])->name('media-intelligence.rss.toggle');
+Route::delete('/media-intelligence/rss-sources/{id}', [MediaIntelligenceController::class, 'deleteRssSource'])->name('media-intelligence.rss.delete');
+Route::post('/media-intelligence/rss-sources/test', [MediaIntelligenceController::class, 'testRssSource'])->name('media-intelligence.rss.test');
 
 // Issues Management
 Route::get('/issues', [IssueController::class, 'index'])->name('issues.index');

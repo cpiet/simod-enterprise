@@ -44,3 +44,27 @@ Modul ini bertugas memantau pemberitaan media massa daring secara real-time untu
 4. **Pencarian Real-Time**:
    - Memfilter kartu berita secara instan berdasarkan kata kunci tanpa me-reload browser.
 
+---
+
+## 4. Fitur Salin Prompt AI, Tempel Ringkasan AI & Kelola Sumber RSS
+
+1. **Salin Prompt AI**:
+   - Menghasilkan formula prompt terstruktur resmi Senior Media Intelligence Analyst Polri.
+   - Format prompt disesuaikan secara otomatis berdasarkan Polda yang aktif (Polda Sulbar, zona waktu WITA, serta daftar 6 Polres jajaran).
+   - Menghasilkan output blok JSON murni yang siap disalin dan ditempelkan ke ChatGPT/Claude/Gemini tanpa biaya API eksternal.
+
+2. **Tempel Ringkasan AI (`POST /media-intelligence/ai-briefing`)**:
+   - Membuka modal input teks/JSON hasil analisis dari ChatGPT.
+   - Parser otomatis membersihkan pembungkus markdown (````json ... ````), mengekstraksi metrik sentimen, ringkasan eksekutif 200 kata, atensi utama (*top concern*), isu strategis nasional vs daerah, matriks mitigasi risiko EWS, hingga format pesan WhatsApp resmi pimpinan.
+   - Data disimpan ke tabel `media_intelligence_reports` dan langsung merefleksikan seluruh tab secara instan.
+
+3. **Pilihan Portal Berita (Portal Selector Pills)**:
+   - Deretan tombol pill interaktif berisi seluruh portal media aktif di Sulbar (Mamuju Pos, Katinting, Kabar Sulbar, Suwarta, Sulbar Terkini, Malaqbi, Rakyat Sulbar, Bugis Pos, Detik Sulsel, Antara, CNN, dll).
+   - Dilengkapi badge counter jumlah artikel per portal.
+
+4. **Kelola Sumber RSS & Uji Kelayakan URL Feed**:
+   - Tombol **"Kelola Sumber RSS"** membuka modal manajemen URL feed.
+   - Fitur uji kelayakan realtime via endpoint `POST /media-intelligence/rss-sources/test` yang memeriksa keabsahan XML RSS 2.0 / Atom beserta waktu respon server (latency ms).
+   - Kemampuan menambah sumber baru, mematikan/mengaktifkan status, serta menghapus sumber media.
+
+

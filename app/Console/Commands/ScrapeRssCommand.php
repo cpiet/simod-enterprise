@@ -51,7 +51,7 @@ class ScrapeRssCommand extends Command
             $count = count($items);
             $this->info(" -> Diperoleh {$count} artikel live.");
 
-            foreach (array_slice($items, 0, 20) as $item) {
+            foreach (array_slice($items, 0, 150) as $item) {
                 MediaArticle::updateOrCreate(
                     ['url' => $item['link']],
                     [
