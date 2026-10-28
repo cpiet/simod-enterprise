@@ -36,6 +36,8 @@ const props = defineProps({
   earlyWarnings: Array,
   mediaFeeds: Array,
   sampleArticles: Array,
+  issues: Array,
+  pressReleases: Array,
   metrics: Object,
 });
 
@@ -65,6 +67,61 @@ const toggleBookmark = (id) => {
 
 const selectedCategory = ref('all');
 const searchQuery = ref('');
+
+
+// Copy helper with toast
+const copyText = (text, label = 'Teks') => {
+  navigator.clipboard.writeText(text);
+  toastMessage.value = `${label} berhasil disalin ke clipboard!`;
+  setTimeout(() => {
+    toastMessage.value = '';
+  }, 3500);
+};
+
+// Press Release Modal State
+const isCreateReleaseModalOpen = ref(false);
+const releaseForm = ref({
+  title: '',
+  content: '',
+  talking_points_text: '',
+  dos_and_donts_text: '',
+  spokesperson: props.selectedPolda?.kabid_humas_name || 'Bidhumas Polda',
+});
+
+const submitPressRelease = () => {
+  const pId = props.selectedPolda?.id || props.allPoldas?.[0]?.id || 1;
+  const tp = releaseForm.value.talking_points_text
+    ? releaseForm.value.talking_points_text.split('\n').filter((s) => s.trim())
+    : [];
+  const dd = releaseForm.value.dos_and_donts_text
+    ? releaseForm.value.dos_and_donts_text.split('\n').filter((s) => s.trim())
+    : [];
+
+  router.post('/press-releases', {
+    polda_id: pId,
+    title: releaseForm.value.title,
+    content: releaseForm.value.content,
+    talking_points: tp,
+    dos_and_donts: dd,
+    spokesperson_name: releaseForm.value.spokesperson,
+  }, {
+    preserveScroll: true,
+    onSuccess: () => {
+      isCreateReleaseModalOpen.value = false;
+      toastMessage.value = 'Siaran Pers Resmi berhasil diterbitkan ke jajaran!';
+      releaseForm.value = {
+        title: '',
+        content: '',
+        talking_points_text: '',
+        dos_and_donts_text: '',
+        spokesperson: props.selectedPolda?.kabid_humas_name || 'Bidhumas Polda',
+      };
+      setTimeout(() => {
+        toastMessage.value = '';
+      }, 4000);
+    },
+  });
+};
 
 const isRefreshingRss = ref(false);
 const refreshRssFeeds = () => {
@@ -562,47 +619,91 @@ const submitIssue = () => {
     <!-- TAB 02: BERITA & BRIEFING                                -->
     <!-- ======================================================== -->
     <div v-show="activeTab === '02'" class="space-y-4">
-      <div class="flex items-center gap-2">
-        <Newspaper class="w-5 h-5 text-amber-400" />
-        <h2 class="text-lg md:text-xl font-bold text-white tracking-tight">
-          Briefing Narasi & Siaran Pers Resmi
-        </h2>
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <Newspaper class="w-5 h-5 text-amber-400" />
+          <h2 class="text-lg md:text-xl font-bold text-white tracking-tight">
+            Briefing Narasi & Siaran Pers Resmi
+          </h2>
+        </div>
+        <button
+          @click="isCreateReleaseModalOpen = true"
+          type="button"
+          class="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center gap-1.5 transition shadow-md cursor-pointer self-start"
+        >
+          <Plus class="w-4 h-4" />
+          <span>+ Terbitkan Siaran Pers Baru</span>
+        </button>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="p-6 rounded-3xl bg-[#0b1426] border border-slate-800 space-y-3">
-          <span class="px-3 py-1 rounded-full text-[10px] font-black bg-sky-500/20 text-sky-400 border border-sky-500/40">
-            DRAF SIARAN PERS RESMI
-          </span>
-          <h3 class="text-base font-extrabold text-white">
-            Klarifikasi Pemberitaan Terkait Kelancaran Pasokan BBM Subsidi Jelang Pilkada Serentak
-          </h3>
-          <p class="text-xs text-slate-300 leading-relaxed">
-            Humas bersama Ditreskrimsus menegaskan sinergi aktif dengan Pertamina Patra Niaga menjamin stok BBM di seluruh SPBU aman tanpa antrean mengular. Masyarakat dihimbau tidak terpancing isu hoaks penimbunan.
-          </p>
-          <div class="flex items-center gap-2 pt-2">
-            <button class="px-3 py-1.5 rounded-xl bg-amber-400 text-slate-950 font-black text-xs">
-              Salin Siaran Pers
+      <!-- Real Press Releases from Database -->
+      <div v-if="pressReleases && pressReleases.length > 0" class="space-y-4">
+        <div
+          v-for="pr in pressReleases"
+          :key="pr.id"
+          class="p-6 rounded-3xl bg-[#0b1426] border border-slate-800 space-y-4 shadow-xl"
+        >
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider bg-sky-500/20 text-sky-400 border border-sky-500/40">
+                SIARAN PERS RESMI
+              </span>
+              <span class="text-xs font-mono text-slate-400 font-bold">
+                {{ pr.press_number || 'B/SP-POLRI/2026' }}
+              </span>
+            </div>
+            <span class="text-xs text-slate-400">
+              Juru Bicara: <strong class="text-white">{{ pr.spokesperson_name }}</strong>
+            </span>
+          </div>
+
+          <div class="space-y-2">
+            <h3 class="text-lg font-black text-white leading-snug">
+              {{ pr.title }}
+            </h3>
+            <p class="text-xs md:text-sm text-slate-300 leading-relaxed whitespace-pre-line">
+              {{ pr.content }}
+            </p>
+          </div>
+
+          <!-- Talking Points & DOs and DONTs -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+            <div v-if="pr.talking_points && pr.talking_points.length > 0" class="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1.5">
+              <span class="text-[11px] font-black text-amber-400 flex items-center gap-1">
+                ⭐ Poin Kunci Juru Bicara:
+              </span>
+              <ul class="text-xs text-slate-300 space-y-1 list-disc list-inside">
+                <li v-for="(tp, idx) in pr.talking_points" :key="idx">{{ tp }}</li>
+              </ul>
+            </div>
+
+            <div v-if="pr.dos_and_donts && pr.dos_and_donts.length > 0" class="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1.5">
+              <span class="text-[11px] font-black text-emerald-400 flex items-center gap-1">
+                🛡️ Panduan Etika Komunikasi:
+              </span>
+              <ul class="text-xs text-slate-300 space-y-1 list-disc list-inside">
+                <li v-for="(dd, idx) in pr.dos_and_donts" :key="idx">{{ dd }}</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 pt-2 border-t border-slate-800/80">
+            <button
+              @click="copyText(pr.title + '\n\n' + pr.content, 'Siaran Pers')"
+              class="px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center gap-1.5 transition cursor-pointer"
+            >
+              <span>📋 Salin Siaran Pers</span>
             </button>
-            <button class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700">
-              Kirim ke Jajaran Satwil
-            </button>
+            <span class="text-[11px] text-slate-400">
+              Diterbitkan: {{ new Date(pr.created_at).toLocaleString('id-ID') }}
+            </span>
           </div>
         </div>
+      </div>
 
-        <div class="p-6 rounded-3xl bg-[#0b1426] border border-slate-800 space-y-3">
-          <span class="px-3 py-1 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
-            BRIEFING JURU BICARA (DO & DON'T)
-          </span>
-          <h3 class="text-base font-extrabold text-white">
-            Panduan Komunikasi Publik Juru Bicara Polres & Satuan Fungsi
-          </h3>
-          <ul class="text-xs text-slate-300 space-y-2 list-disc list-inside">
-            <li>Gunakan satu pintu pernyataan resmi melalui Kasi Humas Polres.</li>
-            <li>Segera rilis klarifikasi awal dalam kurun waktu kurang dari 2 jam pasca insiden.</li>
-            <li>Kedepankan fakta penyidikan ilmiah (scientific crime investigation) tanpa opini subjektif.</li>
-          </ul>
-        </div>
+      <!-- Fallback Briefing Card if empty -->
+      <div v-else class="p-8 rounded-2xl bg-[#0b1426] border border-slate-800 text-center text-slate-400 text-xs">
+        Belum ada siaran pers resmi yang diterbitkan untuk wilayah hukum ini.
       </div>
     </div>
 
@@ -613,25 +714,59 @@ const submitIssue = () => {
       <div class="flex items-center gap-2">
         <Zap class="w-5 h-5 text-amber-400" />
         <h2 class="text-lg md:text-xl font-bold text-white tracking-tight">
-          Executive Snapshot Pimpinan
+          Executive Snapshot Pimpinan & Analisis Sentimen
         </h2>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div class="p-6 rounded-3xl bg-[#0b1426] border border-slate-800 space-y-3">
-          <p class="text-xs font-bold text-slate-400">Indeks Kepercayaan Publik (IKP)</p>
-          <p class="text-4xl font-black text-emerald-400">84.2%</p>
-          <p class="text-xs text-slate-400">Naik +2.4% dibandingkan periode bulan sebelumnya.</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="p-6 rounded-3xl bg-[#0b1426] border border-slate-800 space-y-2 shadow-lg">
+          <p class="text-xs font-bold text-slate-400">Indeks Kepercayaan (IKP)</p>
+          <p class="text-3xl font-black text-emerald-400">84.2%</p>
+          <p class="text-[11px] text-slate-400">Kondusifitas tinggi</p>
         </div>
-        <div class="p-6 rounded-3xl bg-[#0b1426] border border-slate-800 space-y-3">
-          <p class="text-xs font-bold text-slate-400">Total Mention & Jangkauan Media</p>
-          <p class="text-4xl font-black text-amber-400">14.8K</p>
-          <p class="text-xs text-slate-400">Terekam di portal siber, media sosial, dan cetak regional.</p>
+        <div class="p-6 rounded-3xl bg-[#0b1426] border border-slate-800 space-y-2 shadow-lg">
+          <p class="text-xs font-bold text-slate-400">Jangkauan Media 24 Jam</p>
+          <p class="text-3xl font-black text-amber-400">14.8K</p>
+          <p class="text-[11px] text-slate-400">Interaksi & mention</p>
         </div>
-        <div class="p-6 rounded-3xl bg-[#0b1426] border border-slate-800 space-y-3">
-          <p class="text-xs font-bold text-slate-400">Rasio Viralisasi Positif</p>
-          <p class="text-4xl font-black text-sky-400">91.6%</p>
-          <p class="text-xs text-slate-400">Respons counter narasi cepat efektif meredam isu negatif.</p>
+        <div class="p-6 rounded-3xl bg-[#0b1426] border border-slate-800 space-y-2 shadow-lg">
+          <p class="text-xs font-bold text-slate-400">Kasus Terselesaikan</p>
+          <p class="text-3xl font-black text-sky-400">92.4%</p>
+          <p class="text-[11px] text-slate-400">Klarifikasi tuntas</p>
+        </div>
+        <div class="p-6 rounded-3xl bg-[#0b1426] border border-slate-800 space-y-2 shadow-lg">
+          <p class="text-xs font-bold text-slate-400">Hoaks Terdeteksi</p>
+          <p class="text-3xl font-black text-rose-400">{{ metrics.hoax_debunked || 0 }}</p>
+          <p class="text-[11px] text-slate-400">Dilakukan stempel klarifikasi</p>
+        </div>
+      </div>
+
+      <!-- Sentiment Stacked Meter -->
+      <div class="p-6 rounded-3xl bg-[#0b1426] border border-slate-800 space-y-4 shadow-xl">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-extrabold text-white">Distribusi Sentimen Media & Percakapan Netizen</h3>
+          <span class="text-xs text-slate-400">Sampling 400+ Pemberitaan Terkini</span>
+        </div>
+
+        <div class="w-full h-4 rounded-full bg-slate-900 overflow-hidden flex shadow-inner">
+          <div style="width: 76.8%" class="h-full bg-emerald-500" title="Sentimen Positif: 76.8%"></div>
+          <div style="width: 18.2%" class="h-full bg-amber-400" title="Sentimen Netral: 18.2%"></div>
+          <div style="width: 5.0%" class="h-full bg-rose-500" title="Sentimen Negatif: 5.0%"></div>
+        </div>
+
+        <div class="flex items-center justify-between text-xs font-bold pt-1">
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+            <span class="text-slate-200">Sentimen Positif (76.8%)</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-amber-400"></span>
+            <span class="text-slate-200">Sentimen Netral (18.2%)</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-rose-500"></span>
+            <span class="text-slate-200">Sentimen Negatif (5.0%)</span>
+          </div>
         </div>
       </div>
     </div>
@@ -781,5 +916,101 @@ const submitIssue = () => {
         </div>
       </div>
     </div>
+
+    <!-- ======================================================== -->
+    <!-- MODAL POPUP: TERBITKAN SIARAN PERS BARU                  -->
+    <!-- ======================================================== -->
+    <div
+      v-if="isCreateReleaseModalOpen"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm"
+    >
+      <div class="w-full max-w-xl rounded-3xl bg-[#0d182e] border border-slate-700 p-6 sm:p-8 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-xl bg-amber-400/20 text-amber-400 flex items-center justify-center font-bold">
+              <FileText class="w-4 h-4" />
+            </div>
+            <div>
+              <h3 class="text-base font-extrabold text-white">Terbitkan Siaran Pers Resmi</h3>
+              <p class="text-[11px] text-slate-400">Format Standar Divisi Humas Polri</p>
+            </div>
+          </div>
+          <button @click="isCreateReleaseModalOpen = false" class="text-slate-400 hover:text-white p-1">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+
+        <form @submit.prevent="submitPressRelease" class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1">Judul Siaran Pers</label>
+            <input
+              v-model="releaseForm.title"
+              type="text"
+              required
+              placeholder="Contoh: Polda Sulbar Siagakan Personel Gabungan..."
+              class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-semibold text-white focus:outline-none focus:border-amber-400"
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1">Nama Juru Bicara</label>
+            <input
+              v-model="releaseForm.spokesperson"
+              type="text"
+              required
+              class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-semibold text-white focus:outline-none focus:border-amber-400"
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1">Isi Lengkap Rilis Pers</label>
+            <textarea
+              v-model="releaseForm.content"
+              rows="5"
+              required
+              placeholder="Tuliskan narasi lengkap siaran pers..."
+              class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-normal text-white focus:outline-none focus:border-amber-400"
+            ></textarea>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1">Talking Points Juru Bicara (1 baris per poin)</label>
+            <textarea
+              v-model="releaseForm.talking_points_text"
+              rows="2"
+              placeholder="Poin 1&#10;Poin 2"
+              class="w-full px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:border-amber-400"
+            ></textarea>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1">Panduan DO & DON'T (1 baris per arahan)</label>
+            <textarea
+              v-model="releaseForm.dos_and_donts_text"
+              rows="2"
+              placeholder="DO: Tekankan netralitas...&#10;DONT: Jangan berspekulasi..."
+              class="w-full px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:border-amber-400"
+            ></textarea>
+          </div>
+
+          <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+            <button
+              type="button"
+              @click="isCreateReleaseModalOpen = false"
+              class="px-4 py-2 rounded-xl text-xs font-bold text-slate-300 hover:bg-slate-800 border border-slate-700 transition"
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              class="px-5 py-2.5 rounded-xl text-xs font-black bg-amber-400 text-slate-950 hover:bg-amber-300 shadow-md transition"
+            >
+              Terbitkan Siaran Pers
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
   </EnterpriseLayout>
 </template>

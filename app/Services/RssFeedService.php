@@ -346,3 +346,4 @@ class RssFeedService
         return floor($diff / 86400) . ' hari lalu';
     }
 }
+

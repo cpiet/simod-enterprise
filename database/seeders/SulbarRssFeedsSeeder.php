@@ -47,3 +47,4 @@ class SulbarRssFeedsSeeder extends Seeder
         }
     }
 }
+
