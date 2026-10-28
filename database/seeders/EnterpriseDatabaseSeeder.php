@@ -1,0 +1,212 @@
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+
+class EnterpriseDatabaseSeeder extends Seeder
+{
+    public function run(): void
+    {
+        // 1. SEED POLDAS (TENANTS)
+        $sulbarId = DB::table('poldas')->insertGetId([
+            'code'             => 'SULBAR',
+            'name'             => 'Polda Sulawesi Barat',
+            'region'           => 'Sulawesi Barat',
+            'timezone'         => 'Asia/Makassar',
+            'kapolda_name'     => 'Irjen Pol. Drs. R. Adang Ginanjar S., M.M.',
+            'kabid_humas_name' => 'Kombes Pol. Slamet Wahyudi, S.I.K., M.H.',
+            'is_active'        => true,
+            'created_at'       => now(),
+            'updated_at'       => now(),
+        ]);
+
+        $gorontaloId = DB::table('poldas')->insertGetId([
+            'code'             => 'GORONTALO',
+            'name'             => 'Polda Gorontalo',
+            'region'           => 'Gorontalo',
+            'timezone'         => 'Asia/Makassar',
+            'kapolda_name'     => 'Irjen Pol. Drs. Pudji Prasetijanto Hadi, M.H.',
+            'kabid_humas_name' => 'Kombes Pol. Desmont Harjendro A.P, S.I.K., M.T.',
+            'is_active'        => true,
+            'created_at'       => now(),
+            'updated_at'       => now(),
+        ]);
+
+        // 2. SEED POLRES SULBAR
+        $sulbarPolres = [
+            ['code' => 'MAMUJU', 'name' => 'Polresta Mamuju'],
+            ['code' => 'MAJENE', 'name' => 'Polres Majene'],
+            ['code' => 'POLMAN', 'name' => 'Polres Polewali Mandar'],
+            ['code' => 'PASANGKAYU', 'name' => 'Polres Pasangkayu'],
+            ['code' => 'MAMASA', 'name' => 'Polres Mamasa'],
+            ['code' => 'MATENG', 'name' => 'Polres Mamuju Tengah'],
+        ];
+        $firstSulbarPolresId = null;
+        foreach ($sulbarPolres as $p) {
+            $id = DB::table('polres')->insertGetId([
+                'polda_id'   => $sulbarId,
+                'code'       => $p['code'],
+                'name'       => $p['name'],
+                'is_active'  => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            if (! $firstSulbarPolresId) {
+                $firstSulbarPolresId = $id;
+            }
+        }
+
+        // 3. SEED POLRES GORONTALO
+        $gorontaloPolres = [
+            ['code' => 'KOTA_GORONTALO', 'name' => 'Polresta Gorontalo Kota'],
+            ['code' => 'GORONTALO', 'name' => 'Polres Gorontalo'],
+            ['code' => 'BOALEMO', 'name' => 'Polres Boalemo'],
+            ['code' => 'POHUWATO', 'name' => 'Polres Pohuwato'],
+            ['code' => 'BONE_BOLANGO', 'name' => 'Polres Bone Bolango'],
+        ];
+        foreach ($gorontaloPolres as $p) {
+            DB::table('polres')->insert([
+                'polda_id'   => $gorontaloId,
+                'code'       => $p['code'],
+                'name'       => $p['name'],
+                'is_active'  => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // 4. SEED USERS MULTI-TENANT
+        DB::table('users')->insert([
+            // Super Admin Mabes Polri (Lintas Polda)
+            [
+                'polda_id'     => null,
+                'polres_id'    => null,
+                'name'         => 'Super Administrator Mabes',
+                'username'     => 'superadmin',
+                'email'        => 'superadmin@polri.go.id',
+                'password'     => Hash::make('MabesPolri#2026'),
+                'role'         => 'super_admin_mabes',
+                'badge_number' => '80010001',
+                'phone'        => '081100001111',
+                'is_active'    => true,
+                'created_at'   => now(),
+                'updated_at'   => now(),
+            ],
+            // Tech Admin Lutfi (Developer)
+            [
+                'polda_id'     => $sulbarId,
+                'polres_id'    => null,
+                'name'         => 'Lutfi Alfandra',
+                'username'     => 'cpiet',
+                'email'        => 'alumnidarus@gmail.com',
+                'password'     => Hash::make('T0p1s@y@bund@r'),
+                'role'         => 'super_admin_mabes',
+                'badge_number' => '89020089',
+                'phone'        => '081299998888',
+                'is_active'    => true,
+                'created_at'   => now(),
+                'updated_at'   => now(),
+            ],
+            // Pimpinan Polda Sulbar
+            [
+                'polda_id'     => $sulbarId,
+                'polres_id'    => null,
+                'name'         => 'Kombes Pol. Slamet Wahyudi (Kabid Humas)',
+                'username'     => 'kabid_sulbar',
+                'email'        => 'kabid.sulbar@polri.go.id',
+                'password'     => Hash::make('SulbarHumas#2026'),
+                'role'         => 'polda_leader',
+                'badge_number' => '76040112',
+                'phone'        => '081234567891',
+                'is_active'    => true,
+                'created_at'   => now(),
+                'updated_at'   => now(),
+            ],
+            // Pimpinan Polda Gorontalo
+            [
+                'polda_id'     => $gorontaloId,
+                'polres_id'    => null,
+                'name'         => 'Kombes Pol. Desmont Harjendro (Kabid Humas)',
+                'username'     => 'kabid_gorontalo',
+                'email'        => 'kabid.gorontalo@polri.go.id',
+                'password'     => Hash::make('GorontaloHumas#2026'),
+                'role'         => 'polda_leader',
+                'badge_number' => '77080223',
+                'phone'        => '081234567892',
+                'is_active'    => true,
+                'created_at'   => now(),
+                'updated_at'   => now(),
+            ],
+        ]);
+
+        // 5. SEED EARLY WARNING SYSTEM (EWS) PER POLDA
+        DB::table('early_warnings')->insert([
+            [
+                'polda_id'        => $sulbarId,
+                'polres_id'       => $firstSulbarPolresId,
+                'title'           => 'Insiden Anak Tenggelam di Pantai Arteri Mamuju: Narasi Duka dan Pertanyaan Publik',
+                'level'           => 'yellow',
+                'category'        => 'Kecelakaan Perairan / Fasilitas Publik',
+                'facts'           => 'Media lokal melaporkan anak berusia 11 tahun ditemukan meninggal setelah diduga tenggelam di kawasan Pantai Arteri Mamuju. Polresta Mamuju dikutip mengonfirmasi penemuan korban.',
+                'reputation_risk' => 'Komunikasi yang spekulatif, defensif, atau menjadikan tragedi sebagai materi pencitraan dapat memperbesar luka keluarga dan merusak kepercayaan publik.',
+                'protocol_0_2h'   => 'Sampaikan belasungkawa resmi, konfirmasi fakta dasar kepada Polresta Mamuju, serta lindungi identitas dan privasi keluarga korban.',
+                'protocol_2_6h'   => 'Sinkronkan kronologi dan pembagian peran pencarian dengan instansi terkait. Siapkan satu keterangan faktual, jangan menyimpulkan penyebab sebelum pemeriksaan tuntas.',
+                'protocol_6_24h'  => 'Berikan pembaruan hanya jika ada informasi terkonfirmasi dan relevan bagi publik. Pisahkan edukasi keselamatan pesisir dari pemberitaan kasus.',
+                'pic_units'       => 'Polresta Mamuju, Ditpolairud Polda Sulbar, Bidhumas',
+                'status'          => 'active',
+                'created_at'      => now(),
+                'updated_at'      => now(),
+            ],
+            [
+                'polda_id'        => $gorontaloId,
+                'polres_id'       => null,
+                'title'           => 'Potensi Unjuk Rasa Sengketa Lahan Pertambangan Emas Rakyat di Pohuwato',
+                'level'           => 'yellow',
+                'category'        => 'Harkamtibmas / Agraria',
+                'facts'           => 'Kelompok masyarakat lingkar tambang merencanakan aksi penyampaian aspirasi damai terkait batas konsesi tambang rakyat.',
+                'reputation_risk' => 'Potensi pembingkaian represif jika pengamanan tidak mengedepankan pendekatan humanis dan komunikasi persuasif.',
+                'protocol_0_2h'   => 'Koordinasikan intelijen keamanan Polres Pohuwato dan Satbrimob untuk pemetaan korlap dan titik kumpul.',
+                'protocol_2_6h'   => 'Siapkan tim dokumentasi digital Bidhumas dan rilis penerimaan aspirasi secara terbuka.',
+                'protocol_6_24h'  => 'Publikasikan dokumentasi pelayanan unjuk rasa yang humanis serta pengawalan arus lalu lintas.',
+                'pic_units'       => 'Polres Pohuwato, Ditintelkam, Bidhumas Polda Gorontalo',
+                'status'          => 'active',
+                'created_at'      => now(),
+                'updated_at'      => now(),
+            ],
+        ]);
+
+        // 6. SEED MEDIA FEEDS PER POLDA
+        DB::table('media_feeds')->insert([
+            [
+                'polda_id'   => $sulbarId,
+                'name'       => 'Antara News Terkini',
+                'url'        => 'https://www.antaranews.com/rss/terkini.xml',
+                'category'   => 'Nasional',
+                'is_active'  => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'polda_id'   => $sulbarId,
+                'name'       => 'Detik Sulsel',
+                'url'        => 'https://www.detik.com/sulsel/rss',
+                'category'   => 'Regional Sulselbar',
+                'is_active'  => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'polda_id'   => $gorontaloId,
+                'name'       => 'Antara Gorontalo',
+                'url'        => 'https://gorontalo.antaranews.com/rss/terkini.xml',
+                'category'   => 'Regional Gorontalo',
+                'is_active'  => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+    }
+}
