@@ -160,3 +160,4 @@ const switchTenant = (code) => {
     </footer>
   </div>
 </template>
+
