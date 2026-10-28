@@ -241,24 +241,6 @@ class EnterpriseDatabaseSeeder extends Seeder
         // 6. SEED MEDIA FEEDS PER POLDA
         DB::table('media_feeds')->insert([
             [
-                'polda_id'   => $sulbarId,
-                'name'       => 'Antara News Terkini',
-                'url'        => 'https://www.antaranews.com/rss/terkini.xml',
-                'category'   => 'Nasional',
-                'is_active'  => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'polda_id'   => $sulbarId,
-                'name'       => 'Detik Sulsel',
-                'url'        => 'https://www.detik.com/sulsel/rss',
-                'category'   => 'Regional Sulselbar',
-                'is_active'  => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
                 'polda_id'   => $gorontaloId,
                 'name'       => 'Antara Gorontalo',
                 'url'        => 'https://gorontalo.antaranews.com/rss/terkini.xml',
@@ -269,7 +251,7 @@ class EnterpriseDatabaseSeeder extends Seeder
             ],
         ]);
 
-        // Seed 29+ RSS Sources Lengkap untuk Polda Sulbar (Sesuai SIMOD HUMAS)
+        // Seed 29 RSS Sources Resmi Terorganisir untuk Polda Sulbar
         $this->call(SulbarRssFeedsSeeder::class);
     }
 }

@@ -10,7 +10,8 @@ use Illuminate\Database\Seeder;
 class SulbarRssFeedsSeeder extends Seeder
 {
     /**
-     * Seed HANYA 29 Sumber Feed RSS Resmi Wilayah Sulbar & Nasional (Sesuai Permintaan Klien SIMOD HUMAS)
+     * Seed 29 Sumber Feed RSS Resmi Terorganisir (Sulselbar & Nasional)
+     * Sesuai instruksi dan pengelompokan kategori SIMOD HUMAS Polda Sulbar.
      */
     public function run(): void
     {
@@ -20,29 +21,14 @@ class SulbarRssFeedsSeeder extends Seeder
         }
 
         $sources = [
-            // 1-4. Portal Utama Nasional & Regional
+            // =========================================================================
+            // 1. REGIONAL SULSELBAR (SULAWESI SELATAN & BARAT) - 20 PORTAL
+            // =========================================================================
             [
                 'name'     => 'Detik Sulsel',
                 'url'      => 'https://www.detik.com/sulsel/rss',
                 'category' => 'Regional Sulselbar',
             ],
-            [
-                'name'     => 'Antara News Terkini',
-                'url'      => 'https://www.antaranews.com/rss/terkini.xml',
-                'category' => 'Nasional',
-            ],
-            [
-                'name'     => 'CNN Indonesia Nasional',
-                'url'      => 'https://www.cnnindonesia.com/nasional/rss',
-                'category' => 'Nasional',
-            ],
-            [
-                'name'     => 'Detikcom Hukum & Kriminal',
-                'url'      => 'https://news.detik.com/berita/rss',
-                'category' => 'Hukum & Kriminal',
-            ],
-
-            // 5-12. Jaringan ANTARA Regional & Tribun Sulbar/Nasional
             [
                 'name'     => 'Tribun Sulbar',
                 'url'      => 'https://sulbar.tribunnews.com/rss',
@@ -52,11 +38,6 @@ class SulbarRssFeedsSeeder extends Seeder
                 'name'     => 'ANTARA Makassar (Terkini)',
                 'url'      => 'https://makassar.antaranews.com/rss/terkini.xml',
                 'category' => 'Regional Sulselbar',
-            ],
-            [
-                'name'     => 'ANTARA Makassar (Hukum)',
-                'url'      => 'https://makassar.antaranews.com/rss/hukum.xml',
-                'category' => 'Kriminal / Hukum',
             ],
             [
                 'name'     => 'ANTARA Makassar (Top News)',
@@ -73,18 +54,6 @@ class SulbarRssFeedsSeeder extends Seeder
                 'url'      => 'https://makassar.antaranews.com/rss/lintas-daerah.xml',
                 'category' => 'Regional Sulselbar',
             ],
-            [
-                'name'     => 'ANTARA Makassar (Politik)',
-                'url'      => 'https://makassar.antaranews.com/rss/politik.xml',
-                'category' => 'Umum',
-            ],
-            [
-                'name'     => 'Tribunnews (Nasional)',
-                'url'      => 'https://www.tribunnews.com/rss',
-                'category' => 'Nasional',
-            ],
-
-            // 13-25. Media Daring Lokal & Daerah Sulawesi Barat
             [
                 'name'     => 'Mesakada.com',
                 'url'      => 'https://mesakada.com/feed/',
@@ -151,26 +120,66 @@ class SulbarRssFeedsSeeder extends Seeder
                 'category' => 'Regional Sulselbar',
             ],
             [
-                'name'     => 'Polisiku.co.id',
-                'url'      => 'https://polisiku.co.id/feed/',
-                'category' => 'Hukum & Kriminal',
-            ],
-            [
                 'name'     => 'Bacasaja.id',
                 'url'      => 'https://bacasaja.id/feed/',
                 'category' => 'Regional Sulselbar',
             ],
 
-            // 26-27. Google News RSS Monitoring Khusus Media Mamuju
+            // =========================================================================
+            // 2. NASIONAL & UMUM - 4 PORTAL
+            // =========================================================================
             [
-                'name'     => 'iNews Mamuju (Google News RSS)',
-                'url'      => 'https://news.google.com/rss/search?q=inews+mamuju&hl=id&gl=ID&ceid=ID:id',
-                'category' => 'Google News',
+                'name'     => 'Antara News Terkini',
+                'url'      => 'https://www.antaranews.com/rss/terkini.xml',
+                'category' => 'Nasional & Umum',
             ],
             [
-                'name'     => 'Google News - iNews Mamuju',
+                'name'     => 'CNN Indonesia Nasional',
+                'url'      => 'https://www.cnnindonesia.com/nasional/rss',
+                'category' => 'Nasional & Umum',
+            ],
+            [
+                'name'     => 'Tribunnews (Nasional)',
+                'url'      => 'https://www.tribunnews.com/rss',
+                'category' => 'Nasional & Umum',
+            ],
+            [
+                'name'     => 'ANTARA Makassar (Politik)',
+                'url'      => 'https://makassar.antaranews.com/rss/politik.xml',
+                'category' => 'Nasional & Umum',
+            ],
+
+            // =========================================================================
+            // 3. HUKUM & KRIMINAL - 3 PORTAL
+            // =========================================================================
+            [
+                'name'     => 'Detikcom Hukum & Kriminal',
+                'url'      => 'https://news.detik.com/berita/rss',
+                'category' => 'Hukum & Kriminal',
+            ],
+            [
+                'name'     => 'ANTARA Makassar (Hukum)',
+                'url'      => 'https://makassar.antaranews.com/rss/hukum.xml',
+                'category' => 'Hukum & Kriminal',
+            ],
+            [
+                'name'     => 'Polisiku.co.id',
+                'url'      => 'https://polisiku.co.id/feed/',
+                'category' => 'Hukum & Kriminal',
+            ],
+
+            // =========================================================================
+            // 4. GOOGLE NEWS RSS - 2 STREAM
+            // =========================================================================
+            [
+                'name'     => 'iNews Mamuju (Keyword Search)',
+                'url'      => 'https://news.google.com/rss/search?q=inews+mamuju&hl=id&gl=ID&ceid=ID:id',
+                'category' => 'Google News RSS',
+            ],
+            [
+                'name'     => 'Google News - iNews Mamuju (Site Search)',
                 'url'      => 'https://news.google.com/rss/search?q=site:mamuju.inews.id&hl=id&gl=ID&ceid=ID:id',
-                'category' => 'Google News',
+                'category' => 'Google News RSS',
             ],
         ];
 
@@ -181,7 +190,7 @@ class SulbarRssFeedsSeeder extends Seeder
             $validUrls[] = $src['url'];
             $validNames[] = strtoupper($src['name']);
 
-            MediaFeed::updateOrCreate(
+            $feed = MediaFeed::updateOrCreate(
                 ['polda_id' => $sulbar->id, 'url' => $src['url']],
                 [
                     'name'      => $src['name'],
@@ -189,6 +198,13 @@ class SulbarRssFeedsSeeder extends Seeder
                     'is_active' => true,
                 ]
             );
+
+            // Update nama sumber dan kategori pada artikel yang terhubung
+            MediaArticle::where('feed_id', $feed->id)
+                ->update([
+                    'source_name' => $src['name'],
+                    'category'    => $src['category'],
+                ]);
         }
 
         // 2. Buang semua feed di luar 29 daftar resmi khusus Sulbar
@@ -196,9 +212,10 @@ class SulbarRssFeedsSeeder extends Seeder
             ->whereNotIn('url', $validUrls)
             ->delete();
 
-        // 3. Buang semua artikel di luar 29 portal resmi khusus Sulbar
+        // 3. Buang semua artikel di luar 29 feed resmi khusus Sulbar
+        $validFeedIds = MediaFeed::where('polda_id', $sulbar->id)->pluck('id');
         MediaArticle::where('polda_id', $sulbar->id)
-            ->whereNotIn('source_name', $validNames)
+            ->whereNotIn('feed_id', $validFeedIds)
             ->delete();
     }
 }

@@ -634,10 +634,9 @@ const submitIssue = () => {
             <option value="all">Semua Kategori</option>
             <option value="bookmark">⭐ Tersimpan / Bookmark ({{ bookmarkedIds.length }})</option>
             <option value="Regional Sulselbar">Regional Sulselbar</option>
-            <option value="Harkamtibmas">Harkamtibmas</option>
-            <option value="Nasional">Nasional</option>
+            <option value="Nasional & Umum">Nasional & Umum</option>
             <option value="Hukum & Kriminal">Hukum & Kriminal</option>
-            <option value="Umum">Umum</option>
+            <option value="Google News RSS">Google News RSS</option>
           </select>
         </div>
 
@@ -1206,9 +1205,9 @@ const submitIssue = () => {
                 class="w-full px-3 py-2 rounded-xl bg-[#0b1426] border border-slate-700 text-white"
               >
                 <option>Regional Sulselbar</option>
-                <option>Harkamtibmas</option>
-                <option>Nasional</option>
+                <option>Nasional & Umum</option>
                 <option>Hukum & Kriminal</option>
+                <option>Google News RSS</option>
               </select>
             </div>
             <div>

@@ -9,24 +9,52 @@ Modul ini bertugas memantau pemberitaan media massa daring secara real-time untu
 
 ---
 
-## 2. Daftar 14 Sumber Feed Resmi Wilayah Sulawesi Barat
+## 2. Daftar 29 Sumber Feed Resmi Terorganisir (Sulselbar & Nasional)
 
-| No | Nama Portal | URL Feed RSS | Kategori Utama |
+### 2.1 Regional Sulselbar (Sulawesi Selatan & Barat) — 20 Portal
+| No | Nama Portal | URL Feed XML | Kategori |
 |:---|:---|:---|:---|
 | 1 | **Detik Sulsel** | `https://www.detik.com/sulsel/rss` | Regional Sulselbar |
-| 2 | **Mamuju Pos** | `https://mamujupos.com/feed/` | Regional Sulselbar |
-| 3 | **Katinting** | `https://katinting.com/feed/` | Regional Sulselbar |
-| 4 | **Kabar Sulbar** | `https://kabarsulbar.com/feed/` | Regional Sulselbar |
-| 5 | **Suwarta** | `https://suwarta.id/feed/` | Regional Sulselbar |
-| 6 | **Sulbar Terkini** | `https://sulbarterkini.com/feed/` | Regional Sulselbar |
-| 7 | **Malaqbi** | `https://malaqbi.com/feed/` | Regional Sulselbar |
-| 8 | **Rakyat Sulbar** | `https://www.rakyatsulbar.com/feed/` | Regional Sulselbar |
-| 9 | **iNews Mamuju (Google News)** | `https://news.google.com/rss/search?q=inews+mamuju...` | Regional Sulselbar |
-| 10 | **Bugis Pos** | `https://bugispos.com/feed/` | Regional Sulselbar |
-| 11 | **Google News Polda Sulbar** | `https://news.google.com/rss/search?q=polda+sulbar...` | Harkamtibmas |
-| 12 | **Antara News Terkini** | `https://www.antaranews.com/rss/terkini.xml` | Nasional |
-| 13 | **CNN Indonesia Nasional** | `https://www.cnnindonesia.com/nasional/rss` | Nasional |
-| 14 | **Detikcom Hukum & Kriminal** | `https://news.detik.com/berita/rss` | Hukum & Kriminal |
+| 2 | **Tribun Sulbar** | `https://sulbar.tribunnews.com/rss` | Regional Sulselbar |
+| 3 | **ANTARA Makassar (Terkini)** | `https://makassar.antaranews.com/rss/terkini.xml` | Regional Sulselbar |
+| 4 | **ANTARA Makassar (Top News)** | `https://makassar.antaranews.com/rss/top-news.xml` | Regional Sulselbar |
+| 5 | **ANTARA Makassar (Daerah)** | `https://makassar.antaranews.com/rss/daerah.xml` | Regional Sulselbar |
+| 6 | **ANTARA Makassar (Lintas Daerah)** | `https://makassar.antaranews.com/rss/lintas-daerah.xml` | Regional Sulselbar |
+| 7 | **Mesakada.com** | `https://mesakada.com/feed/` | Regional Sulselbar |
+| 8 | **Mekora.id** | `https://mekora.id/feed/` | Regional Sulselbar |
+| 9 | **Globalsulbar** | `https://globalsulbar.com/feed/` | Regional Sulselbar |
+| 10 | **Radar Sulbar** | `https://radarsulbar.fajar.co.id/feed/` | Regional Sulselbar |
+| 11 | **Sulbar Express** | `https://sulbarexpress.fajar.co.id/feed/` | Regional Sulselbar |
+| 12 | **Mamuju Pos** | `https://mamujupos.com/feed/` | Regional Sulselbar |
+| 13 | **Katinting** | `https://katinting.com/feed/` | Regional Sulselbar |
+| 14 | **Kabar Sulbar** | `https://kabarsulbar.com/feed/` | Regional Sulselbar |
+| 15 | **Suwarta** | `https://suwarta.id/feed/` | Regional Sulselbar |
+| 16 | **Sulbar Terkini** | `https://sulbarterkini.com/feed/` | Regional Sulselbar |
+| 17 | **Malaqbi** | `https://malaqbi.com/feed/` | Regional Sulselbar |
+| 18 | **Rakyat Sulbar** | `https://www.rakyatsulbar.com/feed/` | Regional Sulselbar |
+| 19 | **Bugis Pos** | `https://bugispos.com/feed/` | Regional Sulselbar |
+| 20 | **Bacasaja.id** | `https://bacasaja.id/feed/` | Regional Sulselbar |
+
+### 2.2 Nasional & Umum — 4 Portal
+| No | Nama Portal | URL Feed XML | Kategori |
+|:---|:---|:---|:---|
+| 21 | **Antara News Terkini** | `https://www.antaranews.com/rss/terkini.xml` | Nasional & Umum |
+| 22 | **CNN Indonesia Nasional** | `https://www.cnnindonesia.com/nasional/rss` | Nasional & Umum |
+| 23 | **Tribunnews (Nasional)** | `https://www.tribunnews.com/rss` | Nasional & Umum |
+| 24 | **ANTARA Makassar (Politik)** | `https://makassar.antaranews.com/rss/politik.xml` | Nasional & Umum |
+
+### 2.3 Hukum & Kriminal — 3 Portal
+| No | Nama Portal | URL Feed XML | Kategori |
+|:---|:---|:---|:---|
+| 25 | **Detikcom Hukum & Kriminal** | `https://news.detik.com/berita/rss` | Hukum & Kriminal |
+| 26 | **ANTARA Makassar (Hukum)** | `https://makassar.antaranews.com/rss/hukum.xml` | Hukum & Kriminal |
+| 27 | **Polisiku.co.id** | `https://polisiku.co.id/feed/` | Hukum & Kriminal |
+
+### 2.4 Google News RSS — 2 Stream
+| No | Nama Portal | URL Feed XML | Kategori |
+|:---|:---|:---|:---|
+| 28 | **iNews Mamuju (Keyword Search)** | `https://news.google.com/rss/search?q=inews+mamuju&hl=id&gl=ID&ceid=ID:id` | Google News RSS |
+| 29 | **Google News - iNews Mamuju (Site Search)** | `https://news.google.com/rss/search?q=site:mamuju.inews.id&hl=id&gl=ID&ceid=ID:id` | Google News RSS |
 
 ---
 
