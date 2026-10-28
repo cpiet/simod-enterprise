@@ -24,3 +24,4 @@ Route::get('/v1/poldas', function () {
 // Python Background Scraper Ingestion Endpoints
 Route::post('/v1/ingest/article', [IngestController::class, 'ingestArticle']);
 Route::post('/v1/ingest/bulk', [IngestController::class, 'bulkIngestArticles']);
+

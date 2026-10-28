@@ -26,6 +26,7 @@ import {
   Award,
   FileText,
   Search,
+  RotateCw,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -64,6 +65,18 @@ const toggleBookmark = (id) => {
 
 const selectedCategory = ref('all');
 const searchQuery = ref('');
+
+const isRefreshingRss = ref(false);
+const refreshRssFeeds = () => {
+  isRefreshingRss.value = true;
+  router.get('/', { polda: props.selectedCode, refresh: 1 }, {
+    preserveScroll: true,
+    onFinish: () => {
+      isRefreshingRss.value = false;
+    },
+  });
+};
+
 
 const filteredArticles = computed(() => {
   let list = props.sampleArticles || [];
@@ -313,11 +326,24 @@ const submitIssue = () => {
           >
             <option value="all">Semua Kategori</option>
             <option value="bookmark">⭐ Tersimpan / Bookmark ({{ bookmarkedIds.length }})</option>
+            <option value="Regional Sulselbar">Regional Sulselbar</option>
             <option value="Nasional">Nasional</option>
             <option value="Hukum & Kriminal">Hukum & Kriminal</option>
             <option value="Harkamtibmas">Harkamtibmas</option>
             <option value="Lalu Lintas">Lalu Lintas</option>
           </select>
+
+          <!-- Sinkronkan RSS Button -->
+          <button
+            @click="refreshRssFeeds"
+            :disabled="isRefreshingRss"
+            type="button"
+            class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-50"
+            title="Tarik berita RSS terbaru secara real-time"
+          >
+            <RotateCw class="w-3.5 h-3.5" :class="{ 'animate-spin': isRefreshingRss }" />
+            <span>{{ isRefreshingRss ? 'Menyinkronkan...' : 'Sinkronkan RSS' }}</span>
+          </button>
         </div>
       </div>
 
@@ -328,13 +354,14 @@ const submitIssue = () => {
           :key="art.id"
           class="group rounded-2xl bg-[#0e172a] border border-slate-800 hover:border-slate-600 transition-all duration-300 shadow-xl overflow-hidden flex flex-col justify-between"
         >
-          <!-- Top Thumbnail Image with Badges -->
-          <div class="relative h-44 w-full bg-slate-900 overflow-hidden">
+          <!-- Top Thumbnail Image or Police Fallback Banner -->
+          <div v-if="art.image_url" class="relative h-44 w-full bg-slate-900 overflow-hidden">
             <img
               :src="art.image_url"
               :alt="art.title"
               class="w-full h-full object-cover group-hover:scale-105 transition duration-500"
               loading="lazy"
+              @error="$event.target.style.display='none'"
             />
             <div class="absolute inset-0 bg-gradient-to-t from-[#0e172a] via-[#0e172a]/40 to-transparent"></div>
 
@@ -358,6 +385,25 @@ const submitIssue = () => {
               <span class="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-slate-900/90 text-slate-200 border border-slate-700 shadow">
                 {{ art.category_badge }}
               </span>
+            </div>
+          </div>
+
+          <!-- Fallback Banner when article has no photo -->
+          <div v-else class="relative h-32 w-full bg-gradient-to-br from-slate-900 via-[#0b1426] to-[#070d1d] border-b border-slate-800 p-4 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider bg-slate-950/90 text-amber-400 border border-slate-700/80">
+                {{ art.source_name }}
+              </span>
+              <span class="px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-950/90 text-amber-300 border border-slate-700/80 flex items-center gap-1">
+                <Clock class="w-3 h-3 text-amber-400" />
+                {{ art.time_ago }}
+              </span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-slate-800/90 text-slate-200 border border-slate-700">
+                {{ art.category_badge }}
+              </span>
+              <Radio class="w-4 h-4 text-amber-400/50" />
             </div>
           </div>
 
