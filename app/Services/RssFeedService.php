@@ -124,12 +124,13 @@ class RssFeedService
             curl_setopt_array($handle, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_ENCODING       => '',
                 CURLOPT_MAXREDIRS      => 4,
-                CURLOPT_TIMEOUT        => 3,
-                CURLOPT_CONNECTTIMEOUT => 2,
+                CURLOPT_TIMEOUT        => 8,
+                CURLOPT_CONNECTTIMEOUT => 4,
                 CURLOPT_SSL_VERIFYPEER => false,
                 CURLOPT_SSL_VERIFYHOST => false,
-                CURLOPT_USERAGENT      => 'SIMOD-Enterprise-Bot/2.0',
+                CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 (compatible; SIMOD-Enterprise/2.0)',
                 CURLOPT_HTTPHEADER     => ['Accept: application/rss+xml, application/xml, text/xml, application/atom+xml, text/html;q=0.9, */*;q=0.8'],
             ]);
             curl_multi_add_handle($multi, $handle);
@@ -192,6 +193,9 @@ class RssFeedService
 
     protected function parseXml(string $content, array $source): array
     {
+        // Fix misdeclared US-ASCII or ISO-8859-1 encodings containing UTF-8 characters (e.g. Tribunnews network)
+        $content = preg_replace('/<\?xml[^>]*encoding=["\'](?:US-ASCII|ISO-8859-1)["\'][^>]*\?>/i', '<?xml version="1.0" encoding="UTF-8"?>', $content);
+
         libxml_use_internal_errors(true);
         $xml = simplexml_load_string($content, 'SimpleXMLElement', LIBXML_NOCDATA | LIBXML_NONET);
         if ($xml === false) {

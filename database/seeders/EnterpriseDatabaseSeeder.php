@@ -208,5 +208,8 @@ class EnterpriseDatabaseSeeder extends Seeder
                 'updated_at' => now(),
             ],
         ]);
+
+        // Seed 29+ RSS Sources Lengkap untuk Polda Sulbar (Sesuai SIMOD HUMAS)
+        $this->call(SulbarRssFeedsSeeder::class);
     }
 }

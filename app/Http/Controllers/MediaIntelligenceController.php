@@ -51,28 +51,29 @@ class MediaIntelligenceController extends Controller
 
         if ($forceRefresh && $mediaFeeds->isNotEmpty()) {
             $liveArticles = $rssService->fetchAggregatedFeeds($mediaFeeds->toArray(), true);
-            foreach (array_slice($liveArticles, 0, 150) as $item) {
+            foreach (array_slice($liveArticles, 0, 400) as $item) {
                 MediaArticle::updateOrCreate(
                     ['url' => $item['link']],
                     [
                         'polda_id'    => $poldaId,
                         'feed_id'     => $item['source_id'] ?: null,
                         'title'       => $item['title'],
-                        'source_name' => $item['source_name'],
+                        'source_name' => strtoupper($item['source_name']),
                         'category'    => $item['category'],
-                        'image_url'   => $item['image_url'],
+                        'image_url'   => $item['image_url'] ?: null,
                         'summary'     => $item['summary'],
-                        'pub_date'    => now(),
+                        'pub_date'    => !empty($item['pub_date']) ? date('Y-m-d H:i:s', strtotime($item['pub_date'])) : now(),
                         'sentiment'   => $item['sentiment'] ?? 'netral',
                     ]
                 );
             }
         }
 
-        // Load articles from database
+        // Load articles from database (up to 800 latest articles)
         $dbArticles = MediaArticle::where('polda_id', $poldaId)
+            ->latest('pub_date')
             ->latest('id')
-            ->limit(150)
+            ->limit(800)
             ->get();
 
         // Format articles for frontend
@@ -80,7 +81,7 @@ class MediaIntelligenceController extends Controller
             return [
                 'id'             => (string) $a->id,
                 'title'          => $a->title,
-                'source_name'    => $a->source_name,
+                'source_name'    => strtoupper($a->source_name),
                 'category'       => $a->category,
                 'category_badge' => strtoupper($a->category),
                 'time_ago'       => $a->created_at ? $a->created_at->diffForHumans() : 'Baru saja',
@@ -92,17 +93,26 @@ class MediaIntelligenceController extends Controller
             ];
         })->toArray();
 
-        // Portal Summary with counts
-        $portalGroup = [];
-        foreach ($articles as $art) {
-            $src = $art['source_name'];
-            $portalGroup[$src] = ($portalGroup[$src] ?? 0) + 1;
+        // Portal Summary with counts directly from database
+        $dbPortalCounts = MediaArticle::where('polda_id', $poldaId)
+            ->selectRaw('UPPER(source_name) as src_name, COUNT(*) as cnt')
+            ->groupBy('src_name')
+            ->pluck('cnt', 'src_name')
+            ->toArray();
+
+        // Ensure all registered feeds are represented in the portal filter list
+        foreach ($mediaFeeds as $feed) {
+            $feedUpper = strtoupper($feed->name);
+            if (!isset($dbPortalCounts[$feedUpper])) {
+                $dbPortalCounts[$feedUpper] = 0;
+            }
         }
+        ksort($dbPortalCounts);
 
         $portalsList = [
             ['name' => 'Semua Portal', 'count' => count($articles)],
         ];
-        foreach ($portalGroup as $name => $count) {
+        foreach ($dbPortalCounts as $name => $count) {
             $portalsList[] = ['name' => $name, 'count' => $count];
         }
 

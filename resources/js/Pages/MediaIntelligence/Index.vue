@@ -487,8 +487,8 @@ const submitIssue = () => {
           <span>Portal RSS Terdaftar</span>
           <Radio class="w-4 h-4 text-amber-400" />
         </div>
-        <p class="text-2xl md:text-3xl font-black text-white">{{ mediaFeeds?.length || 14 }} Portal</p>
-        <p class="text-[11px] text-slate-400">14 Portal Sulbar & Nasional</p>
+        <p class="text-2xl md:text-3xl font-black text-white">{{ mediaFeeds?.length || 29 }} Portal</p>
+        <p class="text-[11px] text-slate-400">{{ mediaFeeds?.length || 29 }} Portal Sulbar & Nasional</p>
       </div>
 
       <div class="p-5 rounded-2xl bg-[#0b1426] border border-slate-800 shadow-lg space-y-1">
@@ -835,7 +835,7 @@ const submitIssue = () => {
         <Newspaper class="w-12 h-12 mx-auto text-slate-600" />
         <h3 class="text-base font-bold text-white">Tidak ada artikel yang sesuai dengan filter</h3>
         <p class="text-xs text-slate-400 max-w-sm mx-auto">
-          Coba ganti pilihan portal, ubah kategori, atau klik tombol "Sinkronkan Live (14 Portal)" untuk menarik berita terkini.
+          Coba ganti pilihan portal, ubah kategori, atau klik tombol "Sinkron Berita" untuk menarik berita terkini dari seluruh portal.
         </p>
         <button
           @click="selectedPortal = 'Semua Portal'; selectedCategory = 'all'; selectedSentiment = 'all'; searchQuery = ''"
