@@ -93,26 +93,25 @@ class MediaIntelligenceController extends Controller
             ];
         })->toArray();
 
-        // Portal Summary with counts directly from database
+        // Portal Summary with counts directly from database for registered feeds
         $dbPortalCounts = MediaArticle::where('polda_id', $poldaId)
             ->selectRaw('UPPER(source_name) as src_name, COUNT(*) as cnt')
             ->groupBy('src_name')
             ->pluck('cnt', 'src_name')
             ->toArray();
 
-        // Ensure all registered feeds are represented in the portal filter list
+        // Strictly ensure ONLY the registered active feeds for this Polda are shown in filter
+        $mergedPortalCounts = [];
         foreach ($mediaFeeds as $feed) {
             $feedUpper = strtoupper($feed->name);
-            if (!isset($dbPortalCounts[$feedUpper])) {
-                $dbPortalCounts[$feedUpper] = 0;
-            }
+            $mergedPortalCounts[$feedUpper] = $dbPortalCounts[$feedUpper] ?? 0;
         }
-        ksort($dbPortalCounts);
+        ksort($mergedPortalCounts);
 
         $portalsList = [
             ['name' => 'Semua Portal', 'count' => count($articles)],
         ];
-        foreach ($dbPortalCounts as $name => $count) {
+        foreach ($mergedPortalCounts as $name => $count) {
             $portalsList[] = ['name' => $name, 'count' => $count];
         }
 

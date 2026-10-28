@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\MediaArticle;
 use App\Models\MediaFeed;
 use App\Models\Polda;
 use Illuminate\Database\Seeder;
@@ -9,7 +10,7 @@ use Illuminate\Database\Seeder;
 class SulbarRssFeedsSeeder extends Seeder
 {
     /**
-     * Seed seluruh 29 Sumber Feed RSS Resmi Wilayah Sulbar & Nasional (Sesuai SIMOD HUMAS Polda Sulbar)
+     * Seed HANYA 29 Sumber Feed RSS Resmi Wilayah Sulbar & Nasional (Sesuai Permintaan Klien SIMOD HUMAS)
      */
     public function run(): void
     {
@@ -41,7 +42,7 @@ class SulbarRssFeedsSeeder extends Seeder
                 'category' => 'Hukum & Kriminal',
             ],
 
-            // 5-11. Jaringan ANTARA Regional & Tribun Sulbar
+            // 5-12. Jaringan ANTARA Regional & Tribun Sulbar/Nasional
             [
                 'name'     => 'Tribun Sulbar',
                 'url'      => 'https://sulbar.tribunnews.com/rss',
@@ -83,7 +84,7 @@ class SulbarRssFeedsSeeder extends Seeder
                 'category' => 'Nasional',
             ],
 
-            // 12-24. Media Daring Lokal & Daerah Sulawesi Barat
+            // 13-25. Media Daring Lokal & Daerah Sulawesi Barat
             [
                 'name'     => 'Mesakada.com',
                 'url'      => 'https://mesakada.com/feed/',
@@ -160,7 +161,7 @@ class SulbarRssFeedsSeeder extends Seeder
                 'category' => 'Regional Sulselbar',
             ],
 
-            // 25-27. Google News RSS Monitoring Khusus Sulbar & Harkamtibmas
+            // 26-27. Google News RSS Monitoring Khusus Media Mamuju
             [
                 'name'     => 'iNews Mamuju (Google News RSS)',
                 'url'      => 'https://news.google.com/rss/search?q=inews+mamuju&hl=id&gl=ID&ceid=ID:id',
@@ -171,14 +172,15 @@ class SulbarRssFeedsSeeder extends Seeder
                 'url'      => 'https://news.google.com/rss/search?q=site:mamuju.inews.id&hl=id&gl=ID&ceid=ID:id',
                 'category' => 'Google News',
             ],
-            [
-                'name'     => 'Google News Polda Sulbar',
-                'url'      => 'https://news.google.com/rss/search?q=polda+sulbar&hl=id&gl=ID&ceid=ID:id',
-                'category' => 'Harkamtibmas',
-            ],
         ];
 
+        // 1. Sync / Update atau Buat 29 Feed Resmi
+        $validUrls = [];
+        $validNames = [];
         foreach ($sources as $src) {
+            $validUrls[] = $src['url'];
+            $validNames[] = strtoupper($src['name']);
+
             MediaFeed::updateOrCreate(
                 ['polda_id' => $sulbar->id, 'url' => $src['url']],
                 [
@@ -188,5 +190,15 @@ class SulbarRssFeedsSeeder extends Seeder
                 ]
             );
         }
+
+        // 2. Buang semua feed di luar 29 daftar resmi khusus Sulbar
+        MediaFeed::where('polda_id', $sulbar->id)
+            ->whereNotIn('url', $validUrls)
+            ->delete();
+
+        // 3. Buang semua artikel di luar 29 portal resmi khusus Sulbar
+        MediaArticle::where('polda_id', $sulbar->id)
+            ->whereNotIn('source_name', $validNames)
+            ->delete();
     }
 }

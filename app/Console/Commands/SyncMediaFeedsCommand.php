@@ -61,3 +61,4 @@ class SyncMediaFeedsCommand extends Command
         return 0;
     }
 }
+
