@@ -45,3 +45,4 @@ class PressReleaseController extends Controller
         return redirect()->back()->with('success', 'Siaran Pers Resmi berhasil diterbitkan!');
     }
 }
+

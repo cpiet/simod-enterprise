@@ -17,6 +17,8 @@ import {
   Search,
   ExternalLink,
   Sparkles,
+  Share2,
+  CheckSquare,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -42,8 +44,12 @@ const isTenantMenuOpen = ref(false);
 
 const switchTenant = (code) => {
   isTenantMenuOpen.value = false;
-  const currentPath = window.location.pathname.includes('/issues') ? '/issues' : '/';
-  router.get(currentPath, { polda: code }, { preserveScroll: true });
+  let targetPath = '/';
+  if (window.location.pathname.includes('/issues')) targetPath = '/issues';
+  else if (window.location.pathname.includes('/publications')) targetPath = '/publications';
+  else if (window.location.pathname.includes('/tasks')) targetPath = '/tasks';
+
+  router.get(targetPath, { polda: code }, { preserveScroll: true });
 };
 </script>
 
@@ -52,7 +58,7 @@ const switchTenant = (code) => {
     <!-- Top Header -->
     <header class="sticky top-0 z-50 backdrop-blur-xl bg-[#0b1426]/90 border-b border-slate-800/80 px-4 lg:px-8 py-3 flex items-center justify-between shadow-2xl">
       <!-- Left: Brand & Tenant Switcher -->
-      <div class="flex items-center gap-4 lg:gap-6">
+      <div class="flex items-center gap-3 lg:gap-5">
         <!-- Logo -->
         <Link :href="`/?polda=${selectedCode}`" class="flex items-center gap-3 group">
           <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 p-0.5 shadow-lg shadow-amber-500/20 group-hover:scale-105 transition duration-200 flex items-center justify-center">
@@ -126,22 +132,38 @@ const switchTenant = (code) => {
         </div>
 
         <!-- Main Navigation Links -->
-        <nav class="hidden lg:flex items-center gap-1.5 ml-2">
+        <nav class="hidden xl:flex items-center gap-1.5 ml-2">
           <Link
             :href="`/?polda=${selectedCode}`"
-            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
-            :class="!$page.url.startsWith('/issues') ? 'bg-amber-400/15 text-amber-400 border border-amber-400/40 shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'"
+            class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+            :class="$page.url === '/' || $page.url.startsWith('/?polda') ? 'bg-amber-400/15 text-amber-400 border border-amber-400/40 shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'"
           >
             <Radio class="w-3.5 h-3.5" />
             <span>Command Center & EWS</span>
           </Link>
           <Link
             :href="`/issues?polda=${selectedCode}`"
-            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+            class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
             :class="$page.url.startsWith('/issues') ? 'bg-amber-400/15 text-amber-400 border border-amber-400/40 shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'"
           >
             <Layers class="w-3.5 h-3.5" />
-            <span>Manajemen Isu Publik</span>
+            <span>Manajemen Isu</span>
+          </Link>
+          <Link
+            :href="`/publications?polda=${selectedCode}`"
+            class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+            :class="$page.url.startsWith('/publications') ? 'bg-amber-400/15 text-amber-400 border border-amber-400/40 shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'"
+          >
+            <Share2 class="w-3.5 h-3.5" />
+            <span>Publikasi Kanal</span>
+          </Link>
+          <Link
+            :href="`/tasks?polda=${selectedCode}`"
+            class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+            :class="$page.url.startsWith('/tasks') ? 'bg-amber-400/15 text-amber-400 border border-amber-400/40 shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'"
+          >
+            <CheckSquare class="w-3.5 h-3.5" />
+            <span>Disposisi Tugas</span>
           </Link>
         </nav>
       </div>
