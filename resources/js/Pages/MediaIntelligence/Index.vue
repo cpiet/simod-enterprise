@@ -35,6 +35,7 @@ import {
   Check,
   ChevronDown,
   FileJson,
+  Eye,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -84,19 +85,103 @@ const selectedSentiment = ref('all');
 const searchQuery = ref('');
 const toastMessage = ref('');
 
-// Copy helper with toast
-const copyText = (text, label = 'Teks') => {
-  navigator.clipboard.writeText(text);
-  toastMessage.value = `${label} berhasil disalin ke clipboard!`;
+// Modal state for viewing/copying prompt manually
+const showPromptModal = ref(false);
+const promptModalTitle = ref('');
+const promptModalContent = ref('');
+
+const openPromptPreviewModal = (title, content) => {
+  promptModalTitle.value = title;
+  promptModalContent.value = content;
+  showPromptModal.value = true;
+};
+
+// Robust Toast
+const showToastNotification = (msg) => {
+  toastMessage.value = msg;
   setTimeout(() => {
     toastMessage.value = '';
-  }, 3500);
+  }, 4000);
+};
+
+// Universal copy with fallback for non-secure HTTP contexts (.test domain)
+const execCommandCopy = (text, label = 'Teks') => {
+  try {
+    const el = document.createElement('textarea');
+    el.value = text;
+    el.setAttribute('readonly', '');
+    el.style.position = 'fixed';
+    el.style.top = '0';
+    el.style.left = '-9999px';
+    el.style.opacity = '0';
+    document.body.appendChild(el);
+    el.focus();
+    el.select();
+    el.setSelectionRange(0, 99999);
+
+    const successful = document.execCommand('copy');
+    document.body.removeChild(el);
+
+    if (successful) {
+      showToastNotification(`${label} berhasil disalin ke clipboard!`);
+      return true;
+    }
+  } catch (err) {
+    console.warn('execCommand copy failed:', err);
+  }
+  return false;
+};
+
+const copyText = (text, label = 'Teks') => {
+  if (!text) {
+    showToastNotification('Teks tidak tersedia untuk disalin.');
+    return;
+  }
+
+  // 1. Try modern clipboard API if secure context
+  if (navigator?.clipboard?.writeText && window.isSecureContext) {
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        showToastNotification(`${label} berhasil disalin ke clipboard!`);
+      })
+      .catch(() => {
+        const ok = execCommandCopy(text, label);
+        if (!ok) {
+          openPromptPreviewModal(label, text);
+        }
+      });
+    return;
+  }
+
+  // 2. Fallback for HTTP (non-secure context, e.g. .test domain)
+  const ok = execCommandCopy(text, label);
+  if (!ok) {
+    openPromptPreviewModal(label, text);
+  }
 };
 
 // Salin Prompt AI Handler
 const copyAiPrompt = () => {
   const prompt = props.aiPromptTemplate || 'Formula prompt intelijen media Polri...';
   copyText(prompt, 'Formula Prompt AI Presisi');
+};
+
+// Handle broken or blocked image URLs
+const handleImageError = (event, article) => {
+  event.target.style.display = 'none';
+  const parent = event.target.parentElement;
+  if (parent && !parent.querySelector('.img-fallback-placeholder')) {
+    const fallback = document.createElement('div');
+    fallback.className = 'img-fallback-placeholder w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-[#0d1830] to-[#070d18] text-slate-500 p-4 text-center select-none';
+    fallback.innerHTML = `
+      <div class="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center mb-2 shadow-inner">
+        <svg class="w-6 h-6 text-amber-400/80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path></svg>
+      </div>
+      <span class="text-[11px] font-black uppercase tracking-wider text-slate-300 truncate max-w-full">${article?.source_name || 'Portal Berita'}</span>
+      <span class="text-[9px] text-amber-400/70 font-mono mt-0.5">Pantauan Siber Presisi</span>
+    `;
+    parent.appendChild(fallback);
+  }
 };
 
 // Tempel Ringkasan AI Modal State
@@ -355,6 +440,16 @@ const submitIssue = () => {
           <span>Salin Prompt AI</span>
         </button>
 
+        <!-- Button 1b: Lihat Prompt AI (Preview Modal) -->
+        <button
+          @click="openPromptPreviewModal('Formula Prompt AI Presisi', props.aiPromptTemplate || 'Formula prompt intelijen media Polri...')"
+          class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 text-slate-300 hover:text-white text-xs font-bold transition"
+          title="Lihat teks formula prompt ChatGPT secara lengkap"
+        >
+          <Eye class="w-4 h-4 text-slate-400" />
+          <span>Lihat Prompt</span>
+        </button>
+
         <!-- Button 2: Tempel Ringkasan AI -->
         <button
           @click="showPasteAiModal = true"
@@ -564,97 +659,131 @@ const submitIssue = () => {
         </div>
       </div>
 
-      <!-- Articles Grid (Kartu-Kartu Berita Persis SIMOD) -->
-      <div v-if="filteredArticles.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <!-- Articles Grid (Kartu-Kartu Berita Persis SIMOD Ber-Gambar) -->
+      <div v-if="filteredArticles.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         <div
           v-for="article in filteredArticles"
           :key="article.id"
-          class="rounded-3xl bg-[#0b1426] border border-slate-800 hover:border-slate-700 transition flex flex-col justify-between p-5 shadow-xl space-y-4 group"
+          class="rounded-3xl bg-[#0b1426] border border-slate-800 hover:border-slate-700 transition flex flex-col justify-between overflow-hidden shadow-xl group hover:shadow-2xl hover:shadow-amber-400/5"
         >
-          <!-- Top Card Meta -->
-          <div class="space-y-3">
-            <div class="flex items-center justify-between gap-2">
-              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-900 text-amber-400 border border-slate-800 truncate max-w-[160px]">
+          <!-- Top Cover Image with Badges -->
+          <div class="relative w-full h-48 bg-slate-950 overflow-hidden border-b border-slate-800/80">
+            <img
+              v-if="article.image_url"
+              :src="article.image_url"
+              :alt="article.title"
+              loading="lazy"
+              referrerpolicy="no-referrer"
+              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              @error="(e) => handleImageError(e, article)"
+            />
+            <div
+              v-else
+              class="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-[#0d1830] to-[#070d18] text-slate-500 p-4 text-center select-none"
+            >
+              <div class="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center mb-2 shadow-inner">
+                <Radio class="w-6 h-6 text-amber-400/80" />
+              </div>
+              <span class="text-[11px] font-black uppercase tracking-wider text-slate-300 truncate max-w-full">
                 {{ article.source_name }}
               </span>
-              <div class="flex items-center gap-1.5">
-                <span
-                  class="px-2 py-0.5 rounded text-[9px] font-black uppercase"
-                  :class="{
-                    'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30': article.sentiment === 'positif',
-                    'bg-rose-500/20 text-rose-300 border border-rose-500/30': article.sentiment === 'negatif',
-                    'bg-slate-800 text-slate-300 border border-slate-700': !article.sentiment || article.sentiment === 'netral'
-                  }"
-                >
-                  {{ article.sentiment || 'netral' }}
-                </span>
-                <button
-                  @click="toggleBookmark(article.id)"
-                  class="p-1 rounded text-slate-400 hover:text-amber-400"
-                  :title="bookmarkedIds.includes(article.id) ? 'Hapus Bookmark' : 'Simpan Berita'"
-                >
-                  <Bookmark
-                    class="w-4 h-4"
-                    :class="bookmarkedIds.includes(article.id) ? 'fill-amber-400 text-amber-400' : ''"
-                  />
-                </button>
-              </div>
+              <span class="text-[9px] text-amber-400/70 font-mono mt-0.5">Pantauan Siber Presisi</span>
             </div>
 
-            <!-- Title -->
-            <a
-              :href="article.link"
-              target="_blank"
-              class="block font-black text-sm text-white group-hover:text-amber-400 transition leading-snug line-clamp-2"
-            >
-              {{ article.title }}
-            </a>
+            <!-- Dark gradient overlay for bottom text legibility -->
+            <div class="absolute inset-0 bg-gradient-to-t from-[#0b1426] via-transparent to-black/30 pointer-events-none"></div>
 
-            <!-- Time & Category -->
-            <div class="flex items-center gap-2 text-[10px] text-slate-400">
-              <span class="flex items-center gap-1">
-                <Clock class="w-3 h-3 text-amber-400/80" />
-                {{ article.time_ago || article.pub_date }}
+            <!-- Top Left: Source Name Badge -->
+            <div class="absolute top-3 left-3 flex items-center gap-1.5 z-10">
+              <span class="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider bg-slate-950/85 backdrop-blur-md text-amber-400 border border-amber-400/30 shadow-md truncate max-w-[170px]">
+                {{ article.source_name }}
               </span>
-              <span>&bull;</span>
-              <span class="text-slate-300 font-medium">{{ article.category }}</span>
             </div>
 
-            <!-- Summary -->
-            <p class="text-xs text-slate-300 leading-relaxed line-clamp-3">
-              {{ article.summary }}
-            </p>
+            <!-- Top Right: Sentiment Badge & Bookmark Button -->
+            <div class="absolute top-3 right-3 flex items-center gap-1.5 z-10">
+              <span
+                class="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase backdrop-blur-md shadow-md border"
+                :class="{
+                  'bg-emerald-950/85 text-emerald-300 border-emerald-500/40': article.sentiment === 'positif',
+                  'bg-rose-950/85 text-rose-300 border-rose-500/40': article.sentiment === 'negatif',
+                  'bg-slate-900/85 text-slate-300 border-slate-700': !article.sentiment || article.sentiment === 'netral'
+                }"
+              >
+                {{ article.sentiment || 'netral' }}
+              </span>
+              <button
+                @click.stop="toggleBookmark(article.id)"
+                class="p-1.5 rounded-lg bg-slate-950/85 backdrop-blur-md border border-slate-700 text-slate-300 hover:text-amber-400 hover:border-amber-400/50 transition shadow-md"
+                :title="bookmarkedIds.includes(article.id) ? 'Hapus Bookmark' : 'Simpan Berita'"
+              >
+                <Bookmark
+                  class="w-3.5 h-3.5"
+                  :class="bookmarkedIds.includes(article.id) ? 'fill-amber-400 text-amber-400' : ''"
+                />
+              </button>
+            </div>
           </div>
 
-          <!-- Bottom Card Actions: Salin Bahan AI, Buat Laporan Isu, Buka Asli -->
-          <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
-            <button
-              @click="copyArticleForAi(article)"
-              class="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[11px] font-bold text-amber-400 transition"
-              title="Salin cuplikan berita untuk bahan prompt ChatGPT"
-            >
-              <Copy class="w-3 h-3" />
-              <span>Salin Bahan AI</span>
-            </button>
-
-            <div class="flex items-center gap-1.5">
-              <button
-                @click="openIssueModal(article)"
-                class="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-[11px] font-black transition"
-                title="Eskalasi temuan media menjadi laporan isu resmi"
-              >
-                <PlusCircle class="w-3 h-3" />
-                <span>Buat Isu</span>
-              </button>
-
+          <!-- Body Card Content -->
+          <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
+            <div class="space-y-3">
+              <!-- Title -->
               <a
                 :href="article.link"
                 target="_blank"
-                class="p-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-400 hover:text-white transition"
-                title="Buka sumber asli berita"
+                class="block font-black text-sm text-white group-hover:text-amber-400 transition leading-snug line-clamp-2"
+                :title="article.title"
               >
-                <ExternalLink class="w-3.5 h-3.5" />
+                {{ article.title }}
               </a>
+
+              <!-- Time & Category -->
+              <div class="flex items-center gap-2 text-[10px] text-slate-400">
+                <span class="flex items-center gap-1">
+                  <Clock class="w-3 h-3 text-amber-400/80" />
+                  {{ article.time_ago || article.pub_date }}
+                </span>
+                <span>&bull;</span>
+                <span class="text-amber-400/80 font-semibold">{{ article.category }}</span>
+              </div>
+
+              <!-- Summary -->
+              <p class="text-xs text-slate-300 leading-relaxed line-clamp-3">
+                {{ article.summary }}
+              </p>
+            </div>
+
+            <!-- Bottom Card Actions: Salin Bahan AI, Buat Laporan Isu, Buka Asli -->
+            <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+              <button
+                @click="copyArticleForAi(article)"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-400/30 hover:border-amber-400 text-[11px] font-bold text-amber-400 transition shadow-sm"
+                title="Salin cuplikan berita untuk bahan prompt ChatGPT"
+              >
+                <Copy class="w-3.5 h-3.5" />
+                <span>Salin Bahan AI</span>
+              </button>
+
+              <div class="flex items-center gap-1.5">
+                <button
+                  @click="openIssueModal(article)"
+                  class="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-[11px] font-black transition"
+                  title="Eskalasi temuan media menjadi laporan isu resmi"
+                >
+                  <PlusCircle class="w-3.5 h-3.5" />
+                  <span>Buat Isu</span>
+                </button>
+
+                <a
+                  :href="article.link"
+                  target="_blank"
+                  class="p-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-400 hover:text-white transition"
+                  title="Buka sumber asli berita"
+                >
+                  <ExternalLink class="w-3.5 h-3.5" />
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -1210,6 +1339,62 @@ const submitIssue = () => {
           >
             Simpan ke Manajemen Isu
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- MODAL 4: LIHAT & SALIN FORMULA PROMPT AI (PREVIEW MODAL)                  -->
+    <!-- ========================================================================= -->
+    <div
+      v-if="showPromptModal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+    >
+      <div class="w-full max-w-3xl rounded-3xl bg-[#0b1426] border border-amber-400/40 shadow-2xl p-6 space-y-4 max-h-[90vh] flex flex-col">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div class="flex items-center gap-2">
+            <Sparkles class="w-5 h-5 text-amber-400" />
+            <div>
+              <h3 class="text-base font-extrabold text-white">{{ promptModalTitle || 'Formula Prompt AI Presisi' }}</h3>
+              <p class="text-xs text-slate-400">Siap digunakan di ChatGPT (GPT-4o), Claude 3.5 Sonnet, atau Gemini Pro</p>
+            </div>
+          </div>
+          <button @click="showPromptModal = false" class="text-slate-400 hover:text-white">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+
+        <p class="text-xs text-slate-300 leading-relaxed">
+          Salin seluruh formula prompt di bawah ini, lalu tempelkan ke kolom chat AI. Formula ini telah disesuaikan secara otomatis dengan wilayah satuan <strong>{{ selectedPolda?.name || 'Polda Sulbar' }}</strong> dan jajaran Polres terkait.
+        </p>
+
+        <div class="relative flex-1 overflow-hidden rounded-2xl border border-slate-700 bg-slate-950">
+          <textarea
+            readonly
+            :value="promptModalContent"
+            rows="14"
+            class="w-full h-80 p-4 text-xs font-mono text-amber-300 bg-slate-950 border-none focus:outline-none resize-none leading-relaxed"
+            @focus="$event.target.select()"
+          ></textarea>
+        </div>
+
+        <div class="flex items-center justify-between pt-3 border-t border-slate-800">
+          <span class="text-[11px] text-slate-400">Tips: Klik kolom teks untuk memblok/memilih semua secara manual</span>
+          <div class="flex items-center gap-2">
+            <button
+              @click="showPromptModal = false"
+              class="px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-slate-300 hover:text-white"
+            >
+              Tutup
+            </button>
+            <button
+              @click="execCommandCopy(promptModalContent, promptModalTitle || 'Formula Prompt AI'); showPromptModal = false;"
+              class="flex items-center gap-2 px-5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition shadow-lg shadow-amber-400/20"
+            >
+              <Copy class="w-4 h-4" />
+              <span>Salin Teks ke Clipboard</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
