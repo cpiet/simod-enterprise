@@ -25,3 +25,4 @@ Setiap aktivitas sensitif di SIMOD Enterprise dicatat secara permanen tanpa dapa
 - **Waktu Eksekusi**: Waktu pasti kejadian (WITA).
 
 Audit log ini menjamin akuntabilitas personel, kepatuhan SOP kehumasan, dan kesiapan inspeksi pengawasan internal (Itwasda / Propam).
+

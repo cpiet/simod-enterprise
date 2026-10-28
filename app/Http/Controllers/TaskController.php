@@ -99,3 +99,4 @@ class TaskController extends Controller
         return redirect()->back()->with('success', 'Laporan progres tugas berhasil ditambahkan!');
     }
 }
+

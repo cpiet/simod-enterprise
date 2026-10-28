@@ -32,3 +32,4 @@ Protokol resmi Divhumas Polri untuk memitigasi krisis reputasi dan menjaga kondu
 - 🔴 **Siaga Merah (Kritis)**: Berpotensi memicu konflik komunal, kerusuhan, unjuk rasa anarkis, atau mencoreng integritas institusi. Respons wajib kurang dari 2 jam.
 - 🟡 **Siaga Kuning (Tinggi)**: Keluhan pelayanan publik yang viral, kecelakaan menonjol, atau dugaan pelanggaran anggota yang sedang ramai diperbincangkan. Respons 2–6 jam.
 - 🟢 **Siaga Hijau (Rutin)**: Isu lokal berskala kecil atau sentimen netral yang cukup dipantau tanpa eskalasi khusus.
+

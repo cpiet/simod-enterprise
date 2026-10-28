@@ -79,3 +79,4 @@ class PublicationController extends Controller
         return redirect()->back()->with('success', 'Konten narasi publikasi berhasil diterbitkan!');
     }
 }
+

@@ -17,6 +17,7 @@ Dokumentasi ini memandu arsitektur, seluruh perintah CLI, modul operasional, int
 | **06** | [06. Disposisi Tugas & Audit Trail](06-modul-disposisi-tugas-dan-audit-trail.md) | Penugasan operasional ke Satker/Polres, update progres lapangan, dan immutable log. |
 | **07** | [07. Worker Scraper Python & REST API](07-worker-scraper-python-dan-api.md) | Integrasi background worker Python, REST API `/api/v1/ingest/article`, arsitektur scraping medsos. |
 | **08** | [08. Panduan Deployment & Virtual Host](08-panduan-deployment-dan-virtual-host.md) | Konfigurasi domain `http://simod-enterprise.test` di Laragon, Apache/Nginx, dan VPS Hostinger. |
+| **09** | [09. Katalog Lengkap 19 Modul & Paritas Fitur](09-katalog-lengkap-19-modul-simod-enterprise.md) | Pemetaan lengkap seluruh 19 modul operasional dan arsitektur sidebar navigasi terpadu. |
 
 ---
 
@@ -44,3 +45,4 @@ php artisan simod:scrape-rss --polda=SULBAR
 
 ---
 *Dikembangkan secara terpadu untuk Divisi Humas Polri & Bidang Humas Polda Jajaran.*
+

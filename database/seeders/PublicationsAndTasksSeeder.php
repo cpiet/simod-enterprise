@@ -93,3 +93,4 @@ class PublicationsAndTasksSeeder extends Seeder
         }
     }
 }
+

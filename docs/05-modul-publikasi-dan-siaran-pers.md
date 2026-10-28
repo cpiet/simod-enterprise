@@ -29,3 +29,4 @@ Setiap rilis pers mencakup elemen wajib:
 ### Fitur Taktis:
 - Tombol **`[📋 Salin Siaran Pers]`**: Menyalin seluruh naskah rilis pers ke papan klip dalam 1 klik untuk segera disebarkan ke grup WhatsApp wartawan mitra.
 - Tombol **`[+ Terbitkan Siaran Pers Baru]`**: Modal pembuat rilis instan yang langsung menyimpan data ke tabel `press_releases`.
+

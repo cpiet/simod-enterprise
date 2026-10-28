@@ -44,3 +44,4 @@ class Publication extends Model
         return $this->belongsTo(Issue::class);
     }
 }
+

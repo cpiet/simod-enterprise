@@ -85,3 +85,4 @@ php artisan route:list
 ```powershell
 php artisan tinker
 ```
+

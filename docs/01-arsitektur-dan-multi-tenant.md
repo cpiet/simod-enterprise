@@ -56,3 +56,4 @@ SIMOD Enterprise dirancang dengan arsitektur **Modular Monolith Multi-Tenant** y
 3. **Operator Satker / Kasi Humas Polres** (`operator_satker`):
    - Mengelola isu dan penugasan yang didelegasikan ke Polres terkait (`polres_id`).
    - Melaporkan perkembangan investigasi lapangan (*task updates*).
+

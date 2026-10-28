@@ -43,3 +43,4 @@ Modul ini bertugas memantau pemberitaan media massa daring secara real-time untu
    - Petugas tinggal memilih tingkat urgensi (Hijau, Kuning, Merah) dan Satker penanggung jawab, lalu data langsung tercatat di tabel `issues`.
 4. **Pencarian Real-Time**:
    - Memfilter kartu berita secara instan berdasarkan kata kunci tanpa me-reload browser.
+
