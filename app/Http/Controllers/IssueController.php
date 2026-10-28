@@ -124,3 +124,4 @@ class IssueController extends Controller
         return redirect()->back()->with('success', 'Klarifikasi resmi dan hasil fact-check berhasil diperbarui!');
     }
 }
+
