@@ -68,14 +68,34 @@ const tabs = [
 
 // Bookmark state stored in localStorage per device
 const bookmarkedIds = ref(JSON.parse(localStorage.getItem('simod_ent_bookmarks') || '[]'));
+const isBookmarked = (id) => bookmarkedIds.value.includes(id);
 
 const toggleBookmark = (id) => {
   if (bookmarkedIds.value.includes(id)) {
     bookmarkedIds.value = bookmarkedIds.value.filter((item) => item !== id);
+    showToastNotification('Berita dihapus dari Bookmark Tersimpan');
   } else {
     bookmarkedIds.value.push(id);
+    showToastNotification('Berita berhasil disimpan ke Bookmark! (★ Tersimpan)');
   }
   localStorage.setItem('simod_ent_bookmarks', JSON.stringify(bookmarkedIds.value));
+};
+
+// Pagination State
+const currentPage = ref(1);
+const perPage = ref(50);
+const handleSearch = () => {
+  currentPage.value = 1;
+};
+
+// Image fallback tracker
+const brokenImages = ref(new Set());
+const handleImageError = (e, article) => {
+  brokenImages.value.add(article.id);
+  e.target.style.display = 'none';
+  if (e.target.nextElementSibling) {
+    e.target.nextElementSibling.classList.remove('hidden');
+  }
 };
 
 // Filter States
@@ -164,24 +184,6 @@ const copyText = (text, label = 'Teks') => {
 const copyAiPrompt = () => {
   const prompt = props.aiPromptTemplate || 'Formula prompt intelijen media Polri...';
   copyText(prompt, 'Formula Prompt AI Presisi');
-};
-
-// Handle broken or blocked image URLs
-const handleImageError = (event, article) => {
-  event.target.style.display = 'none';
-  const parent = event.target.parentElement;
-  if (parent && !parent.querySelector('.img-fallback-placeholder')) {
-    const fallback = document.createElement('div');
-    fallback.className = 'img-fallback-placeholder w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-[#0d1830] to-[#070d18] text-slate-500 p-4 text-center select-none';
-    fallback.innerHTML = `
-      <div class="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center mb-2 shadow-inner">
-        <svg class="w-6 h-6 text-amber-400/80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path></svg>
-      </div>
-      <span class="text-[11px] font-black uppercase tracking-wider text-slate-300 truncate max-w-full">${article?.source_name || 'Portal Berita'}</span>
-      <span class="text-[9px] text-amber-400/70 font-mono mt-0.5">Pantauan Siber Presisi</span>
-    `;
-    parent.appendChild(fallback);
-  }
 };
 
 // Tempel Ringkasan AI Modal State
@@ -327,6 +329,12 @@ const filteredArticles = computed(() => {
   }
 
   return list;
+});
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredArticles.value.length / perPage.value)));
+const paginatedArticles = computed(() => {
+  const start = (currentPage.value - 1) * perPage.value;
+  return filteredArticles.value.slice(start, start + perPage.value);
 });
 
 // Salin Berita sebagai Bahan AI
@@ -562,230 +570,263 @@ const submitIssue = () => {
     <!-- TAB 01: LIVE RSS MEDIA PATROL (FULL PARITAS SEPERTI SIMOD)                 -->
     <!-- ========================================================================= -->
     <div v-show="activeTab === '01'" class="space-y-5">
-      <!-- Search & Sync Toolbar -->
-      <div class="p-4 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-4">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <!-- Keyword Search -->
-          <div class="relative flex-1 max-w-md">
-            <Search class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              v-model="searchQuery"
-              type="text"
-              placeholder="Cari judul berita atau kata kunci..."
-              class="w-full pl-10 pr-9 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
-            />
-            <button
-              v-if="searchQuery"
-              @click="searchQuery = ''"
-              class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-            >
-              <X class="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <!-- Actions: Refresh Button -->
+      <!-- Patroli Siaran Media Massa Real-Time Header -->
+      <div class="rounded-3xl bg-gradient-to-r from-[#0d182e] via-[#0b1426] to-[#070d1d] border border-slate-800 p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="space-y-1">
           <div class="flex items-center gap-2">
-            <button
-              @click="refreshRssFeeds"
-              :disabled="isRefreshingRss"
-              class="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-black text-amber-400 hover:text-amber-300 transition shadow-sm disabled:opacity-50"
-            >
-              <RotateCw class="w-4 h-4" :class="{ 'animate-spin': isRefreshingRss }" />
-              <span>{{ isRefreshingRss ? 'Menarik Feed...' : 'Sinkronkan Live (14 Portal)' }}</span>
-            </button>
+            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
+            <h2 class="text-lg md:text-xl font-black text-white tracking-tight flex items-center gap-2">
+              Patroli Siaran Media Massa Real-Time
+            </h2>
           </div>
+          <p class="text-xs text-slate-300 max-w-2xl leading-relaxed">
+            Integrasi sindikasi RSS dinamis memantau portal media massa nasional & regional Sulselbar (Detik Sulsel, Antara, CNN, dll). Dapat disaring, disalin langsung sebagai bahan prompt intelijen AI, atau dijadikan draft Laporan Isu Publik SIMOD.
+          </p>
         </div>
-
-        <!-- PORTAL SELECTOR PILLS (Daftar Portal-Portal di Sulbar yang bisa dipilih) -->
-        <div class="space-y-1.5 border-t border-slate-800/80 pt-3">
-          <div class="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
-            <span>PILIHAN PORTAL MEDIA ({{ portalsList?.length || 14 }} Sumber)</span>
-            <span class="text-amber-400">{{ filteredArticles.length }} Berita Ditampilkan</span>
-          </div>
-          <div class="flex flex-wrap items-center gap-1.5 max-h-24 overflow-y-auto custom-scrollbar">
-            <button
-              v-for="p in portalsList"
-              :key="p.name"
-              @click="selectedPortal = p.name"
-              class="px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5"
-              :class="selectedPortal.toLowerCase() === p.name.toLowerCase()
-                ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
-                : 'bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800'"
-            >
-              <span>{{ p.name }}</span>
-              <span
-                class="px-1.5 py-0.2 rounded-full text-[9px] font-black"
-                :class="selectedPortal.toLowerCase() === p.name.toLowerCase() ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-slate-400'"
-              >
-                {{ p.count }}
-              </span>
-            </button>
-          </div>
-        </div>
-
-        <!-- CATEGORY & SENTIMENT PILLS -->
-        <div class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800/80 pt-3">
-          <!-- Categories -->
-          <div class="flex flex-wrap items-center gap-1.5">
-            <span class="text-[10px] font-bold text-slate-500 uppercase mr-1">Kategori:</span>
-            <button
-              v-for="cat in ['all', 'bookmark', 'Regional Sulselbar', 'Harkamtibmas', 'Nasional', 'Hukum & Kriminal']"
-              :key="cat"
-              @click="selectedCategory = cat"
-              class="px-2.5 py-1 rounded-lg text-xs font-bold transition"
-              :class="selectedCategory === cat
-                ? 'bg-amber-400 text-slate-950 font-black'
-                : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'"
-            >
-              {{ cat === 'all' ? 'Semua Kategori' : cat === 'bookmark' ? `⭐ Bookmark (${bookmarkedIds.length})` : cat }}
-            </button>
-          </div>
-
-          <!-- Sentiments -->
-          <div class="flex items-center gap-1.5">
-            <span class="text-[10px] font-bold text-slate-500 uppercase mr-1">Sentimen:</span>
-            <button
-              v-for="s in ['all', 'positif', 'netral', 'negatif']"
-              :key="s"
-              @click="selectedSentiment = s"
-              class="px-2 py-0.5 rounded text-[10px] font-bold uppercase transition"
-              :class="selectedSentiment === s
-                ? 'bg-slate-200 text-slate-950 font-black'
-                : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'"
-            >
-              {{ s === 'all' ? 'Semua' : s }}
-            </button>
-          </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button
+            @click="refreshRssFeeds"
+            :disabled="isRefreshingRss"
+            class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-white transition shadow-sm disabled:opacity-50"
+          >
+            <RotateCw class="w-4 h-4 text-amber-400" :class="{ 'animate-spin': isRefreshingRss }" />
+            <span>{{ isRefreshingRss ? 'Menarik Berita...' : 'Sinkron Berita' }}</span>
+          </button>
+          <button
+            @click="showRssManagerModal = true"
+            class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border-2 border-amber-400/90 text-xs font-black text-amber-300 hover:text-amber-200 transition shadow-lg shadow-amber-400/10"
+          >
+            <SlidersHorizontal class="w-4 h-4 text-amber-400" />
+            <span>Kelola Sumber RSS</span>
+          </button>
         </div>
       </div>
 
-      <!-- Articles Grid (Kartu-Kartu Berita Persis SIMOD Ber-Gambar) -->
-      <div v-if="filteredArticles.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        <div
-          v-for="article in filteredArticles"
-          :key="article.id"
-          class="rounded-3xl bg-[#0b1426] border border-slate-800 hover:border-slate-700 transition flex flex-col justify-between overflow-hidden shadow-xl group hover:shadow-2xl hover:shadow-amber-400/5"
-        >
-          <!-- Top Cover Image with Badges -->
-          <div class="relative w-full h-48 bg-slate-950 overflow-hidden border-b border-slate-800/80">
-            <img
-              v-if="article.image_url"
-              :src="article.image_url"
-              :alt="article.title"
-              loading="lazy"
-              referrerpolicy="no-referrer"
-              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              @error="(e) => handleImageError(e, article)"
-            />
-            <div
-              v-else
-              class="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-[#0d1830] to-[#070d18] text-slate-500 p-4 text-center select-none"
+      <!-- FILTER TOOLBAR (PERSIS TAMPILAN GAMBAR 1) -->
+      <div class="p-4 rounded-2xl bg-[#0b1426] border border-slate-800/90 shadow-xl flex flex-wrap items-center gap-3">
+        <!-- Portal Dropdown -->
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold text-slate-300">Portal:</span>
+          <select
+            v-model="selectedPortal"
+            @change="currentPage = 1"
+            class="px-3 py-2 rounded-xl text-xs font-bold bg-[#070d19] border border-slate-700 text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+          >
+            <option value="Semua Portal">Semua Portal ({{ portalsList?.length > 1 ? portalsList.length - 1 : portalsList?.length || 29 }})</option>
+            <option
+              v-for="p in portalsList?.filter(p => p.name !== 'Semua Portal')"
+              :key="p.name"
+              :value="p.name"
             >
-              <div class="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center mb-2 shadow-inner">
-                <Radio class="w-6 h-6 text-amber-400/80" />
-              </div>
-              <span class="text-[11px] font-black uppercase tracking-wider text-slate-300 truncate max-w-full">
-                {{ article.source_name }}
-              </span>
-              <span class="text-[9px] text-amber-400/70 font-mono mt-0.5">Pantauan Siber Presisi</span>
-            </div>
+              {{ p.name }} ({{ p.count }})
+            </option>
+          </select>
+        </div>
 
-            <!-- Dark gradient overlay for bottom text legibility -->
-            <div class="absolute inset-0 bg-gradient-to-t from-[#0b1426] via-transparent to-black/30 pointer-events-none"></div>
+        <!-- Kategori Dropdown -->
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold text-slate-300">Kategori:</span>
+          <select
+            v-model="selectedCategory"
+            @change="currentPage = 1"
+            class="px-3 py-2 rounded-xl text-xs font-bold bg-[#070d19] border border-slate-700 text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+          >
+            <option value="all">Semua Kategori</option>
+            <option value="bookmark">⭐ Tersimpan / Bookmark ({{ bookmarkedIds.length }})</option>
+            <option value="Regional Sulselbar">Regional Sulselbar</option>
+            <option value="Harkamtibmas">Harkamtibmas</option>
+            <option value="Nasional">Nasional</option>
+            <option value="Hukum & Kriminal">Hukum & Kriminal</option>
+            <option value="Umum">Umum</option>
+          </select>
+        </div>
 
-            <!-- Top Left: Source Name Badge -->
-            <div class="absolute top-3 left-3 flex items-center gap-1.5 z-10">
-              <span class="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider bg-slate-950/85 backdrop-blur-md text-amber-400 border border-amber-400/30 shadow-md truncate max-w-[170px]">
-                {{ article.source_name }}
-              </span>
-            </div>
+        <!-- Search Input -->
+        <div class="relative flex-1 min-w-[240px]">
+          <Search class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            v-model="searchQuery"
+            @keyup.enter="handleSearch"
+            type="text"
+            placeholder="Cari judul berita atau topik (tekan Enter)..."
+            class="w-full pl-9 pr-8 py-2 rounded-xl bg-[#070d19] border border-slate-700 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-amber-400"
+          />
+          <button
+            v-if="searchQuery"
+            @click="searchQuery = ''; currentPage = 1"
+            class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+          >
+            <X class="w-3 h-3" />
+          </button>
+        </div>
 
-            <!-- Top Right: Sentiment Badge & Bookmark Button -->
-            <div class="absolute top-3 right-3 flex items-center gap-1.5 z-10">
-              <span
-                class="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase backdrop-blur-md shadow-md border"
-                :class="{
-                  'bg-emerald-950/85 text-emerald-300 border-emerald-500/40': article.sentiment === 'positif',
-                  'bg-rose-950/85 text-rose-300 border-rose-500/40': article.sentiment === 'negatif',
-                  'bg-slate-900/85 text-slate-300 border-slate-700': !article.sentiment || article.sentiment === 'netral'
-                }"
-              >
-                {{ article.sentiment || 'netral' }}
-              </span>
-              <button
-                @click.stop="toggleBookmark(article.id)"
-                class="p-1.5 rounded-lg bg-slate-950/85 backdrop-blur-md border border-slate-700 text-slate-300 hover:text-amber-400 hover:border-amber-400/50 transition shadow-md"
-                :title="bookmarkedIds.includes(article.id) ? 'Hapus Bookmark' : 'Simpan Berita'"
-              >
-                <Bookmark
-                  class="w-3.5 h-3.5"
-                  :class="bookmarkedIds.includes(article.id) ? 'fill-amber-400 text-amber-400' : ''"
-                />
-              </button>
-            </div>
-          </div>
+        <!-- Cari Button -->
+        <button
+          @click="handleSearch"
+          class="px-5 py-2 rounded-xl bg-[#0d182e] hover:bg-slate-800 text-amber-400 border border-amber-400/50 hover:border-amber-400 text-xs font-black transition shadow-sm"
+        >
+          Cari
+        </button>
 
-          <!-- Body Card Content -->
-          <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
-            <div class="space-y-3">
-              <!-- Title -->
-              <a
-                :href="article.link"
-                target="_blank"
-                class="block font-black text-sm text-white group-hover:text-amber-400 transition leading-snug line-clamp-2"
-                :title="article.title"
-              >
-                {{ article.title }}
-              </a>
+        <!-- Count Indicator -->
+        <div class="text-xs text-slate-400 shrink-0 ml-auto whitespace-nowrap flex items-center gap-1">
+          <span>Menampilkan</span>
+          <strong class="text-amber-400 font-extrabold">{{ filteredArticles.length }}</strong>
+          <span>siaran berita</span>
+        </div>
+      </div>
 
-              <!-- Time & Category -->
-              <div class="flex items-center gap-2 text-[10px] text-slate-400">
-                <span class="flex items-center gap-1">
-                  <Clock class="w-3 h-3 text-amber-400/80" />
-                  {{ article.time_ago || article.pub_date }}
+      <!-- KARTU-KARTU BERITA (PERSIS GAMBAR 1 & 2) -->
+      <div v-if="filteredArticles.length > 0" class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div
+            v-for="article in paginatedArticles"
+            :key="article.id"
+            class="rounded-3xl bg-[#0b1426] border border-slate-800/90 hover:border-amber-400/50 transition-all duration-300 flex flex-col justify-between overflow-hidden shadow-xl group hover:shadow-2xl hover:shadow-amber-400/5"
+          >
+            <!-- Top Cover Image Area (h-48) -->
+            <div class="h-48 w-full bg-slate-950 relative overflow-hidden shrink-0 border-b border-slate-800/80">
+              <!-- Top Left: Source Name Badge & Top Right: Time Ago -->
+              <div class="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 z-10 pointer-events-none">
+                <!-- Source Name -->
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-black/75 text-amber-400 border border-amber-400/40 shadow-sm backdrop-blur-md truncate max-w-[170px]">
+                  {{ article.source_name }}
                 </span>
-                <span>&bull;</span>
-                <span class="text-amber-400/80 font-semibold">{{ article.category }}</span>
+
+                <!-- Time Ago -->
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-black/75 text-slate-200 border border-white/10 backdrop-blur-md flex items-center gap-1.5 shadow-sm">
+                  <Clock class="w-3 h-3 text-amber-400" />
+                  <span>{{ article.time_ago }}</span>
+                </span>
               </div>
 
-              <!-- Summary -->
-              <p class="text-xs text-slate-300 leading-relaxed line-clamp-3">
-                {{ article.summary }}
-              </p>
+              <!-- Real Cover Image -->
+              <img
+                v-if="article.image_url && !brokenImages.has(article.id)"
+                :src="article.image_url"
+                :alt="article.title"
+                loading="lazy"
+                referrerpolicy="no-referrer"
+                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                @error="(e) => handleImageError(e, article)"
+              />
+
+              <!-- Fallback Placeholder Persis SIMOD ("Gambar tidak disediakan oleh website") -->
+              <div
+                v-else
+                class="w-full h-full flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-slate-900 via-[#0d1830] to-slate-950 text-slate-600 p-4 text-center select-none"
+              >
+                <Newspaper class="w-12 h-12 text-slate-700 stroke-[1.5]" />
+                <span class="text-[10px] text-slate-500 font-medium">Gambar tidak disediakan oleh website</span>
+              </div>
+
+              <!-- Dark Gradient Overlay -->
+              <div class="absolute inset-0 bg-gradient-to-t from-[#0b1426] via-transparent to-black/40 pointer-events-none"></div>
             </div>
 
-            <!-- Bottom Card Actions: Salin Bahan AI, Buat Laporan Isu, Buka Asli -->
-            <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
-              <button
-                @click="copyArticleForAi(article)"
-                class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-400/30 hover:border-amber-400 text-[11px] font-bold text-amber-400 transition shadow-sm"
-                title="Salin cuplikan berita untuk bahan prompt ChatGPT"
-              >
-                <Copy class="w-3.5 h-3.5" />
-                <span>Salin Bahan AI</span>
-              </button>
+            <!-- Card Body Content -->
+            <div class="p-5 flex-1 flex flex-col justify-between space-y-3">
+              <div class="space-y-2">
+                <!-- Category Badge -->
+                <div class="flex items-center gap-2 pt-1">
+                  <span class="px-2.5 py-0.5 rounded-md text-[9px] font-extrabold uppercase bg-slate-900/90 text-slate-300 border border-slate-700/80 tracking-wider">
+                    {{ article.category_badge || article.category || 'REGIONAL SULSELBAR' }}
+                  </span>
+                </div>
 
-              <div class="flex items-center gap-1.5">
-                <button
-                  @click="openIssueModal(article)"
-                  class="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-[11px] font-black transition"
-                  title="Eskalasi temuan media menjadi laporan isu resmi"
-                >
-                  <PlusCircle class="w-3.5 h-3.5" />
-                  <span>Buat Isu</span>
-                </button>
+                <!-- Date & Time (📅 28 Oct 2026, 23.22 WITA) -->
+                <div class="text-[10px] text-slate-400 flex items-center gap-1.5">
+                  <Calendar class="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  <span class="truncate">{{ article.pub_date }}</span>
+                </div>
 
+                <!-- Title -->
                 <a
                   :href="article.link"
                   target="_blank"
-                  class="p-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-400 hover:text-white transition"
-                  title="Buka sumber asli berita"
+                  rel="noopener noreferrer"
+                  class="block font-black text-sm md:text-[15px] text-white group-hover:text-amber-400 transition leading-snug line-clamp-2"
+                  :title="article.title"
                 >
-                  <ExternalLink class="w-3.5 h-3.5" />
+                  {{ article.title }}
                 </a>
+
+                <!-- Summary Excerpt -->
+                <p class="text-xs text-slate-300 line-clamp-3 leading-relaxed">
+                  {{ article.summary }}
+                </p>
+              </div>
+
+              <!-- Card Footer Actions (PERSIS GAMBAR 2) -->
+              <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                <!-- Left: Buka Button -->
+                <a
+                  :href="article.link"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="px-3 py-1.5 rounded-full text-xs font-semibold text-slate-300 bg-slate-900 hover:bg-slate-800 hover:text-white border border-slate-700 flex items-center gap-1.5 transition shadow-sm"
+                  title="Buka artikel asli di tab baru"
+                >
+                  <ExternalLink class="w-3.5 h-3.5 text-blue-400" />
+                  <span>Buka</span>
+                </a>
+
+                <!-- Right: Simpan / Bookmark & Buat Isu -->
+                <div class="flex items-center gap-2">
+                  <!-- Simpan / Bookmark -->
+                  <button
+                    @click.stop="toggleBookmark(article.id)"
+                    :class="[
+                      'px-3 py-1.5 rounded-full text-xs font-bold transition flex items-center gap-1.5 shadow-sm border',
+                      isBookmarked(article.id)
+                        ? 'bg-amber-400 text-slate-950 font-black border-amber-300 shadow-md'
+                        : 'bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-amber-300 border-slate-700'
+                    ]"
+                    :title="isBookmarked(article.id) ? 'Hapus dari Bookmark Tersimpan' : 'Simpan / Bookmark Berita Ini'"
+                  >
+                    <Check v-if="isBookmarked(article.id)" class="w-3.5 h-3.5 text-slate-950" />
+                    <Copy v-else class="w-3.5 h-3.5 text-amber-400" />
+                    <span>{{ isBookmarked(article.id) ? '★ Tersimpan' : '🔖 Simpan' }}</span>
+                  </button>
+
+                  <!-- Buat Isu -->
+                  <button
+                    @click.stop="openIssueModal(article)"
+                    class="px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 border-2 border-amber-400/90 hover:border-amber-300 flex items-center gap-1 transition shadow-lg shadow-amber-400/10"
+                    title="Jadikan laporan isu publik baru di SIMOD HUMAS"
+                  >
+                    <Plus class="w-3.5 h-3.5 text-white" />
+                    <span>Buat Isu</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- Pagination Bar -->
+        <div v-if="totalPages > 1" class="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-[#0b1426] border border-slate-800">
+          <button
+            :disabled="currentPage === 1"
+            @click="currentPage--"
+            class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 text-slate-300 border border-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition"
+          >
+            &larr; Sebelumnya
+          </button>
+
+          <div class="flex items-center gap-1 text-xs">
+            <span class="text-slate-400">Halaman</span>
+            <span class="px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 font-black">{{ currentPage }}</span>
+            <span class="text-slate-400">dari {{ totalPages }}</span>
+          </div>
+
+          <button
+            :disabled="currentPage === totalPages"
+            @click="currentPage++"
+            class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 text-slate-300 border border-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition"
+          >
+            Selanjutnya &rarr;
+          </button>
         </div>
       </div>
 
