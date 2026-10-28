@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue';
+import { router } from '@inertiajs/vue3';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
 import {
   Shield,
@@ -98,11 +99,33 @@ const openIssueModal = (article) => {
 };
 
 const submitIssue = () => {
-  showIssueModal.value = false;
-  toastMessage.value = `Berhasil membuat Isu Baru dari [${activeArticleForIssue.value?.title.substring(0, 30)}...]! Diteruskan ke Command Center EWS.`;
-  setTimeout(() => {
-    toastMessage.value = '';
-  }, 4500);
+  const pId = props.selectedPolda?.id || props.allPoldas?.[0]?.id || 1;
+  const priorityMap = {
+    'HIJAU': 'low',
+    'KUNING': 'high',
+    'MERAH': 'critical'
+  };
+
+  router.post('/issues', {
+    polda_id: pId,
+    title: activeArticleForIssue.value?.title || 'Isu Temuan Media',
+    summary: activeArticleForIssue.value?.summary || issueForm.value.notes,
+    category: activeArticleForIssue.value?.category || 'Harkamtibmas',
+    priority: priorityMap[issueForm.value.priority] || 'medium',
+    sentiment: activeArticleForIssue.value?.sentiment || 'netral',
+    source_media: activeArticleForIssue.value?.source_name || 'Media Online',
+    source_url: activeArticleForIssue.value?.link || '',
+    assigned_unit: issueForm.value.pic || 'Bidhumas Polda',
+  }, {
+    preserveScroll: true,
+    onSuccess: () => {
+      showIssueModal.value = false;
+      toastMessage.value = `Berhasil membuat Isu Baru dari [${activeArticleForIssue.value?.title.substring(0, 30)}...]! Telah tersimpan di Database & Manajemen Isu.`;
+      setTimeout(() => {
+        toastMessage.value = '';
+      }, 4500);
+    }
+  });
 };
 </script>
 

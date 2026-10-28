@@ -42,7 +42,8 @@ const isTenantMenuOpen = ref(false);
 
 const switchTenant = (code) => {
   isTenantMenuOpen.value = false;
-  router.get('/', { polda: code }, { preserveScroll: true });
+  const currentPath = window.location.pathname.includes('/issues') ? '/issues' : '/';
+  router.get(currentPath, { polda: code }, { preserveScroll: true });
 };
 </script>
 
@@ -53,7 +54,7 @@ const switchTenant = (code) => {
       <!-- Left: Brand & Tenant Switcher -->
       <div class="flex items-center gap-4 lg:gap-6">
         <!-- Logo -->
-        <Link href="/" class="flex items-center gap-3 group">
+        <Link :href="`/?polda=${selectedCode}`" class="flex items-center gap-3 group">
           <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 p-0.5 shadow-lg shadow-amber-500/20 group-hover:scale-105 transition duration-200 flex items-center justify-center">
             <div class="w-full h-full bg-[#0a1224] rounded-[14px] flex items-center justify-center">
               <Shield class="w-5 h-5 text-amber-400" />
@@ -123,15 +124,43 @@ const switchTenant = (code) => {
             </button>
           </div>
         </div>
+
+        <!-- Main Navigation Links -->
+        <nav class="hidden lg:flex items-center gap-1.5 ml-2">
+          <Link
+            :href="`/?polda=${selectedCode}`"
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+            :class="!$page.url.startsWith('/issues') ? 'bg-amber-400/15 text-amber-400 border border-amber-400/40 shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'"
+          >
+            <Radio class="w-3.5 h-3.5" />
+            <span>Command Center & EWS</span>
+          </Link>
+          <Link
+            :href="`/issues?polda=${selectedCode}`"
+            class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+            :class="$page.url.startsWith('/issues') ? 'bg-amber-400/15 text-amber-400 border border-amber-400/40 shadow-xs' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'"
+          >
+            <Layers class="w-3.5 h-3.5" />
+            <span>Manajemen Isu Publik</span>
+          </Link>
+        </nav>
       </div>
 
-      <!-- Right: Clock & User Profile -->
+      <!-- Right: Clock & User Profile & Login Link -->
       <div class="flex items-center gap-3 md:gap-4">
         <!-- Live Clock -->
         <div class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs font-mono text-slate-300">
           <Clock class="w-3.5 h-3.5 text-amber-400" />
           <span>{{ metrics.server_wita || 'WITA' }}</span>
         </div>
+
+        <!-- Portal Login Button -->
+        <Link
+          href="/login"
+          class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition"
+        >
+          Portal Login
+        </Link>
 
         <!-- Role Badge -->
         <div class="flex items-center gap-2 p-1.5 pr-3 rounded-xl bg-slate-900/80 border border-slate-800">
@@ -160,4 +189,3 @@ const switchTenant = (code) => {
     </footer>
   </div>
 </template>
-

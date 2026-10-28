@@ -6,6 +6,8 @@ use App\Models\EarlyWarning;
 use App\Models\MediaFeed;
 use App\Models\Polda;
 use App\Models\Polres;
+use App\Models\Issue;
+use App\Models\PressRelease;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -154,6 +156,21 @@ class DashboardController extends Controller
             ],
         ];
 
+
+        // Query Issues scoped to active Polda
+        $issuesQuery = Issue::with(['polres'])->latest();
+        if ($selectedPolda) {
+            $issuesQuery->where('polda_id', $selectedPolda->id);
+        }
+        $issues = $issuesQuery->limit(10)->get();
+
+        // Query Press Releases scoped to active Polda
+        $pressReleasesQuery = PressRelease::with(['polres'])->latest();
+        if ($selectedPolda) {
+            $pressReleasesQuery->where('polda_id', $selectedPolda->id);
+        }
+        $pressReleases = $pressReleasesQuery->limit(5)->get();
+
         // System metrics
         $metrics = [
             'total_poldas'   => $allPoldas->count(),
@@ -162,6 +179,8 @@ class DashboardController extends Controller
             'ews_red'        => $earlyWarnings->where('level', 'red')->count(),
             'ews_yellow'     => $earlyWarnings->where('level', 'yellow')->count(),
             'ews_green'      => $earlyWarnings->where('level', 'green')->count(),
+            'total_issues'   => $issues->count(),
+            'hoax_debunked'  => $issues->where('is_hoax', true)->count(),
             'server_wita'    => now()->setTimezone($selectedPolda->timezone ?? 'Asia/Makassar')->format('d M Y, H:i:s') . ' WITA',
         ];
 
@@ -172,6 +191,8 @@ class DashboardController extends Controller
             'earlyWarnings'  => $earlyWarnings,
             'mediaFeeds'     => $mediaFeeds,
             'sampleArticles' => $sampleArticles,
+            'issues'         => $issues,
+            'pressReleases'  => $pressReleases,
             'metrics'        => $metrics,
         ]);
     }
