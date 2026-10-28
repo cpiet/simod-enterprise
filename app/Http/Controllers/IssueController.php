@@ -70,6 +70,37 @@ class IssueController extends Controller
     }
 
     /**
+     * Show the form for creating a new issue / field report.
+     */
+    public function create(Request $request): Response
+    {
+        $selectedCode = $request->query('polda', 'SULBAR');
+        $allPoldas = Polda::withCount('polres')->where('is_active', true)->get();
+        $selectedPolda = null;
+
+        if ($selectedCode !== 'ALL') {
+            $selectedPolda = Polda::with(['polres'])->where('code', $selectedCode)->first();
+            if (! $selectedPolda) {
+                $selectedPolda = $allPoldas->first();
+                $selectedCode = $selectedPolda ? $selectedPolda->code : 'SULBAR';
+            }
+        }
+
+        $polresList = $selectedPolda ? $selectedPolda->polres : Polres::where('is_active', true)->get();
+
+        return Inertia::render('Issues/Create', [
+            'allPoldas'     => $allPoldas,
+            'selectedPolda' => $selectedPolda,
+            'selectedCode'  => $selectedCode,
+            'polresList'    => $polresList,
+            'metrics'       => [
+                'total_issues'   => Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
+                'server_wita'    => now()->setTimezone($selectedPolda->timezone ?? 'Asia/Makassar')->format('d M Y, H:i:s') . ' WITA',
+            ],
+        ]);
+    }
+
+    /**
      * Store a newly created issue in storage (e.g. from + Buat Isu card modal).
      */
     public function store(Request $request)

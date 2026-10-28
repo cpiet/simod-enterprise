@@ -26,6 +26,7 @@ Route::post('/media-intelligence/rss-sources/test', [MediaIntelligenceController
 
 // Issues Management
 Route::get('/issues', [IssueController::class, 'index'])->name('issues.index');
+Route::get('/issues/create', [IssueController::class, 'create'])->name('issues.create');
 Route::post('/issues', [IssueController::class, 'store'])->name('issues.store');
 Route::post('/issues/{id}/clarify', [IssueController::class, 'updateClarification'])->name('issues.clarify');
 

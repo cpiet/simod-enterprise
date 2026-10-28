@@ -36,6 +36,7 @@ import {
   SlidersHorizontal,
   Activity,
   Check,
+  PlusCircle,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -115,12 +116,19 @@ const navigationGroups = [
     name: 'OPERASIONAL HUMAS',
     items: [
       {
-        name: 'Manajemen Isu',
+        name: 'Laporan Polres & Isu',
         desc: 'Pemantauan & Eskalasi Berita',
         href: '/issues',
         icon: Flame,
         match: ['/issues'],
         badgeKey: 'total_issues',
+      },
+      {
+        name: 'Input Laporan Baru',
+        desc: 'Formulir Laporan Lapangan & Foto',
+        href: '/issues/create',
+        icon: PlusCircle,
+        match: ['/issues/create'],
       },
       {
         name: 'Antrean Verifikasi',

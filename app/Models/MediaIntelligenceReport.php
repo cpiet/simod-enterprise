@@ -52,3 +52,4 @@ class MediaIntelligenceReport extends Model
         return $this->belongsTo(Polda::class);
     }
 }
+
