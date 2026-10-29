@@ -17,6 +17,7 @@ Route::post('/login', [AuthController::class, 'login'])->name('login.post');
 // Dashboard & Media Intelligence
 Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
+Route::get('/command-center', [DashboardController::class, 'index'])->name('command-center');
 Route::get('/media-intelligence', [MediaIntelligenceController::class, 'index'])->name('media-intelligence');
 Route::post('/media-intelligence/ai-briefing', [MediaIntelligenceController::class, 'storeAiBriefing'])->name('media-intelligence.briefing');
 Route::post('/media-intelligence/rss-sources', [MediaIntelligenceController::class, 'storeRssSource'])->name('media-intelligence.rss.store');
