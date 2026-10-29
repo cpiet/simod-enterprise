@@ -70,3 +70,21 @@ Stream pencarian berbasis topik dan domain spesifik untuk menjaring pemberitaan 
 - **Eksekusi Seeder**: `php artisan db:seed --class=SulbarRssFeedsSeeder`
 - **Agregator Paralel**: [`app/Services/RssFeedService.php`](file:///d:/Foto/laragon/www/simod-enterprise/app/Services/RssFeedService.php)
 - **Controller Media Intelligence**: [`app/Http/Controllers/MediaIntelligenceController.php`](file:///d:/Foto/laragon/www/simod-enterprise/app/Http/Controllers/MediaIntelligenceController.php)
+
+---
+
+## 6. Diseminasi Naskah WhatsApp Siap Kirim ke Pimpinan
+Fitur naskah WhatsApp resmi siap kirim ke pimpinan telah diintegrasikan pada antarmuka Media Intelligence:
+- **Lokasi Akses**:
+  1. **Hero Action Bar**: Tombol `[📱 Format WA Pimpinan]` yang langsung membuka Tab 07.
+  2. **Tab 02 (Berita & Briefing)**: Tombol `[Salin Format WA Pimpinan]` pada header Executive Briefing dan komponen kartu dispatch interaktif di bagian bawah.
+  3. **Tab 07 (Naskah WA Pimpinan)**: Tampilan penuh dengan panduan alur distribusi berjenjang (Kapolda, Wakapolda, Irwasda), tombol Salin Naskah, Gulir Awal/Akhir, Mode Perluas/Perkecil, Unduh berkas `.txt`, dan tautan langsung ke WhatsApp Web.
+- **Standar Format Naskah**:
+  - **Header Resmi**: `*LAPORAN INTELIJEN MEDIA & SENTIMEN OPINI PUBLIK*` - `*BIDANG HUMAS POLDA SULAWESI BARAT*`.
+  - **Identitas & Tanggal**: Kepada Yth. Bapak Kapolda, Dari Kabid Humas, Tanggal dinas lengkap dengan waktu WITA.
+  - **Bagian I**: Situasi dan Analisis Kabid Humas (Sentimen Nasional vs Sulbar & Rincian Isu Aktual).
+  - **Bagian II**: Saran Langkah Tindak Lanjut beserta Satuan Pelaksana (PIC).
+  - **Bagian III**: Saran Pola Koordinasi & Evaluasi Waktu Nyata (0–2 jam, 2–6 jam, 24 jam).
+  - **Bagian IV**: Kesimpulan Kategori Status (*HIJAU / KUNING / MERAH*) dan Pertimbangan Strategis Pimpinan.
+  - **Tembusan**: Wakapolda dan Irwasda.
+

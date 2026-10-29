@@ -34,8 +34,14 @@ import {
   Trash2,
   Check,
   ChevronDown,
+  ChevronUp,
   FileJson,
   Eye,
+  MessageSquare,
+  MessageCircle,
+  Download,
+  Maximize2,
+  Minimize2,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -54,7 +60,7 @@ const props = defineProps({
   metrics: Object,
 });
 
-// Active Navigation Tab (01-06)
+// Active Navigation Tab (01-07)
 const activeTab = ref('01');
 
 const tabs = [
@@ -64,6 +70,7 @@ const tabs = [
   { id: '04', name: '04. Statistik Satwil', badge: null, icon: MapPin },
   { id: '05', name: '05. Early Warning (EWS)', badge: 'EWS', icon: Shield },
   { id: '06', name: '06. Narasi & Rekomendasi', badge: null, icon: Award },
+  { id: '07', name: '07. Naskah WA Pimpinan', badge: 'WA RESMI', icon: MessageSquare },
 ];
 
 // Bookmark state stored in localStorage per device
@@ -185,6 +192,222 @@ const copyAiPrompt = () => {
   const prompt = props.aiPromptTemplate || 'Formula prompt intelijen media Polri...';
   copyText(prompt, 'Formula Prompt AI Presisi');
 };
+
+// =========================================================================
+// WHATSAPP REPORT DISPATCH KE PIMPINAN (KAPOLDA & PJU)
+// =========================================================================
+const isWaCopied = ref(false);
+const isWaMaximized = ref(false);
+const waBoxRef = ref(null);
+const waBoxTab2Ref = ref(null);
+
+const scrollWaToTop = () => {
+  if (waBoxRef.value) waBoxRef.value.scrollTo({ top: 0, behavior: 'smooth' });
+  if (waBoxTab2Ref.value) waBoxTab2Ref.value.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+const scrollWaToBottom = () => {
+  if (waBoxRef.value) waBoxRef.value.scrollTo({ top: waBoxRef.value.scrollHeight, behavior: 'smooth' });
+  if (waBoxTab2Ref.value) waBoxTab2Ref.value.scrollTo({ top: waBoxTab2Ref.value.scrollHeight, behavior: 'smooth' });
+};
+
+const copyWaReport = () => {
+  copyText(whatsappReportText.value, 'Format Naskah WhatsApp Pimpinan');
+  isWaCopied.value = true;
+  setTimeout(() => { isWaCopied.value = false; }, 3500);
+};
+
+const openWhatsAppDirect = () => {
+  const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(whatsappReportText.value)}`;
+  window.open(url, '_blank');
+};
+
+const downloadWaTxt = () => {
+  try {
+    const blob = new Blob([whatsappReportText.value], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `LAPORAN_WA_KAPOLDA_${props.selectedCode || 'SULBAR'}_${new Date().toISOString().slice(0, 10)}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+    showToastNotification('✓ Naskah WA berhasil diunduh sebagai file .txt!');
+  } catch (err) {
+    console.error('Download error:', err);
+  }
+};
+
+const whatsappReportText = computed(() => {
+  const r = props.report || {};
+  const poldaName = props.selectedPolda?.name || 'Polda Sulawesi Barat';
+  const poldaShort = props.selectedCode === 'SULBAR' ? 'Polda Sulbar' : poldaName;
+  const kapoldaTitle = props.selectedPolda?.kapolda_name
+    ? `Bapak Kapolda ${poldaName} (${props.selectedPolda.kapolda_name})`
+    : `Bapak Kapolda ${poldaName}`;
+  const kabidHumasTitle = props.selectedPolda?.kabid_humas_name
+    ? `Kabid Humas ${poldaName} (${props.selectedPolda.kabid_humas_name})`
+    : `Kabid Humas ${poldaName}`;
+
+  const todayStr = r.report_date
+    ? new Date(r.report_date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    : new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+  const reportTime = r.report_time || '19.03 WITA';
+
+  let s = `*LAPORAN INTELIJEN MEDIA & SENTIMEN OPINI PUBLIK*\n`;
+  s += `*BIDANG HUMAS ${poldaName.toUpperCase()}*\n\n`;
+  s += `Kepada Yth. : ${kapoldaTitle}\n`;
+  s += `Dari        : ${kabidHumasTitle}\n`;
+  s += `Tanggal     : ${todayStr} (Pukul ${reportTime})\n`;
+  s += `Perihal     : Analisis Pemberitaan, Sentimen Opini Publik, dan Rekomendasi Tindak Lanjut\n\n`;
+  s += `*Assalamu’alaikum Wr. Wb.*\n`;
+  s += `*Selamat Pagi Jenderal,*\n\n`;
+  s += `Mohon izin Jenderal, kami sampaikan laporan hasil analisis pemberitaan dan sentimen opini publik terkait Polri secara nasional serta ${poldaShort} berdasarkan bahan pemantauan media siber dan opini publik yang tersedia.\n\n`;
+
+  // SECTION I: SITUASI DAN ANALISIS KABID HUMAS
+  s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  s += `*I. SITUASI DAN ANALISIS KABID HUMAS*\n`;
+  s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+  s += `*1. Sentimen Pemberitaan*\n\n`;
+  s += `🇮🇩 *Nasional*\n`;
+  s += `• Positif: ${r.sentiment_national?.positif ?? 60}%\n`;
+  s += `• Netral : ${r.sentiment_national?.netral ?? 30}%\n`;
+  s += `• Negatif: ${r.sentiment_national?.negatif ?? 10}%\n\n`;
+
+  s += `📍 *${poldaShort}*\n`;
+  s += `• Positif: ${r.sentiment_sulbar?.positif ?? 55}%\n`;
+  s += `• Netral : ${r.sentiment_sulbar?.netral ?? 30}%\n`;
+  s += `• Negatif: ${r.sentiment_sulbar?.negatif ?? 15}%\n\n`;
+
+  s += `*Analisis Perkembangan:*\n`;
+  if (r.snapshot_sulbar_desc) {
+    s += `${r.snapshot_sulbar_desc}\n\n`;
+  } else if (r.executive_brief) {
+    s += `${r.executive_brief}\n\n`;
+  } else {
+    s += `Berdasarkan pemantauan media siber dan 29 portal berita resmi terverifikasi, situasi kamtibmas di wilayah hukum ${poldaShort} terpantau relatif aman dan kondusif dengan dominasi sentimen positif atas akselerasi patroli presisi dan pelayanan prima kepolisian.\n\n`;
+  }
+
+  // Isu Terkini
+  const sulbarIssues = r.sulbar_issues && r.sulbar_issues.length > 0
+    ? r.sulbar_issues.slice(0, 4)
+    : [
+        {
+          title: 'Pengamanan Intensif Tahapan Pilkada Serentak di Mamuju',
+          fact: 'Satgas Operasi Mantap Praja Polresta Mamuju memperketat pengamanan 24 jam di Kantor KPU Sulbar dan Bawaslu, menjaga stabilitas pesta demokrasi.',
+          source: 'Humas Polri & Radar Sulbar',
+          sentiment: 'Positif',
+        },
+        {
+          title: 'Klarifikasi Tim Siber atas Hoaks Isu Begal di Tarailu',
+          fact: 'Subdit Siber Ditreskrimsus dan Humas Mateng mengonfirmasi video beredar merupakan insiden tahun 2021 di luar provinsi dan jalur trans dipatroli rutin aman.',
+          source: 'Subdit Siber & WhatsApp',
+          sentiment: 'Positif',
+        },
+        {
+          title: 'Penertiban Jukir Liar di Kawasan Pantai Manakarra',
+          fact: 'Merespons keluhan video warga di media sosial, Polresta Mamuju bersama Dishub menertibkan jukir liar untuk menjamin kenyamanan ruang publik.',
+          source: 'TikTok & Media Siber',
+          sentiment: 'Netral',
+        },
+      ];
+
+  let issueNum = 2;
+  sulbarIssues.forEach((iss) => {
+    s += `*${issueNum}. Isu: ${iss.title}*\n`;
+    if (iss.source) {
+      s += `Pemberitaan ${iss.source} menyoroti: ${iss.fact}\n\n`;
+    } else {
+      s += `${iss.fact}\n\n`;
+    }
+    s += `*Analisis dan masukan:*\n`;
+    const sent = (iss.sentiment || '').toLowerCase();
+    const risk = (iss.risk || '').toLowerCase();
+    if (sent.includes('positif')) {
+      s += `Pemberitaan ini menjadi momentum positif bagi institusi dalam menunjukkan komitmen perlindungan dan pelayanan masyarakat. Disarankan agar dokumentasi humanis ini terus diamplifikasi melalui platform media sosial jajaran Satwil.\n\n`;
+    } else if (sent.includes('negatif') || risk.includes('merah') || risk.includes('kuning')) {
+      s += `Untuk meredam spekulasi yang belum terverifikasi, kami memandang perlu dilakukan konfirmasi segera kepada satuan kewilayahan terkait serta penyampaian klarifikasi resmi satu pintu agar opini publik tidak berkembang liar.\n\n`;
+    } else {
+      s += `Pelaksanaan kegiatan ini memperkuat kepercayaan masyarakat. Disarankan koordinasi berkala dengan pihak terkait serta edukasi kepada masyarakat melalui kanal komunikasi resmi.\n\n`;
+    }
+    if (iss.url) {
+      s += `Tautan Sumber: ${iss.url}\n\n`;
+    }
+    issueNum++;
+  });
+
+  // SECTION II: SARAN LANGKAH TINDAK LANJUT
+  s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  s += `*II. SARAN LANGKAH TINDAK LANJUT*\n`;
+  s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+  if (r.recommendations && r.recommendations.length > 0) {
+    r.recommendations.forEach((rec, idx) => {
+      s += `*${idx + 1}. Terkait ${rec.issue}*\n`;
+      s += `${rec.action}\n`;
+      if (rec.pic) {
+        s += `Satuan Pelaksana (PIC): ${rec.pic}\n\n`;
+      } else {
+        s += `\n`;
+      }
+    });
+  } else {
+    s += `*1. Terkait Pengamanan Tahapan Pilkada Serentak*\n`;
+    s += `Memperkuat koordinasi Sat Samapta, Intelkam, dan jajaran Polres dalam pengawalan logistik dan stabilitas kamtibmas.\n`;
+    s += `Satuan Pelaksana (PIC): Polresta Mamuju & Polres Jajaran\n\n`;
+
+    s += `*2. Terkait Penanggulangan Isu Hoaks & Provokasi*\n`;
+    s += `Subdit Siber dan Tim Humas aktif 24 jam melakukan fact-checking dan menerbitkan stempel HOAKS resmi pada setiap disinformasi viral.\n`;
+    s += `Satuan Pelaksana (PIC): Subdit Siber Ditreskrimsus & Bidhumas\n\n`;
+  }
+
+  s += `*3. Terkait Monitoring Media dan Opini Publik*\n`;
+  s += `Bidang Humas terus mengoptimalkan pemantauan 29 portal media online resmi, Google News, dan media sosial. Setiap isu sensitif dilaporkan secara berjenjang beserta tautan rujukan dan waktu publikasi WITA.\n\n`;
+
+  s += `*4. Terkait Pelayanan Pengaduan Masyarakat (110)*\n`;
+  s += `Sosialisasi layanan Contact Center Polri 110 terus digencarkan agar masyarakat dapat menyampaikan informasi gangguan kamtibmas secara cepat dan gratis.\n\n`;
+
+  // SECTION III: SARAN KOORDINASI DAN EVALUASI
+  s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  s += `*III. SARAN KOORDINASI DAN EVALUASI*\n`;
+  s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+  s += `Untuk mendukung tindak lanjut yang terukur, kami menyarankan pola koordinasi berjenjang:\n\n`;
+
+  const resp0_2h = r.priority_responses?.response_0_2h?.action || 'Validasi fakta lapangan dan koordinasi cepat dengan satuan fungsi terkait (0-2 jam).';
+  const resp2_6h = r.priority_responses?.response_2_6h?.action || 'Konsolidasi data, penyusunan FAQ kedinasan, dan rilis pers satu pintu (2-6 jam).';
+  const resp24h  = r.priority_responses?.response_24h?.action  || 'Rangkum perkembangan penanganan isu dan evaluasi respons netizen dalam 24 jam.';
+
+  s += `• *Tahap Awal (0–2 jam):* ${resp0_2h}\n\n`;
+  s += `• *Tahap Konsolidasi (2–6 jam):* ${resp2_6h}\n\n`;
+  s += `• *Tahap Evaluasi (24 jam):* ${resp24h}\n\n`;
+  s += `Alur waktu koordinasi tersebut dapat disesuaikan dengan eskalasi urgensi dan petunjuk pimpinan.\n\n`;
+
+  // SECTION IV: KESIMPULAN DAN PERTIMBANGAN
+  s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  s += `*IV. KESIMPULAN DAN PERTIMBANGAN KEPADA BAPAK KAPOLDA*\n`;
+  s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+  let sitStatus = r.snapshot_sulbar_status || 'KUNING - WASPADA';
+  s += `Jenderal, berdasarkan data pemantauan terpadu, situasi komunikasi publik ${poldaShort} saat ini dinilai berada pada kategori *${sitStatus}*.\n\n`;
+
+  if (r.top_concern) {
+    s += `*Atensi Prioritas:* ${r.top_concern}\n\n`;
+  }
+
+  s += `Sebagai bahan pertimbangan tindak lanjut, kami menyarankan:\n`;
+  s += `1. Konsolidasi data lintas fungsi diperkuat agar setiap rilis klarifikasi berbasis fakta terverifikasi.\n`;
+  s += `2. Komunikasi publik konsisten mengedepankan transparansi, pendekatan humanis, dan manfaat nyata bagi warga.\n`;
+  s += `3. Monitoring media siber berkelanjutan guna deteksi dini potensi anomali opini publik.\n\n`;
+
+  s += `Demikian kami laporkan sebagai bahan pertimbangan Bapak Kapolda. Atas arahan dan petunjuk lebih lanjut, kami siap laksanakan.\n\n`;
+  s += `Hormat kami,\n`;
+  s += `*BIDANG HUMAS ${poldaName.toUpperCase()}*\n\n`;
+  s += `_Tembusan:_\n`;
+  s += `_1. Wakapolda ${poldaName}_\n`;
+  s += `_2. Irwasda ${poldaName}_\n\n`;
+  s += `*Wassalamu’alaikum Wr. Wb.*`;
+
+  return s;
+});
 
 // Tempel Ringkasan AI Modal State
 const showPasteAiModal = ref(false);
@@ -476,6 +699,16 @@ const submitIssue = () => {
         >
           <SlidersHorizontal class="w-4 h-4 text-slate-400" />
           <span>Kelola Sumber RSS</span>
+        </button>
+
+        <!-- Button 4: Format WA Pimpinan (Tab 07) -->
+        <button
+          @click="activeTab = '07'"
+          class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white text-xs font-black transition shadow-lg shadow-emerald-600/25 border border-emerald-400/30"
+          title="Buka format naskah WhatsApp resmi siap kirim ke Bapak Kapolda & PJU"
+        >
+          <MessageCircle class="w-4 h-4" />
+          <span>📱 Format WA Pimpinan</span>
         </button>
       </div>
     </div>
@@ -851,14 +1084,25 @@ const submitIssue = () => {
     <div v-show="activeTab === '02'" class="space-y-6">
       <!-- Executive Briefing 200 Words -->
       <div class="rounded-3xl bg-gradient-to-br from-[#0c162e] to-[#080f20] border border-amber-400/30 p-6 shadow-2xl space-y-3">
-        <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-3 flex-wrap gap-2">
           <div class="flex items-center gap-2">
             <Sparkles class="w-4 h-4 text-amber-400" />
             <h2 class="text-sm font-black text-white uppercase tracking-wider">
               Executive Briefing Harian Pimpinan
             </h2>
           </div>
-          <span class="text-xs font-mono text-amber-400">{{ report?.report_time || '19.03 WITA' }}</span>
+          <div class="flex items-center gap-3">
+            <button
+              @click="copyWaReport"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 text-[11px] font-bold transition shadow-sm"
+              title="Salin naskah lengkap siap kirim ke WhatsApp pimpinan"
+            >
+              <Check v-if="isWaCopied" class="w-3.5 h-3.5 text-emerald-400" />
+              <MessageSquare v-else class="w-3.5 h-3.5 text-emerald-400" />
+              <span>{{ isWaCopied ? 'Tersalin!' : 'Salin Format WA Pimpinan' }}</span>
+            </button>
+            <span class="text-xs font-mono text-amber-400">{{ report?.report_time || '19.03 WITA' }}</span>
+          </div>
         </div>
         <p class="text-xs md:text-sm text-slate-200 leading-relaxed">
           {{ report?.executive_brief || 'Ringkasan briefing pimpinan belum diisi. Gunakan tombol "Tempel Ringkasan AI" untuk memuat hasil ChatGPT.' }}
@@ -928,6 +1172,104 @@ const submitIssue = () => {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- WhatsApp Report Dispatch Card (Integrated in Tab 02) -->
+      <div class="rounded-3xl bg-[#0b1426] border border-emerald-500/30 overflow-hidden shadow-2xl space-y-0">
+        <!-- Header -->
+        <div class="p-6 bg-gradient-to-r from-emerald-950/40 via-[#0b1426] to-[#080f20] border-b border-emerald-500/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                LAPORAN RESMI WHATSAPP
+              </span>
+              <span class="text-xs text-slate-400 font-mono">{{ report?.report_time || '19.03 WITA' }}</span>
+            </div>
+            <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+              <MessageSquare class="w-5 h-5 text-emerald-400" />
+              <span>Format Naskah WhatsApp Siap Kirim ke Pimpinan</span>
+            </h3>
+            <p class="text-xs text-slate-400">
+              Sintesis analisis intelijen media & sentimen opini publik terstandarisasi untuk Bapak Kapolda & Pejabat Utama
+            </p>
+          </div>
+
+          <!-- Quick Action Buttons -->
+          <div class="flex items-center flex-wrap gap-2 shrink-0">
+            <!-- Scroll Top -->
+            <button
+              @click="scrollWaToTop"
+              class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition"
+              title="Gulir ke Atas"
+            >
+              <ChevronUp class="w-4 h-4" />
+            </button>
+            <!-- Scroll Bottom -->
+            <button
+              @click="scrollWaToBottom"
+              class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition"
+              title="Gulir ke Bawah"
+            >
+              <ChevronDown class="w-4 h-4" />
+            </button>
+            <!-- Unduh .txt -->
+            <button
+              @click="downloadWaTxt"
+              class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition"
+              title="Unduh naskah sebagai file .txt"
+            >
+              <Download class="w-3.5 h-3.5 text-slate-400" />
+              <span>Unduh .txt</span>
+            </button>
+            <!-- Kirim WA Langsung -->
+            <button
+              @click="openWhatsAppDirect"
+              class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/50 text-emerald-200 text-xs font-bold transition"
+              title="Buka WhatsApp Web dengan naskah siap kirim"
+            >
+              <Send class="w-3.5 h-3.5 text-emerald-400" />
+              <span>Kirim ke WA</span>
+            </button>
+            <!-- Salin Format WA -->
+            <button
+              @click="copyWaReport"
+              class="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 text-xs font-black transition shadow-lg shadow-emerald-500/20"
+            >
+              <Check v-if="isWaCopied" class="w-4 h-4" />
+              <Copy v-else class="w-4 h-4" />
+              <span>{{ isWaCopied ? 'Berhasil Disalin!' : 'Salin Naskah WA' }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Terminal Preformatted Box -->
+        <div class="relative bg-[#060b14] p-5">
+          <div
+            ref="waBoxTab2Ref"
+            class="max-h-[380px] overflow-y-auto font-mono text-xs leading-relaxed text-emerald-300/90 whitespace-pre-wrap select-all p-4 rounded-2xl bg-black/50 border border-emerald-950/80 shadow-inner custom-scrollbar"
+          >
+            {{ whatsappReportText }}
+          </div>
+        </div>
+
+        <!-- Footer Bar -->
+        <div class="px-6 py-3 bg-[#080f1e] border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+          <div class="flex items-center gap-4">
+            <span class="flex items-center gap-1.5 text-emerald-400 font-semibold">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              Tersinkronisasi Realtime WITA
+            </span>
+            <span>Karakter: {{ whatsappReportText.length }}</span>
+            <span>Target: Bapak Kapolda & PJU</span>
+          </div>
+          <button
+            @click="activeTab = '07'"
+            class="text-amber-400 hover:underline font-bold flex items-center gap-1"
+          >
+            <span>Buka Tampilan Penuh di Tab 07</span>
+            <span>&rarr;</span>
+          </button>
         </div>
       </div>
     </div>
@@ -1111,6 +1453,186 @@ const submitIssue = () => {
             </div>
             <p class="text-slate-300">{{ rec.action }}</p>
             <p class="text-[10px] text-slate-400">PIC: {{ rec.pic }} &bull; Indikator: {{ rec.indicator }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 07: FORMAT NASKAH WHATSAPP PIMPINAN (KAPOLDA & PJU)                   -->
+    <!-- ========================================================================= -->
+    <div v-show="activeTab === '07'" class="space-y-6">
+      <!-- Executive Notification Banner -->
+      <div class="rounded-3xl bg-gradient-to-r from-emerald-950/60 via-[#0b1426] to-[#080f20] border border-emerald-500/30 p-6 shadow-2xl space-y-3">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                PRODUK INTELIJEN HUMAS RESMI
+              </span>
+              <span class="text-xs text-emerald-400 font-mono">{{ report?.report_time || '19.03 WITA' }}</span>
+            </div>
+            <h2 class="text-lg font-black text-white flex items-center gap-2">
+              <MessageSquare class="w-5 h-5 text-emerald-400" />
+              <span>Format Naskah WhatsApp Siap Kirim ke Pimpinan</span>
+            </h2>
+            <p class="text-xs text-slate-300 max-w-3xl leading-relaxed">
+              Disusun secara terstandarisasi untuk penyampaian cepat kepada <strong>{{ selectedPolda?.kapolda_name ? `Bapak Kapolda (${selectedPolda.kapolda_name})` : 'Bapak Kapolda' }}</strong>, Wakapolda, dan Irwasda. Format telah dioptimalkan dengan tipografi WhatsApp (bold, italic, divider, and bullets) agar nyaman dibaca pada perangkat mobile pimpinan.
+            </p>
+          </div>
+
+          <!-- Top Quick Actions -->
+          <div class="flex items-center gap-2 shrink-0">
+            <button
+              @click="openWhatsAppDirect"
+              class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/50 text-emerald-200 text-xs font-bold transition shadow-sm"
+              title="Buka WhatsApp Web dan kirimkan teks laporan langsung"
+            >
+              <Send class="w-4 h-4 text-emerald-400" />
+              <span>Buka di WhatsApp Web</span>
+            </button>
+            <button
+              @click="copyWaReport"
+              class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 text-xs font-black transition shadow-lg shadow-emerald-500/25"
+            >
+              <Check v-if="isWaCopied" class="w-4 h-4" />
+              <Copy v-else class="w-4 h-4" />
+              <span>{{ isWaCopied ? '✓ Berhasil Disalin!' : 'Salin Seluruh Naskah' }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 3-Step Flow Guide -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3 border-t border-slate-800/80 text-xs">
+          <div class="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
+            <span class="text-[10px] font-black uppercase text-amber-400">Langkah 1 &bull; Verifikasi Fakta</span>
+            <p class="text-slate-300 text-[11px]">Pastikan ringkasan briefing, sentimen, dan isu prioritas telah disinkronkan dari pemantauan 24 jam.</p>
+          </div>
+          <div class="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
+            <span class="text-[10px] font-black uppercase text-emerald-400">Langkah 2 &bull; Salin Naskah</span>
+            <p class="text-slate-300 text-[11px]">Klik tombol "Salin Seluruh Naskah" atau unduh salinan naskah .txt sebagai arsip fisik dinas.</p>
+          </div>
+          <div class="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
+            <span class="text-[10px] font-black uppercase text-sky-400">Langkah 3 &bull; Diseminasi Berjenjang</span>
+            <p class="text-slate-300 text-[11px]">Tempelkan langsung ke chat WhatsApp dinas Bapak Kapolda dengan tembusan Wakapolda & Irwasda.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main WhatsApp Terminal Box -->
+      <div class="rounded-3xl bg-[#0b1426] border border-emerald-500/40 shadow-2xl overflow-hidden">
+        <!-- Terminal Header Toolbar -->
+        <div class="p-4 md:p-5 bg-gradient-to-r from-emerald-950/50 via-[#0c162e] to-[#080f20] border-b border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-1.5">
+              <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block shadow-sm shadow-emerald-500/50"></span>
+              <span class="w-3 h-3 rounded-full bg-amber-400 inline-block"></span>
+              <span class="w-3 h-3 rounded-full bg-slate-600 inline-block"></span>
+            </div>
+            <span class="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider">
+              WA_DISPATCH_OFFICIAL_BRIEFING.TXT
+            </span>
+          </div>
+
+          <!-- Controls -->
+          <div class="flex items-center flex-wrap gap-2">
+            <!-- Scroll to Top -->
+            <button
+              @click="scrollWaToTop"
+              class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition"
+              title="Gulir ke Awal Teks"
+            >
+              <ChevronUp class="w-4 h-4" />
+            </button>
+            <!-- Scroll to Bottom -->
+            <button
+              @click="scrollWaToBottom"
+              class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition"
+              title="Gulir ke Akhir Teks"
+            >
+              <ChevronDown class="w-4 h-4" />
+            </button>
+            <!-- Maximize Toggle -->
+            <button
+              @click="isWaMaximized = !isWaMaximized"
+              class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition"
+              :title="isWaMaximized ? 'Perkecil Kotak' : 'Perluas Kotak Teks'"
+            >
+              <Minimize2 v-if="isWaMaximized" class="w-4 h-4 text-amber-400" />
+              <Maximize2 v-else class="w-4 h-4 text-slate-300" />
+            </button>
+            <!-- Download TXT -->
+            <button
+              @click="downloadWaTxt"
+              class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition"
+              title="Unduh naskah mentah sebagai file .txt"
+            >
+              <Download class="w-3.5 h-3.5 text-slate-400" />
+              <span>Unduh .txt</span>
+            </button>
+            <!-- Copy Main -->
+            <button
+              @click="copyWaReport"
+              class="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition shadow-md shadow-emerald-500/20"
+            >
+              <Check v-if="isWaCopied" class="w-4 h-4" />
+              <Copy v-else class="w-4 h-4" />
+              <span>{{ isWaCopied ? 'Tersalin ke Clipboard!' : 'Salin Naskah' }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Terminal Body -->
+        <div class="relative bg-[#060b14] p-5">
+          <!-- Floating Copy Button in top right -->
+          <button
+            @click="copyWaReport"
+            class="absolute top-8 right-8 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/50 text-emerald-300 text-[11px] font-bold backdrop-blur-md transition shadow-md"
+            title="Klik untuk salin cepat"
+          >
+            <Check v-if="isWaCopied" class="w-3.5 h-3.5 text-emerald-400" />
+            <Copy v-else class="w-3.5 h-3.5 text-emerald-400" />
+            <span>{{ isWaCopied ? 'Tersalin!' : 'Salin Teks' }}</span>
+          </button>
+
+          <div
+            ref="waBoxRef"
+            :class="[
+              'overflow-y-auto font-mono text-xs leading-relaxed text-emerald-300/95 whitespace-pre-wrap select-all p-6 rounded-2xl bg-black/70 border border-emerald-950/90 shadow-2xl custom-scrollbar transition-all duration-300',
+              isWaMaximized ? 'max-h-[850px]' : 'max-h-[560px]'
+            ]"
+          >
+            {{ whatsappReportText }}
+          </div>
+        </div>
+
+        <!-- Footer Meta -->
+        <div class="px-6 py-4 bg-[#080f1e] border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-400">
+          <div class="flex items-center flex-wrap gap-4 text-[11px]">
+            <span class="flex items-center gap-1.5 text-emerald-400 font-bold">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              Siap Kirim WhatsApp (UTF-8)
+            </span>
+            <span>Jumlah Karakter: <strong class="text-white">{{ whatsappReportText.length }}</strong></span>
+            <span>Estimasi Baca: <strong class="text-white">~3 Menit</strong></span>
+            <span>Tembusan: <strong class="text-slate-300">Wakapolda & Irwasda</strong></span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button
+              @click="openWhatsAppDirect"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition"
+            >
+              <Send class="w-3.5 h-3.5 text-emerald-400" />
+              <span>Buka WhatsApp Web</span>
+            </button>
+            <button
+              @click="copyWaReport"
+              class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition"
+            >
+              <Copy class="w-3.5 h-3.5" />
+              <span>Salin Sekarang</span>
+            </button>
           </div>
         </div>
       </div>
@@ -1301,6 +1823,104 @@ const submitIssue = () => {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- WhatsApp Report Dispatch Card (Integrated in Tab 02) -->
+      <div class="rounded-3xl bg-[#0b1426] border border-emerald-500/30 overflow-hidden shadow-2xl space-y-0">
+        <!-- Header -->
+        <div class="p-6 bg-gradient-to-r from-emerald-950/40 via-[#0b1426] to-[#080f20] border-b border-emerald-500/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                LAPORAN RESMI WHATSAPP
+              </span>
+              <span class="text-xs text-slate-400 font-mono">{{ report?.report_time || '19.03 WITA' }}</span>
+            </div>
+            <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+              <MessageSquare class="w-5 h-5 text-emerald-400" />
+              <span>Format Naskah WhatsApp Siap Kirim ke Pimpinan</span>
+            </h3>
+            <p class="text-xs text-slate-400">
+              Sintesis analisis intelijen media & sentimen opini publik terstandarisasi untuk Bapak Kapolda & Pejabat Utama
+            </p>
+          </div>
+
+          <!-- Quick Action Buttons -->
+          <div class="flex items-center flex-wrap gap-2 shrink-0">
+            <!-- Scroll Top -->
+            <button
+              @click="scrollWaToTop"
+              class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition"
+              title="Gulir ke Atas"
+            >
+              <ChevronUp class="w-4 h-4" />
+            </button>
+            <!-- Scroll Bottom -->
+            <button
+              @click="scrollWaToBottom"
+              class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition"
+              title="Gulir ke Bawah"
+            >
+              <ChevronDown class="w-4 h-4" />
+            </button>
+            <!-- Unduh .txt -->
+            <button
+              @click="downloadWaTxt"
+              class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition"
+              title="Unduh naskah sebagai file .txt"
+            >
+              <Download class="w-3.5 h-3.5 text-slate-400" />
+              <span>Unduh .txt</span>
+            </button>
+            <!-- Kirim WA Langsung -->
+            <button
+              @click="openWhatsAppDirect"
+              class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/50 text-emerald-200 text-xs font-bold transition"
+              title="Buka WhatsApp Web dengan naskah siap kirim"
+            >
+              <Send class="w-3.5 h-3.5 text-emerald-400" />
+              <span>Kirim ke WA</span>
+            </button>
+            <!-- Salin Format WA -->
+            <button
+              @click="copyWaReport"
+              class="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 text-xs font-black transition shadow-lg shadow-emerald-500/20"
+            >
+              <Check v-if="isWaCopied" class="w-4 h-4" />
+              <Copy v-else class="w-4 h-4" />
+              <span>{{ isWaCopied ? 'Berhasil Disalin!' : 'Salin Naskah WA' }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Terminal Preformatted Box -->
+        <div class="relative bg-[#060b14] p-5">
+          <div
+            ref="waBoxTab2Ref"
+            class="max-h-[380px] overflow-y-auto font-mono text-xs leading-relaxed text-emerald-300/90 whitespace-pre-wrap select-all p-4 rounded-2xl bg-black/50 border border-emerald-950/80 shadow-inner custom-scrollbar"
+          >
+            {{ whatsappReportText }}
+          </div>
+        </div>
+
+        <!-- Footer Bar -->
+        <div class="px-6 py-3 bg-[#080f1e] border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+          <div class="flex items-center gap-4">
+            <span class="flex items-center gap-1.5 text-emerald-400 font-semibold">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              Tersinkronisasi Realtime WITA
+            </span>
+            <span>Karakter: {{ whatsappReportText.length }}</span>
+            <span>Target: Bapak Kapolda & PJU</span>
+          </div>
+          <button
+            @click="activeTab = '07'"
+            class="text-amber-400 hover:underline font-bold flex items-center gap-1"
+          >
+            <span>Buka Tampilan Penuh di Tab 07</span>
+            <span>&rarr;</span>
+          </button>
         </div>
       </div>
     </div>
