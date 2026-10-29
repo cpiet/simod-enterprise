@@ -75,15 +75,53 @@ const switchTenant = (code) => {
   router.get(url.pathname, { polda: code }, { preserveScroll: true });
 };
 
-// Check if a route is currently active
-const isRouteActive = (paths) => {
-  if (!Array.isArray(paths)) paths = [paths];
-  const currentPath = window.location.pathname;
+// Merged global & page metrics for accurate dynamic badges across all routes
+const displayMetrics = computed(() => {
+  return {
+    ...(page.props?.sidebarMetrics || {}),
+    ...(props.metrics || {}),
+  };
+});
+
+// Check if a route is currently active with reactive URL tracking & collision prevention
+const isRouteActive = (target) => {
+  if (!target) return false;
+
+  // 1. Reactive current URL from Inertia usePage()
+  const rawUrl = page.url || (typeof window !== 'undefined' ? window.location.pathname : '');
+  const currentPath = (rawUrl.split('?')[0].replace(/\/+$/, '') || '/').toLowerCase();
+
+  // Normalize target to object
+  const item = typeof target === 'object' && !Array.isArray(target) ? target : { match: target };
+
+  // 2. Check exclusions first (e.g. /issues/create is excluded from /issues)
+  if (item.exclude && Array.isArray(item.exclude)) {
+    const isExcluded = item.exclude.some(ex => {
+      const cleanEx = (ex.split('?')[0].replace(/\/+$/, '') || '/').toLowerCase();
+      return currentPath === cleanEx || currentPath.startsWith(cleanEx + '/');
+    });
+    if (isExcluded) return false;
+  }
+
+  // 3. Candidate paths to match against
+  const paths = Array.isArray(item.match) ? item.match : (item.href ? [item.href] : [item]);
+
   return paths.some(p => {
-    if (p === '/' || p === '/dashboard') {
-      return currentPath === '/' || currentPath === '/dashboard';
+    if (typeof p !== 'string') return false;
+    const cleanP = (p.split('?')[0].replace(/\/+$/, '') || '/').toLowerCase();
+
+    // Command Center / Home exact matching
+    if (cleanP === '/' || cleanP === '/dashboard' || cleanP === '/command-center') {
+      return currentPath === '/' || currentPath === '/dashboard' || currentPath === '/command-center';
     }
-    return currentPath.startsWith(p);
+
+    // Explicit exact match requested on item
+    if (item.exact) {
+      return currentPath === cleanP;
+    }
+
+    // Exact match or subpath boundary (e.g. /issues/123 matches /issues, but not /issues-archive)
+    return currentPath === cleanP || currentPath.startsWith(cleanP + '/');
   });
 };
 
@@ -97,13 +135,13 @@ const navigationGroups = [
         desc: 'Ringkasan Eksekutif & EWS',
         href: '/',
         icon: LayoutDashboard,
-        match: ['/', '/dashboard'],
+        match: ['/', '/dashboard', '/command-center'],
         badge: 'LIVE',
         badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
       },
       {
         name: 'Media Intelligence',
-        desc: 'Radar 14 RSS & Sentimen Satwil',
+        desc: 'Radar 29 RSS & Sentimen Satwil',
         href: '/media-intelligence',
         icon: Radio,
         match: ['/media-intelligence'],
@@ -121,6 +159,7 @@ const navigationGroups = [
         href: '/issues',
         icon: Flame,
         match: ['/issues'],
+        exclude: ['/issues/create'],
         badgeKey: 'total_issues',
       },
       {
@@ -129,6 +168,7 @@ const navigationGroups = [
         href: '/issues/create',
         icon: PlusCircle,
         match: ['/issues/create'],
+        exact: true,
       },
       {
         name: 'Antrean Verifikasi',
@@ -293,21 +333,21 @@ const navigationGroups = [
             :key="item.name"
             :href="`${item.href}?polda=${selectedCode}`"
             class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition group relative"
-            :class="isRouteActive(item.match)
+            :class="isRouteActive(item)
               ? 'bg-amber-400 text-slate-950 font-black shadow-md shadow-amber-400/20'
               : 'text-slate-200 hover:text-white hover:bg-slate-800/70'"
             :title="isDesktopSidebarCollapsed ? item.name : undefined"
           >
             <!-- Active Indicator Pill on left -->
             <div
-              v-if="isRouteActive(item.match) && !isDesktopSidebarCollapsed"
+              v-if="isRouteActive(item) && !isDesktopSidebarCollapsed"
               class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r bg-slate-950"
             ></div>
 
             <component
               :is="item.icon"
               class="w-4 h-4 flex-shrink-0 transition-transform group-hover:scale-110"
-              :class="isRouteActive(item.match) ? 'text-slate-950' : 'text-slate-300 group-hover:text-amber-400'"
+              :class="isRouteActive(item) ? 'text-slate-950' : 'text-slate-300 group-hover:text-amber-400'"
             />
 
             <div v-if="!isDesktopSidebarCollapsed" class="min-w-0 flex-1">
@@ -318,18 +358,18 @@ const navigationGroups = [
                 <span
                   v-if="item.badge"
                   class="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-black uppercase border"
-                  :class="isRouteActive(item.match) ? 'bg-slate-950 text-amber-400 border-slate-900' : (item.badgeColor || 'bg-slate-800 text-slate-300 border-slate-700')"
+                  :class="isRouteActive(item) ? 'bg-slate-950 text-amber-400 border-slate-900' : (item.badgeColor || 'bg-slate-800 text-slate-300 border-slate-700')"
                 >
                   {{ item.badge }}
                 </span>
 
                 <!-- Dynamic Metric Badge -->
                 <span
-                  v-else-if="item.badgeKey && metrics[item.badgeKey]"
+                  v-else-if="item.badgeKey && displayMetrics[item.badgeKey]"
                   class="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-black"
-                  :class="isRouteActive(item.match) ? 'bg-slate-950 text-amber-400' : (item.badgeColor || 'bg-slate-800 text-amber-400 border border-slate-700/60')"
+                  :class="isRouteActive(item) ? 'bg-slate-950 text-amber-400' : (item.badgeColor || 'bg-slate-800 text-amber-400 border border-slate-700/60')"
                 >
-                  {{ metrics[item.badgeKey] }}
+                  {{ displayMetrics[item.badgeKey] }}
                 </span>
               </div>
             </div>
@@ -406,18 +446,29 @@ const navigationGroups = [
             :href="`${item.href}?polda=${selectedCode}`"
             @click="isMobileSidebarOpen = false"
             class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition"
-            :class="isRouteActive(item.match)
+            :class="isRouteActive(item)
               ? 'bg-amber-400 text-slate-950 font-black'
               : 'text-slate-300 hover:text-white hover:bg-slate-800/80'"
           >
             <component :is="item.icon" class="w-4 h-4" />
             <span class="flex-1">{{ item.name }}</span>
+
+            <!-- Static Badge Mobile -->
             <span
-              v-if="item.badgeKey && metrics[item.badgeKey]"
-              class="px-2 py-0.5 rounded-full text-[10px] font-black"
-              :class="isRouteActive(item.match) ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-amber-400'"
+              v-if="item.badge"
+              class="px-1.5 py-0.5 rounded text-[9px] font-black uppercase border"
+              :class="isRouteActive(item) ? 'bg-slate-950 text-amber-400 border-slate-900' : (item.badgeColor || 'bg-slate-800 text-slate-300 border-slate-700')"
             >
-              {{ metrics[item.badgeKey] }}
+              {{ item.badge }}
+            </span>
+
+            <!-- Dynamic Metric Badge Mobile -->
+            <span
+              v-else-if="item.badgeKey && displayMetrics[item.badgeKey]"
+              class="px-2 py-0.5 rounded-full text-[10px] font-black"
+              :class="isRouteActive(item) ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-amber-400'"
+            >
+              {{ displayMetrics[item.badgeKey] }}
             </span>
           </Link>
         </div>

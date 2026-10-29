@@ -35,6 +35,20 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $selectedCode = $request->query('polda', 'SULBAR');
+        $selectedPolda = null;
+        if ($selectedCode !== 'ALL') {
+            $selectedPolda = \App\Models\Polda::where('code', $selectedCode)->first();
+        }
+
+        $sidebarMetrics = [
+            'total_issues'       => \App\Models\Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
+            'pending_verify'     => \App\Models\Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->whereIn('status', ['monitoring', 'investigasi'])->count(),
+            'active_tasks'       => \App\Models\Task::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('status', 'in_progress')->count(),
+            'total_publications' => \App\Models\Publication::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
+            'server_wita'        => now()->setTimezone($selectedPolda->timezone ?? 'Asia/Makassar')->format('d M Y, H:i:s') . ' WITA',
+        ];
+
         return [
             ...parent::share($request),
             'auth' => [
@@ -46,6 +60,7 @@ class HandleInertiaRequests extends Middleware
                     'polda' => $request->user()->polda ?? null,
                 ] : null,
             ],
+            'sidebarMetrics' => $sidebarMetrics,
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
