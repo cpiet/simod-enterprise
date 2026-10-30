@@ -7,6 +7,195 @@
 @source "../**/*.vue";
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    --font-sans: 'Plus Jakarta Sans', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+/* ========================================================================= */
+/* DUAL THEME ENGINE (DARK COMMAND CENTER & EXECUTIVE LIGHT MODE)            */
+/* ========================================================================= */
+
+/* Dark Mode Defaults */
+html.dark {
+    color-scheme: dark;
+}
+
+html.dark body {
+    background-color: #070d1d;
+    color: #f1f5f9;
+}
+
+/* ------------------------------------------------------------------------- */
+/* LIGHT MODE RULES (Triggered when html has class 'light' or not '.dark')   */
+/* ------------------------------------------------------------------------- */
+html.light,
+html:not(.dark) {
+    color-scheme: light;
+}
+
+html.light body,
+html:not(.dark) body {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+}
+
+/* Base Viewport & Root Layout Backgrounds */
+html.light .bg-\[\#070d1d\],
+html:not(.dark) .bg-\[\#070d1d\],
+html.light .bg-\[\#050b14\],
+html:not(.dark) .bg-\[\#050b14\],
+html.light .bg-\[\#060b14\],
+html:not(.dark) .bg-\[\#060b14\] {
+    background-color: #f1f5f9 !important;
+}
+
+/* Cards & Surface Containers */
+html.light .bg-\[\#0b1426\],
+html:not(.dark) .bg-\[\#0b1426\],
+html.light .bg-\[\#0a1224\],
+html:not(.dark) .bg-\[\#0a1224\],
+html.light .bg-\[\#0c162e\],
+html:not(.dark) .bg-\[\#0c162e\],
+html.light .bg-\[\#08101e\],
+html:not(.dark) .bg-\[\#08101e\],
+html.light .bg-\[\#080f1e\],
+html:not(.dark) .bg-\[\#080f1e\],
+html.light .bg-\[\#080f20\],
+html:not(.dark) .bg-\[\#080f20\] {
+    background-color: #ffffff !important;
+}
+
+/* Sidebars & Top Navigation Headers */
+html.light .bg-\[\#091122\],
+html:not(.dark) .bg-\[\#091122\],
+html.light .bg-\[\#091122\]\/95,
+html:not(.dark) .bg-\[\#091122\]\/95,
+html.light .bg-\[\#091122\]\/90,
+html:not(.dark) .bg-\[\#091122\]\/90 {
+    background-color: #ffffff !important;
+}
+
+/* Secondary Panels & Inputs */
+html.light .bg-\[\#070d19\],
+html:not(.dark) .bg-\[\#070d19\],
+html.light .bg-slate-900,
+html:not(.dark) .bg-slate-900,
+html.light .bg-slate-900\/90,
+html:not(.dark) .bg-slate-900\/90,
+html.light .bg-slate-900\/80,
+html:not(.dark) .bg-slate-900\/80 {
+    background-color: #f8fafc !important;
+}
+
+html.light .bg-slate-900\/60,
+html:not(.dark) .bg-slate-900\/60,
+html.light .bg-slate-900\/40,
+html:not(.dark) .bg-slate-900\/40,
+html.light .bg-black\/50,
+html:not(.dark) .bg-black\/50 {
+    background-color: #f1f5f9 !important;
+}
+
+/* Borders */
+html.light .border-slate-800,
+html:not(.dark) .border-slate-800,
+html.light .border-slate-800\/80,
+html:not(.dark) .border-slate-800\/80,
+html.light .border-slate-800\/60,
+html:not(.dark) .border-slate-800\/60,
+html.light .border-slate-700,
+html:not(.dark) .border-slate-700,
+html.light .border-slate-700\/80,
+html:not(.dark) .border-slate-700\/80 {
+    border-color: #e2e8f0 !important;
+}
+
+/* Typography Overrides */
+html.light .text-white,
+html:not(.dark) .text-white {
+    color: #0f172a !important;
+}
+
+html.light .text-slate-100,
+html:not(.dark) .text-slate-100,
+html.light .text-slate-200,
+html:not(.dark) .text-slate-200 {
+    color: #1e293b !important;
+}
+
+html.light .text-slate-300,
+html:not(.dark) .text-slate-300 {
+    color: #334155 !important;
+}
+
+html.light .text-slate-400,
+html:not(.dark) .text-slate-400 {
+    color: #64748b !important;
+}
+
+/* Gradients Overrides for Soft Card Backgrounds in Light Mode */
+html.light .bg-gradient-to-r,
+html:not(.dark) .bg-gradient-to-r,
+html.light .bg-gradient-to-br,
+html:not(.dark) .bg-gradient-to-br {
+    background-image: none !important;
+    background-color: #ffffff !important;
+}
+
+/* Enhanced Contrast for Accent Colors in Light Mode */
+html.light .text-amber-400,
+html:not(.dark) .text-amber-400 {
+    color: #b45309 !important;
+}
+
+html.light .text-amber-300,
+html:not(.dark) .text-amber-300 {
+    color: #92400e !important;
+}
+
+html.light .text-emerald-400,
+html:not(.dark) .text-emerald-400 {
+    color: #047857 !important;
+}
+
+html.light .text-rose-400,
+html:not(.dark) .text-rose-400 {
+    color: #be123c !important;
+}
+
+html.light .text-sky-400,
+html:not(.dark) .text-sky-400 {
+    color: #0369a1 !important;
+}
+
+/* Form Inputs in Light Mode */
+html.light input,
+html:not(.dark) input,
+html.light select,
+html:not(.dark) select,
+html.light textarea,
+html:not(.dark) textarea {
+    color: #0f172a !important;
+    background-color: #ffffff !important;
+    border-color: #cbd5e1 !important;
+}
+
+html.light input::placeholder,
+html:not(.dark) input::placeholder,
+html.light textarea::placeholder,
+html:not(.dark) textarea::placeholder {
+    color: #94a3b8 !important;
+}
+
+/* Card Subtle Drop Shadows in Light Mode */
+html.light .shadow-xl,
+html:not(.dark) .shadow-xl,
+html.light .shadow-2xl,
+html:not(.dark) .shadow-2xl {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Smooth Transitions for Theme Toggle */
+body, aside, header, main, footer, .rounded-3xl, .rounded-2xl {
+    transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
 }

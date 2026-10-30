@@ -163,3 +163,4 @@ class MultiPoldaArticlesHistoricalSeeder extends Seeder
         }
     }
 }
+

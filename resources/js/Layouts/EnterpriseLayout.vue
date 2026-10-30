@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { router, Link, usePage } from '@inertiajs/vue3';
 import {
   Shield,
@@ -37,6 +37,8 @@ import {
   Activity,
   Check,
   PlusCircle,
+  Sun,
+  Moon,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -83,6 +85,45 @@ const displayMetrics = computed(() => {
   };
 });
 
+// Dual Theme Engine (Dark Command Center & Clean Executive Light Mode)
+const isDarkMode = ref(true);
+
+const initTheme = () => {
+  try {
+    const saved = localStorage.getItem('simod_theme');
+    if (saved === 'light') {
+      isDarkMode.value = false;
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
+    } else {
+      isDarkMode.value = true;
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    }
+  } catch (e) {
+    isDarkMode.value = true;
+  }
+};
+
+const toggleTheme = () => {
+  isDarkMode.value = !isDarkMode.value;
+  try {
+    if (isDarkMode.value) {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+      localStorage.setItem('simod_theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
+      localStorage.setItem('simod_theme', 'light');
+    }
+  } catch (e) {}
+};
+
+onMounted(() => {
+  initTheme();
+});
+
 // Check if a route is currently active with reactive URL tracking & collision prevention
 const isRouteActive = (target) => {
   if (!target) return false;
@@ -125,7 +166,7 @@ const isRouteActive = (target) => {
   });
 };
 
-// Grouped Navigation Definition (Full 19 Modules from SIMOD-HUMAS)
+// Grouped Navigation Definition - 4 Professional Enterprise Groups
 const navigationGroups = [
   {
     name: 'KOMANDO & INTELIJEN',
@@ -151,7 +192,7 @@ const navigationGroups = [
     ],
   },
   {
-    name: 'OPERASIONAL HUMAS',
+    name: 'MANAJEMEN ISU & TUGAS',
     items: [
       {
         name: 'Laporan Polres & Isu',
@@ -187,6 +228,11 @@ const navigationGroups = [
         match: ['/tasks'],
         badgeKey: 'active_tasks',
       },
+    ],
+  },
+  {
+    name: 'PUBLIKASI & DOKUMENTASI',
+    items: [
       {
         name: 'Publikasi Multi-Kanal',
         desc: 'Tribratanews, IG, TikTok, FB, X',
@@ -233,7 +279,7 @@ const navigationGroups = [
         desc: 'Keamanan, Hak Akses, Audit, Backup, Pembersihan',
         href: '/security',
         icon: ShieldAlert,
-        match: ['/security', '/roles', '/audit-logs', '/database/backup', '/maintenance', '/settings/mail'],
+        match: ['/security', '/roles', '/audit-logs', '/database/backup', '/maintenance', '/settings/mail', '/maintenance/news-cleanup'],
       },
       {
         name: 'Profil Saya',
@@ -391,12 +437,23 @@ const navigationGroups = [
             </p>
           </div>
         </div>
-        <button
-          @click="isMobileSidebarOpen = false"
-          class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
-        >
-          <X class="w-5 h-5" />
-        </button>
+        <div class="flex items-center gap-1.5">
+          <button
+            @click="toggleTheme"
+            type="button"
+            class="p-2 rounded-xl text-slate-400 hover:text-amber-400 hover:bg-slate-800 border border-slate-700/60"
+            :title="isDarkMode ? 'Mode Terang' : 'Mode Gelap'"
+          >
+            <Sun v-if="!isDarkMode" class="w-4 h-4 text-amber-500" />
+            <Moon v-else class="w-4 h-4 text-amber-400" />
+          </button>
+          <button
+            @click="isMobileSidebarOpen = false"
+            class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-700/60"
+          >
+            <X class="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       <!-- Mobile Navigation Scroll -->
@@ -522,13 +579,27 @@ const navigationGroups = [
           </div>
         </div>
 
-        <!-- Right: Live WITA Clock & Notification & User Profile -->
-        <div class="flex items-center gap-2.5 sm:gap-3">
+        <!-- Right: Live WITA Clock & Theme Toggle & Notification & User Profile -->
+        <div class="flex items-center gap-2 sm:gap-2.5">
           <!-- Real-time WITA Clock -->
           <div class="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono text-slate-300 shadow-inner">
             <Clock class="w-3.5 h-3.5 text-amber-400" />
             <span>{{ metrics.server_wita || 'WITA Realtime' }}</span>
           </div>
+
+          <!-- Dual Theme Switcher Toggle (Command Center Dark vs Executive Light) -->
+          <button
+            @click="toggleTheme"
+            type="button"
+            class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-xs font-bold text-slate-200 hover:text-amber-400 transition shadow-sm cursor-pointer select-none"
+            :title="isDarkMode ? 'Beralih ke Tampilan Putih / Terang (Executive Light Mode)' : 'Beralih ke Tampilan Gelap (Command Center Dark Mode)'"
+          >
+            <Sun v-if="!isDarkMode" class="w-3.5 h-3.5 text-amber-500" />
+            <Moon v-else class="w-3.5 h-3.5 text-amber-400" />
+            <span class="hidden sm:inline text-xs font-bold">
+              {{ isDarkMode ? 'Mode Gelap' : 'Mode Terang' }}
+            </span>
+          </button>
 
           <!-- Notification Bell -->
           <Link
