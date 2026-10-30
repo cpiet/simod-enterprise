@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
 import {
   Building2,
@@ -33,14 +33,39 @@ const form = ref({
   call_center: '110 / (0426) 2321110',
 });
 
-const polresData = ref([
-  { id: 1, name: 'Polresta Mamuju', code: 'MAMUJU', head: 'Kombes Pol. Iskandar, S.I.K.', kasihumas: 'Aipda Hendra', status: 'AKTIF', staff: 12 },
-  { id: 2, name: 'Polres Majene', code: 'MAJENE', head: 'AKBP Toni Sugadri, S.I.K.', kasihumas: 'Bripka Ramli', status: 'AKTIF', staff: 8 },
-  { id: 3, name: 'Polres Polewali Mandar', code: 'POLMAN', head: 'AKBP Anjar Purwoko, S.H.', kasihumas: 'Ipda Muh. Firdaus', status: 'AKTIF', staff: 10 },
-  { id: 4, name: 'Polres Mamasa', code: 'MAMASA', head: 'AKBP Muhammad Amiruddin', kasihumas: 'Bripka Daniel', status: 'AKTIF', staff: 6 },
-  { id: 5, name: 'Polres Pasangkayu', code: 'PASANGKAYU', head: 'AKBP Candra Kurniawan', kasihumas: 'Aipda Usman', status: 'AKTIF', staff: 7 },
-  { id: 6, name: 'Polres Mamuju Tengah', code: 'MATENG', head: 'AKBP Hengky Kristanto', kasihumas: 'Briptu Akbar', status: 'AKTIF', staff: 5 },
-]);
+const defaultHeads = {
+  'MAMUJU': { head: 'Kombes Pol. Iskandar, S.I.K.', kasihumas: 'Aipda Hendra Gunawan', staff: 12 },
+  'MAJENE': { head: 'AKBP Toni Sugadri, S.I.K.', kasihumas: 'Bripka Ramli Pratama', staff: 8 },
+  'POLMAN': { head: 'AKBP Anjar Purwoko, S.H.', kasihumas: 'Ipda Muh. Firdaus, S.H.', staff: 10 },
+  'MAMASA': { head: 'AKBP Muhammad Amiruddin', kasihumas: 'Bripka Daniel Tandi', staff: 6 },
+  'PASANGKAYU': { head: 'AKBP Candra Kurniawan', kasihumas: 'Aipda Usman Kadir', staff: 7 },
+  'MATENG': { head: 'AKBP Hengky Kristanto', kasihumas: 'Briptu Akbar Halim', staff: 5 },
+};
+
+const polresData = computed(() => {
+  if (props.polresList && props.polresList.length > 0) {
+    return props.polresList.map((p) => {
+      const info = defaultHeads[p.code] || { head: 'AKBP Kapolres Jajaran', kasihumas: 'Kasihumas Polres', staff: 8 };
+      return {
+        id: p.id,
+        name: p.name,
+        code: p.code,
+        head: info.head,
+        kasihumas: info.kasihumas,
+        status: p.is_active ? 'AKTIF' : 'NONAKTIF',
+        staff: info.staff,
+      };
+    });
+  }
+  return [
+    { id: 1, name: 'Polresta Mamuju', code: 'MAMUJU', head: 'Kombes Pol. Iskandar, S.I.K.', kasihumas: 'Aipda Hendra Gunawan', status: 'AKTIF', staff: 12 },
+    { id: 2, name: 'Polres Majene', code: 'MAJENE', head: 'AKBP Toni Sugadri, S.I.K.', kasihumas: 'Bripka Ramli Pratama', status: 'AKTIF', staff: 8 },
+    { id: 3, name: 'Polres Polewali Mandar', code: 'POLMAN', head: 'AKBP Anjar Purwoko, S.H.', kasihumas: 'Ipda Muh. Firdaus, S.H.', status: 'AKTIF', staff: 10 },
+    { id: 4, name: 'Polres Mamasa', code: 'MAMASA', head: 'AKBP Muhammad Amiruddin', kasihumas: 'Bripka Daniel Tandi', status: 'AKTIF', staff: 6 },
+    { id: 5, name: 'Polres Pasangkayu', code: 'PASANGKAYU', head: 'AKBP Candra Kurniawan', kasihumas: 'Aipda Usman Kadir', status: 'AKTIF', staff: 7 },
+    { id: 6, name: 'Polres Mamuju Tengah', code: 'MATENG', head: 'AKBP Hengky Kristanto', kasihumas: 'Briptu Akbar Halim', status: 'AKTIF', staff: 5 },
+  ];
+});
 
 const saveSettings = () => {
   isSaved.value = true;

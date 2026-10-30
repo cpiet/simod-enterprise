@@ -330,23 +330,79 @@ class SystemModuleController extends Controller
     }
 
     /**
-     * Manajemen Personalia & Pengguna
+     * Manajemen Personalia & Pengguna (Parity with SIMOD-HUMAS PersonaliaView)
      */
     public function personalia(Request $request): Response
     {
         [$allPoldas, $selectedPolda, $selectedCode, $metrics] = $this->getBaseData($request);
 
-        $users = User::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id)->orWhereNull('polda_id'))
-            ->latest()
-            ->paginate(15);
+        $roleFilter = $request->query('role', 'all');
+        $search = $request->query('q', '');
+
+        $query = User::with('polres')
+            ->when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id)->orWhereNull('polda_id'));
+
+        if ($roleFilter !== 'all') {
+            $query->where('role', $roleFilter);
+        }
+
+        if (!empty($search)) {
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('badge_number', 'like', "%{$search}%")
+                  ->orWhere('username', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        $users = $query->orderBy('id', 'asc')->paginate(15)->withQueryString();
+        $polresList = $selectedPolda ? Polres::where('polda_id', $selectedPolda->id)->get() : [];
+
+        $personnelStats = [
+            'total'       => User::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id)->orWhereNull('polda_id'))->count(),
+            'superadmin'  => User::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id)->orWhereNull('polda_id'))->where('role', 'super_admin_mabes')->count(),
+            'polda_staff' => User::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id)->orWhereNull('polda_id'))->whereIn('role', ['polda_leader', 'verifikator', 'analis'])->count(),
+            'satwil'      => User::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id)->orWhereNull('polda_id'))->where('role', 'operator')->count(),
+        ];
 
         return Inertia::render('Personalia/Index', [
-            'allPoldas'     => $allPoldas,
-            'selectedPolda' => $selectedPolda,
-            'selectedCode'  => $selectedCode,
-            'users'         => $users,
-            'metrics'       => $metrics,
+            'allPoldas'      => $allPoldas,
+            'selectedPolda'  => $selectedPolda,
+            'selectedCode'   => $selectedCode,
+            'users'          => $users,
+            'polresList'     => $polresList,
+            'personnelStats' => $personnelStats,
+            'filters'        => [
+                'role' => $roleFilter,
+                'q'    => $search,
+            ],
+            'metrics'        => $metrics,
         ]);
+    }
+
+    /**
+     * Tambah Akun Personel Baru
+     */
+    public function storeUser(Request $request)
+    {
+        $validated = $request->validate([
+            'polda_id'     => 'required|exists:poldas,id',
+            'polres_id'    => 'nullable|exists:polres,id',
+            'name'         => 'required|string|max:255',
+            'username'     => 'required|string|max:100|unique:users,username',
+            'email'        => 'required|email|max:255|unique:users,email',
+            'badge_number' => 'nullable|string|max:50',
+            'role'         => 'required|string',
+            'phone'        => 'nullable|string|max:50',
+            'password'     => 'required|string|min:6',
+        ]);
+
+        $validated['password'] = Hash::make($validated['password']);
+        $validated['is_active'] = true;
+
+        User::create($validated);
+
+        return redirect()->back()->with('success', 'Akun personel berhasil didaftarkan ke sistem.');
     }
 
     /**

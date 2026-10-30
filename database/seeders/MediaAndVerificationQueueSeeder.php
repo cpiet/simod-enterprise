@@ -253,3 +253,4 @@ class MediaAndVerificationQueueSeeder extends Seeder
         }
     }
 }
+

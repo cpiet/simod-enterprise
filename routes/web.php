@@ -57,6 +57,7 @@ Route::post('/gallery', [SystemModuleController::class, 'storeMedia'])->name('ga
 Route::get('/reports', [SystemModuleController::class, 'reports'])->name('reports.index');
 Route::get('/reports/export/csv', [SystemModuleController::class, 'exportReportsCsv'])->name('reports.export.csv');
 Route::get('/personalia', [SystemModuleController::class, 'personalia'])->name('personalia.index');
+Route::post('/personalia', [SystemModuleController::class, 'storeUser'])->name('personalia.store');
 Route::get('/audit-logs', [SystemModuleController::class, 'auditLogs'])->name('audit-logs.index');
 Route::get('/profile', [SystemModuleController::class, 'profile'])->name('profile.index');
 Route::get('/settings/polda', [SystemModuleController::class, 'poldaSettings'])->name('settings.polda');
