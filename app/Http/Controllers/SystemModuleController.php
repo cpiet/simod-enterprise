@@ -8,6 +8,7 @@ use App\Models\MediaFile;
 use App\Models\Polda;
 use App\Models\Polres;
 use App\Models\Publication;
+use App\Models\SecuritySetting;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -568,12 +569,79 @@ class SystemModuleController extends Controller
     {
         [$allPoldas, $selectedPolda, $selectedCode, $metrics] = $this->getBaseData($request);
 
+        $setting = SecuritySetting::current($selectedPolda?->id);
+        $scoreData = $setting->calculateScore();
+
+        // Recent security-related audit logs from real database
+        $recentSecurityLogs = AuditLog::with('user')
+            ->whereIn('action', ['security.update', 'news.cleanup', 'login.failed', 'login.success', 'user.created', 'polda.update'])
+            ->latest('created_at')
+            ->limit(8)
+            ->get()
+            ->map(fn ($log) => [
+                'id'         => $log->id,
+                'action'     => $log->action,
+                'user'       => $log->user ? $log->user->name : 'Administrator',
+                'ip'         => $log->ip_address ?: '127.0.0.1',
+                'time_ago'   => $log->created_at ? $log->created_at->diffForHumans() : 'Baru saja',
+                'created_at' => $log->created_at ? $log->created_at->format('d M Y, H:i') : now()->format('d M Y, H:i'),
+                'metadata'   => $log->metadata,
+            ]);
+
         return Inertia::render('Settings/Security', [
             'allPoldas'     => $allPoldas,
             'selectedPolda' => $selectedPolda,
             'selectedCode'  => $selectedCode,
             'metrics'       => $metrics,
+            'security'      => [
+                'enable_turnstile'        => (bool) $setting->enable_turnstile,
+                'turnstile_site_key'      => (string) $setting->turnstile_site_key,
+                'turnstile_secret_key'    => (string) $setting->turnstile_secret_key,
+                'max_login_attempts'      => (int) $setting->max_login_attempts,
+                'lockout_minutes'         => (int) $setting->lockout_minutes,
+                'enable_pin'              => (bool) $setting->enable_pin,
+                'pin_expiry_days'         => (int) $setting->pin_expiry_days,
+                'session_timeout_minutes' => (int) $setting->session_timeout_minutes,
+                'private_media_storage'   => (bool) $setting->private_media_storage,
+                'ip_whitelist'            => (string) $setting->ip_whitelist,
+            ],
+            'scoreData'     => $scoreData,
+            'securityLogs'  => $recentSecurityLogs,
         ]);
+    }
+
+    /**
+     * Simpan Perubahan Parameter Keamanan ke Database & Audit Log
+     */
+    public function updateSecurity(Request $request)
+    {
+        $validated = $request->validate([
+            'enable_turnstile'        => 'required|boolean',
+            'turnstile_site_key'      => 'nullable|string|max:120',
+            'turnstile_secret_key'    => 'nullable|string|max:120',
+            'max_login_attempts'      => 'required|integer|min:1|max:20',
+            'lockout_minutes'         => 'required|integer|min:1|max:1440',
+            'enable_pin'              => 'required|boolean',
+            'pin_expiry_days'         => 'required|integer|min:1|max:365',
+            'session_timeout_minutes' => 'required|integer|min:5|max:480',
+            'private_media_storage'   => 'required|boolean',
+            'ip_whitelist'            => 'nullable|string|max:1000',
+        ]);
+
+        [$allPoldas, $selectedPolda] = $this->getBaseData($request);
+        $setting = SecuritySetting::current($selectedPolda?->id);
+
+        $validated['updated_by'] = auth()->id();
+        $setting->update($validated);
+
+        AuditLog::log('security.update', 'security_settings', (string) $setting->id, [
+            'polda'        => $selectedPolda ? $selectedPolda->code : 'GLOBAL',
+            'turnstile'    => $validated['enable_turnstile'],
+            'max_attempts' => $validated['max_login_attempts'],
+            'lockout'      => $validated['lockout_minutes'],
+        ]);
+
+        return back()->with('success', 'Parameter Pusat Keamanan berhasil disimpan ke database dan aktif diterapkan.');
     }
 
     /**

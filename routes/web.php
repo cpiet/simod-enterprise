@@ -68,6 +68,7 @@ Route::post('/settings/polda/update', [SystemModuleController::class, 'updatePol
 Route::post('/settings/polda/create', [SystemModuleController::class, 'storePolda'])->name('settings.polda.create');
 Route::post('/settings/polres/create', [SystemModuleController::class, 'storePolres'])->name('settings.polres.create');
 Route::get('/security', [SystemModuleController::class, 'securityCenter'])->name('security.center');
+Route::post('/security', [SystemModuleController::class, 'updateSecurity'])->name('security.update');
 Route::get('/roles', [SystemModuleController::class, 'rolesMatrix'])->name('roles.matrix');
 Route::get('/settings/mail', [SystemModuleController::class, 'mailSettings'])->name('settings.mail');
 Route::get('/database/backup', [SystemModuleController::class, 'databaseBackup'])->name('database.backup');

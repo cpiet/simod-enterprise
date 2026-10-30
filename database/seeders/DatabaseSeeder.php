@@ -13,6 +13,10 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call(EnterpriseDatabaseSeeder::class);
+        $this->call([
+            EnterpriseDatabaseSeeder::class,
+            MultiTenantPoldasSeeder::class,
+            MultiPoldaArticlesHistoricalSeeder::class,
+        ]);
     }
 }
