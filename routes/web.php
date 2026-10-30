@@ -19,6 +19,7 @@ Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
 Route::get('/command-center', [DashboardController::class, 'index'])->name('command-center');
 Route::get('/media-intelligence', [MediaIntelligenceController::class, 'index'])->name('media-intelligence');
+Route::get('/monitoring-media-online', [MediaIntelligenceController::class, 'index'])->name('monitoring-media-online');
 Route::post('/media-intelligence/ai-briefing', [MediaIntelligenceController::class, 'storeAiBriefing'])->name('media-intelligence.briefing');
 Route::post('/media-intelligence/rss-sources', [MediaIntelligenceController::class, 'storeRssSource'])->name('media-intelligence.rss.store');
 Route::post('/media-intelligence/rss-sources/{id}/toggle', [MediaIntelligenceController::class, 'toggleRssSource'])->name('media-intelligence.rss.toggle');

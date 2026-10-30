@@ -64,13 +64,13 @@ const props = defineProps({
 const activeTab = ref('01');
 
 const tabs = [
-  { id: '01', name: '01. Live RSS Media', badge: 'LIVE', icon: Radio },
-  { id: '02', name: '02. Berita & Briefing', badge: null, icon: Newspaper },
-  { id: '03', name: '03. Executive Snapshot', badge: null, icon: Zap },
-  { id: '04', name: '04. Statistik Satwil', badge: null, icon: MapPin },
-  { id: '05', name: '05. Early Warning (EWS)', badge: 'EWS', icon: Shield },
-  { id: '06', name: '06. Narasi & Rekomendasi', badge: null, icon: Award },
-  { id: '07', name: '07. Naskah WA Pimpinan', badge: 'WA RESMI', icon: MessageSquare },
+  { id: '01', name: '01. Agregasi Berita Online (Live RSS)', badge: 'LIVE', icon: Radio },
+  { id: '02', name: '02. Executive Briefing Pimpinan', badge: 'ANALISIS', icon: Newspaper },
+  { id: '03', name: '03. Sentimen & Polarisasi Berita', badge: null, icon: Zap },
+  { id: '04', name: '04. Persebaran Satwil & Polres', badge: null, icon: MapPin },
+  { id: '05', name: '05. Deteksi Dini Isu (EWS)', badge: 'EWS', icon: Shield },
+  { id: '06', name: '06. Narasi & Rekomendasi Media', badge: null, icon: Award },
+  { id: '07', name: '07. Format Naskah WA Pimpinan', badge: 'WA RESMI', icon: MessageSquare },
 ];
 
 // Bookmark state stored in localStorage per device
@@ -288,7 +288,23 @@ const whatsappReportText = computed(() => {
     s += `Berdasarkan pemantauan media siber dan 29 portal berita resmi terverifikasi, situasi kamtibmas di wilayah hukum ${poldaShort} terpantau relatif aman dan kondusif dengan dominasi sentimen positif atas akselerasi patroli presisi dan pelayanan prima kepolisian.\n\n`;
   }
 
-  // Isu Terkini
+  // SECTION I.B: ISU STRATEGIS NASIONAL POLRI
+  const nationalIssues = r.national_issues && r.national_issues.length > 0 ? r.national_issues : [];
+  if (nationalIssues.length > 0) {
+    s += `🇮🇩 *ISU STRATEGIS NASIONAL POLRI*\n`;
+    s += `Status Isu Nasional: *${r.snapshot_national_status || 'KUNING - WASPADA'}*\n\n`;
+    nationalIssues.forEach((iss, nIdx) => {
+      s += `*A.${nIdx + 1}. ${iss.title}*\n`;
+      s += `• Fakta: ${iss.fact}\n`;
+      if (iss.source) s += `• Sumber: ${iss.source}\n`;
+      if (iss.sentiment) s += `• Sentimen: ${iss.sentiment} | Virality: ${iss.virality || 'Sedang'}\n`;
+      if (iss.url) s += `• Tautan: ${iss.url}\n`;
+      s += `\n`;
+    });
+  }
+
+  // SECTION I.C: ISU KEWILAYAHAN DAERAH & POLRES
+  s += `📍 *ISU KEWILAYAHAN ${poldaShort.toUpperCase()} & POLRES JAJARAN*\n\n`;
   const sulbarIssues = r.sulbar_issues && r.sulbar_issues.length > 0
     ? r.sulbar_issues.slice(0, 4)
     : [
@@ -642,20 +658,23 @@ const submitIssue = () => {
       <div class="absolute top-0 right-0 -mt-12 -mr-12 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
       <div class="space-y-2 relative z-10">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
           <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500/20 text-rose-400 border border-rose-500/40">
             Klasifikasi: Rahasia Terbatas / Command Center
           </span>
+          <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40">
+            📰 Monitoring Media Online & Agregasi Pers
+          </span>
           <span class="flex items-center gap-1 text-[11px] font-bold text-emerald-400">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-            Live Radar Aktif
+            Live Radar 29 RSS Aktif
           </span>
         </div>
         <h1 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
-          {{ selectedCode === 'ALL' ? 'KONSOLIDASI NASIONAL MABES POLRI' : selectedPolda?.name }}
+          Monitoring Media Online &bull; {{ selectedCode === 'ALL' ? 'KONSOLIDASI NASIONAL MABES POLRI' : selectedPolda?.name }}
         </h1>
         <p class="text-xs md:text-sm text-slate-300 max-w-2xl leading-relaxed">
-          Pusat Komando Intelijen Media, Sistem Peringatan Dini (EWS), dan Orkestrasi Narasi Publik untuk jajaran satuan wilayah.
+          Pusat Agregasi Berita Pers & Media Siber Real-Time, Analisis Isu Strategis Nasional Polri, Executive Briefing Harian Pimpinan, dan Naskah WhatsApp Terstandarisasi.
         </p>
       </div>
 
@@ -809,11 +828,11 @@ const submitIssue = () => {
           <div class="flex items-center gap-2">
             <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
             <h2 class="text-lg md:text-xl font-black text-white tracking-tight flex items-center gap-2">
-              Patroli Siaran Media Massa Real-Time
+              Radar & Agregasi Berita Online Real-Time
             </h2>
           </div>
           <p class="text-xs text-slate-300 max-w-2xl leading-relaxed">
-            Integrasi sindikasi RSS dinamis memantau portal media massa nasional & regional Sulselbar (Detik Sulsel, Antara, CNN, dll). Dapat disaring, disalin langsung sebagai bahan prompt intelijen AI, atau dijadikan draft Laporan Isu Publik SIMOD.
+            Sindikasi RSS multi-portal memantau siaran pers dan portal media online nasional & daerah secara otomatis. Dilengkapi filter portal, sentimen, pencarian instan, bookmark artikel, dan konversi ke Laporan Isu Humas.
           </p>
         </div>
         <div class="flex items-center gap-2 shrink-0">
@@ -1118,57 +1137,133 @@ const submitIssue = () => {
         </div>
       </div>
 
-      <!-- Grid 2 Col: Isu Nasional vs Isu Sulbar -->
+      <!-- Grid 2 Col: Isu Nasional vs Isu Kewilayahan -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Isu Nasional -->
         <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
-          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-            <h3 class="text-sm font-black text-white uppercase tracking-wider">Isu Strategis Nasional Polri</h3>
-            <span class="text-xs font-bold text-amber-400">{{ report?.snapshot_national_status || 'KUNING' }}</span>
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3 flex-wrap gap-2">
+            <div class="flex items-center gap-2">
+              <span class="text-base">🇮🇩</span>
+              <h3 class="text-sm font-black text-white uppercase tracking-wider">Isu Strategis Nasional Polri</h3>
+            </div>
+            <span
+              class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border"
+              :class="[
+                (report?.snapshot_national_status || '').includes('MERAH')
+                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                  : (report?.snapshot_national_status || '').includes('HIJAU')
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                    : 'bg-amber-400/20 text-amber-300 border-amber-400/40'
+              ]"
+            >
+              {{ report?.snapshot_national_status || 'KUNING - WASPADA' }}
+            </span>
           </div>
           <div class="space-y-3">
             <div
               v-for="(iss, idx) in (report?.national_issues || [])"
               :key="idx"
-              class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2 text-xs"
+              class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5 text-xs hover:border-slate-700 transition"
             >
-              <div class="flex items-center justify-between">
-                <span class="font-bold text-white">{{ iss.title }}</span>
-                <span class="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-300">
+              <div class="flex items-start justify-between gap-3">
+                <span class="font-bold text-white text-xs md:text-sm leading-snug">{{ iss.title }}</span>
+                <span
+                  class="px-2 py-0.5 rounded text-[9px] font-black uppercase shrink-0"
+                  :class="[
+                    (iss.sentiment || '').toLowerCase() === 'positif'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                      : (iss.sentiment || '').toLowerCase() === 'negatif'
+                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                        : 'bg-slate-700/60 text-slate-300 border border-slate-600'
+                  ]"
+                >
                   {{ iss.sentiment || 'Positif' }}
                 </span>
               </div>
               <p class="text-slate-300 leading-relaxed">{{ iss.fact }}</p>
-              <div class="text-[10px] text-slate-400 flex items-center justify-between">
-                <span>Sumber: {{ iss.source }}</span>
-                <span>Virality: {{ iss.virality || 'Sedang' }}</span>
+              <div class="text-[10px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/60 flex-wrap gap-2">
+                <span class="flex items-center gap-1 font-mono text-slate-400">
+                  <Radio class="w-3 h-3 text-amber-400" />
+                  {{ iss.source }}
+                </span>
+                <div class="flex items-center gap-2">
+                  <span class="text-slate-400">Virality: <strong class="text-amber-300">{{ iss.virality || 'Sedang' }}</strong></span>
+                  <a
+                    v-if="iss.url"
+                    :href="iss.url"
+                    target="_blank"
+                    class="text-sky-400 hover:underline flex items-center gap-0.5"
+                  >
+                    <span>Tautan</span>
+                    <ExternalLink class="w-3 h-3" />
+                  </a>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Isu Lokal Sulbar -->
+        <!-- Isu Kewilayahan Polda & Polres -->
         <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
-          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-            <h3 class="text-sm font-black text-white uppercase tracking-wider">Isu Kewilayahan Sulbar & Polres</h3>
-            <span class="text-xs font-bold text-rose-400">{{ report?.snapshot_sulbar_status || 'MERAH' }}</span>
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3 flex-wrap gap-2">
+            <div class="flex items-center gap-2">
+              <MapPin class="w-4 h-4 text-rose-400" />
+              <h3 class="text-sm font-black text-white uppercase tracking-wider">
+                Isu Kewilayahan {{ selectedCode === 'ALL' ? 'Mabes & Seluruh Polda' : (selectedPolda?.name || 'Polda & Jajaran Polres') }}
+              </h3>
+            </div>
+            <span
+              class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border"
+              :class="[
+                (report?.snapshot_sulbar_status || '').includes('MERAH')
+                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                  : (report?.snapshot_sulbar_status || '').includes('HIJAU')
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                    : 'bg-amber-400/20 text-amber-300 border-amber-400/40'
+              ]"
+            >
+              {{ report?.snapshot_sulbar_status || 'KUNING - WASPADA' }}
+            </span>
           </div>
           <div class="space-y-3">
             <div
               v-for="(iss, idx) in (report?.sulbar_issues || [])"
               :key="idx"
-              class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2 text-xs"
+              class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5 text-xs hover:border-slate-700 transition"
             >
-              <div class="flex items-center justify-between">
-                <span class="font-bold text-white">{{ iss.title }}</span>
-                <span class="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-amber-400/20 text-amber-300">
+              <div class="flex items-start justify-between gap-3">
+                <span class="font-bold text-white text-xs md:text-sm leading-snug">{{ iss.title }}</span>
+                <span
+                  class="px-2 py-0.5 rounded text-[9px] font-black uppercase shrink-0"
+                  :class="[
+                    (iss.sentiment || '').toLowerCase() === 'positif'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                      : (iss.sentiment || '').toLowerCase() === 'negatif'
+                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                        : 'bg-slate-700/60 text-slate-300 border border-slate-600'
+                  ]"
+                >
                   {{ iss.sentiment || 'Positif' }}
                 </span>
               </div>
               <p class="text-slate-300 leading-relaxed">{{ iss.fact }}</p>
-              <div class="text-[10px] text-slate-400 flex items-center justify-between">
-                <span>Sumber: {{ iss.source }}</span>
-                <span>Virality: {{ iss.virality || 'Sedang' }}</span>
+              <div class="text-[10px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/60 flex-wrap gap-2">
+                <span class="flex items-center gap-1 font-mono text-slate-400">
+                  <Radio class="w-3 h-3 text-amber-400" />
+                  {{ iss.source }}
+                </span>
+                <div class="flex items-center gap-2">
+                  <span class="text-slate-400">Virality: <strong class="text-amber-300">{{ iss.virality || 'Sedang' }}</strong></span>
+                  <a
+                    v-if="iss.url"
+                    :href="iss.url"
+                    target="_blank"
+                    class="text-sky-400 hover:underline flex items-center gap-0.5"
+                  >
+                    <span>Tautan</span>
+                    <ExternalLink class="w-3 h-3" />
+                  </a>
+                </div>
               </div>
             </div>
           </div>

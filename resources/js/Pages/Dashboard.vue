@@ -657,7 +657,7 @@ const layerLapangan = ref(true);
             </span>
           </div>
           <Link :href="`/media-intelligence?polda=${selectedCode}`" class="text-amber-400 font-bold hover:underline inline-flex items-center gap-1 text-xs">
-            <span>Buka Media Intelligence Radar</span>
+            <span>Buka Monitoring Media Online</span>
             <ArrowRight class="w-3.5 h-3.5" />
           </Link>
         </div>
