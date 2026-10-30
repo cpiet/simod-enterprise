@@ -64,13 +64,13 @@ const props = defineProps({
 const activeTab = ref('01');
 
 const tabs = [
-  { id: '01', name: '01. Agregasi Berita Online (Live RSS)', badge: 'LIVE', icon: Radio },
+  { id: '01', name: '01. Berita Online (Live RSS)', badge: 'LIVE', icon: Radio },
   { id: '02', name: '02. Executive Briefing Pimpinan', badge: 'ANALISIS', icon: Newspaper },
-  { id: '03', name: '03. Sentimen & Polarisasi Berita', badge: null, icon: Zap },
-  { id: '04', name: '04. Persebaran Satwil & Polres', badge: null, icon: MapPin },
-  { id: '05', name: '05. Deteksi Dini Isu (EWS)', badge: 'EWS', icon: Shield },
-  { id: '06', name: '06. Narasi & Rekomendasi Media', badge: null, icon: Award },
-  { id: '07', name: '07. Format Naskah WA Pimpinan', badge: 'WA RESMI', icon: MessageSquare },
+  { id: '03', name: '03. Sentimen Berita', badge: null, icon: Zap },
+  { id: '04', name: '04. Statistik Satwil', badge: null, icon: MapPin },
+  { id: '05', name: '05. Early Warning (EWS)', badge: 'EWS', icon: Shield },
+  { id: '06', name: '06. Narasi & Rekomendasi', badge: null, icon: Award },
+  { id: '07', name: '07. Naskah WA Pimpinan', badge: 'WA RESMI', icon: MessageSquare },
 ];
 
 // Bookmark state stored in localStorage per device
@@ -777,14 +777,14 @@ const submitIssue = () => {
     </div>
 
     <!-- Navigation Tabs Bar (01 - 06) -->
-    <div class="p-2 rounded-2xl bg-[#08101e] border border-slate-800 shadow-xl overflow-x-auto">
-      <div class="flex items-center gap-2 min-w-max">
+    <div class="p-2 rounded-2xl bg-[#08101e] border border-slate-800 shadow-xl">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
         <button
           v-for="t in tabs"
           :key="t.id"
           @click="activeTab = t.id"
           type="button"
-          class="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs md:text-sm font-extrabold transition-all duration-200 cursor-pointer"
+          class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-[11px] md:text-xs font-extrabold text-center leading-tight transition-all duration-200 cursor-pointer"
           :class="[
             activeTab === t.id
               ? 'bg-amber-500/20 text-amber-400 border-2 border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.25)] ring-1 ring-amber-400/50'
@@ -1736,6 +1736,7 @@ const submitIssue = () => {
     <!-- ========================================================================= -->
     <!-- MODAL 1: TEMPEL RINGKASAN AI (CHATGPT / CLAUDE / GEMINI)                  -->
     <!-- ========================================================================= -->
+    <Teleport to="body">
     <div
       v-if="showPasteAiModal"
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
@@ -1920,104 +1921,6 @@ const submitIssue = () => {
           </div>
         </div>
       </div>
-
-      <!-- WhatsApp Report Dispatch Card (Integrated in Tab 02) -->
-      <div class="rounded-3xl bg-[#0b1426] border border-emerald-500/30 overflow-hidden shadow-2xl space-y-0">
-        <!-- Header -->
-        <div class="p-6 bg-gradient-to-r from-emerald-950/40 via-[#0b1426] to-[#080f20] border-b border-emerald-500/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2">
-              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                LAPORAN RESMI WHATSAPP
-              </span>
-              <span class="text-xs text-slate-400 font-mono">{{ report?.report_time || '19.03 WITA' }}</span>
-            </div>
-            <h3 class="text-base font-extrabold text-white flex items-center gap-2">
-              <MessageSquare class="w-5 h-5 text-emerald-400" />
-              <span>Format Naskah WhatsApp Siap Kirim ke Pimpinan</span>
-            </h3>
-            <p class="text-xs text-slate-400">
-              Sintesis analisis intelijen media & sentimen opini publik terstandarisasi untuk Bapak Kapolda & Pejabat Utama
-            </p>
-          </div>
-
-          <!-- Quick Action Buttons -->
-          <div class="flex items-center flex-wrap gap-2 shrink-0">
-            <!-- Scroll Top -->
-            <button
-              @click="scrollWaToTop"
-              class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition"
-              title="Gulir ke Atas"
-            >
-              <ChevronUp class="w-4 h-4" />
-            </button>
-            <!-- Scroll Bottom -->
-            <button
-              @click="scrollWaToBottom"
-              class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition"
-              title="Gulir ke Bawah"
-            >
-              <ChevronDown class="w-4 h-4" />
-            </button>
-            <!-- Unduh .txt -->
-            <button
-              @click="downloadWaTxt"
-              class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition"
-              title="Unduh naskah sebagai file .txt"
-            >
-              <Download class="w-3.5 h-3.5 text-slate-400" />
-              <span>Unduh .txt</span>
-            </button>
-            <!-- Kirim WA Langsung -->
-            <button
-              @click="openWhatsAppDirect"
-              class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/50 text-emerald-200 text-xs font-bold transition"
-              title="Buka WhatsApp Web dengan naskah siap kirim"
-            >
-              <Send class="w-3.5 h-3.5 text-emerald-400" />
-              <span>Kirim ke WA</span>
-            </button>
-            <!-- Salin Format WA -->
-            <button
-              @click="copyWaReport"
-              class="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 text-xs font-black transition shadow-lg shadow-emerald-500/20"
-            >
-              <Check v-if="isWaCopied" class="w-4 h-4" />
-              <Copy v-else class="w-4 h-4" />
-              <span>{{ isWaCopied ? 'Berhasil Disalin!' : 'Salin Naskah WA' }}</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Terminal Preformatted Box -->
-        <div class="relative bg-[#060b14] p-5">
-          <div
-            ref="waBoxTab2Ref"
-            class="max-h-[380px] overflow-y-auto font-mono text-xs leading-relaxed text-emerald-300/90 whitespace-pre-wrap select-all p-4 rounded-2xl bg-black/50 border border-emerald-950/80 shadow-inner custom-scrollbar"
-          >
-            {{ whatsappReportText }}
-          </div>
-        </div>
-
-        <!-- Footer Bar -->
-        <div class="px-6 py-3 bg-[#080f1e] border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
-          <div class="flex items-center gap-4">
-            <span class="flex items-center gap-1.5 text-emerald-400 font-semibold">
-              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              Tersinkronisasi Realtime WITA
-            </span>
-            <span>Karakter: {{ whatsappReportText.length }}</span>
-            <span>Target: Bapak Kapolda & PJU</span>
-          </div>
-          <button
-            @click="activeTab = '07'"
-            class="text-amber-400 hover:underline font-bold flex items-center gap-1"
-          >
-            <span>Buka Tampilan Penuh di Tab 07</span>
-            <span>&rarr;</span>
-          </button>
-        </div>
-      </div>
     </div>
 
     <!-- ========================================================================= -->
@@ -2153,6 +2056,7 @@ const submitIssue = () => {
         </div>
       </div>
     </div>
+  </Teleport>
   </EnterpriseLayout>
 </template>
 
