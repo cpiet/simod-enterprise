@@ -126,6 +126,7 @@ const handleImageError = (e, article) => {
 // Filter States
 const selectedPortal = ref('Semua Portal');
 const selectedCategory = ref('all');
+const showBookmarksOnly = ref(false);
 const selectedSentiment = ref('all');
 const searchQuery = ref('');
 const toastMessage = ref('');
@@ -568,9 +569,10 @@ const filteredArticles = computed(() => {
   }
 
   // Filter Kategori
-  if (selectedCategory.value === 'bookmark') {
+  if (showBookmarksOnly.value) {
     list = list.filter((a) => bookmarkedIds.value.includes(a.id));
-  } else if (selectedCategory.value !== 'all') {
+  }
+  if (selectedCategory.value !== 'all') {
     list = list.filter((a) => a.category.toLowerCase() === selectedCategory.value.toLowerCase());
   }
 
@@ -892,13 +894,27 @@ const submitIssue = () => {
             class="px-3 py-2 rounded-xl text-xs font-bold bg-[#070d19] border border-slate-700 text-white focus:outline-none focus:border-amber-400 cursor-pointer"
           >
             <option value="all">Semua Kategori</option>
-            <option value="bookmark">⭐ Tersimpan / Bookmark ({{ bookmarkedIds.length }})</option>
             <option value="Regional Sulselbar">Regional Sulselbar</option>
             <option value="Nasional & Umum">Nasional & Umum</option>
             <option value="Hukum & Kriminal">Hukum & Kriminal</option>
             <option value="Google News RSS">Google News RSS</option>
           </select>
         </div>
+
+        <!-- Tombol Bookmark (menampilkan hanya berita tersimpan) -->
+        <button
+          type="button"
+          @click="showBookmarksOnly = !showBookmarksOnly; currentPage = 1"
+          class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black border transition"
+          :class="showBookmarksOnly
+            ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-lg shadow-amber-400/20'
+            : 'bg-[#070d19] text-amber-300 border-amber-400/50 hover:border-amber-400 hover:bg-slate-800'"
+          title="Tampilkan hanya berita yang di-bookmark"
+        >
+          <Bookmark class="w-3.5 h-3.5" :class="showBookmarksOnly ? 'fill-slate-950' : ''" />
+          <span>Bookmark</span>
+          <span class="px-1.5 py-0.5 rounded-full text-[10px]" :class="showBookmarksOnly ? 'bg-slate-950 text-amber-300' : 'bg-amber-400/20 text-amber-300'">{{ bookmarkedIds.length }}</span>
+        </button>
 
         <!-- Search Input -->
         <div class="relative flex-1 min-w-[240px]">
@@ -1097,7 +1113,7 @@ const submitIssue = () => {
           Coba ganti pilihan portal, ubah kategori, atau klik tombol "Sinkron Berita" untuk menarik berita terkini dari seluruh portal.
         </p>
         <button
-          @click="selectedPortal = 'Semua Portal'; selectedCategory = 'all'; selectedSentiment = 'all'; searchQuery = ''"
+          @click="selectedPortal = 'Semua Portal'; selectedCategory = 'all'; showBookmarksOnly = false; selectedSentiment = 'all'; searchQuery = ''"
           class="px-4 py-2 rounded-xl bg-amber-400 text-slate-950 font-black text-xs"
         >
           Reset Semua Filter
