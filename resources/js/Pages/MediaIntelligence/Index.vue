@@ -596,6 +596,49 @@ const paginatedArticles = computed(() => {
   return filteredArticles.value.slice(start, start + perPage.value);
 });
 
+// Smart page window generator (e.g. [1, 2, 3, 4, 5, '...', 9])
+const visiblePages = computed(() => {
+  const total = totalPages.value;
+  const current = currentPage.value;
+
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+
+  const pages = [];
+  if (current <= 4) {
+    for (let i = 1; i <= 5; i++) pages.push(i);
+    pages.push('...');
+    pages.push(total);
+  } else if (current >= total - 3) {
+    pages.push(1);
+    pages.push('...');
+    for (let i = total - 4; i <= total; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    pages.push('...');
+    pages.push(current - 1);
+    pages.push(current);
+    pages.push(current + 1);
+    pages.push('...');
+    pages.push(total);
+  }
+
+  return pages;
+});
+
+const goToPage = (page) => {
+  if (typeof page !== 'number') return;
+  if (page < 1 || page > totalPages.value || page === currentPage.value) return;
+  currentPage.value = page;
+
+  // Scroll to article container smoothly
+  const container = document.getElementById('article-list-container');
+  if (container) {
+    container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+};
+
 // Salin Berita sebagai Bahan AI
 const copyArticleForAi = (article) => {
   const content = `Judul: ${article.title}\nSumber: ${article.source_name}\nWaktu: ${article.pub_date || article.time_ago}\nCuplikan: ${article.summary}\nTautan: ${article.link}`;
@@ -952,7 +995,7 @@ const submitIssue = () => {
       </div>
 
       <!-- KARTU-KARTU BERITA (PERSIS GAMBAR 1 & 2) -->
-      <div v-if="filteredArticles.length > 0" class="space-y-6">
+      <div v-if="filteredArticles.length > 0" id="article-list-container" class="space-y-6">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           <div
             v-for="article in paginatedArticles"
@@ -1079,28 +1122,57 @@ const submitIssue = () => {
           </div>
         </div>
 
-        <!-- Pagination Bar -->
-        <div v-if="totalPages > 1" class="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-[#0b1426] border border-slate-800">
+        <!-- Pagination Bar with Numbered Pages (1, 2, 3...) -->
+        <div v-if="totalPages > 1" class="flex flex-col md:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-[#0b1426] border border-slate-800 shadow-xl">
+          <!-- Left: Previous Button -->
           <button
             :disabled="currentPage === 1"
-            @click="currentPage--"
-            class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 text-slate-300 border border-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition"
+            @click="goToPage(currentPage - 1)"
+            type="button"
+            class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-900 text-slate-300 border border-slate-700/80 hover:text-white hover:bg-slate-800 hover:border-amber-400/40 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer select-none"
           >
-            &larr; Sebelumnya
+            <span>&larr;</span>
+            <span>Sebelumnya</span>
           </button>
 
-          <div class="flex items-center gap-1 text-xs">
-            <span class="text-slate-400">Halaman</span>
-            <span class="px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 font-black">{{ currentPage }}</span>
-            <span class="text-slate-400">dari {{ totalPages }}</span>
+          <!-- Center: Numbered Page Buttons & Page Info -->
+          <div class="flex flex-col items-center gap-2">
+            <div class="flex items-center gap-1.5 flex-wrap justify-center">
+              <template v-for="(p, idx) in visiblePages" :key="idx">
+                <span
+                  v-if="p === '...'"
+                  class="px-2 py-1 text-slate-500 font-bold select-none text-xs"
+                >
+                  &hellip;
+                </span>
+                <button
+                  v-else
+                  type="button"
+                  @click="goToPage(p)"
+                  class="min-w-[38px] h-9 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center cursor-pointer select-none"
+                  :class="currentPage === p
+                    ? 'bg-amber-400 text-slate-950 font-black shadow-lg shadow-amber-400/25 ring-2 ring-amber-400/70 scale-105'
+                    : 'bg-slate-900 text-slate-300 border border-slate-700/80 hover:bg-slate-800 hover:text-white hover:border-slate-500'"
+                >
+                  {{ p }}
+                </button>
+              </template>
+            </div>
+
+            <p class="text-[11px] text-slate-400 font-medium">
+              Halaman <span class="text-amber-400 font-bold">{{ currentPage }}</span> dari <span class="text-white font-bold">{{ totalPages }}</span> &bull; Menampilkan {{ ((currentPage - 1) * perPage) + 1 }}-{{ Math.min(currentPage * perPage, filteredArticles.length) }} dari {{ filteredArticles.length }} Berita
+            </p>
           </div>
 
+          <!-- Right: Next Button -->
           <button
             :disabled="currentPage === totalPages"
-            @click="currentPage++"
-            class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 text-slate-300 border border-slate-700 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition"
+            @click="goToPage(currentPage + 1)"
+            type="button"
+            class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-900 text-slate-300 border border-slate-700/80 hover:text-white hover:bg-slate-800 hover:border-amber-400/40 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer select-none"
           >
-            Selanjutnya &rarr;
+            <span>Selanjutnya</span>
+            <span>&rarr;</span>
           </button>
         </div>
       </div>
