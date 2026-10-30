@@ -136,3 +136,4 @@ class PersonaliaSeeder extends Seeder
         }
     }
 }
+

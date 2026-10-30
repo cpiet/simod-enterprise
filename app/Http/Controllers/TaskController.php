@@ -89,7 +89,8 @@ class TaskController extends Controller
         $request->validate(['note' => 'required|string']);
 
         $task->updates()->create([
-            'note' => $request->input('note'),
+            'user_id' => auth()->id(),
+            'note'    => $request->input('note'),
         ]);
 
         if ($request->boolean('mark_completed', false)) {

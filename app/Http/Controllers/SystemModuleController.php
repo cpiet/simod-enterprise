@@ -12,6 +12,7 @@ use App\Models\Task;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -426,7 +427,7 @@ class SystemModuleController extends Controller
             $query->where(function($q) use ($search) {
                 $q->where('action', 'like', "%{$search}%")
                   ->orWhere('ip_address', 'like', "%{$search}%")
-                  ->orWhere('target_type', 'like', "%{$search}%");
+                  ->orWhere('subject_type', 'like', "%{$search}%");
             });
         }
 

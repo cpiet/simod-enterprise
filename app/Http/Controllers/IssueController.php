@@ -218,14 +218,15 @@ class IssueController extends Controller
 
         // Audit log
         AuditLog::create([
-            'polda_id'    => $issue->polda_id,
-            'user_id'     => auth()->id(),
-            'action'      => 'issue.create',
-            'target_type' => 'issue',
-            'target_id'   => $issue->id,
-            'ip_address'  => $request->ip(),
-            'user_agent'  => $request->userAgent(),
-            'details'     => ['report_code' => $reportCode, 'title' => $issue->title],
+            'polda_id'     => $issue->polda_id,
+            'user_id'      => auth()->id(),
+            'action'       => 'issue.create',
+            'subject_type' => 'issue',
+            'subject_id'   => $issue->id,
+            'ip_address'   => $request->ip(),
+            'user_agent'   => $request->userAgent(),
+            'metadata'     => ['report_code' => $reportCode, 'title' => $issue->title],
+            'created_at'   => now(),
         ]);
 
         return redirect()->route('issues.show', ['id' => $issue->id, 'polda' => $request->query('polda', 'SULBAR')])

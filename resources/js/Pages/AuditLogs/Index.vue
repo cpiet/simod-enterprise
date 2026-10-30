@@ -63,6 +63,17 @@ const formatDateWita = (dateStr) => {
     return dateStr;
   }
 };
+
+const formatMetadata = (meta) => {
+  if (!meta) return null;
+  if (typeof meta === 'string') return meta;
+  if (typeof meta === 'object') {
+    if (meta.report_code && meta.title) return `[${meta.report_code}] ${meta.title}`;
+    if (meta.title) return meta.title;
+    return Object.entries(meta).map(([k, v]) => `${k}: ${v}`).join(', ');
+  }
+  return null;
+};
 </script>
 
 <template>
@@ -236,8 +247,8 @@ const formatDateWita = (dateStr) => {
                     {{ entry.status || 'SUCCESS' }}
                   </span>
                 </td>
-                <td class="px-6 py-4 text-slate-300 max-w-sm truncate" :title="entry.details || entry.description">
-                  {{ entry.details || entry.description || '-' }}
+                <td class="px-6 py-4 text-slate-300 max-w-sm truncate" :title="formatMetadata(entry.metadata) || entry.details || entry.description || ''">
+                  {{ formatMetadata(entry.metadata) || entry.details || entry.description || '-' }}
                 </td>
               </tr>
             </tbody>
