@@ -61,6 +61,9 @@ Route::post('/personalia', [SystemModuleController::class, 'storeUser'])->name('
 Route::get('/audit-logs', [SystemModuleController::class, 'auditLogs'])->name('audit-logs.index');
 Route::get('/profile', [SystemModuleController::class, 'profile'])->name('profile.index');
 Route::get('/settings/polda', [SystemModuleController::class, 'poldaSettings'])->name('settings.polda');
+Route::post('/settings/polda/update', [SystemModuleController::class, 'updatePolda'])->name('settings.polda.update');
+Route::post('/settings/polda/create', [SystemModuleController::class, 'storePolda'])->name('settings.polda.create');
+Route::post('/settings/polres/create', [SystemModuleController::class, 'storePolres'])->name('settings.polres.create');
 Route::get('/security', [SystemModuleController::class, 'securityCenter'])->name('security.center');
 Route::get('/roles', [SystemModuleController::class, 'rolesMatrix'])->name('roles.matrix');
 Route::get('/settings/mail', [SystemModuleController::class, 'mailSettings'])->name('settings.mail');

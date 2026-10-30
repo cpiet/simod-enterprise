@@ -241,4 +241,48 @@ class EnterpriseFullSuiteTest extends TestCase
             $res->assertStatus(200);
         }
     }
+
+    public function test_multi_tenant_crud_operations(): void
+    {
+        $this->actingAs($this->user);
+
+        // 1. Update Polda
+        $updRes = $this->post('/settings/polda/update', [
+            'code'             => 'SULBAR',
+            'name'             => 'Polda Sulawesi Barat',
+            'region'           => 'Sulawesi Barat',
+            'timezone'         => 'Asia/Makassar',
+            'kapolda_name'     => 'Irjen Pol. Drs. R. Adang Ginanjar S., M.M.',
+            'kabid_humas_name' => 'Kombes Pol. Slamet Wahyudi, S.I.K., M.H.',
+        ]);
+        $updRes->assertRedirect();
+        $this->assertDatabaseHas('poldas', ['code' => 'SULBAR', 'kapolda_name' => 'Irjen Pol. Drs. R. Adang Ginanjar S., M.M.']);
+
+        // 2. Create New Tenant Polda (Mabes Level)
+        $code = 'PAPUA_' . rand(100, 999);
+        $createPoldaRes = $this->post('/settings/polda/create', [
+            'code'             => $code,
+            'name'             => 'Polda Papua Barat',
+            'region'           => 'Papua Barat',
+            'timezone'         => 'Asia/Jayapura',
+            'kapolda_name'     => 'Irjen Pol. Johnny Eddizon Isir',
+            'kabid_humas_name' => 'Kombes Pol. Ongky Isgunawan',
+        ]);
+        $createPoldaRes->assertRedirect();
+        $this->assertDatabaseHas('poldas', ['code' => $code, 'timezone' => 'Asia/Jayapura']);
+
+        // 3. Create New Polres under Polda
+        $polda = Polda::where('code', $code)->first();
+        $createPolresRes = $this->post('/settings/polres/create', [
+            'polda_id'   => $polda->id,
+            'code'       => 'MANOKWARI',
+            'name'       => 'Polresta Manokwari',
+            'short_name' => 'Manokwari',
+            'tag_desc'   => 'Ibukota Provinsi Papua Barat',
+            'latitude'   => -0.8615,
+            'longitude'  => 134.0620,
+        ]);
+        $createPolresRes->assertRedirect();
+        $this->assertDatabaseHas('polres', ['polda_id' => $polda->id, 'code' => 'MANOKWARI']);
+    }
 }

@@ -494,6 +494,74 @@ class SystemModuleController extends Controller
     }
 
     /**
+     * Perbarui Identitas Polda Terpilih
+     */
+    public function updatePolda(Request $request)
+    {
+        $selectedCode = $request->input('code');
+        $polda = Polda::where('code', $selectedCode)->firstOrFail();
+
+        $validated = $request->validate([
+            'name'             => 'required|string|max:255',
+            'region'           => 'nullable|string|max:255',
+            'timezone'         => 'required|in:Asia/Jakarta,Asia/Makassar,Asia/Jayapura',
+            'kapolda_name'     => 'nullable|string|max:255',
+            'kabid_humas_name' => 'nullable|string|max:255',
+        ]);
+
+        $polda->update($validated);
+
+        return redirect()->back()->with('success', "Identitas {$polda->name} berhasil diperbarui.");
+    }
+
+    /**
+     * Daftarkan Polda Baru ke Sistem Multi-Tenant (Mabes Level)
+     */
+    public function storePolda(Request $request)
+    {
+        $validated = $request->validate([
+            'code'             => 'required|string|max:50|unique:poldas,code',
+            'name'             => 'required|string|max:255',
+            'region'           => 'required|string|max:255',
+            'timezone'         => 'required|in:Asia/Jakarta,Asia/Makassar,Asia/Jayapura',
+            'kapolda_name'     => 'nullable|string|max:255',
+            'kabid_humas_name' => 'nullable|string|max:255',
+        ]);
+
+        $validated['code'] = strtoupper(trim($validated['code']));
+        $validated['is_active'] = true;
+
+        $polda = Polda::create($validated);
+
+        return redirect()->back()->with('success', "Tenant baru {$polda->name} ({$polda->code}) berhasil didaftarkan ke sistem.");
+    }
+
+    /**
+     * Tambah Satuan Kewilayahan (Polres) Baru
+     */
+    public function storePolres(Request $request)
+    {
+        $validated = $request->validate([
+            'polda_id'   => 'required|exists:poldas,id',
+            'code'       => 'required|string|max:50',
+            'name'       => 'required|string|max:255',
+            'short_name' => 'required|string|max:100',
+            'tag_desc'   => 'nullable|string|max:255',
+            'latitude'   => 'nullable|numeric',
+            'longitude'  => 'nullable|numeric',
+            'map_x'      => 'nullable|numeric',
+            'map_y'      => 'nullable|numeric',
+        ]);
+
+        $validated['code'] = strtoupper(trim($validated['code']));
+        $validated['is_active'] = true;
+
+        Polres::create($validated);
+
+        return redirect()->back()->with('success', "Satker Polres {$validated['name']} berhasil ditambahkan ke jajaran.");
+    }
+
+    /**
      * Pusat Keamanan (Security Center)
      */
     public function securityCenter(Request $request): Response
