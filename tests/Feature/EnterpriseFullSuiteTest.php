@@ -15,6 +15,8 @@ use Tests\TestCase;
 
 class EnterpriseFullSuiteTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected Polda $polda;
     protected ?Polres $polres;
     protected User $user;

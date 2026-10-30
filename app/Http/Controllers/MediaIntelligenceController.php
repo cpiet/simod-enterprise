@@ -90,6 +90,7 @@ class MediaIntelligenceController extends Controller
                 'image_url'      => $a->image_url,
                 'link'           => $a->url,
                 'sentiment'      => $a->sentiment ?: 'netral',
+                'is_bookmarked'  => (bool) $a->is_bookmarked,
             ];
         })->toArray();
 
@@ -605,5 +606,27 @@ PROMPT;
             ],
             'raw_input'                => null,
         ]);
+    }
+
+    /**
+     * Toggle bookmark artikel (disimpan di database agar tidak ikut dibersihkan).
+     */
+    public function toggleBookmark(int $id): JsonResponse
+    {
+        $article = MediaArticle::findOrFail($id);
+        $article->update(['is_bookmarked' => ! $article->is_bookmarked]);
+
+        return response()->json(['id' => (string) $article->id, 'is_bookmarked' => $article->is_bookmarked]);
+    }
+
+    /**
+     * Impor bookmark lama dari localStorage browser (sekali jalan).
+     */
+    public function importBookmarks(Request $request): JsonResponse
+    {
+        $ids = collect($request->input('ids', []))->filter(fn ($i) => is_numeric($i))->map(fn ($i) => (int) $i)->take(2000);
+        $count = MediaArticle::whereIn('id', $ids)->update(['is_bookmarked' => true]);
+
+        return response()->json(['imported' => $count]);
     }
 }

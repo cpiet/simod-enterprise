@@ -24,6 +24,8 @@ Route::post('/media-intelligence/ai-briefing', [MediaIntelligenceController::cla
 Route::post('/media-intelligence/rss-sources', [MediaIntelligenceController::class, 'storeRssSource'])->name('media-intelligence.rss.store');
 Route::post('/media-intelligence/rss-sources/{id}/toggle', [MediaIntelligenceController::class, 'toggleRssSource'])->name('media-intelligence.rss.toggle');
 Route::delete('/media-intelligence/rss-sources/{id}', [MediaIntelligenceController::class, 'deleteRssSource'])->name('media-intelligence.rss.delete');
+Route::post('/media-intelligence/articles/{id}/bookmark', [MediaIntelligenceController::class, 'toggleBookmark'])->name('media-intelligence.bookmark');
+Route::post('/media-intelligence/articles/bookmarks/import', [MediaIntelligenceController::class, 'importBookmarks'])->name('media-intelligence.bookmark.import');
 Route::post('/media-intelligence/rss-sources/test', [MediaIntelligenceController::class, 'testRssSource'])->name('media-intelligence.rss.test');
 
 // Issues Management
@@ -70,3 +72,5 @@ Route::get('/roles', [SystemModuleController::class, 'rolesMatrix'])->name('role
 Route::get('/settings/mail', [SystemModuleController::class, 'mailSettings'])->name('settings.mail');
 Route::get('/database/backup', [SystemModuleController::class, 'databaseBackup'])->name('database.backup');
 Route::get('/maintenance', [SystemModuleController::class, 'systemMaintenance'])->name('system.maintenance');
+Route::get('/maintenance/news-cleanup', [\App\Http\Controllers\NewsCleanupController::class, 'index'])->name('news.cleanup');
+Route::post('/maintenance/news-cleanup', [\App\Http\Controllers\NewsCleanupController::class, 'purge'])->name('news.cleanup.purge');

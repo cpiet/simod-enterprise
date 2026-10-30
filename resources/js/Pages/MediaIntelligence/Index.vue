@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import axios from 'axios';
 import { router } from '@inertiajs/vue3';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
 import {
@@ -73,21 +74,38 @@ const tabs = [
   { id: '07', name: '07. Naskah WA Pimpinan', badge: 'WA RESMI', icon: MessageSquare },
 ];
 
-// Bookmark state stored in localStorage per device
-const bookmarkedIds = ref(JSON.parse(localStorage.getItem('simod_ent_bookmarks') || '[]'));
-const isBookmarked = (id) => bookmarkedIds.value.includes(id);
+// Bookmark disimpan di database (tidak ikut dibersihkan oleh Pembersihan Berita)
+const bookmarkedIds = ref((props.sampleArticles || []).filter((a) => a.is_bookmarked).map((a) => String(a.id)));
+const isBookmarked = (id) => bookmarkedIds.value.includes(String(id));
 
-const toggleBookmark = (id) => {
-  if (bookmarkedIds.value.includes(id)) {
-    bookmarkedIds.value = bookmarkedIds.value.filter((item) => item !== id);
-    showToastNotification('Berita dihapus dari Bookmark Tersimpan');
-  } else {
-    bookmarkedIds.value.push(id);
-    showToastNotification('Berita berhasil disimpan ke Bookmark! (★ Tersimpan)');
+// Impor sekali bookmark lama dari localStorage perangkat ini
+onMounted(async () => {
+  try {
+    const legacy = JSON.parse(localStorage.getItem('simod_ent_bookmarks') || '[]');
+    if (legacy.length) {
+      await axios.post('/media-intelligence/articles/bookmarks/import', { ids: legacy });
+      legacy.forEach((id) => {
+        if (!bookmarkedIds.value.includes(String(id))) bookmarkedIds.value.push(String(id));
+      });
+      localStorage.removeItem('simod_ent_bookmarks');
+    }
+  } catch (e) {
+    console.error('Impor bookmark gagal:', e);
   }
-  localStorage.setItem('simod_ent_bookmarks', JSON.stringify(bookmarkedIds.value));
-};
+});
 
+const toggleBookmark = async (id) => {
+  const key = String(id);
+  const wasOn = bookmarkedIds.value.includes(key);
+  bookmarkedIds.value = wasOn ? bookmarkedIds.value.filter((i) => i !== key) : [...bookmarkedIds.value, key];
+  try {
+    await axios.post(`/media-intelligence/articles/${key}/bookmark`);
+    showToastNotification(wasOn ? 'Berita dihapus dari Bookmark Tersimpan' : 'Berita disimpan ke Bookmark (aman dari pembersihan)');
+  } catch (e) {
+    bookmarkedIds.value = wasOn ? [...bookmarkedIds.value, key] : bookmarkedIds.value.filter((i) => i !== key);
+    showToastNotification('Gagal menyimpan bookmark, coba lagi');
+  }
+};
 // Pagination State
 const currentPage = ref(1);
 const perPage = ref(50);

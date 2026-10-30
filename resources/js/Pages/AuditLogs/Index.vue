@@ -1,4 +1,5 @@
 <script setup>
+import SecurityMaintenanceTabs from '@/Components/SecurityMaintenanceTabs.vue';
 import { ref } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
@@ -83,6 +84,8 @@ const formatMetadata = (meta) => {
     :selected-code="selectedCode"
     :metrics="metrics"
   >
+    <SecurityMaintenanceTabs :selected-code="selectedCode" />
+
     <!-- Header -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>

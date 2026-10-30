@@ -1,4 +1,5 @@
 <script setup>
+import SecurityMaintenanceTabs from '@/Components/SecurityMaintenanceTabs.vue';
 import { ref } from 'vue';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
 import {
@@ -47,6 +48,8 @@ const saveSettings = () => {
     :selected-code="selectedCode"
     :metrics="metrics"
   >
+    <SecurityMaintenanceTabs :selected-code="selectedCode" />
+
     <!-- Header -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>

@@ -19,11 +19,13 @@ class MediaArticle extends Model
         'pub_date',
         'sentiment',
         'is_flagged',
+        'is_bookmarked',
     ];
 
     protected $casts = [
         'pub_date'   => 'datetime',
         'is_flagged' => 'boolean',
+        'is_bookmarked' => 'boolean',
     ];
 
     public function polda(): BelongsTo
