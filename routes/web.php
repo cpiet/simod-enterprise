@@ -28,8 +28,15 @@ Route::post('/media-intelligence/rss-sources/test', [MediaIntelligenceController
 // Issues Management
 Route::get('/issues', [IssueController::class, 'index'])->name('issues.index');
 Route::get('/issues/create', [IssueController::class, 'create'])->name('issues.create');
+Route::get('/issues/{id}', [IssueController::class, 'show'])->name('issues.show');
 Route::post('/issues', [IssueController::class, 'store'])->name('issues.store');
 Route::post('/issues/{id}/clarify', [IssueController::class, 'updateClarification'])->name('issues.clarify');
+Route::post('/issues/{id}/verify', [IssueController::class, 'verify'])->name('issues.verify');
+Route::post('/issues/{id}/return', [IssueController::class, 'returnIssue'])->name('issues.return');
+Route::post('/issues/{id}/resolve', [IssueController::class, 'resolve'])->name('issues.resolve');
+Route::post('/issues/{id}/close', [IssueController::class, 'close'])->name('issues.close');
+Route::post('/issues/{id}/task', [IssueController::class, 'createTask'])->name('issues.task');
+Route::post('/issues/{id}/release', [IssueController::class, 'createRelease'])->name('issues.release');
 
 // Press Releases
 Route::post('/press-releases', [PressReleaseController::class, 'store'])->name('press-releases.store');
@@ -46,7 +53,9 @@ Route::post('/tasks/{id}/update', [TaskController::class, 'addUpdate'])->name('t
 // Extended Modules from SIMOD-HUMAS Parity
 Route::get('/verification-queue', [SystemModuleController::class, 'verificationQueue'])->name('verification.queue');
 Route::get('/gallery', [SystemModuleController::class, 'gallery'])->name('gallery.index');
+Route::post('/gallery', [SystemModuleController::class, 'storeMedia'])->name('gallery.store');
 Route::get('/reports', [SystemModuleController::class, 'reports'])->name('reports.index');
+Route::get('/reports/export/csv', [SystemModuleController::class, 'exportReportsCsv'])->name('reports.export.csv');
 Route::get('/personalia', [SystemModuleController::class, 'personalia'])->name('personalia.index');
 Route::get('/audit-logs', [SystemModuleController::class, 'auditLogs'])->name('audit-logs.index');
 Route::get('/profile', [SystemModuleController::class, 'profile'])->name('profile.index');

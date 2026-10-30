@@ -317,9 +317,12 @@ const filteredIssuesList = computed(() => {
 
         <!-- Issue Title & Summary -->
         <div class="space-y-2">
-          <h3 class="text-lg md:text-xl font-black text-white leading-snug">
+          <Link
+            :href="`/issues/${issue.id}?polda=${selectedCode}`"
+            class="text-lg md:text-xl font-black text-white leading-snug hover:text-amber-400 transition block"
+          >
             {{ issue.title }}
-          </h3>
+          </Link>
           <p class="text-xs md:text-sm text-slate-300 leading-relaxed">
             {{ issue.summary }}
           </p>
@@ -386,8 +389,15 @@ const filteredIssuesList = computed(() => {
               class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 flex items-center gap-1.5 transition cursor-pointer"
             >
               <Sparkles class="w-3.5 h-3.5" />
-              <span>{{ issue.official_clarification ? 'Edit Klarifikasi / Fact-Check' : '+ Input Klarifikasi & Cek Fakta' }}</span>
+              <span>{{ issue.official_clarification ? 'Edit Klarifikasi' : '+ Klarifikasi' }}</span>
             </button>
+            <Link
+              :href="`/issues/${issue.id}?polda=${selectedCode}`"
+              class="px-4 py-1.5 rounded-xl text-xs font-black bg-amber-400 hover:bg-amber-300 text-slate-950 flex items-center gap-1.5 transition shadow"
+            >
+              <span>Detail & Tindak Lanjut</span>
+              <span>&rarr;</span>
+            </Link>
           </div>
         </div>
       </div>

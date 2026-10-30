@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Issue extends Model
 {
@@ -14,9 +15,12 @@ class Issue extends Model
         'polda_id',
         'polres_id',
         'created_by',
+        'report_code',
         'title',
         'slug',
         'summary',
+        'location_text',
+        'occurred_at',
         'category',
         'priority',
         'status',
@@ -31,11 +35,13 @@ class Issue extends Model
         'official_clarification',
         'clarification_url',
         'clarified_at',
+        'resolved_note',
     ];
 
     protected $casts = [
         'is_hoax'      => 'boolean',
         'clarified_at' => 'datetime',
+        'occurred_at'  => 'datetime',
     ];
 
     public function polda(): BelongsTo
@@ -52,5 +58,29 @@ class Issue extends Model
     {
         return $this->belongsTo(User::class, 'created_by');
     }
-}
 
+    public function mediaFiles(): HasMany
+    {
+        return $this->hasMany(MediaFile::class);
+    }
+
+    public function statusHistories(): HasMany
+    {
+        return $this->hasMany(IssueStatusHistory::class)->orderBy('created_at', 'asc');
+    }
+
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class);
+    }
+
+    public function publications(): HasMany
+    {
+        return $this->hasMany(Publication::class);
+    }
+
+    public function pressReleases(): HasMany
+    {
+        return $this->hasMany(PressRelease::class);
+    }
+}
