@@ -41,6 +41,8 @@ class IssueController extends Controller
             }
         }
 
+        $polresList = $selectedPolda ? $selectedPolda->polres : Polres::where('is_active', true)->get();
+
         $query = Issue::with(['polres', 'polda', 'creator'])->withCount('mediaFiles')->latest();
 
         if ($selectedPolda) {
@@ -76,10 +78,10 @@ class IssueController extends Controller
 
         $metrics = [
             'total_issues'    => Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
-            'monitoring'      => Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('status', 'monitoring')->count(),
-            'investigasi'     => Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('status', 'investigasi')->count(),
-            'klarifikasi'     => Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('status', 'klarifikasi')->count(),
-            'hoax_count'      => Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('is_hoax', true)->count(),
+            'pending_verify'  => Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->whereIn('status', ['submitted', 'unit_verified', 'monitoring', 'draft'])->count(),
+            'in_progress'     => Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->whereIn('status', ['in_progress', 'polda_verified', 'investigasi'])->count(),
+            'resolved'        => Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->whereIn('status', ['resolved', 'closed', 'selesai', 'klarifikasi'])->count(),
+            'high_priority'   => Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->whereIn('priority', ['high', 'critical'])->count(),
             'server_wita'     => now()->setTimezone($selectedPolda->timezone ?? 'Asia/Makassar')->format('d M Y, H:i:s') . ' WITA',
         ];
 
@@ -87,6 +89,7 @@ class IssueController extends Controller
             'allPoldas'      => $allPoldas,
             'selectedPolda'  => $selectedPolda,
             'selectedCode'   => $selectedCode,
+            'polresList'     => $polresList,
             'issues'         => $issues,
             'filters'        => [
                 'status'   => $statusFilter,
@@ -181,17 +184,19 @@ class IssueController extends Controller
         $validated = $request->validate([
             'polda_id'         => 'required|exists:poldas,id',
             'polres_id'        => 'nullable|exists:polres,id',
-            'title'            => 'required|string|max:255',
-            'summary'          => 'required|string',
+            'title'            => 'required|string|min:5|max:255',
+            'summary'          => 'required|string|min:10',
             'location_text'    => 'nullable|string|max:255',
             'occurred_at'      => 'nullable|date',
             'category'         => 'required|string',
             'priority'         => 'required|in:low,medium,high,critical',
-            'sentiment'        => 'required|in:positif,netral,negatif',
+            'sentiment'        => 'nullable|in:positif,netral,negatif',
+            'status'           => 'nullable|string',
             'source_media'     => 'nullable|string|max:100',
             'source_url'       => 'nullable|string|max:500',
             'assigned_unit'    => 'nullable|string|max:100',
             'is_hoax'          => 'nullable|boolean',
+            'files.*'          => 'nullable|file|mimes:jpg,jpeg,png,webp,mp4,pdf|max:20480',
         ]);
 
         $year = date('Y');
@@ -200,20 +205,52 @@ class IssueController extends Controller
 
         $validated['report_code'] = $reportCode;
         $validated['slug'] = Str::slug($validated['title']) . '-' . Str::random(5);
-        $validated['status'] = 'monitoring';
-        $validated['virality_score'] = rand(40, 85);
-        $validated['engagement_count'] = rand(1000, 15000);
+        $validated['status'] = $request->input('status', 'monitoring');
+        $validated['sentiment'] = $validated['sentiment'] ?? 'netral';
+        $validated['virality_score'] = rand(30, 80);
+        $validated['engagement_count'] = rand(500, 8000);
         $validated['created_by'] = auth()->id();
 
+        unset($validated['files']);
+
         $issue = Issue::create($validated);
+
+        // Upload berkas bukti pendukung ke media_files
+        if ($request->hasFile('files')) {
+            foreach ($request->file('files') as $file) {
+                if ($file && $file->isValid()) {
+                    $ext = $file->getClientOriginalExtension();
+                    $filename = Str::random(24) . '.' . $ext;
+                    $path = $file->storeAs('uploads/issues/' . $issue->id, $filename, 'public');
+                    
+                    $mime = $file->getMimeType();
+                    $fileType = str_starts_with($mime, 'video/') ? 'video' : (str_starts_with($mime, 'image/') ? 'photo' : 'document');
+
+                    MediaFile::create([
+                        'polda_id'      => $issue->polda_id,
+                        'polres_id'     => $issue->polres_id,
+                        'issue_id'      => $issue->id,
+                        'uploaded_by'   => auth()->id(),
+                        'title'         => $file->getClientOriginalName(),
+                        'file_type'     => $fileType,
+                        'file_path'     => $path,
+                        'file_url'      => '/storage/' . $path,
+                        'size_bytes'    => $file->getSize(),
+                        'mime_type'     => $mime,
+                        'review_status' => 'approved',
+                        'is_private'    => false,
+                    ]);
+                }
+            }
+        }
 
         // Record initial status history
         IssueStatusHistory::create([
             'issue_id'    => $issue->id,
             'actor_id'    => auth()->id(),
-            'from_status' => 'draft',
-            'to_status'   => 'monitoring',
-            'reason'      => 'Pendaftaran laporan baru ke dalam pemantauan sistem intelijen',
+            'from_status' => 'none',
+            'to_status'   => $issue->status,
+            'reason'      => $issue->status === 'draft' ? 'Pembuatan draf laporan awal' : 'Pendaftaran laporan baru diajukan ke antrean verifikasi',
         ]);
 
         // Audit log
@@ -229,8 +266,99 @@ class IssueController extends Controller
             'created_at'   => now(),
         ]);
 
-        return redirect()->route('issues.show', ['id' => $issue->id, 'polda' => $request->query('polda', 'SULBAR')])
-            ->with('success', "Laporan {$reportCode} berhasil dibuat dan tercatat di sistem.");
+        $selectedCode = $request->query('polda');
+        if (!$selectedCode && $issue->polda) {
+            $selectedCode = $issue->polda->code;
+        }
+
+        return redirect()->route('issues.index', ['polda' => $selectedCode ?? 'SULBAR'])
+            ->with('success', "✓ Laporan {$reportCode} berhasil dibuat dan diajukan ke sistem.");
+    }
+
+    /**
+     * Ekspor CSV daftar laporan sesuai filter aktif (Standar SIMOD-HUMAS).
+     */
+    public function exportCsv(Request $request)
+    {
+        $selectedCode = $request->query('polda', 'SULBAR');
+        $statusFilter = $request->query('status', 'all');
+        $priorityFilter = $request->query('priority', 'all');
+        $categoryFilter = $request->query('category', 'all');
+        $polresFilter = $request->query('polres', 'all');
+        $search = $request->query('q', '');
+
+        $selectedPolda = null;
+        if ($selectedCode !== 'ALL') {
+            $selectedPolda = Polda::where('code', $selectedCode)->first();
+        }
+
+        $query = Issue::with(['polres', 'polda', 'creator'])->latest();
+
+        if ($selectedPolda) {
+            $query->where('polda_id', $selectedPolda->id);
+        }
+        if ($statusFilter !== 'all') {
+            $query->where('status', $statusFilter);
+        }
+        if ($priorityFilter !== 'all') {
+            $query->where('priority', $priorityFilter);
+        }
+        if ($categoryFilter !== 'all') {
+            $query->where('category', $categoryFilter);
+        }
+        if ($polresFilter !== 'all') {
+            $query->whereHas('polres', fn($q) => $q->where('code', $polresFilter));
+        }
+        if (!empty($search)) {
+            $query->where(function($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                  ->orWhere('report_code', 'like', "%{$search}%")
+                  ->orWhere('summary', 'like', "%{$search}%")
+                  ->orWhere('location_text', 'like', "%{$search}%");
+            });
+        }
+
+        $issues = $query->get();
+        $filename = 'Laporan-Kamtibmas-' . ($selectedPolda ? $selectedPolda->code : 'POLDA') . '-' . date('Ymd-His') . '.csv';
+
+        return response()->streamDownload(function () use ($issues) {
+            $handle = fopen('php://output', 'w');
+            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
+            
+            fputcsv($handle, [
+                'No',
+                'Kode Laporan',
+                'Tanggal Kejadian',
+                'Satker / Wilayah',
+                'Kategori',
+                'Prioritas',
+                'Status Verifikasi',
+                'Judul Laporan',
+                'Lokasi Kejadian',
+                'Ringkasan Kronologi',
+                'Sumber Media / Tautan',
+            ]);
+
+            foreach ($issues as $index => $issue) {
+                fputcsv($handle, [
+                    $index + 1,
+                    $issue->report_code ?? "SIM-{$issue->id}",
+                    $issue->occurred_at ? date('d/m/Y H:i', strtotime($issue->occurred_at)) : date('d/m/Y H:i', strtotime($issue->created_at)),
+                    $issue->polres ? $issue->polres->name : ($issue->polda ? $issue->polda->name : 'Polda Sulbar'),
+                    $issue->category,
+                    strtoupper($issue->priority),
+                    $issue->status,
+                    $issue->title,
+                    $issue->location_text ?? '-',
+                    str_replace(["\r", "\n"], ' ', $issue->summary),
+                    $issue->source_url ?? $issue->source_media ?? '-',
+                ]);
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
     }
 
     /**
