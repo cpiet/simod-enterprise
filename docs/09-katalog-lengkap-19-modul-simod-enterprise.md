@@ -22,7 +22,7 @@ Dokumen ini mencatat pemetaan lengkap seluruh 19 modul pada **SIMOD Enterprise M
 | 12 | **Keamanan & Pemeliharaan** | `/security` | `SystemModuleController` | `Settings/Security.vue` | Administrasi & Sistem |
 | 13 | **Hak Akses (RBAC Matrix)** | `/roles` | `SystemModuleController` | `Settings/Roles.vue` | Administrasi & Sistem |
 | 14 | **Audit Logs (Jejak Digital)** | `/audit-logs` | `SystemModuleController` | `AuditLogs/Index.vue` | Administrasi & Sistem |
-| 15 | **Backup Basis Data** | `/database/backup` | `SystemModuleController` | `Settings/Backup.vue` | Administrasi & Sistem |
+| 15 | **Backup & Restore Basis Data** | `/database/backup` | `DatabaseBackupController` | `Settings/Backup.vue` | Administrasi & Sistem |
 | 16 | **Pembersihan Berita Multi-Polda** | `/maintenance/news-cleanup` | `NewsCleanupController` | `Settings/NewsCleanup.vue` | Administrasi & Sistem |
 | 17 | **Otomasi Sinkron RSS & Kestabilan** | `/maintenance/rss-sync` | `RssSyncController` | `Settings/RssSync.vue` | Administrasi & Sistem |
 | 18 | **Mode Pemeliharaan (Maintenance)** | `/maintenance` | `SystemModuleController` | `Settings/Maintenance.vue` | Administrasi & Sistem |

@@ -17,3 +17,9 @@ if ((int) config('simod.media_retention_days') > 0) {
     ->everyMinute()
     ->withoutOverlapping(10);
 
+// Otomasi Pencadangan Basis Data Berkala (Berdasarkan Waktu & Jadwal Terkonfigurasi)
+\Illuminate\Support\Facades\Schedule::command('db:backup --type=scheduled')
+    ->everyTenMinutes()
+    ->withoutOverlapping(20);
+
+

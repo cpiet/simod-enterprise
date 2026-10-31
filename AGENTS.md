@@ -109,7 +109,11 @@ php artisan rss:sync
 # Pemangkasan retensi berita lama (menjaga bookmark)
 php artisan media:prune --days=90 --polda=SULBAR
 
-# Menjalankan seluruh test suite otomatis (19 tests, 88 assertions)
+# Pencadangan basis data snapshot terkompresi & pembersihan retensi berkas
+php artisan db:backup --force
+php artisan db:backup --type=scheduled
+
+# Menjalankan seluruh test suite otomatis (26 tests, 128 assertions)
 php artisan test
 
 # Kompilasi aset Vite frontend
@@ -125,3 +129,4 @@ Saat Anda (Agent) diminta memodifikasi kode ini:
 2. **Jalankan Testing Sebelum Selesai**: Selalu jalankan `php artisan test` dan `npm run build` sebelum menyelesaikan tugas.
 3. **Multi-Tenant Scoping**: Setiap query data operasional (`MediaArticle`, `Issue`, `Task`, `EarlyWarning`) **wajib** menyertakan filter `polda_id`.
 4. **Preserve Docstrings**: Pertahankan semua dokumentasi, komentar PHPDoc, dan struktur kode yang ada.
+

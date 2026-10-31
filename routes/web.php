@@ -71,7 +71,14 @@ Route::get('/security', [SystemModuleController::class, 'securityCenter'])->name
 Route::post('/security', [SystemModuleController::class, 'updateSecurity'])->name('security.update');
 Route::get('/roles', [SystemModuleController::class, 'rolesMatrix'])->name('roles.matrix');
 Route::get('/settings/mail', [SystemModuleController::class, 'mailSettings'])->name('settings.mail');
-Route::get('/database/backup', [SystemModuleController::class, 'databaseBackup'])->name('database.backup');
+// Database Backup & Restore Center
+Route::get('/database/backup', [\App\Http\Controllers\DatabaseBackupController::class, 'index'])->name('database.backup');
+Route::post('/database/backup/create', [\App\Http\Controllers\DatabaseBackupController::class, 'createBackup'])->name('database.backup.create');
+Route::get('/database/backup/download/{filename}', [\App\Http\Controllers\DatabaseBackupController::class, 'download'])->name('database.backup.download');
+Route::post('/database/backup/restore/{filename}', [\App\Http\Controllers\DatabaseBackupController::class, 'restore'])->name('database.backup.restore');
+Route::post('/database/backup/upload-restore', [\App\Http\Controllers\DatabaseBackupController::class, 'uploadAndRestore'])->name('database.backup.upload-restore');
+Route::delete('/database/backup/delete/{filename}', [\App\Http\Controllers\DatabaseBackupController::class, 'deleteBackup'])->name('database.backup.delete');
+Route::post('/database/backup/settings', [\App\Http\Controllers\DatabaseBackupController::class, 'updateSettings'])->name('database.backup.settings');
 Route::get('/maintenance', [SystemModuleController::class, 'systemMaintenance'])->name('system.maintenance');
 Route::get('/maintenance/news-cleanup', [\App\Http\Controllers\NewsCleanupController::class, 'index'])->name('news.cleanup');
 Route::post('/maintenance/news-cleanup', [\App\Http\Controllers\NewsCleanupController::class, 'purge'])->name('news.cleanup.purge');

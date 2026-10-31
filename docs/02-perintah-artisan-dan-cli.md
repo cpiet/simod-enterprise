@@ -61,14 +61,30 @@ php artisan media:prune --days=90
 php artisan media:prune --days=30 --polda=SULBAR
 ```
 
+### 2.3. Pencadangan Basis Data Otomatis & Manual (Database Snapshot & Prune)
+Mencadangkan basis data MySQL ke snapshot terkompresi Gzip dengan verifikasi hash SHA-256 dan auto-pruning berkas lama:
+```powershell
+# Eksekusi backup seketika (mengabaikan jam jadwal)
+php artisan db:backup --force
+
+# Eksekusi terjadwal (memverifikasi konfigurasi jadwal waktu di database)
+php artisan db:backup --type=scheduled
+
+# Eksekusi dengan retensi kustom (hapus berkas lama lebih tua dari 30 hari)
+php artisan db:backup --force --retention=30
+```
+
 ---
 
 ## 3. Pengujian Otomatis (Automated Testing Suite)
 
 Pengujian fitur aplikasi menggunakan PHPUnit dengan basis data SQLite in-memory (aman, cepat, dan tidak menghapus database MySQL lokal):
 ```powershell
-# Menjalankan seluruh 19 Unit & Feature Tests
+# Menjalankan seluruh 26 Unit & Feature Tests (128 assertions)
 php artisan test
+
+# Menjalankan spesifik modul DatabaseBackupTest
+php artisan test --filter=DatabaseBackupTest
 
 # Menjalankan spesifik modul RssSyncTest
 php artisan test --filter=RssSyncTest
