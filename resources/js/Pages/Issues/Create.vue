@@ -80,18 +80,20 @@ const priorities = [
   },
 ];
 
+const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+
 const form = ref({
   polda_id: props.selectedPolda?.id || props.allPoldas?.[0]?.id || 1,
   polres_id: '',
-  title: '',
-  category: '🚨 Kejadian / Insiden Lapangan',
-  priority: 'medium',
+  title: urlParams?.get('title') || '',
+  category: urlParams?.get('category') || '🚨 Kejadian / Insiden Lapangan',
+  priority: urlParams?.get('priority') || 'medium',
   occurred_at: new Date().toISOString().slice(0, 16),
-  location_text: '',
-  summary: '',
-  source_media: 'Laporan Lapangan',
-  source_account: '',
-  source_url: '',
+  location_text: urlParams?.get('location_text') || urlParams?.get('location') || '',
+  summary: urlParams?.get('summary') || '',
+  source_media: urlParams?.get('source_media') || 'Laporan Lapangan',
+  source_account: urlParams?.get('source_account') || '',
+  source_url: urlParams?.get('source_url') || '',
   assigned_unit: 'Bidhumas Polda',
 });
 

@@ -189,6 +189,15 @@ const navigationGroups = [
         badge: 'ONLINE',
         badgeColor: 'bg-amber-400/20 text-amber-300 border-amber-400/30',
       },
+      {
+        name: 'Radar Media Sosial',
+        desc: 'Pantauan 𝕏, TikTok, IG, YT & KOL',
+        href: '/social-intelligence',
+        icon: Share2,
+        match: ['/social-intelligence'],
+        badge: 'RADAR',
+        badgeColor: 'bg-sky-500/20 text-sky-400 border border-sky-500/30',
+      },
     ],
   },
   {

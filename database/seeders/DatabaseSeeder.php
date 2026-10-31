@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
             EnterpriseDatabaseSeeder::class,
             MultiTenantPoldasSeeder::class,
             MultiPoldaArticlesHistoricalSeeder::class,
+            SocialIntelligenceSeeder::class,
         ]);
     }
 }

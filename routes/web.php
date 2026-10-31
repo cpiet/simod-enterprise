@@ -6,6 +6,7 @@ use App\Http\Controllers\IssueController;
 use App\Http\Controllers\MediaIntelligenceController;
 use App\Http\Controllers\PressReleaseController;
 use App\Http\Controllers\PublicationController;
+use App\Http\Controllers\SocialIntelligenceController;
 use App\Http\Controllers\SystemModuleController;
 use App\Http\Controllers\TaskController;
 use Illuminate\Support\Facades\Route;
@@ -27,6 +28,12 @@ Route::delete('/media-intelligence/rss-sources/{id}', [MediaIntelligenceControll
 Route::post('/media-intelligence/articles/{id}/bookmark', [MediaIntelligenceController::class, 'toggleBookmark'])->name('media-intelligence.bookmark');
 Route::post('/media-intelligence/articles/bookmarks/import', [MediaIntelligenceController::class, 'importBookmarks'])->name('media-intelligence.bookmark.import');
 Route::post('/media-intelligence/rss-sources/test', [MediaIntelligenceController::class, 'testRssSource'])->name('media-intelligence.rss.test');
+
+// Social Media Intelligence Radar
+Route::get('/social-intelligence', [SocialIntelligenceController::class, 'index'])->name('social-intelligence.index');
+Route::post('/social-intelligence/{id}/bookmark', [SocialIntelligenceController::class, 'toggleBookmark'])->name('social-intelligence.bookmark');
+Route::post('/social-intelligence/sync', [SocialIntelligenceController::class, 'sync'])->name('social-intelligence.sync');
+Route::post('/social-intelligence/settings', [SocialIntelligenceController::class, 'updateSettings'])->name('social-intelligence.settings');
 
 // Issues Management
 Route::get('/issues', [IssueController::class, 'index'])->name('issues.index');
