@@ -73,5 +73,17 @@ php artisan serve
 
 ---
 
+## 📚 Dokumentasi & Panduan Pengembang
+
+Dokumentasi lengkap sistem SIMOD Enterprise terpusat pada direktori [`docs/`](./docs/README.md) dan panduan arsitektur khusus untuk AI Agents:
+
+- **[AGENTS.md](./AGENTS.md)**: Panduan instruksi, arsitektur 4 pilar, dual-theme engine, aturan kuota RSS 29 portal, dan protokol pengembangan untuk AI Coding Agents (Codex, Claude, Gemini, Antigravity).
+- **[Katalog Lengkap Modul](./docs/09-katalog-lengkap-19-modul-simod-enterprise.md)**: Daftar seluruh modul operasional, hak akses, dan rute navigasi.
+- **[Modul Media Intelligence & RSS](./docs/03-modul-media-intelligence-dan-rss.md)**: Panduan agregasi berita, executive briefing AI, dan naskah WhatsApp pimpinan.
+- **[Daftar 29 RSS Feed Resmi](./docs/10-daftar-rss-feed-resmi-sulbar.md)**: Inventaris lengkap portal media online Sulbar, endpoint syndication, dan fallback Google News RSS.
+- **[Perintah CLI Artisan & Penjadwal](./docs/02-perintah-artisan-dan-cli.md)**: Panduan sinkronisasi otomatis, retensi data, dan CLI automation.
+
+---
+
 ## 🔒 Lisensi & Hak Cipta
 Hak cipta dilindungi undang-undang. Dikembangkan untuk kebutuhan operasional kehumasan kepolisian.

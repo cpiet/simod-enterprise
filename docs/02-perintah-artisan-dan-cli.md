@@ -1,6 +1,6 @@
 # 🛠️ 02. Daftar Perintah Artisan & CLI
 
-Kumpulan perintah CLI resmi untuk pemeliharaan, pengembangan, pengujian, dan operasional SIMOD Enterprise di Laragon.
+Kumpulan perintah CLI resmi untuk pemeliharaan, pengembangan, pengujian otomatis, dan operasional SIMOD Enterprise di Laragon.
 
 ---
 
@@ -18,14 +18,17 @@ php artisan db:seed
 
 ### Menjalankan Seeder Tertentu Secara Terpisah
 ```powershell
-# Seed data awal multi-tenant (Polda Sulbar, Gorontalo, Polres, Akun Dinas)
-php artisan db:seed --class=EnterpriseDatabaseSeeder
+# Seed data awal multi-tenant (Polda Sulbar, Gorontalo, Sulsel, Sultra, Kaltim, Polres, Akun Dinas)
+php artisan db:seed --class=MultiTenantPoldasSeeder
 
 # Seed data isu kamtibmas & siaran pers
 php artisan db:seed --class=IssueAndReleaseSeeder
 
-# Seed 14 sumber portal RSS resmi Sulbar & Nasional
+# Seed 29 sumber portal RSS resmi Sulbar & Nasional
 php artisan db:seed --class=SulbarRssFeedsSeeder
+
+# Seed artikel historis multi-Polda (untuk uji coba retensi & umur berita)
+php artisan db:seed --class=MultiPoldaArticlesHistoricalSeeder
 
 # Seed publikasi media sosial & disposisi tugas operasional
 php artisan db:seed --class=PublicationsAndTasksSeeder
@@ -35,24 +38,50 @@ php artisan db:seed --class=PublicationsAndTasksSeeder
 
 ## 2. Perintah Operasional SIMOD CLI
 
-### Menjalankan Penarikan Berita RSS Satwil (Scheduled Scraper)
-Menarik berita secara paralel dari 14 portal media Satwil dan menyimpannya ke basis data:
+### 2.1. Sinkronisasi Agregasi Berita RSS Multi-Polda
+Menarik berita secara paralel dari portal media dan menyimpannya ke basis data dengan proteksi Mutex Lock dan Auto-Capping:
 ```powershell
-# Tarik untuk Polda Sulawesi Barat
-php artisan simod:scrape-rss --polda=SULBAR
+# Sinkronisasi aman untuk Polda Sulawesi Barat
+php artisan rss:sync --polda=SULBAR
 
-# Tarik untuk Polda Gorontalo
-php artisan simod:scrape-rss --polda=GORONTALO
+# Abaikan mutex lock jika ada proses terkunci macet
+php artisan rss:sync --polda=SULBAR --force
 
-# Tarik untuk seluruh Polda terdaftar secara otomatis
-php artisan simod:scrape-rss
+# Sinkronisasi seluruh 34 Polda terdaftar secara berurutan
+php artisan rss:sync
+```
+
+### 2.2. Pembersihan & Pemangkasan Berita Lama (Retention Pruner)
+Membersihkan artikel non-bookmark yang melebihi batas hari simpan:
+```powershell
+# Bersihkan artikel non-bookmark yang lebih tua dari 90 hari untuk seluruh Polda
+php artisan media:prune --days=90
+
+# Bersihkan untuk Polda tertentu saja (misal Sulbar 30 hari)
+php artisan media:prune --days=30 --polda=SULBAR
 ```
 
 ---
 
-## 3. Perintah Frontend & Aset Vite
+## 3. Pengujian Otomatis (Automated Testing Suite)
 
-### Kompilasi Aset untuk Produksi (Wajib setelah mengubah file Vue/Tailwind)
+Pengujian fitur aplikasi menggunakan PHPUnit dengan basis data SQLite in-memory (aman, cepat, dan tidak menghapus database MySQL lokal):
+```powershell
+# Menjalankan seluruh 19 Unit & Feature Tests
+php artisan test
+
+# Menjalankan spesifik modul RssSyncTest
+php artisan test --filter=RssSyncTest
+
+# Menjalankan spesifik modul SecurityCenterTest
+php artisan test --filter=SecurityCenterTest
+```
+
+---
+
+## 4. Perintah Frontend & Aset Vite
+
+### Kompilasi Aset untuk Produksi (Wajib setelah mengubah file Vue/CSS)
 ```powershell
 npm run build
 ```
@@ -64,25 +93,20 @@ npm run dev
 
 ---
 
-## 4. Perintah Server & Cache
+## 5. Perintah Server, Cache & Task Scheduler
 
 ### Menjalankan Server Lokal Port 8000
 ```powershell
 php artisan serve --port=8000
 ```
 
-### Membersihkan Cache Aplikasi, Rute, dan Konfigurasi
+### Membersihkan Seluruh Cache Aplikasi
 ```powershell
 php artisan optimize:clear
 ```
 
-### Verifikasi Rute yang Terdaftar
+### Menjalankan Simulasi Task Scheduler
 ```powershell
-php artisan route:list
+php artisan schedule:run
 ```
-
-### Membuka Konsol Interaktif Tinker
-```powershell
-php artisan tinker
-```
-
+*(Scheduler di `routes/console.php` menjalankan `rss:sync --scheduled` setiap menit dan `media:prune` setiap pukul 02:00).*

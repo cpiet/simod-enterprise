@@ -1,90 +1,69 @@
-# 📡 10. Daftar RSS Feed Terorganisir (Sulselbar & Nasional)
+# 📋 10. Daftar Lengkap 29 Sumber RSS Feed Resmi Sulbar & Nasional
 
-Dokumentasi ini merangkum 29 sumber RSS feed resmi yang telah dirapikan, dikelompokkan ke dalam kategori terstruktur, dan dibersihkan dari duplikasi untuk sistem **SIMOD Enterprise Media Intelligence** (Polda Sulawesi Barat).
-
----
-
-## 1. Regional Sulselbar (Sulawesi Selatan & Barat) — 20 Sumber
-Fokus pada liputan kamtibmas, peristiwa lokal, kebijakan pemerintah daerah, dan dinamika sosial masyarakat di 6 kabupaten se-Sulawesi Barat dan Sulawesi Selatan.
-
-| No | Nama Portal | URL Feed XML | Status |
-|:---|:---|:---|:---:|
-| 1 | **Detik Sulsel** | `https://www.detik.com/sulsel/rss` | ● AKTIF |
-| 2 | **Tribun Sulbar** | `https://sulbar.tribunnews.com/rss` | ● AKTIF |
-| 3 | **ANTARA Makassar (Terkini)** | `https://makassar.antaranews.com/rss/terkini.xml` | ● AKTIF |
-| 4 | **ANTARA Makassar (Top News)** | `https://makassar.antaranews.com/rss/top-news.xml` | ● AKTIF |
-| 5 | **ANTARA Makassar (Daerah)** | `https://makassar.antaranews.com/rss/daerah.xml` | ● AKTIF |
-| 6 | **ANTARA Makassar (Lintas Daerah)** | `https://makassar.antaranews.com/rss/lintas-daerah.xml` | ● AKTIF |
-| 7 | **Mesakada.com** | `https://mesakada.com/feed/` | ● AKTIF |
-| 8 | **Mekora.id** | `https://mekora.id/feed/` | ● AKTIF |
-| 9 | **Globalsulbar** | `https://globalsulbar.com/feed/` | ● AKTIF |
-| 10 | **Radar Sulbar** | `https://radarsulbar.fajar.co.id/feed/` | ● AKTIF |
-| 11 | **Sulbar Express** | `https://sulbarexpress.fajar.co.id/feed/` | ● AKTIF |
-| 12 | **Mamuju Pos** | `https://mamujupos.com/feed/` | ● AKTIF |
-| 13 | **Katinting** | `https://katinting.com/feed/` | ● AKTIF |
-| 14 | **Kabar Sulbar** | `https://kabarsulbar.com/feed/` | ● AKTIF |
-| 15 | **Suwarta** | `https://suwarta.id/feed/` | ● AKTIF |
-| 16 | **Sulbar Terkini** | `https://sulbarterkini.com/feed/` | ● AKTIF |
-| 17 | **Malaqbi** | `https://malaqbi.com/feed/` | ● AKTIF |
-| 18 | **Rakyat Sulbar** | `https://www.rakyatsulbar.com/feed/` | ● AKTIF |
-| 19 | **Bugis Pos** | `https://bugispos.com/feed/` | ● AKTIF |
-| 20 | **Bacasaja.id** | `https://bacasaja.id/feed/` | ● AKTIF |
+Dokumen ini memuat daftar resmi dan terstandarisasi 29 URL Feed RSS yang digunakan oleh Bidang Humas Polda Sulawesi Barat dalam modul **Media Online** (`/media-intelligence`) pada SIMOD Enterprise.
 
 ---
 
-## 2. Nasional & Umum — 4 Sumber
-Memantau isu nasional, kebijakan Mabes Polri, dan peristiwa politik nasional yang berdampak pada stabilitas daerah.
+## 1. Kategori: Regional Sulselbar (20 Portal)
 
-| No | Nama Portal | URL Feed XML | Status |
-|:---|:---|:---|:---:|
-| 21 | **Antara News Terkini** | `https://www.antaranews.com/rss/terkini.xml` | ● AKTIF |
-| 22 | **CNN Indonesia Nasional** | `https://www.cnnindonesia.com/nasional/rss` | ● AKTIF |
-| 23 | **Tribunnews (Nasional)** | `https://www.tribunnews.com/rss` | ● AKTIF |
-| 24 | **ANTARA Makassar (Politik)** | `https://makassar.antaranews.com/rss/politik.xml` | ● AKTIF |
-
----
-
-## 3. Hukum & Kriminal — 3 Sumber
-Memantau pengungkapan kasus, operasi kepolisian, penindakan kejahatan konvensional, transnasional, maupun peradilan pidana.
-
-| No | Nama Portal | URL Feed XML | Status |
-|:---|:---|:---|:---:|
-| 25 | **Detikcom Hukum & Kriminal** | `https://news.detik.com/berita/rss` | ● AKTIF |
-| 26 | **ANTARA Makassar (Hukum)** | `https://makassar.antaranews.com/rss/hukum.xml` | ● AKTIF |
-| 27 | **Polisiku.co.id** | `https://polisiku.co.id/feed/` | ● AKTIF |
-
----
-
-## 4. Google News RSS — 2 Sumber
-Stream pencarian berbasis topik dan domain spesifik untuk menjaring pemberitaan hiperlokal Mamuju dan sekitarnya.
-
-| No | Nama Sumber | URL Feed XML | Status |
-|:---|:---|:---|:---:|
-| 28 | **iNews Mamuju (Keyword Search)** | `https://news.google.com/rss/search?q=inews+mamuju&hl=id&gl=ID&ceid=ID:id` | ● AKTIF |
-| 29 | **Google News - iNews Mamuju (Site Search)** | `https://news.google.com/rss/search?q=site:mamuju.inews.id&hl=id&gl=ID&ceid=ID:id` | ● AKTIF |
+| No | Nama Portal | URL Feed RSS / XML | Status & Mekanisme Sindikasi |
+|---|---|---|---|
+| 1 | **Detik Sulsel** | `https://www.detik.com/sulsel/rss` | Langsung (RSS 2.0) |
+| 2 | **Tribun Sulbar** | `https://sulbar.tribunnews.com/rss` | Langsung (RSS 2.0) |
+| 3 | **ANTARA Makassar (Terkini)** | `https://makassar.antaranews.com/rss/terkini.xml` | Langsung (XML Antara) |
+| 4 | **ANTARA Makassar (Top News)** | `https://makassar.antaranews.com/rss/top-news.xml` | Langsung (XML Antara) |
+| 5 | **ANTARA Makassar (Daerah)** | `https://makassar.antaranews.com/rss/daerah.xml` | Langsung (XML Antara) |
+| 6 | **ANTARA Makassar (Lintas Daerah)** | `https://makassar.antaranews.com/rss/lintas-daerah.xml` | Langsung (XML Antara) |
+| 7 | **Mesakada.com** | `https://mesakada.com/feed/` | Langsung (WordPress RSS) |
+| 8 | **Mekora.id** | `https://mekora.id/feed/` | Langsung (WordPress RSS) |
+| 9 | **Globalsulbar** | `https://globalsulbar.com/feed/` | Langsung (WordPress RSS) |
+| 10 | **Radar Sulbar** | `https://radarsulbar.fajar.co.id/feed/` | Langsung (Fajar Group) |
+| 11 | **Sulbar Express** | `https://sulbarexpress.fajar.co.id/feed/` | Langsung (Fajar Group) |
+| 12 | **Mamuju Pos** | `https://mamujupos.com/feed/` | Langsung (WordPress RSS) |
+| 13 | **Katinting** | `https://katinting.com/feed/` | Langsung (WordPress RSS) |
+| 14 | **Kabar Sulbar** | `https://kabarsulbar.com/feed/` | Langsung (WordPress RSS) |
+| 15 | **Suwarta** | `https://suwarta.id/feed/` | Langsung (WordPress RSS) |
+| 16 | **Sulbar Terkini** | `https://sulbarterkini.com/feed/` | Langsung (WordPress RSS) |
+| 17 | **Malaqbi** | `https://news.google.com/rss/search?q=site:malaqbi.com&hl=id&gl=ID&ceid=ID:id` | Google News RSS Proxy (Stabil & Bebas 404) |
+| 18 | **Rakyat Sulbar** | `https://www.rakyatsulbar.com/feed/` | Langsung (WordPress RSS) |
+| 19 | **Bugis Pos** | `https://bugispos.com/feed/` | Langsung (WordPress RSS) |
+| 20 | **Bacasaja.id** | `https://news.google.com/rss/search?q=site:bacasaja.id&hl=id&gl=ID&ceid=ID:id` | Google News RSS Proxy (Bypass Cloudflare 403) |
 
 ---
 
-## 5. Implementasi Basis Data & Kode
-- **Seeder Database**: [`database/seeders/SulbarRssFeedsSeeder.php`](file:///d:/Foto/laragon/www/simod-enterprise/database/seeders/SulbarRssFeedsSeeder.php)
-- **Eksekusi Seeder**: `php artisan db:seed --class=SulbarRssFeedsSeeder`
-- **Agregator Paralel**: [`app/Services/RssFeedService.php`](file:///d:/Foto/laragon/www/simod-enterprise/app/Services/RssFeedService.php)
-- **Controller Media Intelligence**: [`app/Http/Controllers/MediaIntelligenceController.php`](file:///d:/Foto/laragon/www/simod-enterprise/app/Http/Controllers/MediaIntelligenceController.php)
+## 2. Kategori: Nasional & Umum (4 Portal)
+
+| No | Nama Portal | URL Feed RSS / XML | Status & Mekanisme Sindikasi |
+|---|---|---|---|
+| 21 | **Antara News Terkini** | `https://www.antaranews.com/rss/terkini.xml` | Langsung (LKBN Antara) |
+| 22 | **CNN Indonesia Nasional** | `https://www.cnnindonesia.com/nasional/rss` | Langsung (Transmedia) |
+| 23 | **Tribunnews (Nasional)** | `https://www.tribunnews.com/rss` | Langsung (Kompas Gramedia) |
+| 24 | **ANTARA Makassar (Politik)** | `https://makassar.antaranews.com/rss/politik.xml` | Langsung (LKBN Antara) |
 
 ---
 
-## 6. Diseminasi Naskah WhatsApp Siap Kirim ke Pimpinan
-Fitur naskah WhatsApp resmi siap kirim ke pimpinan telah diintegrasikan pada antarmuka Media Intelligence:
-- **Lokasi Akses**:
-  1. **Hero Action Bar**: Tombol `[📱 Format WA Pimpinan]` yang langsung membuka Tab 07.
-  2. **Tab 02 (Berita & Briefing)**: Tombol `[Salin Format WA Pimpinan]` pada header Executive Briefing dan komponen kartu dispatch interaktif di bagian bawah.
-  3. **Tab 07 (Naskah WA Pimpinan)**: Tampilan penuh dengan panduan alur distribusi berjenjang (Kapolda, Wakapolda, Irwasda), tombol Salin Naskah, Gulir Awal/Akhir, Mode Perluas/Perkecil, Unduh berkas `.txt`, dan tautan langsung ke WhatsApp Web.
-- **Standar Format Naskah**:
-  - **Header Resmi**: `*LAPORAN INTELIJEN MEDIA & SENTIMEN OPINI PUBLIK*` - `*BIDANG HUMAS POLDA SULAWESI BARAT*`.
-  - **Identitas & Tanggal**: Kepada Yth. Bapak Kapolda, Dari Kabid Humas, Tanggal dinas lengkap dengan waktu WITA.
-  - **Bagian I**: Situasi dan Analisis Kabid Humas (Sentimen Nasional vs Sulbar & Rincian Isu Aktual).
-  - **Bagian II**: Saran Langkah Tindak Lanjut beserta Satuan Pelaksana (PIC).
-  - **Bagian III**: Saran Pola Koordinasi & Evaluasi Waktu Nyata (0–2 jam, 2–6 jam, 24 jam).
-  - **Bagian IV**: Kesimpulan Kategori Status (*HIJAU / KUNING / MERAH*) dan Pertimbangan Strategis Pimpinan.
-  - **Tembusan**: Wakapolda dan Irwasda.
+## 3. Kategori: Hukum & Kriminal (3 Portal)
 
+| No | Nama Portal | URL Feed RSS / XML | Status & Mekanisme Sindikasi |
+|---|---|---|---|
+| 25 | **Detikcom Hukum & Kriminal** | `https://news.detik.com/berita/rss` | Langsung (Detik Network) |
+| 26 | **ANTARA Makassar (Hukum)** | `https://makassar.antaranews.com/rss/hukum.xml` | Langsung (LKBN Antara) |
+| 27 | **Polisiku.co.id** | `https://polisiku.co.id/feed/` | Langsung (Siber Polri Media) |
+
+---
+
+## 4. Kategori: Google News RSS (2 Stream Khusus)
+
+| No | Nama Portal | URL Feed RSS / XML | Target Pantauan |
+|---|---|---|---|
+| 28 | **iNews Mamuju (Keyword Search)** | `https://news.google.com/rss/search?q=inews+mamuju&hl=id&gl=ID&ceid=ID:id` | Keyword query `inews mamuju` |
+| 29 | **Google News - iNews Mamuju (Site Search)** | `https://news.google.com/rss/search?q=site:mamuju.inews.id&hl=id&gl=ID&ceid=ID:id` | Domain spesifik `mamuju.inews.id` |
+
+---
+
+## 5. Algoritma Fair Quota & Auto-Cap Kestabilan
+
+Agar seluruh 29 portal media selalu terisi berita (tidak ada yang kosong atau 0 berita):
+1. **Penyimpanan Berimbang**: Tiap portal diberi kuota simpan maksimum 25–30 artikel per batch penarikan.
+2. **Auto-Cap Per-Portal**: Pemangkasan artikel non-bookmark tertua dilakukan per-sumber jika kuota melebihi kapasitas yang ditentukan di menu *Otomasi Sinkron RSS*.
+3. **Proteksi Bookmark Permanen**: Artikel yang ditandai bookmark (`is_bookmarked = true`) **kebal** dari segala jenis pemangkasan atau pembersihan data otomatis.
