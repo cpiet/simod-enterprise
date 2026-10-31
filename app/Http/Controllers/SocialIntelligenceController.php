@@ -7,6 +7,7 @@ use App\Models\Polda;
 use App\Models\Polres;
 use App\Models\SocialPost;
 use App\Models\SocialSetting;
+use App\Services\ApifySyncService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Inertia\Inertia;
@@ -206,21 +207,29 @@ class SocialIntelligenceController extends Controller
     }
 
     /**
+     * Test connection to Apify using provided token.
+     */
+    public function testConnection(Request $request, ApifySyncService $service)
+    {
+        $token = $request->input('apify_api_token');
+        $result = $service->testConnection($token);
+
+        return response()->json($result);
+    }
+
+    /**
      * Trigger manual sync or simulated real-time crawl.
      */
-    public function sync(Request $request)
+    public function sync(Request $request, ApifySyncService $service)
     {
-        $poldaId = $request->input('polda_id');
-        $setting = SocialSetting::where('polda_id', $poldaId)->first();
+        $poldaId = (int) $request->input('polda_id', 1);
+        $result = $service->syncPolda($poldaId);
 
-        if ($setting) {
-            $setting->update([
-                'last_synced_at' => now(),
-            ]);
+        if (!$result['success']) {
+            return redirect()->back()->with('error', $result['message']);
         }
 
-        // If an Apify token is provided, in a full live production setup this invokes the Apify Actor API.
-        // For local development & demo, it touches the sync timestamp and ensures realistic data presence.
-        return redirect()->back()->with('success', '✓ Sinkronisasi radar media sosial berhasil dijalankan. Data percakapan diperbarui.');
+        return redirect()->back()->with('success', '✓ ' . $result['message']);
     }
 }
+

@@ -109,6 +109,46 @@ const saveSettings = () => {
   });
 };
 
+// Test Connection Apify
+const isTestingConnection = ref(false);
+const testConnectionResult = ref(null);
+
+const testConnection = async () => {
+  if (!settingsForm.value.apify_api_token) {
+    testConnectionResult.value = {
+      success: false,
+      message: 'Masukkan Personal API Token Apify terlebih dahulu sebelum melakukan pengujian koneksi.',
+    };
+    return;
+  }
+
+  isTestingConnection.value = true;
+  testConnectionResult.value = null;
+
+  try {
+    const res = await fetch('/social-intelligence/test-connection', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        apify_api_token: settingsForm.value.apify_api_token,
+      }),
+    });
+    const data = await res.json();
+    testConnectionResult.value = data;
+  } catch (err) {
+    testConnectionResult.value = {
+      success: false,
+      message: 'Terjadi kegagalan jaringan saat menghubungi server backend atau Apify.',
+    };
+  } finally {
+    isTestingConnection.value = false;
+  }
+};
+
 // Format Helpers
 const getPlatformBadge = (platform) => {
   switch (platform) {
@@ -763,18 +803,44 @@ const formatNumber = (num) => {
         <form @submit.prevent="saveSettings" class="space-y-5 text-xs">
           <!-- Token Apify -->
           <div>
-            <label class="block font-black text-slate-800 dark:text-slate-200 mb-1.5 uppercase tracking-wider text-[11px]">
-              APIFY PERSONAL API TOKEN (OPSIONAL / TRIAL)
-            </label>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="block font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[11px]">
+                APIFY PERSONAL API TOKEN (KREDENSIAL API)
+              </label>
+              <button
+                type="button"
+                @click="testConnection"
+                :disabled="isTestingConnection || !settingsForm.apify_api_token"
+                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-bold bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 transition disabled:opacity-40 cursor-pointer"
+              >
+                <RefreshCw :class="['w-3 h-3', isTestingConnection ? 'animate-spin' : '']" />
+                <span>{{ isTestingConnection ? 'Menguji...' : 'Uji Koneksi Token' }}</span>
+              </button>
+            </div>
             <input
               v-model="settingsForm.apify_api_token"
-              type="password"
-              placeholder="apify_api_..."
+              type="text"
+              placeholder="apify_api_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
               class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono placeholder-slate-400 focus:outline-none focus:border-amber-400"
             />
             <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-              Dapatkan token dari <a href="https://console.apify.com/account/integrations" target="_blank" class="text-amber-500 underline">Apify Console Integrations</a>. Jika dikosongkan, sistem menjalankan simulasi radar lokal.
+              Dapatkan token dari menu <a href="https://console.apify.com/account/integrations" target="_blank" class="text-amber-500 underline font-semibold">Apify Console Integrations</a>. Masukkan token Anda untuk mengaktifkan penarikan data live dari internet.
             </p>
+
+            <!-- Status Hasil Uji Koneksi -->
+            <div v-if="testConnectionResult" class="mt-2.5 p-3 rounded-xl border text-xs" :class="testConnectionResult.success ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300' : 'bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-300'">
+              <div class="flex items-start gap-2">
+                <CheckCircle2 v-if="testConnectionResult.success" class="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                <AlertTriangle v-else class="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                <div class="space-y-1">
+                  <p class="font-bold">{{ testConnectionResult.message }}</p>
+                  <div v-if="testConnectionResult.user" class="text-[11px] opacity-90 space-y-0.5 font-mono">
+                    <p>• Akun: {{ testConnectionResult.user.username }} ({{ testConnectionResult.user.email }})</p>
+                    <p>• Paket: {{ testConnectionResult.user.plan }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Kata Kunci Pelacakan -->
@@ -841,3 +907,4 @@ const formatNumber = (num) => {
     </div>
   </EnterpriseLayout>
 </template>
+

@@ -56,3 +56,4 @@ class SocialPost extends Model
         return $this->belongsTo(Polres::class);
     }
 }
+

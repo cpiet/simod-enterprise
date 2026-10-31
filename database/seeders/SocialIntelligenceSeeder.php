@@ -246,3 +246,4 @@ class SocialIntelligenceSeeder extends Seeder
         }
     }
 }
+

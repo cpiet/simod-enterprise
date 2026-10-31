@@ -164,4 +164,39 @@ class SocialIntelligenceTest extends TestCase
 
         $response->assertRedirect();
     }
+
+    public function test_apify_test_connection_endpoint(): void
+    {
+        // 1. Missing token
+        $responseEmpty = $this->actingAs($this->user)->postJson('/social-intelligence/test-connection', [
+            'apify_api_token' => '',
+        ]);
+        $responseEmpty->assertStatus(200);
+        $responseEmpty->assertJson(['success' => false, 'status' => 'missing_token']);
+
+        // 2. Simulated call
+        \Illuminate\Support\Facades\Http::fake([
+            'api.apify.com/v2/users/me' => \Illuminate\Support\Facades\Http::response([
+                'data' => [
+                    'id'       => 'test_user_id',
+                    'username' => 'humas_sulbar',
+                    'email'    => 'humas@sulbar.polri.go.id',
+                    'plan'     => ['name' => 'Free ($5/mo)'],
+                ],
+            ], 200),
+        ]);
+
+        $responseValid = $this->actingAs($this->user)->postJson('/social-intelligence/test-connection', [
+            'apify_api_token' => 'apify_api_valid_mock_token',
+        ]);
+        $responseValid->assertStatus(200);
+        $responseValid->assertJson([
+            'success' => true,
+            'status'  => 'connected',
+            'user'    => [
+                'username' => 'humas_sulbar',
+            ],
+        ]);
+    }
 }
+

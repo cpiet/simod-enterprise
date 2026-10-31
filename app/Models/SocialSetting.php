@@ -31,3 +31,4 @@ class SocialSetting extends Model
         return $this->belongsTo(Polda::class);
     }
 }
+
