@@ -166,3 +166,4 @@ class RssSyncTest extends TestCase
         $this->assertEquals(5, $remaining);
     }
 }
+

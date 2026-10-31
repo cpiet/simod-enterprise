@@ -59,3 +59,4 @@ class RssSyncCommand extends Command
         return self::SUCCESS;
     }
 }
+

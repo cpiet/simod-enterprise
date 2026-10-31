@@ -337,3 +337,4 @@ class RssSyncService
         return false;
     }
 }
+
