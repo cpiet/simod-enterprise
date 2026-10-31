@@ -68,3 +68,4 @@ class DatabaseBackupCommand extends Command
         }
     }
 }
+

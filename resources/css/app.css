@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source "../**/*.blade.php";
@@ -75,9 +77,11 @@ html:not(.dark) .bg-\[\#091122\]\/90 {
     background-color: #ffffff !important;
 }
 
-/* Secondary Panels & Inputs */
+/* Secondary Panels, Buttons & Inputs */
 html.light .bg-\[\#070d19\],
 html:not(.dark) .bg-\[\#070d19\],
+html.light .bg-\[\#0d182e\],
+html:not(.dark) .bg-\[\#0d182e\],
 html.light .bg-slate-900,
 html:not(.dark) .bg-slate-900,
 html.light .bg-slate-900\/90,
@@ -85,15 +89,40 @@ html:not(.dark) .bg-slate-900\/90,
 html.light .bg-slate-900\/80,
 html:not(.dark) .bg-slate-900\/80 {
     background-color: #f8fafc !important;
+    color: #1e293b !important;
 }
 
+html.light .bg-slate-800,
+html:not(.dark) .bg-slate-800,
+html.light .bg-slate-800\/80,
+html:not(.dark) .bg-slate-800\/80,
+html.light .bg-slate-800\/70,
+html:not(.dark) .bg-slate-800\/70,
+html.light .bg-slate-800\/60,
+html:not(.dark) .bg-slate-800\/60,
+html.light .bg-slate-800\/50,
+html:not(.dark) .bg-slate-800\/50,
 html.light .bg-slate-900\/60,
 html:not(.dark) .bg-slate-900\/60,
 html.light .bg-slate-900\/40,
 html:not(.dark) .bg-slate-900\/40,
-html.light .bg-black\/50,
-html:not(.dark) .bg-black\/50 {
+html.light .bg-slate-950,
+html:not(.dark) .bg-slate-950 {
     background-color: #f1f5f9 !important;
+    color: #1e293b !important;
+}
+
+/* Secondary Button Hover States in Light Mode */
+html.light .hover\:bg-slate-800:hover,
+html:not(.dark) .hover\:bg-slate-800:hover,
+html.light .hover\:bg-slate-800\/80:hover,
+html:not(.dark) .hover\:bg-slate-800\/80:hover,
+html.light .hover\:bg-slate-800\/70:hover,
+html:not(.dark) .hover\:bg-slate-800\/70:hover,
+html.light .hover\:bg-slate-700:hover,
+html:not(.dark) .hover\:bg-slate-700:hover {
+    background-color: #e2e8f0 !important;
+    color: #0f172a !important;
 }
 
 /* Borders */
@@ -106,11 +135,15 @@ html:not(.dark) .border-slate-800\/60,
 html.light .border-slate-700,
 html:not(.dark) .border-slate-700,
 html.light .border-slate-700\/80,
-html:not(.dark) .border-slate-700\/80 {
+html:not(.dark) .border-slate-700\/80,
+html.light .border-slate-700\/60,
+html:not(.dark) .border-slate-700\/60,
+html.light .border-slate-900,
+html:not(.dark) .border-slate-900 {
     border-color: #e2e8f0 !important;
 }
 
-/* Typography Overrides */
+/* Typography Overrides for General Text */
 html.light .text-white,
 html:not(.dark) .text-white {
     color: #0f172a !important;
@@ -133,16 +166,83 @@ html:not(.dark) .text-slate-400 {
     color: #64748b !important;
 }
 
-/* Gradients Overrides for Soft Card Backgrounds in Light Mode */
-html.light .bg-gradient-to-r,
-html:not(.dark) .bg-gradient-to-r,
-html.light .bg-gradient-to-br,
-html:not(.dark) .bg-gradient-to-br {
+/* CRITICAL: Keep Text White on Solid Colored / Danger / Action Badges */
+html.light .bg-rose-500,
+html:not(.dark) .bg-rose-500,
+html.light .bg-rose-600,
+html:not(.dark) .bg-rose-600,
+html.light .bg-red-500,
+html:not(.dark) .bg-red-500,
+html.light .bg-red-600,
+html:not(.dark) .bg-red-600,
+html.light .bg-emerald-500,
+html:not(.dark) .bg-emerald-500,
+html.light .bg-emerald-600,
+html:not(.dark) .bg-emerald-600,
+html.light .bg-blue-600,
+html:not(.dark) .bg-blue-600 {
+    color: #ffffff !important;
+}
+
+html.light .bg-rose-500 .text-white,
+html:not(.dark) .bg-rose-500 .text-white,
+html.light .bg-rose-500.text-white,
+html:not(.dark) .bg-rose-500.text-white,
+html.light .bg-rose-600.text-white,
+html:not(.dark) .bg-rose-600.text-white,
+html.light .bg-emerald-500.text-white,
+html:not(.dark) .bg-emerald-500.text-white,
+html.light .bg-emerald-600.text-white,
+html:not(.dark) .bg-emerald-600.text-white,
+html.light .bg-blue-600.text-white,
+html:not(.dark) .bg-blue-600.text-white {
+    color: #ffffff !important;
+}
+
+/* Preserve Amber & Gold Primary Buttons */
+html.light .bg-amber-400,
+html:not(.dark) .bg-amber-400,
+html.light .bg-amber-500,
+html:not(.dark) .bg-amber-500 {
+    background-color: #f59e0b !important;
+    color: #0f172a !important;
+}
+
+html.light .bg-amber-400:hover,
+html:not(.dark) .bg-amber-400:hover {
+    background-color: #fbbf24 !important;
+    color: #0f172a !important;
+}
+
+/* Card Gradient Containers (Only Large Containers, Never Buttons) */
+html.light .rounded-3xl.bg-gradient-to-br,
+html:not(.dark) .rounded-3xl.bg-gradient-to-br,
+html.light .from-\[\#0c162e\],
+html:not(.dark) .from-\[\#0c162e\] {
     background-image: none !important;
     background-color: #ffffff !important;
 }
 
-/* Enhanced Contrast for Accent Colors in Light Mode */
+/* Preserve Button Gradients and Progress Bars */
+html.light a.bg-gradient-to-r,
+html:not(.dark) a.bg-gradient-to-r,
+html.light button.bg-gradient-to-r,
+html:not(.dark) button.bg-gradient-to-r {
+    background-image: linear-gradient(to right, #f59e0b, #fbbf24) !important;
+    color: #0f172a !important;
+}
+
+/* Progress Bar Tracks in Light Mode */
+html.light .w-16.h-2.rounded-full.bg-slate-800,
+html:not(.dark) .w-16.h-2.rounded-full.bg-slate-800,
+html.light .h-2.rounded-full.bg-slate-800,
+html:not(.dark) .h-2.rounded-full.bg-slate-800,
+html.light .h-2.rounded-full.bg-slate-900,
+html:not(.dark) .h-2.rounded-full.bg-slate-900 {
+    background-color: #e2e8f0 !important;
+}
+
+/* Enhanced Contrast for Accent Text in Light Mode */
 html.light .text-amber-400,
 html:not(.dark) .text-amber-400 {
     color: #b45309 !important;
@@ -185,6 +285,57 @@ html:not(.dark) input::placeholder,
 html.light textarea::placeholder,
 html:not(.dark) textarea::placeholder {
     color: #94a3b8 !important;
+}
+
+/* Modals & Dialogs in Light Mode */
+html.light .fixed.inset-0.bg-slate-950\/80,
+html:not(.dark) .fixed.inset-0.bg-slate-950\/80,
+html.light .fixed.inset-0.bg-slate-950\/70,
+html:not(.dark) .fixed.inset-0.bg-slate-950\/70,
+html.light .fixed.inset-0.bg-black\/60,
+html:not(.dark) .fixed.inset-0.bg-black\/60 {
+    background-color: rgba(15, 23, 42, 0.6) !important;
+}
+
+html.light .fixed.inset-0 .rounded-3xl,
+html:not(.dark) .fixed.inset-0 .rounded-3xl,
+html.light .fixed.inset-0 .rounded-2xl,
+html:not(.dark) .fixed.inset-0 .rounded-2xl {
+    background-color: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    color: #0f172a !important;
+}
+
+/* Secondary Button in Modals (Batal) */
+html.light .fixed.inset-0 button.bg-slate-800,
+html:not(.dark) .fixed.inset-0 button.bg-slate-800,
+html.light .fixed.inset-0 button.bg-slate-900,
+html:not(.dark) .fixed.inset-0 button.bg-slate-900 {
+    background-color: #f1f5f9 !important;
+    border: 1px solid #cbd5e1 !important;
+    color: #334155 !important;
+}
+
+html.light .fixed.inset-0 button.bg-slate-800:hover,
+html:not(.dark) .fixed.inset-0 button.bg-slate-800:hover,
+html.light .fixed.inset-0 button.bg-slate-900:hover,
+html:not(.dark) .fixed.inset-0 button.bg-slate-900:hover {
+    background-color: #e2e8f0 !important;
+    color: #0f172a !important;
+}
+
+/* Sidebar Badges in Light Mode */
+html.light aside .bg-slate-800,
+html:not(.dark) aside .bg-slate-800 {
+    background-color: #e2e8f0 !important;
+    color: #b45309 !important;
+    border-color: #cbd5e1 !important;
+}
+
+html.light aside .bg-slate-950,
+html:not(.dark) aside .bg-slate-950 {
+    background-color: #0f172a !important;
+    color: #f59e0b !important;
 }
 
 /* Card Subtle Drop Shadows in Light Mode */

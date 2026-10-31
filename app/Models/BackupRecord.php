@@ -57,3 +57,4 @@ class BackupRecord extends Model
         return round($bytes, $precision) . ' ' . $units[$pow];
     }
 }
+

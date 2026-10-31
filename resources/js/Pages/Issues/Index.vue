@@ -520,7 +520,7 @@ const filteredIssuesList = computed(() => {
             <button
               type="button"
               @click="isCreateModalOpen = false"
-              class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 hover:text-white"
+              class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-white border border-slate-300 dark:border-slate-700 transition"
             >
               Batal
             </button>
@@ -611,7 +611,7 @@ const filteredIssuesList = computed(() => {
             <button
               type="button"
               @click="isClarifyModalOpen = false"
-              class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 text-slate-300 hover:text-white"
+              class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-white border border-slate-300 dark:border-slate-700 transition"
             >
               Batal
             </button>

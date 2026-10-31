@@ -558,7 +558,7 @@ const saveScheduleSettings = () => {
             :href="link.url || '#'"
             v-html="link.label"
             class="px-3 py-1.5 rounded-lg border text-xs font-bold transition"
-            :class="link.active ? 'bg-amber-400 text-slate-950 border-amber-400' : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'"
+            :class="link.active ? 'bg-amber-400 text-slate-950 border-amber-400' : 'bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-400 border-slate-300 dark:border-slate-800 hover:text-slate-950 dark:hover:text-white'"
           />
         </div>
       </div>
@@ -641,7 +641,7 @@ const saveScheduleSettings = () => {
         <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
           <button
             @click="closeRestoreModal"
-            class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-bold transition"
+            class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-300 text-xs font-bold transition border border-slate-300 dark:border-slate-800"
           >
             Batal
           </button>
@@ -709,7 +709,7 @@ const saveScheduleSettings = () => {
         <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
           <button
             @click="closeUploadModal"
-            class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-bold transition"
+            class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-300 text-xs font-bold transition border border-slate-300 dark:border-slate-800"
           >
             Batal
           </button>

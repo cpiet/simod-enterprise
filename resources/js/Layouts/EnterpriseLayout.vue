@@ -369,7 +369,7 @@ const navigationGroups = [
                 <span
                   v-if="item.badge"
                   class="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-black uppercase border"
-                  :class="isRouteActive(item) ? 'bg-slate-950 text-amber-400 border-slate-900' : (item.badgeColor || 'bg-slate-800 text-slate-300 border-slate-700')"
+                  :class="isRouteActive(item) ? 'bg-slate-950 text-amber-400 border-slate-900' : (item.badgeColor || 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700')"
                 >
                   {{ item.badge }}
                 </span>
@@ -378,7 +378,7 @@ const navigationGroups = [
                 <span
                   v-else-if="item.badgeKey && displayMetrics[item.badgeKey]"
                   class="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-black"
-                  :class="isRouteActive(item) ? 'bg-slate-950 text-amber-400' : (item.badgeColor || 'bg-slate-800 text-amber-400 border border-slate-700/60')"
+                  :class="isRouteActive(item) ? 'bg-slate-950 text-amber-400' : (item.badgeColor || 'bg-amber-100 text-amber-800 border border-amber-300 dark:bg-slate-800 dark:text-amber-400 dark:border-slate-700/60')"
                 >
                   {{ displayMetrics[item.badgeKey] }}
                 </span>
@@ -479,7 +479,7 @@ const navigationGroups = [
             <span
               v-if="item.badge"
               class="px-1.5 py-0.5 rounded text-[9px] font-black uppercase border"
-              :class="isRouteActive(item) ? 'bg-slate-950 text-amber-400 border-slate-900' : (item.badgeColor || 'bg-slate-800 text-slate-300 border-slate-700')"
+              :class="isRouteActive(item) ? 'bg-slate-950 text-amber-400 border-slate-900' : (item.badgeColor || 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700')"
             >
               {{ item.badge }}
             </span>
@@ -488,7 +488,7 @@ const navigationGroups = [
             <span
               v-else-if="item.badgeKey && displayMetrics[item.badgeKey]"
               class="px-2 py-0.5 rounded-full text-[10px] font-black"
-              :class="isRouteActive(item) ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-amber-400'"
+              :class="isRouteActive(item) ? 'bg-slate-950 text-amber-400' : 'bg-amber-100 text-amber-800 border border-amber-300 dark:bg-slate-800 dark:text-amber-400'"
             >
               {{ displayMetrics[item.badgeKey] }}
             </span>
@@ -571,7 +571,7 @@ const navigationGroups = [
                   <Shield class="w-3.5 h-3.5" :class="selectedCode === p.code ? 'text-slate-950' : 'text-amber-400'" />
                   <span class="truncate">{{ p.name }}</span>
                 </div>
-                <span class="text-[10px] px-2 py-0.5 rounded-full" :class="selectedCode === p.code ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-slate-300'">
+                <span class="text-[10px] px-2 py-0.5 rounded-full" :class="selectedCode === p.code ? 'bg-slate-950 text-amber-400' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700'">
                   {{ p.polres_count || 6 }} Polres
                 </span>
               </button>

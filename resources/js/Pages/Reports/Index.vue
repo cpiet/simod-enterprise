@@ -119,23 +119,23 @@ const formatDateWita = (dateStr) => {
       <div class="flex flex-wrap items-center gap-2 print:hidden">
         <button
           @click="copyExecutiveSummary"
-          class="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-slate-200 transition"
+          class="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 dark:border-slate-700 dark:text-slate-200 text-xs font-bold transition shadow-sm"
         >
-          <Copy class="w-3.5 h-3.5 text-amber-400" />
+          <Copy class="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
           <span>{{ copySuccess ? 'Tersalin ke Clipboard!' : 'Salin Format WA Pimpinan' }}</span>
         </button>
 
         <button
           @click="triggerPrint"
-          class="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-slate-200 transition"
+          class="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 dark:border-slate-700 dark:text-slate-200 text-xs font-bold transition shadow-sm"
         >
-          <Printer class="w-3.5 h-3.5 text-sky-400" />
+          <Printer class="w-3.5 h-3.5 text-sky-500 dark:text-sky-400" />
           <span>Cetak Dokumen</span>
         </button>
 
         <a
           :href="`/reports/export/csv?polda=${selectedCode}`"
-          class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 text-xs font-extrabold hover:brightness-110 shadow-lg shadow-amber-500/20 transition"
+          class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-lg shadow-amber-400/20 transition cursor-pointer"
         >
           <Download class="w-3.5 h-3.5" />
           <span>Ekspor CSV Resmi</span>
@@ -234,13 +234,13 @@ const formatDateWita = (dateStr) => {
                 <td class="py-3 text-center font-mono text-emerald-400 font-bold">{{ satwil.resolved }}</td>
                 <td class="py-3 text-center">
                   <div class="inline-flex items-center gap-1.5">
-                    <div class="w-16 h-2 rounded-full bg-slate-800 overflow-hidden">
+                    <div class="w-16 h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
                       <div
-                        class="h-full bg-gradient-to-r from-amber-400 to-emerald-400"
+                        class="h-full bg-gradient-to-r from-amber-400 to-emerald-400 rounded-full"
                         :style="{ width: `${satwil.sla_pct}%` }"
                       ></div>
                     </div>
-                    <span class="font-mono text-[10px] text-slate-300">{{ satwil.sla_pct }}%</span>
+                    <span class="font-mono text-[10px] text-slate-600 dark:text-slate-300">{{ satwil.sla_pct }}%</span>
                   </div>
                 </td>
                 <td class="py-3 text-right">
@@ -269,7 +269,7 @@ const formatDateWita = (dateStr) => {
               <span class="font-bold text-slate-200">{{ cat.name }}</span>
               <span class="font-mono text-amber-400 font-bold">{{ cat.count }} ({{ cat.pct }}%)</span>
             </div>
-            <div class="w-full h-2 rounded-full bg-slate-900 border border-slate-800 overflow-hidden">
+            <div class="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 overflow-hidden">
               <div
                 class="h-full bg-gradient-to-r from-amber-500 to-amber-300 rounded-full"
                 :style="{ width: `${cat.pct}%` }"
@@ -351,7 +351,7 @@ const formatDateWita = (dateStr) => {
                 {{ rep.polres?.name || 'Polda Sulbar' }}
               </td>
               <td class="px-6 py-4">
-                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
                   {{ rep.category }}
                 </span>
               </td>
@@ -359,22 +359,22 @@ const formatDateWita = (dateStr) => {
                 <span
                   class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border"
                   :class="{
-                    'bg-emerald-500/20 text-emerald-300 border-emerald-500/40': rep.status === 'selesai' || rep.status === 'arsip',
-                    'bg-amber-400/20 text-amber-300 border-amber-400/40': rep.status === 'investigasi' || rep.status === 'klarifikasi',
-                    'bg-sky-500/20 text-sky-300 border-sky-500/40': rep.status === 'monitoring',
-                    'bg-slate-800 text-slate-300 border-slate-700': rep.status === 'draft' || rep.status === 'returned',
+                    'bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border-emerald-500/40': rep.status === 'selesai' || rep.status === 'arsip',
+                    'bg-amber-400/20 text-amber-700 dark:text-amber-300 border-amber-400/40': rep.status === 'investigasi' || rep.status === 'klarifikasi',
+                    'bg-sky-500/20 text-sky-600 dark:text-sky-300 border-sky-500/40': rep.status === 'monitoring',
+                    'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700': rep.status === 'draft' || rep.status === 'returned',
                   }"
                 >
                   {{ rep.status }}
                 </span>
               </td>
-              <td class="px-6 py-4 font-mono text-slate-400 whitespace-nowrap">
+              <td class="px-6 py-4 font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
                 {{ formatDateWita(rep.created_at) }}
               </td>
               <td class="px-6 py-4 text-right print:hidden">
                 <Link
                   :href="`/issues/${rep.id}?polda=${selectedCode}`"
-                  class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-amber-400 font-bold text-xs inline-flex items-center gap-1 transition"
+                  class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-amber-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:border-slate-700 dark:text-amber-400 font-bold text-xs inline-flex items-center gap-1 transition shadow-sm"
                 >
                   <span>Detail &rarr;</span>
                 </Link>
@@ -394,8 +394,8 @@ const formatDateWita = (dateStr) => {
           :class="link.active
             ? 'bg-amber-400 text-slate-950 border-amber-400 font-black'
             : link.url
-              ? 'bg-slate-900 text-slate-300 border-slate-800 hover:text-white hover:border-slate-700'
-              : 'bg-slate-950 text-slate-600 border-slate-900 pointer-events-none'"
+              ? 'bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-800 hover:text-slate-950 dark:hover:text-white'
+              : 'bg-slate-100 dark:bg-slate-950 text-slate-400 dark:text-slate-600 border-slate-200 dark:border-slate-900 pointer-events-none'"
           v-html="link.label"
         />
       </div>
