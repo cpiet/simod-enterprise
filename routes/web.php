@@ -75,3 +75,6 @@ Route::get('/database/backup', [SystemModuleController::class, 'databaseBackup']
 Route::get('/maintenance', [SystemModuleController::class, 'systemMaintenance'])->name('system.maintenance');
 Route::get('/maintenance/news-cleanup', [\App\Http\Controllers\NewsCleanupController::class, 'index'])->name('news.cleanup');
 Route::post('/maintenance/news-cleanup', [\App\Http\Controllers\NewsCleanupController::class, 'purge'])->name('news.cleanup.purge');
+Route::get('/maintenance/rss-sync', [\App\Http\Controllers\RssSyncController::class, 'index'])->name('maintenance.rss-sync');
+Route::post('/maintenance/rss-sync', [\App\Http\Controllers\RssSyncController::class, 'update'])->name('maintenance.rss-sync.update');
+Route::post('/maintenance/rss-sync/trigger', [\App\Http\Controllers\RssSyncController::class, 'triggerSync'])->name('maintenance.rss-sync.trigger');

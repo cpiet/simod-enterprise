@@ -276,10 +276,10 @@ const navigationGroups = [
       },
       {
         name: 'Keamanan & Pemeliharaan',
-        desc: 'Keamanan, Hak Akses, Audit, Backup, Pembersihan',
+        desc: 'Keamanan, Hak Akses, Audit, Backup, Pembersihan, Sinkron RSS',
         href: '/security',
         icon: ShieldAlert,
-        match: ['/security', '/roles', '/audit-logs', '/database/backup', '/maintenance', '/settings/mail', '/maintenance/news-cleanup'],
+        match: ['/security', '/roles', '/audit-logs', '/database/backup', '/maintenance', '/settings/mail', '/maintenance/news-cleanup', '/maintenance/rss-sync'],
       },
       {
         name: 'Profil Saya',

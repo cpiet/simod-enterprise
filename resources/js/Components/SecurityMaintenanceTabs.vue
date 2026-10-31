@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
-import { ShieldAlert, KeyRound, History, Database, Eraser, Wrench, Mail } from 'lucide-vue-next';
+import { ShieldAlert, KeyRound, History, Database, Eraser, Wrench, Mail, Radio } from 'lucide-vue-next';
 
 const props = defineProps({ selectedCode: { type: String, default: 'SULBAR' } });
 const page = usePage();
@@ -12,6 +12,7 @@ const tabs = [
   { name: 'Audit Log', href: '/audit-logs', icon: History },
   { name: 'Backup Data', href: '/database/backup', icon: Database },
   { name: 'Pembersihan Berita', href: '/maintenance/news-cleanup', icon: Eraser },
+  { name: 'Otomasi Sinkron RSS', href: '/maintenance/rss-sync', icon: Radio },
   { name: 'Mode Pemeliharaan', href: '/maintenance', icon: Wrench },
   { name: 'Konfigurasi Mail', href: '/settings/mail', icon: Mail },
 ];
@@ -28,7 +29,7 @@ const isActive = (href) => currentPath.value === href;
       </span>
     </div>
     <div class="p-2 rounded-2xl bg-[#08101e] border border-slate-800 shadow-xl">
-      <div class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-2">
+      <div class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2">
         <Link
           v-for="t in tabs"
           :key="t.href"
