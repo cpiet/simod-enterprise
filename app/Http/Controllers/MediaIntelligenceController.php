@@ -51,29 +51,40 @@ class MediaIntelligenceController extends Controller
 
         if ($forceRefresh && $mediaFeeds->isNotEmpty()) {
             $liveArticles = $rssService->fetchAggregatedFeeds($mediaFeeds->toArray(), true);
-            foreach (array_slice($liveArticles, 0, 400) as $item) {
-                MediaArticle::updateOrCreate(
-                    ['url' => $item['link']],
-                    [
-                        'polda_id'    => $poldaId,
-                        'feed_id'     => $item['source_id'] ?: null,
-                        'title'       => $item['title'],
-                        'source_name' => strtoupper($item['source_name']),
-                        'category'    => $item['category'],
-                        'image_url'   => $item['image_url'] ?: null,
-                        'summary'     => $item['summary'],
-                        'pub_date'    => !empty($item['pub_date']) ? date('Y-m-d H:i:s', strtotime($item['pub_date'])) : now(),
-                        'sentiment'   => $item['sentiment'] ?? 'netral',
-                    ]
-                );
+
+            // Group by source to ensure fair quota per feed (up to 25 articles per feed)
+            // This prevents high-volume national portals from crowding out regional feeds
+            $bySource = [];
+            foreach ($liveArticles as $item) {
+                $srcKey = strtoupper($item['source_name'] ?? 'MEDIA ONLINE');
+                $bySource[$srcKey][] = $item;
+            }
+
+            foreach ($bySource as $srcKey => $items) {
+                foreach (array_slice($items, 0, 25) as $item) {
+                    MediaArticle::updateOrCreate(
+                        ['url' => $item['link']],
+                        [
+                            'polda_id'    => $poldaId,
+                            'feed_id'     => $item['source_id'] ?: null,
+                            'title'       => $item['title'],
+                            'source_name' => strtoupper($item['source_name']),
+                            'category'    => $item['category'],
+                            'image_url'   => $item['image_url'] ?: null,
+                            'summary'     => $item['summary'],
+                            'pub_date'    => !empty($item['pub_date']) ? date('Y-m-d H:i:s', strtotime($item['pub_date'])) : now(),
+                            'sentiment'   => $item['sentiment'] ?? 'netral',
+                        ]
+                    );
+                }
             }
         }
 
-        // Load articles from database (up to 800 latest articles)
+        // Load articles from database (up to 1,500 latest articles)
         $dbArticles = MediaArticle::where('polda_id', $poldaId)
             ->latest('pub_date')
             ->latest('id')
-            ->limit(800)
+            ->limit(1500)
             ->get();
 
         // Format articles for frontend

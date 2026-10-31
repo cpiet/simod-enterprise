@@ -232,27 +232,33 @@ class RssSyncService
         $storedCount = 0;
 
         $maxPerFeed = $setting->max_articles_per_feed ?: 25;
-        $itemsToStore = array_slice($articles, 0, min(500, $feeds->count() * $maxPerFeed));
+        $bySource = [];
+        foreach ($articles as $item) {
+            $srcKey = strtoupper($item['source_name'] ?? 'MEDIA ONLINE');
+            $bySource[$srcKey][] = $item;
+        }
 
-        foreach ($itemsToStore as $item) {
-            $link = trim($item['link'] ?? '');
-            if ($link === '') continue;
+        foreach ($bySource as $srcKey => $items) {
+            foreach (array_slice($items, 0, $maxPerFeed) as $item) {
+                $link = trim($item['link'] ?? '');
+                if ($link === '') continue;
 
-            MediaArticle::updateOrCreate(
-                ['url' => $link],
-                [
-                    'polda_id'    => $polda->id,
-                    'feed_id'     => $item['source_id'] ?: null,
-                    'title'       => $item['title'] ?? 'Berita Pantauan',
-                    'source_name' => strtoupper($item['source_name'] ?? 'MEDIA SIBER'),
-                    'category'    => $item['category'] ?? 'Regional Sulselbar',
-                    'image_url'   => $item['image_url'] ?: null,
-                    'summary'     => $item['summary'] ?? null,
-                    'pub_date'    => !empty($item['pub_date']) ? date('Y-m-d H:i:s', strtotime($item['pub_date'])) : now(),
-                    'sentiment'   => $item['sentiment'] ?? 'netral',
-                ]
-            );
-            $storedCount++;
+                MediaArticle::updateOrCreate(
+                    ['url' => $link],
+                    [
+                        'polda_id'    => $polda->id,
+                        'feed_id'     => $item['source_id'] ?: null,
+                        'title'       => $item['title'] ?? 'Berita Pantauan',
+                        'source_name' => strtoupper($item['source_name'] ?? 'MEDIA SIBER'),
+                        'category'    => $item['category'] ?? 'Regional Sulselbar',
+                        'image_url'   => $item['image_url'] ?: null,
+                        'summary'     => $item['summary'] ?? null,
+                        'pub_date'    => !empty($item['pub_date']) ? date('Y-m-d H:i:s', strtotime($item['pub_date'])) : now(),
+                        'sentiment'   => $item['sentiment'] ?? 'netral',
+                    ]
+                );
+                $storedCount++;
+            }
         }
 
         // AUTO-CAPPING & LEAN DATABASE GUARD:
@@ -269,28 +275,35 @@ class RssSyncService
     }
 
     /**
-     * Pangkas berita lama non-bookmark jika melebihi batas simpan per Polda.
+     * Pangkas berita lama non-bookmark dengan distribusi adil antar-sumber.
+     * Mencegah media nasional berfrekuensi tinggi (Detik, CNN) menghabisi kuota portal lokal.
      */
     protected function autoCapArticles(int $poldaId, int $maxAllowed): int
     {
-        $currentCount = MediaArticle::where('polda_id', $poldaId)
-            ->where('is_bookmarked', false)
-            ->count();
+        $feedCount = MediaFeed::where('polda_id', $poldaId)->where('is_active', true)->count() ?: 29;
+        $maxPerSource = max(5, (int) round($maxAllowed / $feedCount));
 
-        if ($currentCount <= $maxAllowed) {
-            return 0;
+        $sources = MediaArticle::where('polda_id', $poldaId)
+            ->where('is_bookmarked', false)
+            ->selectRaw('UPPER(source_name) as src, COUNT(*) as cnt')
+            ->groupBy('src')
+            ->having('cnt', '>', $maxPerSource)
+            ->pluck('cnt', 'src');
+
+        $totalPruned = 0;
+        foreach ($sources as $src => $cnt) {
+            $excess = $cnt - $maxPerSource;
+            $oldestIds = MediaArticle::where('polda_id', $poldaId)
+                ->where('is_bookmarked', false)
+                ->whereRaw('UPPER(source_name) = ?', [$src])
+                ->oldest('pub_date')
+                ->limit($excess)
+                ->pluck('id');
+
+            $totalPruned += MediaArticle::whereIn('id', $oldestIds)->delete();
         }
 
-        $excess = $currentCount - $maxAllowed;
-
-        // Ambil ID berita unbookmarked tertua yang melebihi batas
-        $oldestIds = MediaArticle::where('polda_id', $poldaId)
-            ->where('is_bookmarked', false)
-            ->oldest('pub_date')
-            ->limit($excess)
-            ->pluck('id');
-
-        return MediaArticle::whereIn('id', $oldestIds)->delete();
+        return $totalPruned;
     }
 
     /**

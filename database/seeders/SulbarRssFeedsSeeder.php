@@ -106,7 +106,7 @@ class SulbarRssFeedsSeeder extends Seeder
             ],
             [
                 'name'     => 'Malaqbi',
-                'url'      => 'https://malaqbi.com/feed/',
+                'url'      => 'https://news.google.com/rss/search?q=site:malaqbi.com&hl=id&gl=ID&ceid=ID:id',
                 'category' => 'Regional Sulselbar',
             ],
             [
@@ -121,7 +121,7 @@ class SulbarRssFeedsSeeder extends Seeder
             ],
             [
                 'name'     => 'Bacasaja.id',
-                'url'      => 'https://bacasaja.id/feed/',
+                'url'      => 'https://news.google.com/rss/search?q=site:bacasaja.id&hl=id&gl=ID&ceid=ID:id',
                 'category' => 'Regional Sulselbar',
             ],
 
