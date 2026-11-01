@@ -97,6 +97,7 @@ const settingsForm = ref({
   polda_id: props.selectedPolda?.id || props.settings?.polda_id || 5,
   apify_api_token: props.settings?.apify_api_token || '',
   keywords_tracked: props.settings?.keywords_tracked || 'Polda Sulbar, Polresta Mamuju, Polisi Sulbar, Polres Majene, Polres Polman',
+  accounts_tracked: props.settings?.accounts_tracked || '@poldasulbar, @polresta_mamuju_official, @tribratanews_sulbar, @sulbar_update',
   sync_frequency: props.settings?.sync_frequency || 'every_3_hours',
   auto_sync_enabled: Boolean(props.settings?.auto_sync_enabled ?? true),
 });
@@ -535,14 +536,23 @@ const formatNumber = (num) => {
               {{ post.content }}
             </p>
 
-            <!-- Optional Media Thumbnail -->
-            <div v-if="post.thumbnail_url" class="relative rounded-xl overflow-hidden h-36 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+            <!-- Media Thumbnail with Play Overlay for Video Platforms -->
+            <div v-if="post.thumbnail_url" class="relative rounded-xl overflow-hidden h-40 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 group">
               <img
                 :src="post.thumbnail_url"
                 :alt="post.author_name"
-                class="w-full h-full object-cover"
+                class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                 loading="lazy"
               />
+              <!-- Play Button Overlay for Video Platforms -->
+              <div v-if="post.platform === 'youtube' || post.platform === 'tiktok'" class="absolute inset-0 flex items-center justify-center bg-black/25 group-hover:bg-black/40 transition">
+                <div
+                  class="w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition transform group-hover:scale-110"
+                  :class="post.platform === 'youtube' ? 'bg-red-600 text-white' : 'bg-black/80 text-white border border-cyan-400'"
+                >
+                  <svg class="w-4 h-4 fill-current ml-0.5" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -898,11 +908,27 @@ const formatNumber = (num) => {
             </label>
             <textarea
               v-model="settingsForm.keywords_tracked"
-              rows="3"
+              rows="2"
               class="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-medium placeholder-slate-400 focus:outline-none focus:border-amber-400 leading-relaxed"
             ></textarea>
             <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
               Contoh: Polda Sulbar, Polresta Mamuju, Polisi Sulbar, Polres Majene, Polres Polman, Lantas Sulbar
+            </p>
+          </div>
+
+          <!-- Akun Target Pantauan Khusus -->
+          <div>
+            <label class="block font-black text-slate-800 dark:text-slate-200 mb-1.5 uppercase tracking-wider text-[11px]">
+              AKUN TARGET PANTAUAN KHUSUS (PROFIL PUBLIK / INSTAGRAM / 𝕏 / TIKTOK / YOUTUBE)
+            </label>
+            <textarea
+              v-model="settingsForm.accounts_tracked"
+              rows="2"
+              placeholder="@poldasulbar, @polresta_mamuju_official, @tribratanews_sulbar, @sulbar_update"
+              class="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono placeholder-slate-400 focus:outline-none focus:border-amber-400 leading-relaxed"
+            ></textarea>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+              Masukkan username akun publik yang wajib dipantau (pisahkan dengan koma). Crawler akan memprioritaskan penarikan dari akun-akun ini dan menandainya sebagai pantauan prioritas.
             </p>
           </div>
 

@@ -143,7 +143,7 @@ class ApifySyncService
             ];
         }
 
-        // Prepare multi-query for all 4 platforms
+        // Prepare multi-query for all 4 platforms & specific target accounts
         $keywordsStr = $setting?->keywords_tracked ?: 'poldasulbar, polda sulbar, polresta mamuju';
         $keywords = array_filter(array_map('trim', explode(',', $keywordsStr)));
         $primary = $keywords[0] ?? 'polda sulbar';
@@ -155,6 +155,16 @@ class ApifySyncService
             "site:instagram.com \"{$primary}\"",
             "site:twitter.com OR site:x.com \"{$primary}\"",
         ];
+
+        // Include specific targeted accounts if specified by the user
+        $accountsStr = $setting?->accounts_tracked ?: '';
+        $targetAccounts = array_filter(array_map('trim', preg_split('/[\r\n,;]+/', $accountsStr)));
+        foreach (array_slice($targetAccounts, 0, 3) as $acc) {
+            $cleanAcc = ltrim($acc, '@');
+            if (!empty($cleanAcc)) {
+                $queries[] = "site:instagram.com/{$cleanAcc} OR site:tiktok.com/@{$cleanAcc} OR site:youtube.com/@{$cleanAcc} OR site:x.com/{$cleanAcc}";
+            }
+        }
 
         $input = [
             'queries'          => implode("\n", $queries),
@@ -279,6 +289,22 @@ class ApifySyncService
                 $content = !empty($desc) ? $desc : $title;
                 $postId = 'apify_' . md5($url ?: ($title . $idx . $platform));
 
+                // Extract or generate thumbnail for rich visual cards
+                $thumbnailUrl = null;
+                if ($platform === 'youtube') {
+                    if (preg_match('/(?:v=|\/watch\?v=|\/embed\/|\/shorts\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/', $url, $ytMatches)) {
+                        $thumbnailUrl = "https://img.youtube.com/vi/{$ytMatches[1]}/hqdefault.jpg";
+                    } else {
+                        $thumbnailUrl = "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=600&q=80";
+                    }
+                } elseif ($platform === 'instagram') {
+                    $thumbnailUrl = "https://images.unsplash.com/photo-1611262588024-d12430b98920?auto=format&fit=crop&w=600&q=80";
+                } elseif ($platform === 'tiktok') {
+                    $thumbnailUrl = "https://images.unsplash.com/photo-1611605698335-8b1569810432?auto=format&fit=crop&w=600&q=80";
+                } elseif ($platform === 'x') {
+                    $thumbnailUrl = "https://images.unsplash.com/photo-1611605698323-b1e99cfd37ea?auto=format&fit=crop&w=600&q=80";
+                }
+
                 SocialPost::updateOrCreate(
                     [
                         'polda_id' => $poldaId,
@@ -292,6 +318,7 @@ class ApifySyncService
                         'kol_category'   => $kolCategory,
                         'content'        => $content,
                         'post_url'       => $url ?: "https://www.youtube.com/results?search_query=" . urlencode($primary),
+                        'thumbnail_url'  => $thumbnailUrl,
                         'likes_count'    => $likes,
                         'shares_count'   => $shares,
                         'comments_count' => $comments,

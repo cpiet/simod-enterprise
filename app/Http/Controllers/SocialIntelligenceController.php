@@ -190,6 +190,7 @@ class SocialIntelligenceController extends Controller
             'polda_id'          => 'required|exists:poldas,id',
             'apify_api_token'   => 'nullable|string|max:1000',
             'keywords_tracked'  => 'nullable|string|max:1000',
+            'accounts_tracked'  => 'nullable|string|max:1000',
             'sync_frequency'    => 'required|string',
             'auto_sync_enabled' => 'required|boolean',
         ]);

@@ -16,6 +16,7 @@ class SocialSetting extends Model
         'polda_id',
         'apify_api_token',
         'keywords_tracked',
+        'accounts_tracked',
         'sync_frequency',
         'auto_sync_enabled',
         'last_synced_at',
