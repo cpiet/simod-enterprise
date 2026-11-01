@@ -125,36 +125,35 @@ class GeminiService
             ];
         }
 
-        $modelsToTry = array_unique([
+        $modelsToTry = array_values(array_unique(array_filter([
             $model,
             'gemini-3.5-flash-lite',
             'gemini-flash-lite-latest',
-            'gemini-3.8-flash',
             'gemini-3.1-pro-preview',
+            'gemini-2.5-flash',
+            'gemini-2.0-flash',
+            'gemini-1.5-flash',
             'gemini-2.5-pro',
             'gemini-1.5-pro',
-            'gemini-2.5-flash',
-            'gemini-1.5-flash',
-        ]);
+        ])));
         $start = microtime(true);
         $lastError = 'Gagal menghubungi Google Gemini API';
 
         foreach ($modelsToTry as $m) {
             try {
                 $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$m}:generateContent?key={$apiKey}";
-                $response = Http::timeout(20)->withHeaders([
+                $response = Http::timeout(15)->withHeaders([
                     'Content-Type' => 'application/json',
                 ])->post($endpoint, [
                     'contents' => [
                         [
                             'parts' => [
-                                ['text' => 'Ping test for SIMOD POLRI. Output JSON: {"status": "ok", "app": "SIMOD Enterprise"}'],
+                                ['text' => 'Ping uji koneksi SIMOD Presisi Polri. Mohon balas: KONEKSI_OK.'],
                             ],
                         ],
                     ],
                     'generationConfig' => [
-                        'temperature'      => 0.1,
-                        'responseMimeType' => 'application/json',
+                        'temperature' => 0.1,
                     ],
                 ]);
 
@@ -162,10 +161,7 @@ class GeminiService
 
                 if ($response->successful()) {
                     $json = $response->json();
-                    $text = $json['candidates'][0]['content']['parts'][0]['text'] ?? '';
-                    $decoded = json_decode($text, true);
-
-                    if (isset($decoded['status']) && $decoded['status'] === 'ok') {
+                    if (!empty($json['candidates']) || !empty($response->body())) {
                         return [
                             'success'    => true,
                             'message'    => "Koneksi Google Gemini API Berhasil ({$m}, {$latency}ms)!",
@@ -178,7 +174,7 @@ class GeminiService
                 $errJson = $response->json();
                 $lastError = $errJson['error']['message'] ?? "HTTP {$response->status()}";
 
-                if ($response->status() === 404 || $response->status() === 429) {
+                if (in_array($response->status(), [400, 404, 429])) {
                     continue;
                 }
 
@@ -297,17 +293,17 @@ class GeminiService
             $basePromptTemplate
         );
 
-        $modelsToTry = array_unique([
+        $modelsToTry = array_values(array_unique(array_filter([
             $model,
             'gemini-3.5-flash-lite',
             'gemini-flash-lite-latest',
-            'gemini-3.8-flash',
             'gemini-3.1-pro-preview',
+            'gemini-2.5-flash',
+            'gemini-2.0-flash',
+            'gemini-1.5-flash',
             'gemini-2.5-pro',
             'gemini-1.5-pro',
-            'gemini-2.5-flash',
-            'gemini-1.5-flash',
-        ]);
+        ])));
 
         $lastError = 'Gagal memproses analisis Gemini Pro';
         $keysExhausted = [];

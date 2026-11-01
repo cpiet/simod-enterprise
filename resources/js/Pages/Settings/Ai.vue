@@ -341,27 +341,32 @@ const submitSettings = () => {
               <div
                 v-for="acc in testResult.accounts"
                 :key="acc.index"
-                class="p-3 rounded-xl bg-slate-900/90 border flex items-center justify-between gap-2"
+                class="p-3 rounded-xl bg-slate-900/90 border flex flex-col justify-between gap-1.5"
                 :class="acc.status === 'connected' ? 'border-emerald-500/40 text-emerald-300' : 'border-rose-500/40 text-rose-300'"
               >
-                <div class="flex items-center gap-2">
-                  <span
-                    class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider"
-                    :class="acc.is_primary ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300'"
-                  >
-                    {{ acc.is_primary ? 'Kunci #1 Utama' : `Kunci #${acc.index} Cadangan` }}
-                  </span>
-                  <span class="font-mono text-xs font-bold text-white">{{ acc.token_masked }}</span>
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2">
+                    <span
+                      class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider"
+                      :class="acc.is_primary ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300'"
+                    >
+                      {{ acc.is_primary ? 'Kunci #1 Utama' : `Kunci #${acc.index} Cadangan` }}
+                    </span>
+                    <span class="font-mono text-xs font-bold text-white">{{ acc.token_masked }}</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span v-if="acc.latency_ms" class="text-[11px] font-mono text-slate-400">{{ acc.latency_ms }}ms</span>
+                    <span
+                      class="px-2 py-0.5 rounded text-[10px] font-bold"
+                      :class="acc.status === 'connected' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'"
+                    >
+                      {{ acc.status === 'connected' ? 'Terhubung' : 'Gagal' }}
+                    </span>
+                  </div>
                 </div>
-                <div class="flex items-center gap-2">
-                  <span v-if="acc.latency_ms" class="text-[11px] font-mono text-slate-400">{{ acc.latency_ms }}ms</span>
-                  <span
-                    class="px-2 py-0.5 rounded text-[10px] font-bold"
-                    :class="acc.status === 'connected' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'"
-                  >
-                    {{ acc.status === 'connected' ? 'Terhubung' : 'Gagal' }}
-                  </span>
-                </div>
+                <p v-if="acc.message" class="text-[10px] text-slate-400 leading-tight">
+                  {{ acc.message }}
+                </p>
               </div>
             </div>
           </div>
