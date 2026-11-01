@@ -74,6 +74,7 @@ class TaskController extends Controller
         ]);
 
         $validated['status'] = 'in_progress';
+        $validated['created_by'] = auth()->id();
 
         Task::create($validated);
 

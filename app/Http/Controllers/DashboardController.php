@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\EarlyWarning;
 use App\Models\Issue;
 use App\Models\MediaArticle;
 use App\Models\MediaFeed;
@@ -254,12 +253,15 @@ class DashboardController extends Controller
             ->limit(6)
             ->get();
 
+        $tz = $selectedPolda->timezone ?? ($isNational ? 'Asia/Jakarta' : 'Asia/Makassar');
+        $tzSuffix = $tz === 'Asia/Jakarta' ? 'WIB' : ($tz === 'Asia/Jayapura' ? 'WIT' : 'WITA');
+
         $metrics = [
             'total_issues'       => Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
             'pending_verify'     => $pendingVerifyCount,
             'active_tasks'       => Task::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('status', 'in_progress')->count(),
             'total_publications' => Publication::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
-            'server_wita'        => now()->setTimezone($selectedPolda->timezone ?? 'Asia/Makassar')->format('d M Y, H:i:s') . ' WITA',
+            'server_wita'        => now()->setTimezone($tz)->format('d M Y, H:i:s') . ' ' . $tzSuffix,
         ];
 
         return Inertia::render('Dashboard', [

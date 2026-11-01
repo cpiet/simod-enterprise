@@ -4,12 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\Polda;
-use App\Models\Polres;
 use App\Models\SocialPost;
 use App\Models\SocialSetting;
 use App\Services\ApifySyncService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 use Inertia\Inertia;
 use Inertia\Response;
 

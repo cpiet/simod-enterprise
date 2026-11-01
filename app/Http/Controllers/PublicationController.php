@@ -72,6 +72,7 @@ class PublicationController extends Controller
         ]);
 
         $validated['approval_status'] = 'published';
+        $validated['author_id'] = auth()->id();
         $validated['reviewed_at'] = now();
 
         Publication::create($validated);

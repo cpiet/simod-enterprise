@@ -8,7 +8,6 @@ use App\Models\IssueStatusHistory;
 use App\Models\MediaFile;
 use App\Models\Polda;
 use App\Models\Polres;
-use App\Models\PressRelease;
 use App\Models\Publication;
 use App\Models\Task;
 use Illuminate\Http\Request;
@@ -203,6 +202,7 @@ class IssueController extends Controller
         $countYear = Issue::whereYear('created_at', $year)->count() + 1;
         $reportCode = sprintf('SIM-%s-%05d', $year, $countYear);
 
+        $validated['polres_id'] = !empty($validated['polres_id']) ? $validated['polres_id'] : null;
         $validated['report_code'] = $reportCode;
         $validated['slug'] = Str::slug($validated['title']) . '-' . Str::random(5);
         $validated['status'] = $request->input('status', 'monitoring');
@@ -395,7 +395,7 @@ class IssueController extends Controller
     {
         $issue = Issue::findOrFail($id);
         $reason = $request->input('reason');
-        if (empty($reason)) {
+        if (empty(trim((string) $reason))) {
             return redirect()->back()->with('error', 'Wajib mencantumkan alasan pengembalian/catatan revisi.');
         }
 
@@ -423,7 +423,7 @@ class IssueController extends Controller
     {
         $issue = Issue::findOrFail($id);
         $resolvedNote = $request->input('resolved_note');
-        if (empty($resolvedNote)) {
+        if (empty(trim((string) $resolvedNote))) {
             return redirect()->back()->with('error', 'Wajib mencantumkan catatan hasil penanganan tuntas.');
         }
 

@@ -14,7 +14,6 @@ use App\Models\Task;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -175,6 +174,8 @@ class SystemModuleController extends Controller
             'file_url'    => 'required|string|max:500',
         ]);
 
+        $validated['polres_id'] = !empty($validated['polres_id']) ? $validated['polres_id'] : null;
+        $validated['issue_id'] = !empty($validated['issue_id']) ? $validated['issue_id'] : null;
         $validated['uploaded_by'] = auth()->id();
         $validated['size_bytes'] = rand(1500000, 8500000);
         $validated['mime_type'] = $validated['file_type'] === 'video' ? 'video/mp4' : 'image/jpeg';
@@ -749,11 +750,18 @@ class SystemModuleController extends Controller
         }
 
         AuditLog::create([
-            'user_id'    => auth()->id(),
-            'action'     => 'update_rbac_matrix',
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'details'    => "Memperbarui matriks hak akses untuk {$rolesCount} peran otoritas pada polda_id: " . ($targetPoldaId ?? 'Nasional'),
+            'polda_id'     => $targetPoldaId,
+            'user_id'      => auth()->id(),
+            'action'       => 'roles.matrix_update',
+            'subject_type' => 'role_permission',
+            'subject_id'   => (string) ($targetPoldaId ?? 0),
+            'metadata'     => [
+                'roles_count' => $rolesCount,
+                'summary'     => "Memperbarui matriks hak akses untuk {$rolesCount} peran otoritas pada polda_id: " . ($targetPoldaId ?? 'Nasional'),
+            ],
+            'ip_address'   => $request->ip() ?? '127.0.0.1',
+            'user_agent'   => $request->userAgent() ?? 'System',
+            'created_at'   => now(),
         ]);
 
         return back()->with('success', "Matriks Hak Akses & Otoritas untuk {$rolesCount} peran berhasil disimpan secara permanen!");
@@ -776,11 +784,17 @@ class SystemModuleController extends Controller
         RolePermission::getMatrixForPolda($targetPoldaId);
 
         AuditLog::create([
-            'user_id'    => auth()->id(),
-            'action'     => 'reset_rbac_matrix',
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'details'    => "Mereset matriks hak akses ke standar Polri Presisi pada polda_id: " . ($targetPoldaId ?? 'Nasional'),
+            'polda_id'     => $targetPoldaId,
+            'user_id'      => auth()->id(),
+            'action'       => 'roles.matrix_reset',
+            'subject_type' => 'role_permission',
+            'subject_id'   => (string) ($targetPoldaId ?? 0),
+            'metadata'     => [
+                'summary' => "Mereset matriks hak akses ke standar Polri Presisi pada polda_id: " . ($targetPoldaId ?? 'Nasional'),
+            ],
+            'ip_address'   => $request->ip() ?? '127.0.0.1',
+            'user_agent'   => $request->userAgent() ?? 'System',
+            'created_at'   => now(),
         ]);
 
         return back()->with('success', "Matriks Hak Akses berhasil direset ke standar resmi Polri Presisi!");
@@ -794,21 +808,6 @@ class SystemModuleController extends Controller
         [$allPoldas, $selectedPolda, $selectedCode, $metrics] = $this->getBaseData($request);
 
         return Inertia::render('Settings/Mail', [
-            'allPoldas'     => $allPoldas,
-            'selectedPolda' => $selectedPolda,
-            'selectedCode'  => $selectedCode,
-            'metrics'       => $metrics,
-        ]);
-    }
-
-    /**
-     * Cadangan Database & Snapshot (Backup)
-     */
-    public function databaseBackup(Request $request): Response
-    {
-        [$allPoldas, $selectedPolda, $selectedCode, $metrics] = $this->getBaseData($request);
-
-        return Inertia::render('Settings/Backup', [
             'allPoldas'     => $allPoldas,
             'selectedPolda' => $selectedPolda,
             'selectedCode'  => $selectedCode,

@@ -7,18 +7,12 @@ import {
   Radio,
   Building2,
   Flame,
-  Newspaper,
   Clock,
   Layers,
   Users,
   CheckCircle2,
-  AlertTriangle,
   ChevronDown,
-  ChevronRight,
   Bell,
-  Search,
-  ExternalLink,
-  Sparkles,
   Share2,
   CheckSquare,
   Menu,
@@ -29,12 +23,9 @@ import {
   KeyRound,
   Mail,
   Database,
-  History,
-  Wrench,
   UserCheck,
   LogOut,
   SlidersHorizontal,
-  Activity,
   Check,
   PlusCircle,
   Sun,
@@ -65,9 +56,6 @@ const isTenantMenuOpen = ref(false);
 const isUserMenuOpen = ref(false);
 const isMobileSidebarOpen = ref(false);
 const isDesktopSidebarCollapsed = ref(false);
-const searchQuery = ref('');
-
-const currentUrl = computed(() => page.url);
 
 const switchTenant = (code) => {
   isTenantMenuOpen.value = false;
