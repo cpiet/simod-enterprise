@@ -10,6 +10,7 @@ Dokumen ini mencatat pemetaan lengkap seluruh 19 modul pada **SIMOD Enterprise M
 |:---|:---|:---|:---|:---|:---|
 | 1 | **Command Center** | `/` & `/dashboard` | `DashboardController` | `Dashboard.vue` | Komando & Intelijen |
 | 2 | **Media Online (Radar 29 RSS)** | `/media-intelligence` | `MediaIntelligenceController` | `MediaIntelligence/Index.vue` | Komando & Intelijen |
+| 3 | **Radar Media Sosial** | `/social-intelligence` | `SocialIntelligenceController` | `SocialIntelligence/Index.vue` | Komando & Intelijen |
 | 3 | **Laporan Polres & Isu** | `/issues` | `IssueController` | `Issues/Index.vue` | Manajemen Isu & Tugas |
 | 4 | **Input Laporan Baru** | `/issues/create` | `IssueController` | `Issues/Create.vue` | Manajemen Isu & Tugas |
 | 5 | **Antrean Verifikasi** | `/verification-queue` | `SystemModuleController` | `VerificationQueue/Index.vue` | Manajemen Isu & Tugas |

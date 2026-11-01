@@ -20,6 +20,7 @@ Dokumentasi ini memandu arsitektur, seluruh perintah CLI, modul operasional, int
 | **08** | [08. Panduan Deployment & Virtual Host](08-panduan-deployment-dan-virtual-host.md) | Konfigurasi domain `http://simod-enterprise.test` di Laragon, Apache/Nginx, dan VPS Hostinger. |
 | **09** | [09. Katalog Lengkap 19 Modul & Paritas Fitur](09-katalog-lengkap-19-modul-simod-enterprise.md) | Pemetaan lengkap seluruh 19 modul operasional dan arsitektur sidebar 4 pilar terpadu. |
 | **10** | [10. Daftar Lengkap 29 Sumber RSS Feed Sulbar](10-daftar-rss-feed-resmi-sulbar.md) | Rincian 29 portal resmi Sulbar & nasional, status Cloudflare bypass, dan proxy Google News. |
+| **11** | [11. Radar Media Sosial & Apify](11-modul-radar-media-sosial-apify.md) | Monitoring 𝕏, TikTok, Instagram, YouTube, Multi-API Token Pool, target akun, dan thumbnail HD. |
 
 ---
 
