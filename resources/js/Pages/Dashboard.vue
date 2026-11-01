@@ -187,7 +187,7 @@ const layerLapangan = ref(true);
             Dashboard Media Intelligence & Kamtibmas
           </h1>
           <p class="text-xs md:text-sm text-slate-300 max-w-2xl leading-relaxed">
-            Monitoring terpadu pemberitaan 29 portal media online, radar 4 platform media sosial (𝕏, TikTok, Instagram, YouTube), laporan lapangan 6 Polres, dan analisis sentimen pimpinan <strong>{{ selectedCode === 'ALL' ? 'Mabes Polri' : selectedPolda?.name }}</strong>.
+            Monitoring terpadu pemberitaan 29 portal media online, radar 4 platform media sosial (𝕏, TikTok, Instagram, YouTube), laporan lapangan Satwil, dan orkestrasi sentimen pimpinan <strong>{{ selectedCode === 'ALL' ? 'Divhumas Polri (Nasional)' : selectedPolda?.name }}</strong>.
           </p>
 
           <!-- Quick Action Buttons -->
@@ -374,9 +374,11 @@ const layerLapangan = ref(true);
             </div>
             <div>
               <h2 class="text-base font-black text-white uppercase tracking-wider flex items-center gap-2">
-                Peta Sebaran Isu & Sentimen Kamtibmas 6 Polres
+                {{ selectedCode === 'ALL' ? 'Peta Situasi Kamtibmas & Sentimen Satwil Jajaran' : 'Peta Sebaran Isu & Sentimen Kamtibmas 6 Polres' }}
               </h2>
-              <p class="text-xs text-slate-400">Wilayah Hukum Polda Sulawesi Barat</p>
+              <p class="text-xs text-slate-400">
+                {{ selectedCode === 'ALL' ? 'Orkestrasi Nasional Divhumas Polri' : (selectedPolda?.name ? `Wilayah Hukum ${selectedPolda.name}` : 'Wilayah Hukum Polda Sulawesi Barat') }}
+              </p>
             </div>
           </div>
 
@@ -814,7 +816,7 @@ const layerLapangan = ref(true);
                 class="px-2.5 py-1 rounded-lg transition"
                 :class="activeTrendingTab === 'issues' ? 'bg-amber-400 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'"
               >
-                🚨 Isu Kamtibmas ({{ topIssues?.length || 0 }})
+                🚨 {{ selectedCode === 'ALL' ? 'Top Isu Nasional' : 'Top Isu Daerah' }} ({{ topIssues?.length || 0 }})
               </button>
             </div>
 
@@ -920,8 +922,12 @@ const layerLapangan = ref(true);
       <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-2xl space-y-4 flex flex-col justify-between">
         <div>
           <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-            <h3 class="text-sm font-black text-white uppercase tracking-wider">Matriks Kondusifitas Opini 6 Polres Jajaran</h3>
-            <span class="text-xs text-slate-400">{{ selectedPolda?.name || 'Polda Sulbar' }}</span>
+            <h3 class="text-sm font-black text-white uppercase tracking-wider">
+              {{ selectedCode === 'ALL' ? 'Matriks Kondusifitas Satwil & Jajaran Polda' : 'Matriks Kondusifitas Opini 6 Polres Jajaran' }}
+            </h3>
+            <span class="text-xs text-slate-400">
+              {{ selectedCode === 'ALL' ? 'Divhumas Polri (Orkestrasi Nasional)' : (selectedPolda?.name || 'Polda Sulbar') }}
+            </span>
           </div>
 
           <div class="overflow-x-auto mt-3">

@@ -39,25 +39,26 @@ class DashboardController extends Controller
         }
 
         $poldaId = $selectedPolda ? $selectedPolda->id : ($allPoldas->first()?->id ?? 1);
+        $isNational = ($selectedCode === 'ALL');
 
-        // 1. KPI METRICS (100% Dynamic from DB)
-        $totalArticles = MediaArticle::where('polda_id', $poldaId)->count();
-        $activeFeedsCount = MediaFeed::where('polda_id', $poldaId)->where('is_active', true)->count();
+        // 1. KPI METRICS (100% Dynamic from DB - National or Specific Polda)
+        $totalArticles = MediaArticle::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))->count();
+        $activeFeedsCount = MediaFeed::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))->where('is_active', true)->count();
 
-        $priorityIssuesCount = Issue::where('polda_id', $poldaId)
+        $priorityIssuesCount = Issue::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))
             ->whereIn('priority', ['critical', 'high'])
             ->whereNotIn('status', ['selesai'])
             ->count();
 
-        $fieldReportsCount = Issue::where('polda_id', $poldaId)->count();
-        $pendingVerifyCount = Issue::where('polda_id', $poldaId)
+        $fieldReportsCount = Issue::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))->count();
+        $pendingVerifyCount = Issue::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))
             ->whereIn('status', ['monitoring', 'investigasi'])
             ->count();
 
-        $tasksResolvedCount = Task::where('polda_id', $poldaId)
+        $tasksResolvedCount = Task::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))
             ->where('status', 'completed')
             ->count();
-        $totalTasksCount = Task::where('polda_id', $poldaId)->count();
+        $totalTasksCount = Task::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))->count();
         $taskCompletionRate = $totalTasksCount > 0 ? (int) round(($tasksResolvedCount / $totalTasksCount) * 100) : 100;
 
         // 2. DYNAMIC 6 POLRES SATWIL STATUSES & GEOSPATIAL MAP DATA
@@ -137,14 +138,14 @@ class DashboardController extends Controller
             ];
         }
 
-        // 3. TOP 5 TRENDING ISSUES (100% Dynamic from DB)
-        $topIssues = Issue::where('polda_id', $poldaId)
+        // 3. TOP 5 TRENDING ISSUES (100% Dynamic from DB - National or Specific Polda)
+        $topIssues = Issue::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))
             ->orderByDesc('virality_score')
             ->limit(5)
             ->get();
 
         // 4. RADAR MEDIA SOSIAL INTELLIGENCE (Dynamic from social_posts DB)
-        $socialPostsQuery = SocialPost::where('polda_id', $poldaId);
+        $socialPostsQuery = SocialPost::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId));
         $totalSocialPosts = (clone $socialPostsQuery)->count();
 
         $platformCounts = [
@@ -176,13 +177,13 @@ class DashboardController extends Controller
         ];
 
         // Top 5 Viral Social Media Posts
-        $topViralSocialPosts = SocialPost::where('polda_id', $poldaId)
+        $topViralSocialPosts = SocialPost::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))
             ->orderByDesc('virality_score')
             ->limit(5)
             ->get();
 
         // Latest 6 Real-time Social Posts Stream
-        $liveSocialPosts = SocialPost::where('polda_id', $poldaId)
+        $liveSocialPosts = SocialPost::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))
             ->latest('posted_at')
             ->latest('id')
             ->limit(6)
@@ -204,9 +205,9 @@ class DashboardController extends Controller
             $dateStr = $date->toDateString();
             $dayAbbr = $dayNames[$date->format('D')] ?? $date->format('D');
 
-            $articles = MediaArticle::where('polda_id', $poldaId)->whereDate('pub_date', $dateStr)->get();
-            $issues = Issue::where('polda_id', $poldaId)->whereDate('created_at', $dateStr)->get();
-            $socials = SocialPost::where('polda_id', $poldaId)->whereDate('posted_at', $dateStr)->get();
+            $articles = MediaArticle::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))->whereDate('pub_date', $dateStr)->get();
+            $issues = Issue::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))->whereDate('created_at', $dateStr)->get();
+            $socials = SocialPost::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))->whereDate('posted_at', $dateStr)->get();
 
             $pos = $articles->where('sentiment', 'positif')->count() + $issues->where('sentiment', 'positif')->count() + $socials->where('sentiment', 'positif')->count();
             $neg = $articles->where('sentiment', 'negatif')->count() + $issues->where('sentiment', 'negatif')->count() + $socials->where('sentiment', 'negatif')->count();
@@ -247,7 +248,7 @@ class DashboardController extends Controller
         $avgPositivePct = (int) round(collect($sentiment7Days)->avg('positif'));
 
         // 6. LIVE RADAR ARTICLES (Latest 6 from DB)
-        $liveRadarArticles = MediaArticle::where('polda_id', $poldaId)
+        $liveRadarArticles = MediaArticle::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))
             ->latest('pub_date')
             ->latest('id')
             ->limit(6)
@@ -265,6 +266,7 @@ class DashboardController extends Controller
             'allPoldas'            => $allPoldas,
             'selectedPolda'        => $selectedPolda,
             'selectedCode'         => $selectedCode,
+            'isNational'           => $isNational,
             'kpi'                  => [
                 'total_articles'       => $totalArticles,
                 'active_feeds_count'   => $activeFeedsCount,

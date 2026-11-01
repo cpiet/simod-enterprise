@@ -237,7 +237,7 @@ const formatNumber = (num) => {
             Cyber Patrol & Social Listening
           </span>
           <span class="text-xs font-bold text-slate-500 dark:text-slate-400">
-            {{ selectedCode === 'ALL' ? 'Mabes Polri' : selectedPolda?.name }}
+            {{ selectedCode === 'ALL' ? 'Divhumas Polri (Orkestrasi Nasional)' : selectedPolda?.name }}
           </span>
         </div>
         <h1 class="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight mt-1">

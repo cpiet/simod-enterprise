@@ -734,7 +734,7 @@ const submitIssue = () => {
           </span>
         </div>
         <h1 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
-          Radar Media Online &bull; {{ selectedCode === 'ALL' ? 'KONSOLIDASI NASIONAL MABES POLRI' : selectedPolda?.name }}
+          Radar Media Online &bull; {{ selectedCode === 'ALL' ? 'DIVHUMAS POLRI (ORKESTRASI NASIONAL)' : selectedPolda?.name }}
         </h1>
         <p class="text-xs md:text-sm text-slate-300 max-w-2xl leading-relaxed">
           Pusat Agregasi Berita Pers & Media Siber Real-Time, Analisis Isu Strategis Nasional Polri, Executive Briefing Harian Pimpinan, dan Naskah WhatsApp Terstandarisasi.
@@ -1305,7 +1305,7 @@ const submitIssue = () => {
             <div class="flex items-center gap-2">
               <MapPin class="w-4 h-4 text-rose-400" />
               <h3 class="text-sm font-black text-white uppercase tracking-wider">
-                Isu Kewilayahan {{ selectedCode === 'ALL' ? 'Mabes & Seluruh Polda' : (selectedPolda?.name || 'Polda & Jajaran Polres') }}
+                Isu Kewilayahan {{ selectedCode === 'ALL' ? 'Divhumas Polri & Seluruh Polda' : (selectedPolda?.name || 'Polda & Jajaran Polres') }}
               </h3>
             </div>
             <span

@@ -329,7 +329,7 @@ const navigationGroups = [
               </span>
             </div>
             <p class="text-[10px] text-amber-400/90 font-medium truncate">
-              {{ selectedCode === 'ALL' ? 'Mabes Polri' : (selectedPolda?.name || 'Polda Sulbar') }}
+              {{ selectedCode === 'ALL' ? 'Divhumas Polri' : (selectedPolda?.name || 'Polda Sulbar') }}
             </p>
           </div>
         </Link>
@@ -442,7 +442,7 @@ const navigationGroups = [
           <div>
             <span class="font-extrabold text-sm text-white">SIMOD ENTERPRISE</span>
             <p class="text-[10px] text-amber-400 font-medium">
-              {{ selectedCode === 'ALL' ? 'Mabes Polri' : selectedPolda?.name }}
+              {{ selectedCode === 'ALL' ? 'Divhumas Polri' : selectedPolda?.name }}
             </p>
           </div>
         </div>
@@ -539,7 +539,7 @@ const navigationGroups = [
             >
               <Building2 class="w-3.5 h-3.5 text-amber-400" />
               <span class="truncate max-w-[140px] sm:max-w-[220px]">
-                {{ selectedCode === 'ALL' ? 'Mabes Polri (Konsolidasi)' : (selectedPolda?.name || 'Polda Sulawesi Barat') }}
+                {{ selectedCode === 'ALL' ? 'Divhumas Polri (Nasional)' : (selectedPolda?.name || 'Polda Sulawesi Barat') }}
               </span>
               <ChevronDown class="w-3 h-3 text-slate-400 transition duration-200" :class="{ 'rotate-180': isTenantMenuOpen }" />
             </button>
@@ -550,11 +550,11 @@ const navigationGroups = [
               class="absolute left-0 mt-2 w-72 rounded-2xl bg-[#0b1426] border border-slate-700/80 shadow-2xl p-2 z-50 backdrop-blur-2xl"
             >
               <div class="px-3 py-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-800/80 flex items-center justify-between">
-                <span>Pilih Wilayah Satwil</span>
+                <span>Pilih Wilayah Komando</span>
                 <span class="text-amber-400">Multi-Tenant</span>
               </div>
 
-              <!-- All Poldas (Mabes View) -->
+              <!-- All Poldas (Divhumas Polri View) -->
               <button
                 @click="switchTenant('ALL')"
                 class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-between transition mt-1"
@@ -562,9 +562,12 @@ const navigationGroups = [
               >
                 <div class="flex items-center gap-2">
                   <Layers class="w-4 h-4" />
-                  <span>Konsolidasi Nasional (Mabes)</span>
+                  <div>
+                    <span class="block">Divhumas Polri (Nasional)</span>
+                    <span class="text-[9px] block opacity-75 font-normal">Orkestrasi 34 Polda Jajaran</span>
+                  </div>
                 </div>
-                <span class="text-[10px] opacity-80">34 Polda</span>
+                <span class="text-[10px] opacity-80 font-black">Nasional</span>
               </button>
 
               <!-- Individual Poldas -->
@@ -707,7 +710,7 @@ const navigationGroups = [
           <span>SIMOD Enterprise Multi-Tenant &copy; 2026 Divisi Humas Polri & Satwil Polda Jajaran</span>
         </div>
         <div class="flex items-center gap-3 text-slate-300">
-          <span>Polda Aktif: <strong class="text-amber-400">{{ selectedCode === 'ALL' ? 'MABES POLRI' : (selectedPolda?.name || selectedCode) }}</strong></span>
+          <span>Komando / Satker: <strong class="text-amber-400">{{ selectedCode === 'ALL' ? 'DIVHUMAS POLRI (ORKESTRASI NASIONAL)' : (selectedPolda?.name || selectedCode) }}</strong></span>
           <span>&bull;</span>
           <span>Laravel 12 + Inertia.js v2 + Vue 3</span>
         </div>
