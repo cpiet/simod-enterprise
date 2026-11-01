@@ -124,6 +124,9 @@ php artisan test
 
 # Kompilasi aset Vite frontend
 npm run build
+
+# Menjalankan tunnel Ngrok publik untuk live demo & presentasi pimpinan
+ngrok http --domain=humped-obvious-blatantly.ngrok-free.dev --host-header=simod-enterprise.test 80
 ```
 
 ---
@@ -135,4 +138,10 @@ Saat Anda (Agent) diminta memodifikasi kode ini:
 2. **Jalankan Testing Sebelum Selesai**: Selalu jalankan `php artisan test` dan `npm run build` sebelum menyelesaikan tugas.
 3. **Multi-Tenant Scoping**: Setiap query data operasional (`MediaArticle`, `Issue`, `Task`, `EarlyWarning`) **wajib** menyertakan filter `polda_id`.
 4. **Preserve Docstrings**: Pertahankan semua dokumentasi, komentar PHPDoc, dan struktur kode yang ada.
+5. **Otomasi Live Demo Tunnel (Ngrok)**:
+   - Jika pengguna meminta *"jalankan ngrok"*, *"start ngrok"*, atau *"buka tunnel demo"*:
+     Jalankan perintah berikut sebagai background process daemon:
+     `ngrok http --domain=humped-obvious-blatantly.ngrok-free.dev --host-header=simod-enterprise.test 80`
+   - Tunnel ini mengarahkan domain publik tetap `https://humped-obvious-blatantly.ngrok-free.dev` ke vhost Laragon Apache `simod-enterprise.test:80`.
+   - Konfigurasi `trustProxies` dan `URL::forceScheme('https')` di Laravel menjamin seluruh CSS/JS Vite dan form Inertia bekerja secara mulus di internet publik tanpa mixed-content block.
 
