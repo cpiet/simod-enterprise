@@ -535,7 +535,7 @@ const submitSettings = () => {
                     class="mt-1 rounded border-slate-700 text-amber-400 focus:ring-amber-400 bg-slate-800 cursor-pointer"
                   />
                   <label for="apply-all-poldas" class="text-xs cursor-pointer select-none">
-                    <strong class="text-amber-300 block font-bold">Sinkronkan ke Seluruh 34 Polda Jajaran</strong>
+                    <strong class="text-amber-300 block font-bold">Sinkronkan ke Seluruh Satwil Polda Jajaran</strong>
                     <span class="text-slate-400 text-[11px] leading-relaxed block mt-0.5">
                       Gunakan pool kunci ini sebagai Master Key Nasional untuk Divhumas Mabes dan jajaran Polda.
                     </span>

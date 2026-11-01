@@ -438,7 +438,7 @@ const layerLapangan = ref(true);
 
           <span class="text-xs font-mono text-emerald-400 flex items-center gap-1.5">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            {{ selectedCode === 'ALL' ? '34 Polda Terpantau Aktif' : '6 Satwil Terpantau Aktif' }}
+            {{ selectedCode === 'ALL' ? 'Komando Nasional Terpantau Aktif' : '6 Satwil Terpantau Aktif' }}
           </span>
         </div>
 

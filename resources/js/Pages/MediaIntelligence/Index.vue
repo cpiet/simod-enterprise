@@ -78,7 +78,7 @@ const tabs = computed(() => [
   { id: '01', name: '01. Berita Online (Live RSS)', badge: 'LIVE', icon: Radio },
   { id: '02', name: '02. Executive Briefing Pimpinan', badge: 'ANALISIS', icon: Newspaper },
   { id: '03', name: '03. Sentimen Berita', badge: null, icon: Zap },
-  { id: '04', name: isDivhumas.value ? '04. Orkestrasi 34 Polda' : '04. Statistik Satwil', badge: null, icon: MapPin },
+  { id: '04', name: isDivhumas.value ? '04. Orkestrasi Satwil' : '04. Statistik Satwil', badge: null, icon: MapPin },
   { id: '05', name: '05. Early Warning (EWS)', badge: 'EWS', icon: Shield },
   { id: '06', name: '06. Narasi & Rekomendasi', badge: null, icon: Award },
   { id: '07', name: '07. Naskah WA Pimpinan', badge: 'WA RESMI', icon: MessageSquare },
@@ -1578,7 +1578,7 @@ const submitIssue = () => {
             <div class="flex items-center gap-2">
               <MapPin class="w-4 h-4 text-rose-400" />
               <h3 class="text-sm font-black text-white uppercase tracking-wider">
-                Isu Kewilayahan {{ isDivhumas ? '34 Polda Jajaran se-Indonesia' : (selectedPolda?.name || 'Polda & Jajaran Polres') }}
+                Isu Kewilayahan {{ isDivhumas ? 'Satwil Jajaran se-Indonesia' : (selectedPolda?.name || 'Polda & Jajaran Polres') }}
               </h3>
             </div>
             <span
@@ -1776,7 +1776,7 @@ const submitIssue = () => {
         <!-- Sentiment Wilayah / 34 Polda Jajaran -->
         <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
           <h3 class="text-sm font-black text-white uppercase tracking-wider">
-            {{ isDivhumas ? 'Sentimen Kewilayahan 34 Polda Jajaran' : ('Sentimen Publik ' + (selectedPolda?.name || 'Sulawesi Barat')) }}
+            {{ isDivhumas ? 'Sentimen Kewilayahan Satwil Jajaran' : ('Sentimen Publik ' + (selectedPolda?.name || 'Sulawesi Barat')) }}
           </h3>
           <div class="flex items-center justify-around py-4">
             <div class="text-center">
@@ -1834,14 +1834,14 @@ const submitIssue = () => {
           <div>
             <h3 class="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
               <MapPin class="w-4 h-4 text-amber-400" />
-              <span>{{ isDivhumas ? 'Pemetaan Orkestrasi 34 Polda Jajaran se-Indonesia' : ('Pemetaan Kondusifitas Jajaran ' + (selectedPolda?.name || 'Polda Sulbar')) }}</span>
+              <span>{{ isDivhumas ? 'Pemetaan Kewilayahan Polda Jajaran' : ('Pemetaan Kondusifitas Jajaran ' + (selectedPolda?.name || 'Polda Sulbar')) }}</span>
             </h3>
             <p class="text-xs text-slate-400 mt-0.5">
-              {{ isDivhumas ? 'Monitoring komando Divhumas Polri atas stabilitas kamtibmas dan sentimen opini publik kewilayahan se-Indonesia.' : 'Pantauan kondusifitas dan sentimen kamtibmas di tingkat Polres jajaran.' }}
+              {{ isDivhumas ? 'Monitoring komando Divhumas Polri atas stabilitas kamtibmas dan sentimen opini publik kewilayahan.' : 'Pantauan kondusifitas dan sentimen kamtibmas di tingkat Polres jajaran.' }}
             </p>
           </div>
           <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0 self-start sm:self-auto">
-            {{ isDivhumas ? '34 Polda Terpantau Kondusif' : ((selectedPolda?.polres?.length || 6) + ' Polres Jajaran Aktif') }}
+            {{ isDivhumas ? ((allPoldas?.filter(p => p.code !== 'DIVHUMAS').length || 1) + ' Polda Terpantau Kondusif') : ((selectedPolda?.polres?.length || 6) + ' Polres Jajaran Aktif') }}
           </span>
         </div>
 

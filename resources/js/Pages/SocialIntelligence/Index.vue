@@ -240,7 +240,7 @@ const formatNumber = (num) => {
             {{ isNational ? 'Cyber Patrol & Social Listening Nasional' : 'Cyber Patrol & Social Listening' }}
           </span>
           <span class="text-xs font-bold text-slate-500 dark:text-slate-400">
-            {{ isNational ? 'Divhumas Polri (Komando Nasional & Orkestrasi 34 Polda)' : selectedPolda?.name }}
+            {{ isNational ? 'Divhumas Polri (Komando Nasional)' : selectedPolda?.name }}
           </span>
         </div>
         <h1 class="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight mt-1">
@@ -248,7 +248,7 @@ const formatNumber = (num) => {
         </h1>
         <p class="text-xs md:text-sm text-slate-600 dark:text-slate-300">
           {{ isNational
-            ? 'Pemantauan komprehensif percakapan publik skala nasional, orkestrasi sentimen 34 Polda jajaran, deteksi dini isu viral, dan manajemen narasi Mabes Polri di 𝕏, TikTok, Instagram, dan YouTube.'
+            ? 'Pemantauan komprehensif percakapan publik skala nasional, orkestrasi sentimen kewilayahan, deteksi dini isu viral, dan manajemen narasi Mabes Polri di 𝕏, TikTok, Instagram, dan YouTube.'
             : 'Pemantauan percakapan publik, sentimen netizen, tren tagar, dan radar tokoh kritis di 𝕏, TikTok, Instagram, dan YouTube.'
           }}
         </p>
@@ -454,8 +454,8 @@ const formatNumber = (num) => {
             @change="handleFilter"
             class="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-amber-400"
           >
-            <option value="all">🌐 Seluruh 34 Polda</option>
-            <option v-for="p in allPoldas" :key="p.id" :value="p.id">
+            <option value="all">🌐 Seluruh Wilayah Hukum</option>
+            <option v-for="p in (allPoldas || []).filter(item => item.code !== 'DIVHUMAS')" :key="p.id" :value="p.id">
               {{ p.name }}
             </option>
           </select>
@@ -879,7 +879,7 @@ const formatNumber = (num) => {
           </div>
           <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
             {{ isNational
-              ? 'Konfigurasi crawler skala nasional untuk pemantauan citra Polri, akun kedinasan pimpinan, dan narasi kamtibmas lintas 34 Polda.'
+              ? 'Konfigurasi crawler skala nasional untuk pemantauan citra Polri, akun kedinasan pimpinan, dan narasi kamtibmas kewilayahan.'
               : 'Gunakan paket gratis Apify (gratis $5/bulan) untuk scraping data X, TikTok, Instagram, dan YouTube.'
             }}
           </p>

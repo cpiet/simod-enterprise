@@ -429,7 +429,7 @@ const saveSettings = () => {
                 class="w-full accent-amber-400 cursor-pointer"
               />
               <p class="text-[10px] text-slate-400 leading-tight">
-                Mencegah database penuh saat ada 34 Polda. Berita unbookmarked paling usang akan dipangkas otomatis jika melampaui angka ini.
+                Mencegah database penuh. Berita unbookmarked paling usang akan dipangkas otomatis jika melampaui angka ini.
               </p>
             </div>
 

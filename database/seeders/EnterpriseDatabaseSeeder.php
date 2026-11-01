@@ -30,7 +30,7 @@ class EnterpriseDatabaseSeeder extends Seeder
             'timezone'         => 'Asia/Makassar',
             'kapolda_name'     => 'Irjen Pol. Drs. Pudji Prasetijanto Hadi, M.H.',
             'kabid_humas_name' => 'Kombes Pol. Desmont Harjendro A.P, S.I.K., M.T.',
-            'is_active'        => true,
+            'is_active'        => false, // Non-aktif sementara: fokus pada Divhumas Polri & Polda Sulbar
             'created_at'       => now(),
             'updated_at'       => now(),
         ]);

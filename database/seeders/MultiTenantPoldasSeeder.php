@@ -21,7 +21,7 @@ class MultiTenantPoldasSeeder extends Seeder
                 'timezone'         => 'Asia/Makassar',
                 'kapolda_name'     => 'Irjen Pol. Yudhiawan Wibisono, S.I.K., M.Si.',
                 'kabid_humas_name' => 'Kombes Pol. Didik Supranoto, S.I.K., M.H.',
-                'is_active'        => true,
+                'is_active'        => false, // Non-aktif sementara: fokus pada Divhumas Polri & Polda Sulbar
             ]
         );
 
@@ -50,7 +50,7 @@ class MultiTenantPoldasSeeder extends Seeder
                 'timezone'         => 'Asia/Makassar',
                 'kapolda_name'     => 'Irjen Pol. Dwi Irianto, S.I.K., M.Si.',
                 'kabid_humas_name' => 'Kombes Pol. Iis Kristian, S.I.K.',
-                'is_active'        => true,
+                'is_active'        => false, // Non-aktif sementara: fokus pada Divhumas Polri & Polda Sulbar
             ]
         );
 
@@ -77,7 +77,7 @@ class MultiTenantPoldasSeeder extends Seeder
                 'timezone'         => 'Asia/Makassar',
                 'kapolda_name'     => 'Irjen Pol. Nanang Avianto, M.Si.',
                 'kabid_humas_name' => 'Kombes Pol. Yuliyanto, S.I.K., M.Sc.',
-                'is_active'        => true,
+                'is_active'        => false, // Non-aktif sementara: fokus pada Divhumas Polri & Polda Sulbar
             ]
         );
 

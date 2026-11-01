@@ -278,7 +278,7 @@ const switchTenant = (code) => {
           : 'bg-slate-900 text-slate-300 hover:text-white border border-slate-800'"
       >
         <Globe class="w-4 h-4" />
-        <span>Katalog 34 Polda Se-Indonesia &amp; Mabes</span>
+        <span>Katalog Wilayah Komando &amp; Satker</span>
       </button>
     </div>
 
@@ -393,7 +393,7 @@ const switchTenant = (code) => {
 
           <!-- Regional Poldas -->
           <div
-            v-for="p in allPoldas"
+            v-for="p in (allPoldas || []).filter(item => item.code !== 'DIVHUMAS')"
             :key="p.id"
             @click="switchTenant(p.code)"
             class="p-4 rounded-2xl border transition cursor-pointer flex items-center justify-between"
@@ -630,7 +630,7 @@ const switchTenant = (code) => {
           </button>
         </div>
         <div
-          v-for="p in allPoldas"
+          v-for="p in (allPoldas || []).filter(item => item.code !== 'DIVHUMAS')"
           :key="p.id"
           class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl flex flex-col justify-between space-y-4 hover:border-slate-600 transition"
         >
