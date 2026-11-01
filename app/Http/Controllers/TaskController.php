@@ -17,11 +17,12 @@ class TaskController extends Controller
     {
         $allPoldas = Polda::withCount('polres')->where('is_active', true)->get();
         [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
+        $isNational = ($selectedCode === 'ALL');
         $statusFilter = $request->query('status', 'all');
 
         $query = Task::with(['polres', 'issue', 'updates'])->latest();
 
-        if ($selectedPolda) {
+        if (!$isNational && $selectedPolda) {
             $query->where('polda_id', $selectedPolda->id);
         }
 
@@ -32,10 +33,10 @@ class TaskController extends Controller
         $tasks = $query->paginate(15)->withQueryString();
 
         $metrics = [
-            'total'       => Task::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
-            'in_progress' => Task::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('status', 'in_progress')->count(),
-            'urgent'      => Task::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('priority', 'urgent')->count(),
-            'completed'   => Task::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('status', 'completed')->count(),
+            'total'       => Task::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
+            'in_progress' => Task::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('status', 'in_progress')->count(),
+            'urgent'      => Task::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('priority', 'urgent')->count(),
+            'completed'   => Task::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('status', 'completed')->count(),
         ];
 
         return Inertia::render('Tasks/Index', [

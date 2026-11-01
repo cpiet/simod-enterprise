@@ -26,13 +26,14 @@ class SystemModuleController extends Controller
     {
         $allPoldas = Polda::withCount('polres')->where('is_active', true)->get();
         [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
+        $isNational = ($selectedCode === 'ALL');
 
         $metrics = [
-            'total_issues'       => Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
-            'pending_verify'     => Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->whereIn('status', ['monitoring', 'investigasi'])->count(),
-            'active_tasks'       => Task::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('status', 'in_progress')->count(),
-            'total_publications' => Publication::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
-            'server_wita'        => now()->setTimezone($selectedPolda->timezone ?? 'Asia/Makassar')->format('d M Y, H:i:s') . ' WITA',
+            'total_issues'       => Issue::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
+            'pending_verify'     => Issue::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->whereIn('status', ['monitoring', 'investigasi'])->count(),
+            'active_tasks'       => Task::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('status', 'in_progress')->count(),
+            'total_publications' => Publication::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
+            'server_wita'        => now()->setTimezone($selectedPolda->timezone ?? 'Asia/Makassar')->format('d M Y, H:i:s') . ($isNational ? ' WIB' : ' WITA'),
         ];
 
         return [$allPoldas, $selectedPolda, $selectedCode, $metrics];
@@ -48,8 +49,9 @@ class SystemModuleController extends Controller
         $tab = $request->query('tab', 'all'); // 'all', 'polres', 'polda'
         $priorityFilter = $request->query('priority', 'all');
 
+        $isNational = ($selectedCode === 'ALL');
         $baseQuery = Issue::with(['polres', 'creator', 'mediaFiles'])
-            ->when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))
+            ->when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))
             ->whereIn('status', ['monitoring', 'investigasi']);
 
         // KPI Counts
@@ -94,13 +96,14 @@ class SystemModuleController extends Controller
     public function gallery(Request $request): Response
     {
         [$allPoldas, $selectedPolda, $selectedCode, $metrics] = $this->getBaseData($request);
+        $isNational = ($selectedCode === 'ALL');
 
         $format = $request->query('format', 'all'); // 'all', 'photo', 'video', 'document'
         $polresCode = $request->query('polres', 'all');
         $search = $request->query('q', '');
 
         $query = MediaFile::with(['polres', 'issue', 'uploader'])
-            ->when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id));
+            ->when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id));
 
         // Stats
         $totalMedia = (clone $query)->count();
@@ -182,11 +185,12 @@ class SystemModuleController extends Controller
     public function reports(Request $request): Response
     {
         [$allPoldas, $selectedPolda, $selectedCode, $metrics] = $this->getBaseData($request);
+        $isNational = ($selectedCode === 'ALL');
 
         $categoryFilter = $request->query('category', 'all');
         $statusFilter = $request->query('status', 'all');
 
-        $poldaId = $selectedPolda?->id;
+        $poldaId = (!$isNational && $selectedPolda) ? $selectedPolda->id : null;
         $totalIssues = Issue::when($poldaId, fn($q) => $q->where('polda_id', $poldaId))->count();
         $resolvedCount = Issue::when($poldaId, fn($q) => $q->where('polda_id', $poldaId))->whereIn('status', ['selesai', 'arsip'])->count();
         $inProgressCount = Issue::when($poldaId, fn($q) => $q->where('polda_id', $poldaId))->whereIn('status', ['investigasi', 'klarifikasi'])->count();
@@ -265,11 +269,11 @@ class SystemModuleController extends Controller
      */
     public function exportReportsCsv(Request $request): StreamedResponse
     {
-        $selectedCode = $request->query('polda', 'SULBAR');
-        $selectedPolda = Polda::where('code', $selectedCode)->first();
+        [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
+        $isNational = ($selectedCode === 'ALL');
 
         $issues = Issue::with(['polres', 'creator'])
-            ->when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))
+            ->when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))
             ->latest()
             ->get();
 

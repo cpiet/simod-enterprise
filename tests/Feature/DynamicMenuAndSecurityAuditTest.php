@@ -203,3 +203,4 @@ class DynamicMenuAndSecurityAuditTest extends TestCase
         $verifyRes->assertStatus(403);
     }
 }
+

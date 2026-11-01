@@ -307,7 +307,8 @@ const getPriorityBadgeClass = (priority) => {
           class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-amber-400"
         >
           <option value="all">Semua Prioritas</option>
-          <option value="critical">🔥 Kritis (Merah)</option>
+          <option value="attention">🔥 Prioritas Atensi (Kritis & Tinggi)</option>
+          <option value="critical">⚡ Kritis (Merah)</option>
           <option value="high">🔴 Tinggi (Atensi)</option>
           <option value="medium">🟡 Sedang</option>
           <option value="low">🟢 Rendah</option>

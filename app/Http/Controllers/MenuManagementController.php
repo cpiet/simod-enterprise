@@ -351,3 +351,4 @@ class MenuManagementController extends Controller
         return redirect()->back()->with('success', '✓ Struktur menu berhasil dipulihkan ke konfigurasi standar SIMOD Enterprise.');
     }
 }
+

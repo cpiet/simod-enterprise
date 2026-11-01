@@ -17,11 +17,12 @@ class PublicationController extends Controller
     {
         $allPoldas = Polda::withCount('polres')->where('is_active', true)->get();
         [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
+        $isNational = ($selectedCode === 'ALL');
         $channelFilter = $request->query('channel', 'all');
 
         $query = Publication::with(['polres', 'issue'])->latest();
 
-        if ($selectedPolda) {
+        if (!$isNational && $selectedPolda) {
             $query->where('polda_id', $selectedPolda->id);
         }
 
@@ -32,10 +33,10 @@ class PublicationController extends Controller
         $publications = $query->paginate(12)->withQueryString();
 
         $metrics = [
-            'total'        => Publication::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
-            'tribratanews' => Publication::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('channel', 'tribratanews')->count(),
-            'instagram'    => Publication::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('channel', 'instagram')->count(),
-            'tiktok'       => Publication::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('channel', 'tiktok')->count(),
+            'total'        => Publication::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
+            'tribratanews' => Publication::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('channel', 'tribratanews')->count(),
+            'instagram'    => Publication::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('channel', 'instagram')->count(),
+            'tiktok'       => Publication::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('channel', 'tiktok')->count(),
         ];
 
         return Inertia::render('Publications/Index', [

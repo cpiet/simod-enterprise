@@ -36,7 +36,8 @@ class IssueController extends Controller
 
         $query = Issue::with(['polres', 'polda', 'creator'])->withCount('mediaFiles')->latest();
 
-        if ($selectedPolda) {
+        // Multi-Tenant Scoping: Jika tingkat Polda spesifik, filter polda_id. Jika Mabes (ALL), cakup konsolidasi nasional.
+        if (!$isNational && $selectedPolda) {
             $query->where('polda_id', $selectedPolda->id);
         }
 
@@ -44,7 +45,9 @@ class IssueController extends Controller
             $query->where('status', $statusFilter);
         }
 
-        if ($priorityFilter !== 'all') {
+        if ($priorityFilter === 'attention' || $priorityFilter === 'atensi') {
+            $query->whereIn('priority', ['critical', 'high'])->whereNotIn('status', ['selesai']);
+        } elseif ($priorityFilter !== 'all') {
             $query->where('priority', $priorityFilter);
         }
 
@@ -68,12 +71,12 @@ class IssueController extends Controller
         $issues = $query->paginate(15)->withQueryString();
 
         $metrics = [
-            'total_issues'    => Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
-            'pending_verify'  => Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->whereIn('status', ['submitted', 'unit_verified', 'monitoring', 'draft'])->count(),
-            'in_progress'     => Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->whereIn('status', ['in_progress', 'polda_verified', 'investigasi'])->count(),
-            'resolved'        => Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->whereIn('status', ['resolved', 'closed', 'selesai', 'klarifikasi'])->count(),
-            'high_priority'   => Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->whereIn('priority', ['high', 'critical'])->count(),
-            'server_wita'     => now()->setTimezone($selectedPolda->timezone ?? 'Asia/Makassar')->format('d M Y, H:i:s') . ' WITA',
+            'total_issues'    => Issue::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
+            'pending_verify'  => Issue::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->whereIn('status', ['submitted', 'unit_verified', 'monitoring', 'draft'])->count(),
+            'in_progress'     => Issue::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->whereIn('status', ['in_progress', 'polda_verified', 'investigasi'])->count(),
+            'resolved'        => Issue::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->whereIn('status', ['resolved', 'closed', 'selesai', 'klarifikasi'])->count(),
+            'high_priority'   => Issue::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->whereIn('priority', ['high', 'critical'])->count(),
+            'server_wita'     => now()->setTimezone($selectedPolda->timezone ?? 'Asia/Makassar')->format('d M Y, H:i:s') . ($isNational ? ' WIB' : ' WITA'),
         ];
 
         return Inertia::render('Issues/Index', [
@@ -252,6 +255,7 @@ class IssueController extends Controller
     public function exportCsv(Request $request)
     {
         [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
+        $isNational = ($selectedCode === 'ALL');
         $statusFilter = $request->query('status', 'all');
         $priorityFilter = $request->query('priority', 'all');
         $categoryFilter = $request->query('category', 'all');
@@ -260,13 +264,15 @@ class IssueController extends Controller
 
         $query = Issue::with(['polres', 'polda', 'creator'])->latest();
 
-        if ($selectedPolda) {
+        if (!$isNational && $selectedPolda) {
             $query->where('polda_id', $selectedPolda->id);
         }
         if ($statusFilter !== 'all') {
             $query->where('status', $statusFilter);
         }
-        if ($priorityFilter !== 'all') {
+        if ($priorityFilter === 'attention' || $priorityFilter === 'atensi') {
+            $query->whereIn('priority', ['critical', 'high'])->whereNotIn('status', ['selesai']);
+        } elseif ($priorityFilter !== 'all') {
             $query->where('priority', $priorityFilter);
         }
         if ($categoryFilter !== 'all') {

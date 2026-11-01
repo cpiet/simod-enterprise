@@ -41,6 +41,8 @@ const props = defineProps({
   allPoldas: Array,
   selectedPolda: Object,
   selectedCode: String,
+  isNational: Boolean,
+  nationalMapData: Array,
   kpi: Object,
   socialStats: Object,
   topViralSocialPosts: Array,
@@ -54,6 +56,9 @@ const props = defineProps({
   publicIndex: Object,
   metrics: Object,
 });
+
+// Map Scope: 'national' (Peta Nusantara / 34 Polda) vs 'regional' (Peta Satwil / 6 Polres)
+const mapScope = ref(props.selectedCode === 'ALL' || props.isNational ? 'national' : 'regional');
 
 // View mode: 'map' (Peta Interaktif) or 'cards' (Matriks Kartu)
 const viewMode = ref('map');
@@ -96,7 +101,7 @@ const getPlatformBadge = (platform) => {
   }
 };
 
-// Satwil filter / focus
+// Satwil / Wilayah filter
 const selectedSatwilCode = ref('ALL');
 
 // Map Zoom State
@@ -113,7 +118,7 @@ const resetZoom = () => {
 
 // Interactive Pin Callout Selection
 const activePin = ref(null);
-const selectPolresPin = (p) => {
+const selectPin = (p) => {
   if (activePin.value?.id === p.id) {
     activePin.value = null;
   } else {
@@ -124,17 +129,36 @@ const closeCallout = () => {
   activePin.value = null;
 };
 
-// Filtered Polres list based on Satwil dropdown
-const filteredPolres = computed(() => {
-  if (!props.polresStatuses) return [];
-  if (selectedSatwilCode.value === 'ALL') return props.polresStatuses;
-  return props.polresStatuses.filter((p) => p.code === selectedSatwilCode.value);
+// Active pins based on mapScope & filter
+const currentMapPins = computed(() => {
+  if (mapScope.value === 'national') {
+    if (!props.nationalMapData) return [];
+    if (selectedSatwilCode.value !== 'ALL') {
+      return props.nationalMapData.filter((p) => p.code === selectedSatwilCode.value);
+    }
+    return props.nationalMapData;
+  } else {
+    if (!props.polresStatuses) return [];
+    if (selectedSatwilCode.value !== 'ALL') {
+      return props.polresStatuses.filter((p) => p.code === selectedSatwilCode.value);
+    }
+    return props.polresStatuses;
+  }
 });
 
 // Real-time status counts for legend
-const atensiCount = computed(() => props.polresStatuses?.filter((p) => p.status === 'ATENSI').length || 0);
-const waspadaCount = computed(() => props.polresStatuses?.filter((p) => p.status === 'WASPADA').length || 0);
-const kondusifCount = computed(() => props.polresStatuses?.filter((p) => p.status === 'KONDUSIF').length || 0);
+const atensiCount = computed(() => {
+  const list = mapScope.value === 'national' ? props.nationalMapData : props.polresStatuses;
+  return list?.filter((p) => p.status === 'ATENSI').length || 0;
+});
+const waspadaCount = computed(() => {
+  const list = mapScope.value === 'national' ? props.nationalMapData : props.polresStatuses;
+  return list?.filter((p) => p.status === 'WASPADA').length || 0;
+});
+const kondusifCount = computed(() => {
+  const list = mapScope.value === 'national' ? props.nationalMapData : props.polresStatuses;
+  return list?.filter((p) => p.status === 'KONDUSIF').length || 0;
+});
 
 // Layer filters (active simulation)
 const layerMedia = ref(true);
@@ -308,7 +332,7 @@ const layerLapangan = ref(true);
 
       <!-- 3. Isu Prioritas Atensi -->
       <Link
-        href="/issues?priority=critical"
+        href="/issues?priority=attention"
         class="p-4 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1.5 hover:border-rose-500/50 transition group block"
       >
         <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
@@ -361,10 +385,10 @@ const layerLapangan = ref(true);
     </div>
 
     <!-- ========================================================================= -->
-    <!-- 3. MIDDLE GRID: PETA 6 POLRES SULBAR & SENTIMEN AI                        -->
+    <!-- 3. MIDDLE GRID: PETA SITUASI NUSANTARA / SATWIL & SENTIMEN AI             -->
     <!-- ========================================================================= -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Col 1 & 2: Peta Sebaran Isu & Sentimen Kamtibmas 6 Polres -->
+      <!-- Col 1 & 2: Peta Situasi Kamtibmas & Sentimen -->
       <div class="lg:col-span-2 rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-2xl space-y-4">
         <!-- Card Header with Mode Toggle & Filters -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
@@ -374,15 +398,37 @@ const layerLapangan = ref(true);
             </div>
             <div>
               <h2 class="text-base font-black text-white uppercase tracking-wider flex items-center gap-2">
-                {{ selectedCode === 'ALL' ? 'Peta Situasi Kamtibmas & Sentimen Satwil Jajaran' : 'Peta Sebaran Isu & Sentimen Kamtibmas 6 Polres' }}
+                {{ mapScope === 'national' ? 'Peta Situasi Kamtibmas & Sentimen Nusantara (Nasional)' : (selectedCode === 'ALL' ? 'Peta Situasi Kamtibmas & Sentimen Satwil Jajaran' : 'Peta Sebaran Isu & Sentimen Kamtibmas 6 Polres') }}
               </h2>
               <p class="text-xs text-slate-400">
-                {{ selectedCode === 'ALL' ? 'Orkestrasi Nasional Divhumas Polri' : (selectedPolda?.name ? `Wilayah Hukum ${selectedPolda.name}` : 'Wilayah Hukum Polda Sulawesi Barat') }}
+                {{ mapScope === 'national' ? 'Agregasi 11 Sentra Komando & 22 Portal Media Berbasis Database' : (selectedCode === 'ALL' ? 'Orkestrasi Nasional Divhumas Polri' : (selectedPolda?.name ? `Wilayah Hukum ${selectedPolda.name}` : 'Wilayah Hukum Polda Sulawesi Barat')) }}
               </p>
             </div>
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
+            <!-- Scope Switch: Peta Indonesia (Nasional) vs Peta Satwil (Sulbar) -->
+            <div class="inline-flex rounded-xl bg-slate-900 border border-slate-800 p-0.5 text-xs font-bold">
+              <button
+                type="button"
+                @click="mapScope = 'national'; selectedSatwilCode = 'ALL'; activePin = null;"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition"
+                :class="mapScope === 'national' ? 'bg-amber-400 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'"
+                title="Tampilkan Peta Kepulauan Nusantara (Nasional RI)"
+              >
+                <span>🇮🇩 Peta Nasional</span>
+              </button>
+              <button
+                type="button"
+                @click="mapScope = 'regional'; selectedSatwilCode = 'ALL'; activePin = null;"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition"
+                :class="mapScope === 'regional' ? 'bg-amber-400 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'"
+                title="Tampilkan Peta Wilayah Hukum Satwil (Sulbar 6 Polres)"
+              >
+                <span>🏛️ Peta Satwil</span>
+              </button>
+            </div>
+
             <!-- View Mode Toggle: Map vs Cards -->
             <div class="inline-flex rounded-xl bg-slate-900 border border-slate-800 p-0.5 text-xs font-bold">
               <button
@@ -392,7 +438,7 @@ const layerLapangan = ref(true);
                 :class="viewMode === 'map' ? 'bg-amber-400 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'"
               >
                 <MapIcon class="w-3.5 h-3.5" />
-                <span>Peta Interaktif</span>
+                <span>Peta</span>
               </button>
               <button
                 type="button"
@@ -401,19 +447,27 @@ const layerLapangan = ref(true);
                 :class="viewMode === 'cards' ? 'bg-amber-400 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'"
               >
                 <Grid class="w-3.5 h-3.5" />
-                <span>Matriks Kartu</span>
+                <span>Matriks</span>
               </button>
             </div>
 
-            <!-- Satwil Filter Select -->
+            <!-- Satwil / Wilayah Filter Select -->
             <select
               v-model="selectedSatwilCode"
               class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-bold text-slate-300 focus:outline-none focus:border-amber-400"
             >
-              <option value="ALL">{{ selectedCode === 'ALL' ? 'Semua Jajaran Satwil' : 'Semua Satwil (6 Polres)' }}</option>
-              <option v-for="p in polresStatuses" :key="p.id" :value="p.code">
-                {{ p.name }} ({{ p.status }})
-              </option>
+              <template v-if="mapScope === 'national'">
+                <option value="ALL">Semua Sentra Nusantara (11 Polda)</option>
+                <option v-for="p in nationalMapData" :key="p.id" :value="p.code">
+                  {{ p.name }} ({{ p.articles_count }} Berita)
+                </option>
+              </template>
+              <template v-else>
+                <option value="ALL">{{ selectedCode === 'ALL' ? 'Semua Jajaran Satwil' : 'Semua Satwil (6 Polres)' }}</option>
+                <option v-for="p in polresStatuses" :key="p.id" :value="p.code">
+                  {{ p.name }} ({{ p.status }})
+                </option>
+              </template>
             </select>
           </div>
         </div>
@@ -438,12 +492,12 @@ const layerLapangan = ref(true);
 
           <span class="text-xs font-mono text-emerald-400 flex items-center gap-1.5">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            {{ selectedCode === 'ALL' ? 'Komando Nasional Terpantau Aktif' : '6 Satwil Terpantau Aktif' }}
+            {{ mapScope === 'national' ? '11 Sentra Komando Nasional Terpantau' : (selectedCode === 'ALL' ? 'Komando Nasional Terpantau Aktif' : '6 Satwil Terpantau Aktif') }}
           </span>
         </div>
 
         <!-- ========================================================================= -->
-        <!-- VIEW 1: INTERACTIVE GEOSPATIAL VECTOR MAP (Kamtibmas Sulbar Map)          -->
+        <!-- VIEW 1: INTERACTIVE GEOSPATIAL VECTOR MAP (Nasional RI / Sulbar)          -->
         <!-- ========================================================================= -->
         <div
           v-if="viewMode === 'map'"
@@ -462,15 +516,24 @@ const layerLapangan = ref(true);
             <div class="h-full w-px bg-sky-400 absolute left-2/3"></div>
           </div>
 
-          <!-- Selat Makassar Watermark -->
-          <div class="absolute left-6 top-1/2 -translate-y-1/2 text-slate-700/60 font-black text-xs md:text-sm tracking-[0.4em] uppercase pointer-events-none select-none z-0">
+          <!-- Sea Watermark Label -->
+          <div
+            v-if="mapScope === 'national'"
+            class="absolute left-1/2 top-4 -translate-x-1/2 text-slate-700/60 font-black text-xs md:text-sm tracking-[0.4em] uppercase pointer-events-none select-none z-0"
+          >
+            N U S A N T A R A &nbsp; R E P U B L I K &nbsp; I N D O N E S I A
+          </div>
+          <div
+            v-else
+            class="absolute left-6 top-1/2 -translate-y-1/2 text-slate-700/60 font-black text-xs md:text-sm tracking-[0.4em] uppercase pointer-events-none select-none z-0"
+          >
             S E L A T &nbsp; M A K A S S A R
           </div>
 
           <!-- Compass North Indicator -->
           <div class="absolute left-4 top-4 z-20 flex flex-col items-center bg-slate-900/90 border border-slate-700/80 p-2 rounded-xl text-[10px] text-slate-300 font-mono shadow-xl backdrop-blur-sm">
             <span class="font-black text-amber-400">▲ N</span>
-            <span class="text-[8px] text-slate-400 font-bold">WITA</span>
+            <span class="text-[8px] text-slate-400 font-bold">{{ mapScope === 'national' ? 'WIB/WITA' : 'WITA' }}</span>
           </div>
 
           <!-- Map Zoom Controls (Top Right) -->
@@ -506,8 +569,170 @@ const layerLapangan = ref(true);
             class="absolute inset-0 transition-transform duration-500 ease-out origin-center"
             :style="{ transform: `scale(${mapZoom})` }"
           >
-            <!-- SVG Landmass of Sulawesi Barat -->
-            <svg class="w-full h-full" viewBox="0 0 600 500" preserveAspectRatio="xMidYMid meet">
+            <!-- =============================================================== -->
+            <!-- SVG MAP OPTION A: PETA KEPULAUAN NUSANTARA INDONESIA (NASIONAL) -->
+            <!-- =============================================================== -->
+            <svg
+              v-if="mapScope === 'national'"
+              class="w-full h-full"
+              viewBox="0 0 920 440"
+              preserveAspectRatio="xMidYMid meet"
+            >
+              <defs>
+                <filter id="glowIndo" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="3" result="blur" />
+                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+                <linearGradient id="indoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#14244d" stop-opacity="0.95" />
+                  <stop offset="50%" stop-color="#0f1e40" stop-opacity="0.9" />
+                  <stop offset="100%" stop-color="#182a57" stop-opacity="0.95" />
+                </linearGradient>
+                <linearGradient id="seaGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#0284c7" stop-opacity="0.1" />
+                  <stop offset="100%" stop-color="#0369a1" stop-opacity="0.02" />
+                </linearGradient>
+              </defs>
+
+              <!-- Maritime Nautical Boundaries & Dashed Sea Lines -->
+              <path d="M 60 210 Q 200 240 380 290" fill="none" stroke="#1e293b" stroke-width="1.2" stroke-dasharray="4 6" opacity="0.6" />
+              <path d="M 380 290 Q 560 320 860 300" fill="none" stroke="#1e293b" stroke-width="1.2" stroke-dasharray="4 6" opacity="0.6" />
+              <path d="M 430 80 L 430 380" fill="none" stroke="#1e293b" stroke-width="1.2" stroke-dasharray="3 5" opacity="0.4" />
+              <path d="M 620 80 L 620 380" fill="none" stroke="#1e293b" stroke-width="1.2" stroke-dasharray="3 5" opacity="0.4" />
+
+              <!-- Maritime Ocean Labels -->
+              <text x="110" y="380" fill="#334155" font-size="10" font-weight="900" letter-spacing="4" opacity="0.5">SAMUDERA HINDIA</text>
+              <text x="290" y="295" fill="#334155" font-size="9" font-weight="900" letter-spacing="3" opacity="0.6">LAUT JAWA</text>
+              <text x="430" y="210" fill="#334155" font-size="8" font-weight="900" letter-spacing="2" opacity="0.6">SELAT MAKASSAR</text>
+              <text x="690" y="110" fill="#334155" font-size="10" font-weight="900" letter-spacing="4" opacity="0.5">SAMUDERA PASIFIK</text>
+              <text x="730" y="340" fill="#334155" font-size="9" font-weight="900" letter-spacing="3" opacity="0.5">LAUT ARAFURA</text>
+
+              <!-- Indonesian Archipelago Landmass Group -->
+              <g class="transition-all duration-300">
+                <!-- 1. SUMATERA -->
+                <path
+                  d="
+                    M 75 75
+                    C 95 85, 115 125, 130 160
+                    C 145 195, 170 230, 195 270
+                    C 205 285, 215 295, 205 305
+                    C 195 315, 175 300, 160 275
+                    C 140 240, 115 195, 95 155
+                    C 80 125, 65 95, 75 75
+                    Z
+                  "
+                  fill="url(#indoGrad)"
+                  stroke="#38bdf8"
+                  stroke-width="1.6"
+                  class="drop-shadow-[0_0_12px_rgba(56,189,248,0.25)]"
+                />
+                <!-- Kepulauan Sekitar Sumatera (Nias, Mentawai, Bangka, Belitung) -->
+                <circle cx="85" cy="180" r="3.5" fill="#38bdf8" opacity="0.7" />
+                <circle cx="110" cy="235" r="4" fill="#38bdf8" opacity="0.7" />
+                <ellipse cx="205" cy="225" rx="7" ry="12" fill="url(#indoGrad)" stroke="#38bdf8" stroke-width="1.2" transform="rotate(25 205 225)" />
+                <circle cx="230" cy="238" r="5" fill="url(#indoGrad)" stroke="#38bdf8" stroke-width="1.2" />
+
+                <!-- 2. JAWA & MADURA -->
+                <path
+                  d="
+                    M 220 318
+                    C 240 314, 275 315, 305 318
+                    C 335 321, 365 323, 395 330
+                    C 400 334, 395 342, 385 344
+                    C 350 340, 310 338, 275 336
+                    C 245 334, 225 330, 220 318
+                    Z
+                  "
+                  fill="url(#indoGrad)"
+                  stroke="#38bdf8"
+                  stroke-width="1.6"
+                  class="drop-shadow-[0_0_12px_rgba(56,189,248,0.25)]"
+                />
+                <!-- Pulau Madura -->
+                <ellipse cx="375" cy="315" rx="14" ry="5" fill="url(#indoGrad)" stroke="#38bdf8" stroke-width="1.2" transform="rotate(-5 375 315)" />
+
+                <!-- 3. KALIMANTAN -->
+                <path
+                  d="
+                    M 330 115
+                    C 365 110, 395 125, 415 150
+                    C 430 175, 435 205, 410 245
+                    C 390 270, 360 270, 335 260
+                    C 310 250, 290 230, 290 190
+                    C 290 155, 305 125, 330 115
+                    Z
+                  "
+                  fill="url(#indoGrad)"
+                  stroke="#38bdf8"
+                  stroke-width="1.6"
+                  class="drop-shadow-[0_0_12px_rgba(56,189,248,0.25)]"
+                />
+
+                <!-- 4. SULAWESI (K-Shape Island) -->
+                <path
+                  d="
+                    M 470 120
+                    C 510 112, 545 125, 555 135
+                    C 550 145, 520 150, 500 155
+                    C 490 165, 485 180, 520 190
+                    C 535 195, 540 215, 510 220
+                    C 490 220, 485 230, 515 250
+                    C 530 265, 530 285, 505 285
+                    C 490 280, 485 255, 475 245
+                    C 470 260, 475 285, 465 295
+                    C 455 295, 450 270, 455 240
+                    C 458 215, 465 185, 470 155
+                    Z
+                  "
+                  fill="url(#indoGrad)"
+                  stroke="#38bdf8"
+                  stroke-width="1.6"
+                  class="drop-shadow-[0_0_12px_rgba(56,189,248,0.25)]"
+                />
+
+                <!-- 5. BALI & NUSA TENGGARA -->
+                <ellipse cx="415" cy="336" rx="8" ry="6" fill="url(#indoGrad)" stroke="#38bdf8" stroke-width="1.2" />
+                <ellipse cx="438" cy="338" rx="10" ry="7" fill="url(#indoGrad)" stroke="#38bdf8" stroke-width="1.2" />
+                <ellipse cx="468" cy="340" rx="14" ry="7" fill="url(#indoGrad)" stroke="#38bdf8" stroke-width="1.2" />
+                <ellipse cx="515" cy="342" rx="20" ry="7" fill="url(#indoGrad)" stroke="#38bdf8" stroke-width="1.2" />
+                <ellipse cx="495" cy="360" rx="14" ry="7" fill="url(#indoGrad)" stroke="#38bdf8" stroke-width="1.2" />
+                <ellipse cx="560" cy="360" rx="18" ry="8" fill="url(#indoGrad)" stroke="#38bdf8" stroke-width="1.2" transform="rotate(-15 560 360)" />
+
+                <!-- 6. KEPULAUAN MALUKU & HALMAHERA -->
+                <path d="M 590 125 C 610 130, 615 150, 595 160 C 615 170, 610 185, 590 190 C 585 170, 580 150, 590 125 Z" fill="url(#indoGrad)" stroke="#38bdf8" stroke-width="1.2" />
+                <ellipse cx="615" cy="225" rx="22" ry="7" fill="url(#indoGrad)" stroke="#38bdf8" stroke-width="1.2" transform="rotate(-10 615 225)" />
+                <circle cx="600" cy="235" r="4" fill="#38bdf8" opacity="0.8" />
+
+                <!-- 7. PAPUA (Kepala Burung & Daratan Utama) -->
+                <path
+                  d="
+                    M 660 175
+                    C 685 160, 715 175, 705 200
+                    C 690 215, 680 215, 695 225
+                    C 725 210, 770 200, 810 210
+                    C 845 220, 855 240, 855 280
+                    C 840 285, 785 280, 745 270
+                    C 715 260, 685 245, 665 220
+                    C 650 205, 645 190, 660 175
+                    Z
+                  "
+                  fill="url(#indoGrad)"
+                  stroke="#38bdf8"
+                  stroke-width="1.6"
+                  class="drop-shadow-[0_0_12px_rgba(56,189,248,0.25)]"
+                />
+              </g>
+            </svg>
+
+            <!-- =============================================================== -->
+            <!-- SVG MAP OPTION B: PETA SATWIL POLDA SULAWESI BARAT (6 POLRES)   -->
+            <!-- =============================================================== -->
+            <svg
+              v-else
+              class="w-full h-full"
+              viewBox="0 0 600 500"
+              preserveAspectRatio="xMidYMid meet"
+            >
               <defs>
                 <filter id="glowRed" x="-20%" y="-20%" width="140%" height="140%">
                   <feGaussianBlur stdDeviation="3" result="blur" />
@@ -583,15 +808,15 @@ const layerLapangan = ref(true);
               </g>
             </svg>
 
-            <!-- Interactive Pin Markers for 6 Polres -->
+            <!-- Interactive Pin Markers (Dynamic: National Regions or Satwil 6 Polres) -->
             <div
-              v-for="p in polresStatuses"
+              v-for="p in currentMapPins"
               :key="p.id"
               class="absolute pointer-events-auto transform -translate-x-1/2 -translate-y-1/2 cursor-pointer z-30"
               :style="{ left: `${p.map_x}%`, top: `${p.map_y}%` }"
             >
               <div
-                @click="selectPolresPin(p)"
+                @click="selectPin(p)"
                 class="relative flex flex-col items-center group"
               >
                 <!-- Sonar Radar Pulsing Ring -->
@@ -625,14 +850,14 @@ const layerLapangan = ref(true);
                     'bg-slate-900/90 text-emerald-300 border-emerald-500/40': p.status === 'KONDUSIF',
                   }"
                 >
-                  {{ p.short_name }}
+                  {{ p.short_name || p.name }}
                 </div>
               </div>
 
               <!-- Interactive Callout Popover Card -->
               <div
                 v-if="activePin?.id === p.id"
-                class="absolute z-50 w-64 md:w-72 rounded-2xl p-4 shadow-2xl backdrop-blur-xl transition-all duration-200 border"
+                class="absolute z-50 w-72 md:w-80 rounded-2xl p-4 shadow-2xl backdrop-blur-xl transition-all duration-200 border"
                 :class="[
                   p.status === 'ATENSI'
                     ? 'bg-[#091122]/95 border-rose-500/70 shadow-rose-950/60'
@@ -678,47 +903,96 @@ const layerLapangan = ref(true);
                   </div>
                 </div>
 
-                <!-- Callout Body -->
-                <p class="text-[10px] text-slate-400 font-bold mb-1">{{ p.tag_desc }}</p>
-                <p class="text-[11px] text-slate-200 line-clamp-3 leading-relaxed mb-3 bg-slate-900/60 p-2 rounded-xl border border-slate-800/80">
-                  {{ p.summary }}
-                </p>
+                <!-- Callout Body: Conditional National vs Regional -->
+                <template v-if="mapScope === 'national'">
+                  <div class="flex items-center justify-between text-[10px] text-slate-400 font-bold mb-1.5">
+                    <span>{{ p.region }}</span>
+                    <span class="text-amber-400 font-mono font-bold">{{ p.articles_count }} Berita Database</span>
+                  </div>
 
-                <!-- Callout Footer -->
-                <div class="flex items-center justify-between text-[10px] pt-1 border-t border-slate-800">
-                  <span class="text-slate-400">
-                    Skor Opini: <strong class="text-white">{{ p.score }}</strong>
-                  </span>
-                  <span class="text-amber-400 font-bold">
-                    {{ p.issues_count }} Isu Aktif ({{ p.total_issues }} Laporan)
-                  </span>
-                </div>
+                  <!-- Headline Box -->
+                  <div class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800/80 mb-2.5 space-y-1">
+                    <div class="flex items-center justify-between text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                      <span>Headlines Terkini:</span>
+                      <span class="font-mono text-slate-500">{{ p.pub_date }}</span>
+                    </div>
+                    <p class="text-[11px] text-slate-100 font-medium line-clamp-2 leading-snug">
+                      "{{ p.latest_headline }}"
+                    </p>
+                    <p class="text-[9px] text-sky-400 font-mono font-bold">{{ p.latest_source }}</p>
+                  </div>
 
-                <div class="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between">
-                  <Link
-                    :href="`/issues?polres=${p.code}`"
-                    class="text-[10px] font-bold text-amber-400 hover:underline flex items-center gap-1"
-                  >
-                    <span>Lihat Laporan Polres</span>
-                    <ArrowRight class="w-3 h-3" />
-                  </Link>
-                  <span class="text-[9px] font-mono text-slate-500">
-                    {{ p.latitude }}, {{ p.longitude }}
-                  </span>
-                </div>
+                  <!-- Sentiment Ratio Mini Bar -->
+                  <div class="space-y-1 mb-2.5">
+                    <div class="flex items-center justify-between text-[9px] text-slate-400 font-mono">
+                      <span class="text-emerald-400">+{{ p.sentiment?.positif || 0 }}% Positif</span>
+                      <span class="text-slate-400">~{{ p.sentiment?.netral || 0 }}% Netral</span>
+                      <span class="text-rose-400">-{{ p.sentiment?.negatif || 0 }}% Negatif</span>
+                    </div>
+                    <div class="h-1.5 rounded-full bg-slate-900 overflow-hidden flex">
+                      <div class="bg-emerald-400" :style="{ width: (p.sentiment?.positif || 0) + '%' }"></div>
+                      <div class="bg-slate-600" :style="{ width: (p.sentiment?.netral || 0) + '%' }"></div>
+                      <div class="bg-rose-500" :style="{ width: (p.sentiment?.negatif || 0) + '%' }"></div>
+                    </div>
+                  </div>
+
+                  <!-- Callout Footer -->
+                  <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                    <Link
+                      href="/media-intelligence"
+                      class="text-[10px] font-bold text-amber-400 hover:underline flex items-center gap-1"
+                    >
+                      <span>Buka di Radar Media</span>
+                      <ArrowRight class="w-3 h-3" />
+                    </Link>
+                    <span class="text-[9px] font-mono text-slate-500">
+                      {{ p.issues_count }} Isu Atensi
+                    </span>
+                  </div>
+                </template>
+
+                <template v-else>
+                  <!-- Regional Sulbar Popover Content -->
+                  <p class="text-[10px] text-slate-400 font-bold mb-1">{{ p.tag_desc }}</p>
+                  <p class="text-[11px] text-slate-200 line-clamp-3 leading-relaxed mb-3 bg-slate-900/60 p-2 rounded-xl border border-slate-800/80">
+                    {{ p.summary }}
+                  </p>
+
+                  <div class="flex items-center justify-between text-[10px] pt-1 border-t border-slate-800">
+                    <span class="text-slate-400">
+                      Skor Opini: <strong class="text-white">{{ p.score }}</strong>
+                    </span>
+                    <span class="text-amber-400 font-bold">
+                      {{ p.issues_count }} Isu Aktif ({{ p.total_issues }} Laporan)
+                    </span>
+                  </div>
+
+                  <div class="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                    <Link
+                      :href="`/issues?polres=${p.code}`"
+                      class="text-[10px] font-bold text-amber-400 hover:underline flex items-center gap-1"
+                    >
+                      <span>Lihat Laporan Polres</span>
+                      <ArrowRight class="w-3 h-3" />
+                    </Link>
+                    <span class="text-[9px] font-mono text-slate-500">
+                      {{ p.latitude }}, {{ p.longitude }}
+                    </span>
+                  </div>
+                </template>
               </div>
             </div>
           </div>
         </div>
 
         <!-- ========================================================================= -->
-        <!-- VIEW 2: MATRIKS KARTU 6 POLRES                                            -->
+        <!-- VIEW 2: MATRIKS KARTU (Nasional RI / Sulbar 6 Polres)                     -->
         <!-- ========================================================================= -->
         <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
           <div
-            v-for="p in filteredPolres"
+            v-for="p in currentMapPins"
             :key="p.id"
-            @click="selectPolresPin(p)"
+            @click="selectPin(p)"
             class="p-4 rounded-2xl bg-slate-900 border transition cursor-pointer hover:border-amber-400/60 group relative overflow-hidden"
             :class="p.status === 'ATENSI' ? 'border-rose-500/40 bg-rose-500/5' : 'border-slate-800'"
           >
@@ -735,13 +1009,26 @@ const layerLapangan = ref(true);
                 {{ p.status }}
               </span>
             </div>
-            <p class="text-[11px] text-slate-300 line-clamp-2 leading-relaxed mb-3">
-              {{ p.summary }}
-            </p>
-            <div class="flex items-center justify-between text-[10px] text-slate-400 pt-2 border-t border-slate-800">
-              <span>Skor Opini: <strong class="text-white">{{ p.score }}</strong></span>
-              <span class="text-amber-400 font-bold">{{ p.issues_count }} Isu Aktif</span>
-            </div>
+
+            <template v-if="mapScope === 'national'">
+              <p class="text-[10px] text-amber-400/90 font-bold mb-1">{{ p.region }} • {{ p.articles_count }} Berita</p>
+              <p class="text-[11px] text-slate-300 line-clamp-2 leading-relaxed mb-2 italic">
+                "{{ p.latest_headline }}"
+              </p>
+              <div class="flex items-center justify-between text-[10px] text-slate-400 pt-2 border-t border-slate-800">
+                <span class="text-sky-400 font-mono text-[9px]">{{ p.latest_source }}</span>
+                <span class="text-emerald-400 font-mono text-[9px]">{{ p.score }} Positif</span>
+              </div>
+            </template>
+            <template v-else>
+              <p class="text-[11px] text-slate-300 line-clamp-2 leading-relaxed mb-3">
+                {{ p.summary }}
+              </p>
+              <div class="flex items-center justify-between text-[10px] text-slate-400 pt-2 border-t border-slate-800">
+                <span>Skor Opini: <strong class="text-white">{{ p.score }}</strong></span>
+                <span class="text-amber-400 font-bold">{{ p.issues_count }} Isu Aktif</span>
+              </div>
+            </template>
           </div>
         </div>
 
@@ -761,10 +1048,15 @@ const layerLapangan = ref(true);
               Atensi Pimpinan ({{ atensiCount }})
             </span>
           </div>
-          <Link href="/media-intelligence" class="text-amber-400 font-bold hover:underline inline-flex items-center gap-1 text-xs">
-            <span>Buka Radar Media Online</span>
-            <ArrowRight class="w-3.5 h-3.5" />
-          </Link>
+          <div class="flex items-center gap-3">
+            <span v-if="mapScope === 'national'" class="text-[11px] font-mono text-sky-400 bg-sky-950/60 px-2 py-0.5 rounded border border-sky-800/60">
+              {{ kpi?.total_articles || 1715 }} Berita Terpetakan
+            </span>
+            <Link href="/media-intelligence" class="text-amber-400 font-bold hover:underline inline-flex items-center gap-1 text-xs">
+              <span>Buka Radar Media Online</span>
+              <ArrowRight class="w-3.5 h-3.5" />
+            </Link>
+          </div>
         </div>
       </div>
 

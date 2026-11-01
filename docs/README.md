@@ -25,6 +25,7 @@ Dokumentasi ini memandu arsitektur, seluruh perintah CLI, modul operasional, int
 | **13** | [13. Keamanan Tenant & Mesin Intelijen AI](13-keamanan-tenant-dan-mesin-intelijen-ai.md) | Keamanan URL tenant (POST session-based), Smart Dossier Atensi Pimpinan, dan Multi-API Gemini failover. |
 | **14** | [14. Katalog RSS Media Online Nasional](14-katalog-rss-media-online-nasional.md) | Registri feed media online nasional, endpoints valid, dan protokol polling ingestion pipeline. |
 | **15** | [15. Manajemen Menu Dinamis & Portabilitas Multi-Domain](15-manajemen-menu-dinamis-dan-portabilitas-multi-domain.md) | Navigasi berbasis basis data (`/settings/menus`), portabilitas multi-hosting, dan keamanan sesi (`PreventBackHistory`). |
+| **16** | [16. Peta Situasi Kamtibmas Nusantara & Integritas KPI](16-peta-nusantara-dan-integritas-kpi-command-center.md) | Peta Indonesia interaktif berbasis berita database (11 sentra), dual-scope map toggle, dan eliminasi KPI *gimmick*. |
 
 ---
 

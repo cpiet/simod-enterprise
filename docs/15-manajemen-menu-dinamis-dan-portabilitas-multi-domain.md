@@ -69,3 +69,4 @@ SIMOD Enterprise dirancang agar dapat dipindahkan antar-domain, sub-domain, VPS 
    - Mencegah browser menampilkan halaman dari cache lokal ketika tombol **Back** ditekan setelah logout.
 4. **Proteksi Direct Parameter Tampering (Multi-Tenant IDOR Guard)**:
    - Metode `authorizeTenantRecord()` pada base `Controller` memastikan personel kewilayahan tidak dapat mengakses atau memanipulasi ID laporan/tugas milik Polda lain (`HTTP 403 Forbidden`).
+
