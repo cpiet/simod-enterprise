@@ -96,6 +96,10 @@ class GeminiMediaIntelligenceTest extends TestCase
     public function test_analyze_gemini_without_api_key_returns_422(): void
     {
         $user = User::factory()->create();
+        config(['services.gemini.api_key' => null]);
+        putenv('GEMINI_API_KEY=');
+        unset($_ENV['GEMINI_API_KEY'], $_SERVER['GEMINI_API_KEY']);
+        AiSetting::query()->update(['gemini_api_key' => null]);
 
         $response = $this->actingAs($user)->postJson('/media-intelligence/analyze-gemini?polda=ALL');
 

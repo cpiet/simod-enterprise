@@ -564,7 +564,7 @@ class MediaIntelligenceController extends Controller
     {
         $validated = $request->validate([
             'gemini_api_key'  => 'nullable|string',
-            'gemini_model'    => 'required|string|in:gemini-2.5-pro,gemini-1.5-pro,gemini-2.5-flash,gemini-1.5-flash',
+            'gemini_model'    => 'required|string|in:gemini-3.5-flash-lite,gemini-flash-lite-latest,gemini-3.8-flash,gemini-3.1-pro-preview,gemini-2.5-pro,gemini-1.5-pro,gemini-2.5-flash,gemini-1.5-flash',
             'is_auto_analyze' => 'nullable|boolean',
         ]);
 

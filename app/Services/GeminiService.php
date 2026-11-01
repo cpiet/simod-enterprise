@@ -50,7 +50,7 @@ class GeminiService
             $model = config('services.gemini.model') ?: env('GEMINI_MODEL');
         }
 
-        return !empty(trim((string) $model)) ? trim((string) $model) : 'gemini-2.5-pro';
+        return !empty(trim((string) $model)) ? trim((string) $model) : 'gemini-3.5-flash-lite';
     }
 
     /**
@@ -74,7 +74,7 @@ class GeminiService
      */
     public function testConnection(?string $apiKey = null, ?string $model = null): array
     {
-        $model = $model ?: 'gemini-2.5-pro';
+        $model = $model ?: 'gemini-3.5-flash-lite';
         $apiKey = trim((string) $apiKey);
 
         if (empty($apiKey)) {
@@ -84,7 +84,17 @@ class GeminiService
             ];
         }
 
-        $modelsToTry = array_unique([$model, 'gemini-2.5-pro', 'gemini-1.5-pro', 'gemini-2.5-flash', 'gemini-1.5-flash']);
+        $modelsToTry = array_unique([
+            $model,
+            'gemini-3.5-flash-lite',
+            'gemini-flash-lite-latest',
+            'gemini-3.8-flash',
+            'gemini-3.1-pro-preview',
+            'gemini-2.5-pro',
+            'gemini-1.5-pro',
+            'gemini-2.5-flash',
+            'gemini-1.5-flash',
+        ]);
         $start = microtime(true);
         $lastError = 'Gagal menghubungi Google Gemini API';
 
@@ -127,8 +137,8 @@ class GeminiService
                 $errJson = $response->json();
                 $lastError = $errJson['error']['message'] ?? "HTTP {$response->status()}";
 
-                // If 404 model not found, try fallback model in the list
-                if ($response->status() === 404) {
+                // If 404 model not found or 429 quota exceeded, try fallback model in the list
+                if ($response->status() === 404 || $response->status() === 429) {
                     continue;
                 }
 
@@ -188,7 +198,17 @@ class GeminiService
             $basePromptTemplate
         );
 
-        $modelsToTry = array_unique([$model, 'gemini-2.5-pro', 'gemini-1.5-pro', 'gemini-2.5-flash', 'gemini-1.5-flash']);
+        $modelsToTry = array_unique([
+            $model,
+            'gemini-3.5-flash-lite',
+            'gemini-flash-lite-latest',
+            'gemini-3.8-flash',
+            'gemini-3.1-pro-preview',
+            'gemini-2.5-pro',
+            'gemini-1.5-pro',
+            'gemini-2.5-flash',
+            'gemini-1.5-flash',
+        ]);
         $start = microtime(true);
         $lastError = 'Gagal memproses analisis Gemini Pro';
 
@@ -240,8 +260,8 @@ class GeminiService
                     $errJson = $response->json();
                     $lastError = $errJson['error']['message'] ?? "HTTP {$response->status()}";
 
-                    // If model 404, try next model in list
-                    if ($response->status() === 404) {
+                    // If model 404 or 429 quota exceeded, try next model in list
+                    if ($response->status() === 404 || $response->status() === 429) {
                         continue;
                     }
                 }

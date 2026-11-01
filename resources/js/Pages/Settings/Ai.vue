@@ -285,10 +285,11 @@ const submitSettings = () => {
                 v-model="form.gemini_model"
                 class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
               >
-                <option value="gemini-2.5-pro">gemini-2.5-pro (Rekomendasi • Nalar Intelijen Paling Akurat & Mendalam)</option>
-                <option value="gemini-1.5-pro">gemini-1.5-pro (Stabil • Analisis Komprehensif & Cepat)</option>
-                <option value="gemini-2.5-flash">gemini-2.5-flash (Kecepatan Tinggi • Sangat Responsif)</option>
-                <option value="gemini-1.5-flash">gemini-1.5-flash (Ekonomis • Respon Kilat)</option>
+                <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite (Rekomendasi Utama &bull; Aktif ~800ms &bull; Kuota Bebas)</option>
+                <option value="gemini-flash-lite-latest">gemini-flash-lite-latest (Stabil &bull; Respon Kilat)</option>
+                <option value="gemini-3.8-flash">gemini-3.8-flash (Generasi Terbaru Flash)</option>
+                <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview (Nalar Intelijen Mendalam &bull; Pro)</option>
+                <option value="gemini-2.5-pro">gemini-2.5-pro (Akun Tier Khusus)</option>
               </select>
               <p class="text-[11px] text-slate-400 mt-1">
                 Sistem memiliki *automatic fallback* bertingkat jika model tertentu mengalami *rate limit*.
@@ -425,3 +426,4 @@ const submitSettings = () => {
     </div>
   </EnterpriseLayout>
 </template>
+
