@@ -49,6 +49,9 @@ import {
   Cpu,
   Settings,
   Key,
+  Pin,
+  Tag,
+  Edit3,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -58,6 +61,7 @@ const props = defineProps({
   earlyWarnings: Array,
   mediaFeeds: Array,
   sampleArticles: Array,
+  topics: { type: Array, default: () => [] },
   portalsList: Array,
   categoriesList: Array,
   report: Object,
@@ -164,6 +168,214 @@ const showBookmarksOnly = ref(false);
 const selectedSentiment = ref('all');
 const searchQuery = ref('');
 const toastMessage = ref('');
+
+// Smart Dossier & Topik Atensi Pimpinan States
+const selectedTopicId = ref(null);
+const showTopicModal = ref(false);
+const isEditingTopic = ref(false);
+const isSubmittingTopic = ref(false);
+const topicForm = ref({
+  id: null,
+  title: '',
+  keywords: '',
+  description: '',
+  priority: 'high',
+});
+
+const showTagModal = ref(false);
+const targetArticleForTag = ref(null);
+
+const showTopicAiModal = ref(false);
+const isAnalyzingTopic = ref(false);
+const topicAiResult = ref(null);
+const activeAnalyzingTopic = ref(null);
+const topicAiError = ref('');
+
+const currentSelectedTopic = computed(() => {
+  if (!selectedTopicId.value) return null;
+  return (props.topics || []).find((t) => t.id === selectedTopicId.value) || null;
+});
+
+const openCreateTopicModal = () => {
+  topicForm.value = {
+    id: null,
+    title: '',
+    keywords: '',
+    description: '',
+    priority: 'high',
+  };
+  isEditingTopic.value = false;
+  showTopicModal.value = true;
+};
+
+const openEditTopicModal = (topic) => {
+  topicForm.value = {
+    id: topic.id,
+    title: topic.title,
+    keywords: topic.keywords,
+    description: topic.description || '',
+    priority: topic.priority || 'high',
+  };
+  isEditingTopic.value = true;
+  showTopicModal.value = true;
+};
+
+const submitTopicForm = () => {
+  if (!topicForm.value.title.trim() || !topicForm.value.keywords.trim()) {
+    showToastNotification('Judul kasus dan kata kunci tidak boleh kosong!');
+    return;
+  }
+  isSubmittingTopic.value = true;
+
+  if (isEditingTopic.value) {
+    router.post(`/media-intelligence/topics/${topicForm.value.id}/update`, topicForm.value, {
+      preserveScroll: true,
+      onSuccess: () => {
+        showTopicModal.value = false;
+        isSubmittingTopic.value = false;
+        showToastNotification('Topik Atensi berhasil diperbarui!');
+      },
+      onError: () => {
+        isSubmittingTopic.value = false;
+      },
+    });
+  } else {
+    router.post('/media-intelligence/topics', {
+      ...topicForm.value,
+      polda_code: props.selectedCode,
+    }, {
+      preserveScroll: true,
+      onSuccess: () => {
+        showTopicModal.value = false;
+        isSubmittingTopic.value = false;
+        showToastNotification('Topik Atensi baru berhasil dibuat!');
+      },
+      onError: () => {
+        isSubmittingTopic.value = false;
+      },
+    });
+  }
+};
+
+const deleteTopic = (topic) => {
+  if (!confirm(`Hapus Topik Atensi "${topic.title}"?`)) return;
+  router.delete(`/media-intelligence/topics/${topic.id}`, {
+    preserveScroll: true,
+    onSuccess: () => {
+      if (selectedTopicId.value === topic.id) {
+        selectedTopicId.value = null;
+      }
+      showToastNotification('Topik Atensi berhasil dihapus.');
+    },
+  });
+};
+
+const openTagModal = (article) => {
+  targetArticleForTag.value = article;
+  showTagModal.value = true;
+};
+
+const toggleArticleTopic = async (topicId) => {
+  if (!targetArticleForTag.value) return;
+  const art = targetArticleForTag.value;
+  try {
+    const res = await axios.post(`/media-intelligence/articles/${art.id}/toggle-topic`, {
+      topic_id: topicId,
+    });
+    if (res.data?.success) {
+      if (!art.manual_topic_ids) art.manual_topic_ids = [];
+      if (!art.matched_topic_ids) art.matched_topic_ids = [];
+      if (!art.matched_topics) art.matched_topics = [];
+
+      const tIdx = art.manual_topic_ids.indexOf(topicId);
+      const topObj = (props.topics || []).find(t => t.id === topicId);
+
+      if (res.data.is_tagged) {
+        if (tIdx === -1) art.manual_topic_ids.push(topicId);
+        if (!art.matched_topic_ids.includes(topicId)) art.matched_topic_ids.push(topicId);
+        if (topObj && !art.matched_topics.some(t => t.id === topicId)) {
+          art.matched_topics.push({ id: topObj.id, title: topObj.title, priority: topObj.priority });
+        }
+      } else {
+        if (tIdx !== -1) art.manual_topic_ids.splice(tIdx, 1);
+        const isKeywordMatch = topObj ? (topObj.keywords_array || []).some(k => (art.title + ' ' + art.summary).toLowerCase().includes(k)) : false;
+        if (!isKeywordMatch) {
+          const mIdx = art.matched_topic_ids.indexOf(topicId);
+          if (mIdx !== -1) art.matched_topic_ids.splice(mIdx, 1);
+          art.matched_topics = art.matched_topics.filter(t => t.id !== topicId);
+        }
+      }
+      showToastNotification(res.data.message || 'Status kaitan topik diperbarui.');
+    }
+  } catch (err) {
+    showToastNotification('Gagal mengaitkan artikel ke topik.');
+  }
+};
+
+const runTopicAiAnalysis = async (topic) => {
+  if (!topic) return;
+  activeAnalyzingTopic.value = topic;
+  isAnalyzingTopic.value = true;
+  topicAiError.value = '';
+  topicAiResult.value = null;
+  showTopicAiModal.value = true;
+
+  try {
+    const res = await axios.post(`/media-intelligence/topics/${topic.id}/analyze-ai`);
+    if (res.data?.success) {
+      topicAiResult.value = res.data.analysis;
+    } else {
+      topicAiError.value = res.data?.message || 'Gagal memproses analisis AI kasus ini.';
+    }
+  } catch (err) {
+    topicAiError.value = err.response?.data?.message || 'Terjadi kendala saat menghubungi Google Gemini API.';
+  } finally {
+    isAnalyzingTopic.value = false;
+  }
+};
+
+const copyTopicWaScript = (topic) => {
+  if (!topic) return;
+  const matched = (props.sampleArticles || []).filter(a => (a.matched_topic_ids || []).includes(topic.id));
+  const isDiv = props.selectedCode === 'ALL' || props.selectedCode === 'DIVHUMAS';
+  const tz = isDiv ? 'WIB' : 'WITA';
+  const nowStr = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' ' + tz;
+
+  let s = `*LAPORAN INTELIJEN MEDIA — ATENSI KHUSUS PIMPINAN*\n`;
+  s += `*SATUAN:* ${isDiv ? 'DIVISI HUMAS POLRI (MABES POLRI)' : (props.selectedPolda?.name?.toUpperCase() || 'POLDA')}\n`;
+  s += `*WAKTU PEMANTAUAN:* ${nowStr}, Pukul ${timeStr}\n\n`;
+  s += `*KASUS / ISU ATENSI:* ${topic.title.toUpperCase()}\n`;
+  s += `*TINGKAT PRIORITAS:* ${topic.priority.toUpperCase()}\n`;
+  if (topic.description) {
+    s += `*ARAHAN & CATATAN PIMPINAN:*\n"${topic.description}"\n\n`;
+  }
+  s += `*KATA KUNCI PANTAUKAN:* ${topic.keywords}\n`;
+  s += `*VOLUME PEMBERITAAN:* ${matched.length} Berita Terkumpul\n\n`;
+
+  s += `*REKAPITULASI BERITA TERKINI:*\n`;
+  if (matched.length === 0) {
+    s += `Belum ditemukan pemberitaan baru pada pantauan 24 jam terakhir.\n\n`;
+  } else {
+    matched.slice(0, 8).forEach((a, i) => {
+      s += `${i + 1}. [${a.source_name}] *${a.title}*\n   Waktu: ${a.pub_date || a.time_ago} | Sentimen: ${(a.sentiment || 'NETRAL').toUpperCase()}\n   Link: ${a.link}\n\n`;
+    });
+  }
+
+  s += `*REKOMENDASI STRATEGIS HUMAS POLRI:*\n`;
+  s += `1. Pastikan juru bicara resmi satu pintu menyampaikan data berbasis fakta objektif dan progres nyata.\n`;
+  s += `2. Siapkan infografis / materi counter narasi untuk menangkal disinformasi di media sosial.\n`;
+  s += `3. Lakukan koordinasi proaktif dengan pilar kewilayahan dan stakeholder eksternal terkait.\n\n`;
+  s += `Demikian laporan khusus perkembangan kasus ini kami sampaikan. Mohon petunjuk dan arahan lebih lanjut, Jenderal.\n\n`;
+  s += `*Hormat kami,*\n*Tim Analisis Intelijen Media Humas Polri*`;
+
+  copyText(s, `Naskah WhatsApp Atensi "${topic.title}"`);
+};
+
+const copyAiWaScript = () => {
+  if (!topicAiResult.value?.whatsapp_script) return;
+  copyText(topicAiResult.value.whatsapp_script, 'Naskah WhatsApp Resmi Hasil Analisis AI');
+};
 
 // Modal state for viewing/copying prompt manually
 const showPromptModal = ref(false);
@@ -717,6 +929,11 @@ const filteredArticles = computed(() => {
     list = list.filter((a) => (a.title && a.title.toLowerCase().includes(q)) || (a.summary && a.summary.toLowerCase().includes(q)));
   }
 
+  // Filter Topik Atensi Pimpinan (Smart Dossier)
+  if (selectedTopicId.value) {
+    list = list.filter((a) => (a.matched_topic_ids || []).includes(selectedTopicId.value));
+  }
+
   return list;
 });
 
@@ -1050,6 +1267,201 @@ const submitIssue = () => {
         </div>
       </div>
 
+      <!-- SMART DOSSIER: TOPIK ATENSI & REQUEST PIMPINAN -->
+      <div class="rounded-3xl bg-[#0b1426] border border-amber-500/30 p-5 shadow-2xl space-y-4">
+        <!-- Top Bar: Title & Action -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+          <div class="space-y-0.5">
+            <div class="flex items-center gap-2">
+              <span class="flex h-2.5 w-2.5 relative">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+              </span>
+              <h3 class="text-sm md:text-base font-extrabold text-white flex items-center gap-1.5">
+                <span>Topik Atensi &amp; Request Pimpinan</span>
+                <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                  Smart Dossier
+                </span>
+              </h3>
+            </div>
+            <p class="text-[11px] text-slate-400">
+              Penyaringan kasus viral / atensi khusus Kapolda &amp; Kadiv Humas berbasis pencocokan kata kunci otomatis dan tagging manual.
+            </p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button
+              @click="openCreateTopicModal"
+              class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:brightness-110 text-slate-950 text-xs font-black shadow-md shadow-amber-500/20 transition cursor-pointer select-none"
+            >
+              <PlusCircle class="w-3.5 h-3.5" />
+              <span>+ Buat Topik Atensi</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter Pills Bar (Semua, Bookmark, Topik 1, Topik 2...) -->
+        <div class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          <!-- All News Pill -->
+          <button
+            @click="selectedTopicId = null; showBookmarksOnly = false; currentPage = 1"
+            class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+            :class="selectedTopicId === null && !showBookmarksOnly
+              ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
+              : 'bg-slate-900 text-slate-300 hover:text-white border border-slate-800'"
+          >
+            <Globe class="w-3.5 h-3.5" />
+            <span>Semua Berita</span>
+            <span class="text-[10px] px-1.5 py-0.2 rounded-full" :class="selectedTopicId === null && !showBookmarksOnly ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-slate-400'">
+              {{ sampleArticles?.length || 0 }}
+            </span>
+          </button>
+
+          <!-- Bookmarked Pill -->
+          <button
+            @click="showBookmarksOnly = true; selectedTopicId = null; currentPage = 1"
+            class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+            :class="showBookmarksOnly && selectedTopicId === null
+              ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
+              : 'bg-slate-900 text-slate-300 hover:text-white border border-slate-800'"
+          >
+            <Bookmark class="w-3.5 h-3.5" :class="showBookmarksOnly && selectedTopicId === null ? 'text-slate-950' : 'text-amber-400'" />
+            <span>Disimpan</span>
+            <span class="text-[10px] px-1.5 py-0.2 rounded-full" :class="showBookmarksOnly && selectedTopicId === null ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-slate-400'">
+              {{ bookmarkedIds.length }}
+            </span>
+          </button>
+
+          <div class="h-5 border-r border-slate-800 mx-1"></div>
+
+          <!-- Dynamic Topic Pills -->
+          <div
+            v-for="t in topics"
+            :key="t.id"
+            class="flex items-center shrink-0"
+          >
+            <button
+              @click="selectedTopicId = (selectedTopicId === t.id ? null : t.id); showBookmarksOnly = false; currentPage = 1"
+              class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap cursor-pointer border"
+              :class="selectedTopicId === t.id
+                ? 'bg-amber-400 text-slate-950 font-black border-amber-400 shadow-md'
+                : t.priority === 'urgent'
+                  ? 'bg-rose-950/40 text-rose-200 border-rose-500/40 hover:border-rose-400'
+                  : 'bg-slate-900 text-slate-200 border-slate-800 hover:border-slate-700'"
+            >
+              <span
+                class="w-2 h-2 rounded-full"
+                :class="selectedTopicId === t.id
+                  ? 'bg-slate-950'
+                  : t.priority === 'urgent' ? 'bg-rose-500 animate-pulse' : 'bg-amber-400'"
+              ></span>
+              <span class="truncate max-w-[190px]">{{ t.title }}</span>
+              <span
+                class="text-[10px] px-1.5 py-0.2 rounded-full font-mono font-extrabold"
+                :class="selectedTopicId === t.id
+                  ? 'bg-slate-950 text-amber-400'
+                  : t.priority === 'urgent' ? 'bg-rose-500/30 text-rose-300' : 'bg-slate-800 text-slate-300'"
+              >
+                {{ t.articles_count || 0 }}
+              </span>
+            </button>
+          </div>
+
+          <span v-if="topics.length === 0" class="text-xs text-slate-500 italic px-2">
+            Belum ada topik atensi aktif. Klik "+ Buat Topik Atensi" untuk memantau kasus request pimpinan.
+          </span>
+        </div>
+
+        <!-- Dossier Detail Bar (Muncul saat Topik Dipilih) -->
+        <div
+          v-if="currentSelectedTopic"
+          class="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-900/90 to-slate-900 border border-amber-500/40 space-y-3"
+        >
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span
+                  class="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider"
+                  :class="currentSelectedTopic.priority === 'urgent' ? 'bg-rose-500 text-white' : 'bg-amber-400 text-slate-950'"
+                >
+                  {{ currentSelectedTopic.priority === 'urgent' ? '🚨 SANGAT MENDESAK' : '⭐ PRIORITAS TINGGI' }}
+                </span>
+                <h4 class="text-sm font-black text-white">
+                  {{ currentSelectedTopic.title }}
+                </h4>
+                <span class="text-[10px] text-amber-400 font-mono font-bold">
+                  ({{ currentSelectedTopic.articles_count || 0 }} Berita Terkait)
+                </span>
+              </div>
+              <p v-if="currentSelectedTopic.description" class="text-xs text-slate-300 italic leading-relaxed">
+                "{{ currentSelectedTopic.description }}"
+              </p>
+              <!-- Keywords Tags -->
+              <div class="flex items-center gap-1.5 flex-wrap pt-1">
+                <span class="text-[10px] text-slate-400 font-bold">Kata Kunci Pantau:</span>
+                <span
+                  v-for="kw in (currentSelectedTopic.keywords_array || [])"
+                  :key="kw"
+                  class="px-2 py-0.5 rounded-md text-[9px] font-mono bg-slate-800 text-slate-300 border border-slate-700"
+                >
+                  #{{ kw }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Action Buttons for Selected Topic -->
+            <div class="flex items-center gap-2 shrink-0 flex-wrap">
+              <!-- AI Analysis Button -->
+              <button
+                @click="runTopicAiAnalysis(currentSelectedTopic)"
+                class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-md transition cursor-pointer"
+                title="Jalankan analisis AI khusus untuk seluruh berita dalam kasus ini"
+              >
+                <Zap class="w-3.5 h-3.5 fill-slate-950" />
+                <span>⚡ Analisis Kasus Ini</span>
+              </button>
+
+              <!-- WhatsApp Report Button -->
+              <button
+                @click="copyTopicWaScript(currentSelectedTopic)"
+                class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition cursor-pointer"
+                title="Salin Naskah WhatsApp Laporan Khusus Pimpinan"
+              >
+                <MessageSquare class="w-3.5 h-3.5" />
+                <span>📱 Salin Naskah WA</span>
+              </button>
+
+              <!-- Edit Topic -->
+              <button
+                @click="openEditTopicModal(currentSelectedTopic)"
+                class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
+                title="Edit Topik & Kata Kunci"
+              >
+                <Edit3 class="w-3.5 h-3.5" />
+              </button>
+
+              <!-- Delete Topic -->
+              <button
+                @click="deleteTopic(currentSelectedTopic)"
+                class="p-2 rounded-xl bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-500/50 transition cursor-pointer"
+                title="Hapus Topik"
+              >
+                <Trash2 class="w-3.5 h-3.5" />
+              </button>
+
+              <!-- Close Topic Filter -->
+              <button
+                @click="selectedTopicId = null; currentPage = 1"
+                class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-400 hover:text-white border border-slate-700 transition cursor-pointer"
+                title="Tutup Filter Topik"
+              >
+                ✕ Kembali
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- FILTER TOOLBAR (PERSIS TAMPILAN GAMBAR 1) -->
       <div class="p-4 rounded-2xl bg-[#0b1426] border border-slate-800/90 shadow-xl flex flex-wrap items-center gap-3">
         <!-- Portal Dropdown -->
@@ -1217,10 +1629,23 @@ const submitIssue = () => {
             <!-- Card Body Content -->
             <div class="p-5 flex-1 flex flex-col justify-between space-y-3">
               <div class="space-y-2">
-                <!-- Category Badge -->
-                <div class="flex items-center gap-2 pt-1">
+                <!-- Category Badge & Topic Atensi Badges -->
+                <div class="flex flex-wrap items-center gap-1.5 pt-1">
                   <span class="px-2.5 py-0.5 rounded-md text-[9px] font-extrabold uppercase bg-slate-900/90 text-slate-300 border border-slate-700/80 tracking-wider">
                     {{ article.category_badge || article.category || (isDivhumas ? 'NASIONAL & MABES' : 'REGIONAL') }}
+                  </span>
+                  <!-- Topic Dossier Badges -->
+                  <span
+                    v-for="top in (article.matched_topics || [])"
+                    :key="top.id"
+                    class="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider flex items-center gap-1 border shadow-xs"
+                    :class="top.priority === 'urgent'
+                      ? 'bg-rose-500/20 text-rose-300 border-rose-500/50'
+                      : 'bg-amber-400/20 text-amber-300 border-amber-400/40'"
+                    :title="'Topik Atensi: ' + top.title"
+                  >
+                    <span>📌</span>
+                    <span class="truncate max-w-[140px]">{{ top.title }}</span>
                   </span>
                 </div>
 
@@ -1277,6 +1702,16 @@ const submitIssue = () => {
                     <Check v-if="isBookmarked(article.id)" class="w-3.5 h-3.5 text-slate-950" />
                     <Copy v-else class="w-3.5 h-3.5 text-amber-400" />
                     <span>{{ isBookmarked(article.id) ? '★ Tersimpan' : '🔖 Simpan' }}</span>
+                  </button>
+
+                  <!-- Tag Kasus Atensi Pimpinan -->
+                  <button
+                    @click.stop="openTagModal(article)"
+                    class="px-2.5 py-1.5 rounded-full text-xs font-bold transition flex items-center gap-1 shadow-sm border bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-amber-400 border-slate-700 cursor-pointer"
+                    title="Kaitkan atau lepaskan berita ini dari Topik Atensi Pimpinan"
+                  >
+                    <span>📌</span>
+                    <span class="hidden sm:inline">Tag</span>
                   </button>
 
                   <!-- Buat Isu -->
@@ -1375,7 +1810,7 @@ const submitIssue = () => {
           Coba ganti pilihan portal, ubah kategori, atau klik tombol "Sinkron Berita" untuk menarik berita terkini dari seluruh portal.
         </p>
         <button
-          @click="selectedPortal = 'Semua Portal'; selectedCategory = 'all'; showBookmarksOnly = false; selectedSentiment = 'all'; searchQuery = ''"
+          @click="selectedPortal = 'Semua Portal'; selectedCategory = 'all'; showBookmarksOnly = false; selectedSentiment = 'all'; searchQuery = ''; selectedTopicId = null"
           class="px-4 py-2 rounded-xl bg-amber-400 text-slate-950 font-black text-xs"
         >
           Reset Semua Filter
@@ -2533,6 +2968,393 @@ const submitIssue = () => {
               <span>Salin Teks ke Clipboard</span>
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- MODAL 5: BUAT / EDIT TOPIK ATENSI PIMPINAN (SMART DOSSIER)                -->
+    <!-- ========================================================================= -->
+    <div
+      v-if="showTopicModal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+    >
+      <div class="w-full max-w-xl rounded-3xl bg-[#0b1426] border border-amber-400/50 shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">📌</span>
+            <div>
+              <h3 class="text-base font-extrabold text-white">
+                {{ isEditingTopic ? 'Edit Topik Atensi Pimpinan' : 'Daftarkan Topik Atensi Pimpinan (Smart Dossier)' }}
+              </h3>
+              <p class="text-xs text-slate-400">Kasus khusus atau permintaan pimpinan yang memerlukan pemantauan intensif</p>
+            </div>
+          </div>
+          <button @click="showTopicModal = false" class="text-slate-400 hover:text-white cursor-pointer">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+
+        <form @submit.prevent="submitTopicForm" class="space-y-4 text-xs">
+          <!-- Judul Kasus -->
+          <div class="space-y-1">
+            <label class="block font-bold text-slate-200">Judul Kasus / Isu Atensi *</label>
+            <input
+              v-model="topicForm.title"
+              type="text"
+              required
+              placeholder="Contoh: Penggeledahan Ponpes di Sukoharjo & Respon Komnas HAM"
+              class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-semibold focus:outline-none focus:border-amber-400"
+            />
+          </div>
+
+          <!-- Kata Kunci Pantau -->
+          <div class="space-y-1">
+            <label class="block font-bold text-slate-200">Kata Kunci Pantauan Otomatis (Keywords) *</label>
+            <textarea
+              v-model="topicForm.keywords"
+              rows="3"
+              required
+              placeholder="Contoh: pesantren, ponpes, sukoharjo, karanganyar, komnas ham, penggeledahan"
+              class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono focus:outline-none focus:border-amber-400"
+            ></textarea>
+            <p class="text-[10px] text-slate-400">
+              💡 Pisahkan dengan koma. Setiap berita dari 22/29 portal yang memuat kata kunci ini akan otomatis masuk ke dalam topik ini.
+            </p>
+          </div>
+
+          <!-- Tingkat Prioritas -->
+          <div class="space-y-1">
+            <label class="block font-bold text-slate-200">Tingkat Prioritas</label>
+            <select
+              v-model="topicForm.priority"
+              class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-bold focus:outline-none focus:border-amber-400"
+            >
+              <option value="urgent">🔴 Sangat Mendesak / Viral (Atensi Pimpinan Utama)</option>
+              <option value="high">🟡 Prioritas Tinggi (Potensi Eskalasi Negatif)</option>
+              <option value="medium">🔵 Sedang (Monitoring Rutin)</option>
+              <option value="low">⚪ Rendah / Arsip</option>
+            </select>
+          </div>
+
+          <!-- Arahan Pimpinan / Catatan Khusus -->
+          <div class="space-y-1">
+            <label class="block font-bold text-slate-200">Arahan Khusus &amp; Catatan Pimpinan (Opsional)</label>
+            <textarea
+              v-model="topicForm.description"
+              rows="3"
+              placeholder="Contoh: Atensi Kadiv Humas Polri: Pantau intensitas kritik eksternal, siapkan rilis klarifikasi transparan, dan koordinasi dengan Bidpropam Polda Jateng."
+              class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 focus:outline-none focus:border-amber-400"
+            ></textarea>
+          </div>
+
+          <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+            <button
+              type="button"
+              @click="showTopicModal = false"
+              class="px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 hover:text-white"
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              :disabled="isSubmittingTopic"
+              class="flex items-center gap-2 px-5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black transition disabled:opacity-50 cursor-pointer shadow-lg shadow-amber-400/20"
+            >
+              <Check class="w-4 h-4" />
+              <span>{{ isSubmittingTopic ? 'Menyimpan...' : (isEditingTopic ? 'Simpan Perubahan' : 'Daftarkan Topik') }}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- MODAL 6: TAGGING KASUS (KAITKAN BERITA KE TOPIK ATENSI)                   -->
+    <!-- ========================================================================= -->
+    <div
+      v-if="showTagModal && targetArticleForTag"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+    >
+      <div class="w-full max-w-lg rounded-3xl bg-[#0b1426] border border-slate-700 shadow-2xl p-6 space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">📌</span>
+            <div>
+              <h3 class="text-base font-extrabold text-white">Kaitkan Berita ke Topik Atensi</h3>
+              <p class="text-xs text-slate-400">Pilih topik kasus untuk mengaitkan atau melepas berita ini</p>
+            </div>
+          </div>
+          <button @click="showTagModal = false" class="text-slate-400 hover:text-white cursor-pointer">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+
+        <!-- Article Summary Box -->
+        <div class="p-3 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1">
+          <span class="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-slate-800 text-amber-400">
+            {{ targetArticleForTag.source_name }} &bull; {{ targetArticleForTag.category }}
+          </span>
+          <h4 class="text-xs font-bold text-white leading-snug">
+            {{ targetArticleForTag.title }}
+          </h4>
+        </div>
+
+        <!-- Topics List Checklist -->
+        <div class="space-y-2 max-h-64 overflow-y-auto pr-1">
+          <div
+            v-for="t in topics"
+            :key="t.id"
+            class="p-3 rounded-xl border flex items-center justify-between gap-3 transition"
+            :class="(targetArticleForTag.matched_topic_ids || []).includes(t.id)
+              ? 'bg-amber-400/10 border-amber-400/60 text-white'
+              : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'"
+          >
+            <div class="space-y-0.5 min-w-0">
+              <div class="flex items-center gap-2">
+                <span
+                  class="w-2 h-2 rounded-full shrink-0"
+                  :class="t.priority === 'urgent' ? 'bg-rose-500' : 'bg-amber-400'"
+                ></span>
+                <span class="text-xs font-bold truncate">{{ t.title }}</span>
+              </div>
+              <p class="text-[10px] text-slate-400 truncate">
+                Kata kunci: {{ t.keywords }}
+              </p>
+            </div>
+
+            <button
+              @click="toggleArticleTopic(t.id)"
+              class="px-3 py-1.5 rounded-lg text-xs font-bold transition shrink-0 cursor-pointer"
+              :class="(targetArticleForTag.matched_topic_ids || []).includes(t.id)
+                ? 'bg-emerald-500 text-white font-black'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'"
+            >
+              {{ (targetArticleForTag.matched_topic_ids || []).includes(t.id) ? '✓ Terkait' : '+ Kaitkan' }}
+            </button>
+          </div>
+
+          <div v-if="topics.length === 0" class="text-center py-6 text-xs text-slate-500">
+            Belum ada topik atensi aktif. Buat topik atensi baru terlebih dahulu.
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end pt-3 border-t border-slate-800">
+          <button
+            @click="showTagModal = false"
+            class="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs cursor-pointer shadow-md"
+          >
+            Selesai
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- MODAL 7: HASIL ANALISIS AI KHUSUS TOPIK ATENSI (GEMINI PRO)               -->
+    <!-- ========================================================================= -->
+    <div
+      v-if="showTopicAiModal && activeAnalyzingTopic"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
+    >
+      <div class="w-full max-w-4xl rounded-3xl bg-[#0b1426] border border-amber-400/50 shadow-2xl p-6 md:p-8 space-y-6 max-h-[90vh] overflow-y-auto">
+        <!-- Modal Header -->
+        <div class="flex items-start justify-between border-b border-slate-800 pb-4">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950">
+                Google Gemini Pro
+              </span>
+              <span
+                class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider"
+                :class="activeAnalyzingTopic.priority === 'urgent' ? 'bg-rose-500 text-white' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'"
+              >
+                {{ activeAnalyzingTopic.priority === 'urgent' ? '🚨 Kasus Sangat Mendesak' : '⭐ Prioritas Tinggi' }}
+              </span>
+            </div>
+            <h2 class="text-lg md:text-xl font-black text-white">
+              Hasil Analisis Intelijen Kasus: {{ activeAnalyzingTopic.title }}
+            </h2>
+            <p class="text-xs text-slate-400">
+              Analisis mendalam pemberitaan siber, asesmen risiko kamtibmas, talking points, dan naskah WhatsApp pimpinan.
+            </p>
+          </div>
+          <button @click="showTopicAiModal = false" class="text-slate-400 hover:text-white cursor-pointer">
+            <X class="w-6 h-6" />
+          </button>
+        </div>
+
+        <!-- Loading State -->
+        <div v-if="isAnalyzingTopic" class="py-16 flex flex-col items-center justify-center text-center space-y-4">
+          <div class="relative w-16 h-16 flex items-center justify-center">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-30"></span>
+            <div class="w-12 h-12 rounded-full border-3 border-amber-400 border-t-transparent animate-spin"></div>
+            <Zap class="w-6 h-6 text-amber-400 absolute" />
+          </div>
+          <div class="space-y-1">
+            <h4 class="text-sm font-black text-white">Mesin AI Sedang Menganalisis Seluruh Berita Kasus Ini...</h4>
+            <p class="text-xs text-slate-400 max-w-md">
+              Mengekstrak isu krusial, menghitung polarisasi sentimen, memetakan potensi risiko jika tidak dimitigasi, serta merancang naskah resmi kepolisian.
+            </p>
+          </div>
+        </div>
+
+        <!-- Error State -->
+        <div v-else-if="topicAiError" class="p-4 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-200 text-xs space-y-2">
+          <div class="flex items-center gap-2 font-bold text-rose-300">
+            <AlertTriangle class="w-4 h-4" />
+            <span>Kendala Analisis AI</span>
+          </div>
+          <p>{{ topicAiError }}</p>
+          <button
+            @click="runTopicAiAnalysis(activeAnalyzingTopic)"
+            class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs"
+          >
+            Coba Ulangi Analisis
+          </button>
+        </div>
+
+        <!-- Analysis Content Result -->
+        <div v-else-if="topicAiResult" class="space-y-6">
+          <!-- 1. Executive Summary -->
+          <div class="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+            <div class="flex items-center gap-2 text-amber-400 font-bold text-xs">
+              <FileText class="w-4 h-4" />
+              <span class="uppercase tracking-wider">1. Ringkasan Eksekutif Perkembangan Kasus</span>
+            </div>
+            <p class="text-xs md:text-sm text-slate-200 leading-relaxed whitespace-pre-line">
+              {{ topicAiResult.executive_summary }}
+            </p>
+          </div>
+
+          <!-- 2. Risk Assessment (Potensi Dampak & Risiko Kamtibmas) -->
+          <div class="p-5 rounded-2xl bg-rose-950/30 border border-rose-500/40 space-y-2">
+            <div class="flex items-center gap-2 text-rose-400 font-bold text-xs">
+              <AlertTriangle class="w-4 h-4" />
+              <span class="uppercase tracking-wider">2. Potensi Dampak &amp; Risiko Jika Tidak Dimitigasi</span>
+            </div>
+            <p class="text-xs md:text-sm text-slate-200 leading-relaxed whitespace-pre-line">
+              {{ topicAiResult.risk_assessment }}
+            </p>
+          </div>
+
+          <!-- 3. Sentiment & Framing Analysis -->
+          <div class="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                <Zap class="w-4 h-4 text-amber-400" />
+                <span>3. Polarisasi Sentimen &amp; Sudut Pandang Media</span>
+              </span>
+              <span
+                class="px-2.5 py-0.5 rounded text-[10px] font-black uppercase"
+                :class="topicAiResult.sentiment_analysis?.dominant_sentiment === 'negatif' ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'"
+              >
+                Sentimen Dominan: {{ (topicAiResult.sentiment_analysis?.dominant_sentiment || 'Netral').toUpperCase() }}
+              </span>
+            </div>
+
+            <!-- Sentiment Percentages Bar -->
+            <div class="grid grid-cols-3 gap-3">
+              <div class="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center">
+                <span class="text-[10px] font-bold text-emerald-400 uppercase">Positif</span>
+                <div class="text-xl font-black text-emerald-300">{{ topicAiResult.sentiment_analysis?.positif || 0 }}%</div>
+              </div>
+              <div class="p-3 rounded-xl bg-sky-500/10 border border-sky-500/30 text-center">
+                <span class="text-[10px] font-bold text-sky-400 uppercase">Netral</span>
+                <div class="text-xl font-black text-sky-300">{{ topicAiResult.sentiment_analysis?.netral || 0 }}%</div>
+              </div>
+              <div class="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-center">
+                <span class="text-[10px] font-bold text-rose-400 uppercase">Negatif</span>
+                <div class="text-xl font-black text-rose-300">{{ topicAiResult.sentiment_analysis?.negatif || 0 }}%</div>
+              </div>
+            </div>
+
+            <p v-if="topicAiResult.sentiment_analysis?.framing_media" class="text-xs text-slate-300 leading-relaxed bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <strong>Framing Media &amp; Netizen:</strong> {{ topicAiResult.sentiment_analysis.framing_media }}
+            </p>
+          </div>
+
+          <!-- 4. Talking Points (Poin Klarifikasi Resmi) -->
+          <div v-if="topicAiResult.talking_points?.length" class="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+            <div class="flex items-center gap-2 text-sky-400 font-bold text-xs">
+              <Award class="w-4 h-4" />
+              <span class="uppercase tracking-wider">4. Poin-Poin Klarifikasi Resmi (Talking Points Juru Bicara)</span>
+            </div>
+            <ul class="space-y-2 text-xs text-slate-200">
+              <li
+                v-for="(tp, i) in topicAiResult.talking_points"
+                :key="i"
+                class="flex items-start gap-2.5 bg-slate-950/80 p-3 rounded-xl border border-slate-800"
+              >
+                <span class="w-5 h-5 rounded-full bg-sky-500/20 text-sky-300 font-black flex items-center justify-center shrink-0 text-[10px]">
+                  {{ i + 1 }}
+                </span>
+                <span class="leading-relaxed">{{ tp }}</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- 5. Action Recommendations Timeline -->
+          <div v-if="topicAiResult.action_recommendations?.length" class="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+            <div class="flex items-center gap-2 text-emerald-400 font-bold text-xs">
+              <Clock class="w-4 h-4" />
+              <span class="uppercase tracking-wider">5. Rekomendasi Garis Waktu Tindak Lanjut</span>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div
+                v-for="(rec, i) in topicAiResult.action_recommendations"
+                :key="i"
+                class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2"
+              >
+                <span class="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-amber-400 text-slate-950">
+                  {{ rec.timeframe }}
+                </span>
+                <p class="text-xs text-slate-200 leading-snug">{{ rec.action }}</p>
+                <span class="text-[10px] font-bold text-slate-400 block pt-1 border-t border-slate-800">
+                  PIC: {{ rec.pic }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 6. WhatsApp Script (Naskah Siap Kirim) -->
+          <div class="p-5 rounded-2xl bg-emerald-950/30 border border-emerald-500/40 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
+                <MessageSquare class="w-4 h-4" />
+                <span>6. Naskah WhatsApp Laporan Khusus Pimpinan (Siap Kirim)</span>
+              </span>
+              <button
+                @click="copyAiWaScript"
+                class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-md transition cursor-pointer"
+              >
+                <Copy class="w-3.5 h-3.5" />
+                <span>Salin Naskah WA</span>
+              </button>
+            </div>
+
+            <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-emerald-300 whitespace-pre-line leading-relaxed max-h-72 overflow-y-auto">
+              {{ topicAiResult.whatsapp_script }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer Actions -->
+        <div class="flex items-center justify-end gap-2 pt-4 border-t border-slate-800">
+          <button
+            @click="showTopicAiModal = false"
+            class="px-5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold cursor-pointer"
+          >
+            Tutup
+          </button>
+          <button
+            v-if="topicAiResult?.whatsapp_script"
+            @click="copyAiWaScript"
+            class="flex items-center gap-2 px-5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition cursor-pointer shadow-lg shadow-amber-400/20"
+          >
+            <Copy class="w-4 h-4" />
+            <span>Salin Naskah WA Pimpinan</span>
+          </button>
         </div>
       </div>
     </div>

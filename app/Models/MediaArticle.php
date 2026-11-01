@@ -37,4 +37,10 @@ class MediaArticle extends Model
     {
         return $this->belongsTo(MediaFeed::class, 'feed_id');
     }
+
+    public function manualTopics(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(MediaTopic::class, 'media_article_topic', 'media_article_id', 'media_topic_id')
+            ->withTimestamps();
+    }
 }

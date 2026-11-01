@@ -266,7 +266,9 @@ class EnterpriseDatabaseSeeder extends Seeder
             ],
         ]);
 
-        // Seed 29 RSS Sources Resmi Terorganisir untuk Polda Sulbar
+        // Seed 29 RSS Sources Resmi Terorganisir untuk Polda Sulbar & 22 Feed Nasional Divhumas
         $this->call(SulbarRssFeedsSeeder::class);
+        $this->call(DivhumasNationalRssFeedsSeeder::class);
+        $this->call(MediaTopicsSeeder::class);
     }
 }

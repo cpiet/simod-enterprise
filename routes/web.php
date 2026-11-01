@@ -32,6 +32,13 @@ Route::post('/media-intelligence/analyze-gemini', [MediaIntelligenceController::
 Route::post('/media-intelligence/gemini-settings', [MediaIntelligenceController::class, 'updateGeminiSettings'])->name('media-intelligence.gemini.settings');
 Route::post('/media-intelligence/gemini-test', [MediaIntelligenceController::class, 'testGeminiConnection'])->name('media-intelligence.gemini.test');
 
+// Smart Dossier & Topik Atensi Pimpinan
+Route::post('/media-intelligence/topics', [MediaIntelligenceController::class, 'storeTopic'])->name('media-intelligence.topics.store');
+Route::post('/media-intelligence/topics/{id}/update', [MediaIntelligenceController::class, 'updateTopic'])->name('media-intelligence.topics.update');
+Route::delete('/media-intelligence/topics/{id}', [MediaIntelligenceController::class, 'deleteTopic'])->name('media-intelligence.topics.delete');
+Route::post('/media-intelligence/articles/{id}/toggle-topic', [MediaIntelligenceController::class, 'toggleArticleTopic'])->name('media-intelligence.articles.toggle-topic');
+Route::post('/media-intelligence/topics/{id}/analyze-ai', [MediaIntelligenceController::class, 'analyzeTopicAi'])->name('media-intelligence.topics.analyze-ai');
+
 // Social Media Intelligence Radar
 Route::get('/social-intelligence', [SocialIntelligenceController::class, 'index'])->name('social-intelligence.index');
 Route::post('/social-intelligence/{id}/bookmark', [SocialIntelligenceController::class, 'toggleBookmark'])->name('social-intelligence.bookmark');

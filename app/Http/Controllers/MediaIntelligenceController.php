@@ -8,6 +8,7 @@ use App\Models\Issue;
 use App\Models\MediaArticle;
 use App\Models\MediaFeed;
 use App\Models\MediaIntelligenceReport;
+use App\Models\MediaTopic;
 use App\Models\Polda;
 use App\Models\Polres;
 use App\Models\PressRelease;
@@ -16,6 +17,7 @@ use App\Services\RssFeedService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -42,6 +44,10 @@ class MediaIntelligenceController extends Controller
                 $selectedPolda = $allPoldas->first();
                 $selectedCode = $selectedPolda->code;
             }
+        }
+
+        if (!$selectedPolda) {
+            $selectedPolda = $allPoldas->first() ?? Polda::first();
         }
 
         // Active Polda ID fallback
@@ -85,6 +91,12 @@ class MediaIntelligenceController extends Controller
             }
         }
 
+        // Load active Media Topics (Smart Dossier Atensi Pimpinan)
+        $dbTopics = MediaTopic::where('polda_id', $poldaId)
+            ->where('status', 'active')
+            ->latest()
+            ->get();
+
         // Load articles from database (up to 1,500 latest articles)
         $dbArticles = MediaArticle::where('polda_id', $poldaId)
             ->latest('pub_date')
@@ -92,21 +104,79 @@ class MediaIntelligenceController extends Controller
             ->limit(1500)
             ->get();
 
-        // Format articles for frontend
-        $articles = $dbArticles->map(function ($a) {
+        $articleIds = $dbArticles->pluck('id')->toArray();
+        $manualArticleTopics = DB::table('media_article_topic')
+            ->whereIn('media_article_id', $articleIds)
+            ->get()
+            ->groupBy('media_article_id');
+
+        $topicsMap = [];
+        foreach ($dbTopics as $t) {
+            $topicsMap[$t->id] = [
+                'id'             => $t->id,
+                'title'          => $t->title,
+                'keywords'       => $t->keywords,
+                'keywords_array' => $t->getKeywordsArray(),
+                'description'    => $t->description,
+                'priority'       => $t->priority,
+                'status'         => $t->status,
+                'created_at'     => $t->created_at?->format('d M Y, H:i'),
+                'articles_count' => 0,
+            ];
+        }
+
+        // Format articles for frontend with topic matching
+        $articles = $dbArticles->map(function ($a) use (&$topicsMap, $manualArticleTopics) {
+            $manualTopicIds = $manualArticleTopics->get($a->id, collect())
+                ->pluck('media_topic_id')
+                ->map(fn($id) => (int)$id)
+                ->toArray();
+
+            $matchedTopicIds = [];
+            $matchedTopics = [];
+            $textToSearch = mb_strtolower($a->title . ' ' . $a->summary);
+
+            foreach ($topicsMap as $tId => &$tData) {
+                $isMatch = false;
+                if (in_array($tId, $manualTopicIds, true)) {
+                    $isMatch = true;
+                } else {
+                    foreach ($tData['keywords_array'] as $kw) {
+                        if ($kw !== '' && str_contains($textToSearch, $kw)) {
+                            $isMatch = true;
+                            break;
+                        }
+                    }
+                }
+
+                if ($isMatch) {
+                    $matchedTopicIds[] = $tId;
+                    $matchedTopics[] = [
+                        'id'       => $tId,
+                        'title'    => $tData['title'],
+                        'priority' => $tData['priority'],
+                    ];
+                    $tData['articles_count']++;
+                }
+            }
+            unset($tData);
+
             return [
-                'id'             => (string) $a->id,
-                'title'          => $a->title,
-                'source_name'    => strtoupper($a->source_name),
-                'category'       => $a->category,
-                'category_badge' => strtoupper($a->category),
-                'time_ago'       => $a->created_at ? $a->created_at->diffForHumans() : 'Baru saja',
-                'pub_date'       => $a->pub_date ? $a->pub_date->format('d M Y, H.i') . ' WITA' : now()->format('d M Y, H.i') . ' WITA',
-                'summary'        => $a->summary ?: 'Cuplikan berita pantauan intelijen media belum tersedia.',
-                'image_url'      => $a->image_url,
-                'link'           => $a->url,
-                'sentiment'      => $a->sentiment ?: 'netral',
-                'is_bookmarked'  => (bool) $a->is_bookmarked,
+                'id'                => (string) $a->id,
+                'title'             => $a->title,
+                'source_name'       => strtoupper($a->source_name),
+                'category'          => $a->category,
+                'category_badge'    => strtoupper($a->category),
+                'time_ago'          => $a->created_at ? $a->created_at->diffForHumans() : 'Baru saja',
+                'pub_date'          => $a->pub_date ? $a->pub_date->format('d M Y, H.i') . ' WITA' : now()->format('d M Y, H.i') . ' WITA',
+                'summary'           => $a->summary ?: 'Cuplikan berita pantauan intelijen media belum tersedia.',
+                'image_url'         => $a->image_url,
+                'link'              => $a->url,
+                'sentiment'         => $a->sentiment ?: 'netral',
+                'is_bookmarked'     => (bool) $a->is_bookmarked,
+                'matched_topic_ids' => $matchedTopicIds,
+                'matched_topics'    => $matchedTopics,
+                'manual_topic_ids'  => $manualTopicIds,
             ];
         })->toArray();
 
@@ -197,6 +267,7 @@ class MediaIntelligenceController extends Controller
             'earlyWarnings'    => $earlyWarnings,
             'mediaFeeds'       => $mediaFeeds,
             'sampleArticles'   => $articles,
+            'topics'           => array_values($topicsMap),
             'portalsList'      => $portalsList,
             'categoriesList'   => $categoriesList,
             'report'           => $report,
@@ -1153,5 +1224,203 @@ PROMPT;
         $count = MediaArticle::whereIn('id', $ids)->update(['is_bookmarked' => true]);
 
         return response()->json(['imported' => $count]);
+    }
+
+    /**
+     * Daftarkan Topik Atensi Pimpinan (Smart Dossier) baru.
+     */
+    public function storeTopic(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'title'       => 'required|string|max:255',
+            'keywords'    => 'required|string|max:1000',
+            'description' => 'nullable|string|max:1000',
+            'priority'    => 'nullable|in:urgent,high,medium,low',
+            'polda_code'  => 'nullable|string|max:50',
+        ]);
+
+        $poldaCode = $validated['polda_code'] ?? $request->query('polda', 'SULBAR');
+        $searchCode = strtoupper($poldaCode) === 'ALL' ? 'DIVHUMAS' : strtoupper($poldaCode);
+        $polda = Polda::where('code', $searchCode)->first() ?? Polda::where('is_active', true)->first();
+
+        MediaTopic::create([
+            'polda_id'    => $polda->id,
+            'title'       => $validated['title'],
+            'keywords'    => $validated['keywords'],
+            'description' => $validated['description'] ?? null,
+            'priority'    => $validated['priority'] ?? 'high',
+            'status'      => 'active',
+            'created_by'  => auth()->id(),
+        ]);
+
+        return back()->with('success', "Topik Atensi Pimpinan \"{$validated['title']}\" berhasil dibuat.");
+    }
+
+    /**
+     * Perbarui Topik Atensi Pimpinan.
+     */
+    public function updateTopic(Request $request, int $id): RedirectResponse
+    {
+        $topic = MediaTopic::findOrFail($id);
+
+        $validated = $request->validate([
+            'title'       => 'required|string|max:255',
+            'keywords'    => 'required|string|max:1000',
+            'description' => 'nullable|string|max:1000',
+            'priority'    => 'nullable|in:urgent,high,medium,low',
+            'status'      => 'nullable|in:active,archived',
+        ]);
+
+        $topic->update($validated);
+
+        return back()->with('success', "Topik Atensi \"{$topic->title}\" berhasil diperbarui.");
+    }
+
+    /**
+     * Hapus Topik Atensi Pimpinan.
+     */
+    public function deleteTopic(int $id): RedirectResponse
+    {
+        $topic = MediaTopic::findOrFail($id);
+        $title = $topic->title;
+        $topic->delete();
+
+        return back()->with('success', "Topik Atensi \"{$title}\" berhasil dihapus.");
+    }
+
+    /**
+     * Toggle manual tagging artikel ke Topik Atensi tertentu.
+     */
+    public function toggleArticleTopic(Request $request, int $id): JsonResponse|RedirectResponse
+    {
+        $validated = $request->validate([
+            'topic_id' => 'required|exists:media_topics,id',
+        ]);
+
+        $article = MediaArticle::findOrFail($id);
+        $topicId = (int) $validated['topic_id'];
+
+        $existing = DB::table('media_article_topic')
+            ->where('media_article_id', $article->id)
+            ->where('media_topic_id', $topicId)
+            ->first();
+
+        if ($existing) {
+            DB::table('media_article_topic')
+                ->where('media_article_id', $article->id)
+                ->where('media_topic_id', $topicId)
+                ->delete();
+            $action = 'dilepas dari';
+            $isTagged = false;
+        } else {
+            DB::table('media_article_topic')->insert([
+                'media_article_id' => $article->id,
+                'media_topic_id'   => $topicId,
+                'is_manual'        => true,
+                'created_at'       => now(),
+                'updated_at'       => now(),
+            ]);
+            $action = 'dikaitkan ke';
+            $isTagged = true;
+        }
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success'    => true,
+                'article_id' => (string) $article->id,
+                'topic_id'   => $topicId,
+                'is_tagged'  => $isTagged,
+                'message'    => "Berita berhasil {$action} Topik Atensi.",
+            ]);
+        }
+
+        return back()->with('success', "Berita berhasil {$action} Topik Atensi.");
+    }
+
+    /**
+     * Analisis intelijen instan berbasis AI (Google Gemini Pro) khusus untuk Topik Atensi Pimpinan.
+     */
+    public function analyzeTopicAi(Request $request, int $id): JsonResponse
+    {
+        $topic = MediaTopic::with('polda')->findOrFail($id);
+        $polda = $topic->polda ?? Polda::find($topic->polda_id);
+
+        if (!$polda) {
+            return response()->json(['success' => false, 'message' => 'Polda terkait topik ini tidak valid.'], 404);
+        }
+
+        // Kumpulkan berita terkait (kombinasi manual + keyword match)
+        $keywords = $topic->getKeywordsArray();
+        $manualArticleIds = DB::table('media_article_topic')
+            ->where('media_topic_id', $topic->id)
+            ->pluck('media_article_id')
+            ->toArray();
+
+        $articlesQuery = MediaArticle::where('polda_id', $polda->id);
+
+        if (!empty($manualArticleIds) || !empty($keywords)) {
+            $articlesQuery->where(function ($q) use ($manualArticleIds, $keywords) {
+                if (!empty($manualArticleIds)) {
+                    $q->whereIn('id', $manualArticleIds);
+                }
+                foreach ($keywords as $kw) {
+                    $q->orWhere('title', 'like', "%{$kw}%")
+                      ->orWhere('summary', 'like', "%{$kw}%");
+                }
+            });
+        }
+
+        $matchingArticles = $articlesQuery->latest('pub_date')->limit(25)->get();
+
+        if ($matchingArticles->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => "Belum ada berita yang sesuai dengan kata kunci Topik \"{$topic->title}\". Tambahkan kata kunci yang lebih luas atau kaitkan berita secara manual.",
+            ], 422);
+        }
+
+        $formattedArticles = $matchingArticles->map(function ($a) {
+            return [
+                'title'       => $a->title,
+                'source_name' => $a->source_name,
+                'category'    => $a->category,
+                'pub_date'    => $a->pub_date ? $a->pub_date->format('d M Y, H.i') : '',
+                'summary'     => $a->summary,
+                'link'        => $a->url,
+            ];
+        })->toArray();
+
+        $geminiService = new GeminiService();
+        $apiKey = $geminiService->getApiKey($polda->id);
+        $model = $geminiService->getModel($polda->id);
+
+        if (empty($apiKey)) {
+            return response()->json([
+                'success' => false,
+                'status'  => 'missing_api_key',
+                'message' => 'Google Gemini API Key belum diatur di menu Keamanan & Pemeliharaan -> Mesin Intelijen AI.',
+            ], 422);
+        }
+
+        $result = $geminiService->analyzeTopicDossier($polda, $topic, $formattedArticles, $apiKey, $model);
+
+        if (!$result['success']) {
+            return response()->json($result, 500);
+        }
+
+        return response()->json([
+            'success'        => true,
+            'topic'          => [
+                'id'          => $topic->id,
+                'title'       => $topic->title,
+                'priority'    => $topic->priority,
+                'keywords'    => $topic->keywords,
+                'description' => $topic->description,
+            ],
+            'analysis'       => $result['data'],
+            'articles_count' => count($formattedArticles),
+            'model_used'     => $result['model_used'] ?? $model,
+            'latency_ms'     => $result['latency_ms'] ?? 0,
+        ]);
     }
 }
