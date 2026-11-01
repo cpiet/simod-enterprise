@@ -86,6 +86,8 @@ const submitAddUser = () => {
 
 const getRoleBadge = (role) => {
   switch (role) {
+    case 'kadiv_humas':
+      return { label: '⭐⭐ KADIVHUMAS POLRI', color: 'bg-gradient-to-r from-amber-500/25 to-yellow-500/20 text-amber-300 border-amber-400/50 font-black tracking-wider' };
     case 'super_admin_mabes':
       return { label: 'SUPERADMIN MABES', color: 'bg-rose-500/20 text-rose-300 border-rose-500/30' };
     case 'polda_leader':
@@ -116,20 +118,20 @@ const getRoleBadge = (role) => {
             Manajemen Personalia
           </span>
           <span class="text-xs font-bold text-slate-400">
-            {{ selectedCode === 'ALL' ? 'Mabes Polri' : (selectedPolda?.name || 'Polda Sulawesi Barat') }}
+            {{ selectedCode === 'ALL' ? 'Divisi Humas Polri (Komando Nasional)' : (selectedPolda?.name || 'Polda Sulawesi Barat') }}
           </span>
         </div>
         <h1 class="text-2xl md:text-3xl font-black text-white tracking-tight mt-1">
-          Personalia & Pengguna Sistem
+          Personalia &amp; Pengguna Sistem
         </h1>
         <p class="text-xs md:text-sm text-slate-300">
-          Pengelolaan akun personel Humas, otorisasi peran berjenjang, dan delegasi hak akses 6 Satwil Polres.
+          Pengelolaan akun personel Humas, otorisasi peran berjenjang, dan delegasi hak akses Divhumas Polri &amp; jajaran Satwil.
         </p>
       </div>
 
       <button
         @click="showAddModal = true"
-        class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:brightness-110 text-slate-950 text-xs font-black shadow-lg shadow-amber-500/20 transition"
+        class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:brightness-110 text-slate-950 text-xs font-black shadow-lg shadow-amber-500/20 transition cursor-pointer"
       >
         <UserPlus class="w-4 h-4" />
         <span>+ Tambah Personel Baru</span>
@@ -141,17 +143,17 @@ const getRoleBadge = (role) => {
       <div class="p-5 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
         <span class="text-[11px] font-black uppercase text-slate-400">Total Personel Aktif</span>
         <div class="text-3xl font-black text-white">
-          {{ personnelStats?.total || users?.total || 13 }}
+          {{ personnelStats?.total || users?.total || 14 }}
         </div>
         <p class="text-[11px] text-emerald-400">Terdaftar Resmi</p>
       </div>
 
       <div class="p-5 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
-        <span class="text-[11px] font-black uppercase text-slate-400">Super Administrator</span>
+        <span class="text-[11px] font-black uppercase text-slate-400">Komando Mabes &amp; Divhumas</span>
         <div class="text-3xl font-black text-amber-400">
-          {{ personnelStats?.superadmin || 2 }}
+          {{ personnelStats?.superadmin || 3 }}
         </div>
-        <p class="text-[11px] text-slate-400">Akses Penuh Mabes</p>
+        <p class="text-[11px] text-amber-400 font-semibold">Kadivhumas &amp; Superadmin</p>
       </div>
 
       <div class="p-5 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
@@ -159,11 +161,11 @@ const getRoleBadge = (role) => {
         <div class="text-3xl font-black text-sky-400">
           {{ personnelStats?.polda_staff || 4 }}
         </div>
-        <p class="text-[11px] text-slate-400">Verifikator & Analis</p>
+        <p class="text-[11px] text-slate-400">Verifikator &amp; Analis</p>
       </div>
 
       <div class="p-5 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
-        <span class="text-[11px] font-black uppercase text-slate-400">Operator 6 Satwil</span>
+        <span class="text-[11px] font-black uppercase text-slate-400">Operator Satwil Jajaran</span>
         <div class="text-3xl font-black text-emerald-400">
           {{ personnelStats?.satwil || 7 }}
         </div>
@@ -181,6 +183,7 @@ const getRoleBadge = (role) => {
           class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-400"
         >
           <option value="all">Semua Peran (Roles)</option>
+          <option value="kadiv_humas">🇮🇩 Kadivhumas Polri (Mabes)</option>
           <option value="super_admin_mabes">Super Administrator Mabes</option>
           <option value="polda_leader">Pimpinan Polda (Kabid Humas)</option>
           <option value="verifikator">Verifikator (Penmas)</option>
@@ -212,10 +215,10 @@ const getRoleBadge = (role) => {
         <table class="w-full text-left border-collapse text-xs">
           <thead>
             <tr class="border-b border-slate-800 bg-slate-900/60 text-[11px] font-black uppercase text-slate-400">
-              <th class="px-6 py-3.5">Nama & NRP Personel</th>
+              <th class="px-6 py-3.5">Nama &amp; NRP Personel</th>
               <th class="px-6 py-3.5">Peran Sistem</th>
               <th class="px-6 py-3.5">Satuan Wilayah / Penugasan</th>
-              <th class="px-6 py-3.5">Kontak & Username</th>
+              <th class="px-6 py-3.5">Kontak &amp; Username</th>
               <th class="px-6 py-3.5">Status Akun</th>
             </tr>
           </thead>
@@ -227,11 +230,21 @@ const getRoleBadge = (role) => {
             >
               <td class="px-6 py-4">
                 <div class="flex items-center gap-3">
-                  <div class="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-amber-400">
-                    {{ u.name.charAt(0) }}
+                  <div
+                    class="w-9 h-9 rounded-xl border flex items-center justify-center font-bold text-xs shadow-sm"
+                    :class="u.role === 'kadiv_humas'
+                      ? 'bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950 border-amber-300 ring-2 ring-amber-400/40 font-black'
+                      : 'bg-slate-800 border-slate-700 text-amber-400'"
+                  >
+                    {{ u.role === 'kadiv_humas' ? '⭐⭐' : u.name.charAt(0) }}
                   </div>
                   <div>
-                    <p class="font-extrabold text-white">{{ u.name }}</p>
+                    <p class="font-extrabold text-white flex items-center gap-1.5">
+                      <span>{{ u.name }}</span>
+                      <span v-if="u.role === 'kadiv_humas'" class="px-1.5 py-0.2 rounded text-[8px] font-black uppercase bg-amber-400 text-slate-950">
+                        Kadiv
+                      </span>
+                    </p>
                     <span class="text-[11px] font-mono text-slate-400">NRP: {{ u.badge_number || '-' }}</span>
                   </div>
                 </div>
@@ -247,7 +260,7 @@ const getRoleBadge = (role) => {
               <td class="px-6 py-4">
                 <div class="flex items-center gap-1.5 font-semibold text-slate-200">
                   <Building2 class="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-                  <span>{{ u.polres?.name || selectedPolda?.name || 'Bidhumas Polda Sulbar' }}</span>
+                  <span>{{ u.polres?.name || u.polda?.name || (u.role === 'kadiv_humas' || u.role === 'super_admin_mabes' ? 'Divisi Humas Polri (Mabes)' : 'Bidhumas Polda Sulbar') }}</span>
                 </div>
               </td>
               <td class="px-6 py-4 space-y-0.5">
@@ -322,6 +335,36 @@ const getRoleBadge = (role) => {
 
           <div class="grid grid-cols-2 gap-3">
             <div>
+              <label class="block font-bold text-slate-300 mb-1">Satuan Induk (Polda / Mabes) *</label>
+              <select
+                v-model="form.polda_id"
+                class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
+              >
+                <option value="">🇮🇩 Divisi Humas Polri (Mabes)</option>
+                <option v-for="p in allPoldas" :key="p.id" :value="p.id">
+                  🏛️ {{ p.name }}
+                </option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-300 mb-1">Peran Akses (Role) *</label>
+              <select
+                v-model="form.role"
+                class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
+              >
+                <option value="kadiv_humas">🇮🇩 Kadivhumas Polri (Mabes ⭐⭐)</option>
+                <option value="super_admin_mabes">Super Administrator Mabes</option>
+                <option value="polda_leader">Pimpinan Polda (Kabid Humas)</option>
+                <option value="verifikator">Verifikator (Penmas)</option>
+                <option value="analis">Analis Intelijen Media</option>
+                <option value="operator">Operator Satwil (Polres)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
               <label class="block font-bold text-slate-300 mb-1">NRP Anggota *</label>
               <input
                 v-model="form.badge_number"
@@ -333,38 +376,12 @@ const getRoleBadge = (role) => {
             </div>
 
             <div>
-              <label class="block font-bold text-slate-300 mb-1">Peran Akses (Role) *</label>
-              <select
-                v-model="form.role"
-                class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
-              >
-                <option value="operator">Operator Satwil (Polres)</option>
-                <option value="analis">Analis Intelijen Media</option>
-                <option value="verifikator">Verifikator (Penmas)</option>
-                <option value="polda_leader">Pimpinan Polda (Kabid)</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block font-bold text-slate-300 mb-1">Username Login *</label>
-              <input
-                v-model="form.username"
-                type="text"
-                required
-                placeholder="Contoh: yunus_mamuju"
-                class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono"
-              />
-            </div>
-
-            <div>
-              <label class="block font-bold text-slate-300 mb-1">Satker / Polres</label>
+              <label class="block font-bold text-slate-300 mb-1">Satker / Polres (Opsional)</label>
               <select
                 v-model="form.polres_id"
                 class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
               >
-                <option value="">Bidhumas Polda Sulbar</option>
+                <option value="">{{ form.polda_id ? 'Tingkat Markas Polda' : 'Divisi Humas Polri Mabes' }}</option>
                 <option v-for="p in polresList" :key="p.id" :value="p.id">
                   {{ p.name }}
                 </option>

@@ -27,21 +27,33 @@ const props = defineProps({
   selectedPolda: Object,
   selectedCode: String,
   polresList: Array,
+  divhumasProfile: Object,
   metrics: Object,
 });
 
+const isNational = computed(() => props.selectedCode === 'ALL');
 const activeTab = ref('identity'); // 'identity', 'polres', 'tenants'
 const isSaved = ref(false);
 const isSubmitting = ref(false);
 
-// Active Polda Edit Form
+// Active Polda / Divhumas Edit Form
 const form = ref({
-  code: props.selectedPolda?.code || 'SULBAR',
-  name: props.selectedPolda?.name || 'Polda Sulawesi Barat',
-  region: props.selectedPolda?.region || 'Sulawesi Barat',
-  timezone: props.selectedPolda?.timezone || 'Asia/Makassar',
-  kapolda_name: props.selectedPolda?.kapolda_name || 'Irjen Pol. Drs. R. Adang Ginanjar S., M.M.',
-  kabid_humas_name: props.selectedPolda?.kabid_humas_name || 'Kombes Pol. Slamet Wahyudi, S.I.K., M.H.',
+  code: props.selectedCode === 'ALL' ? 'DIVHUMAS' : (props.selectedPolda?.code || 'SULBAR'),
+  name: props.selectedCode === 'ALL'
+    ? 'Divisi Humas Polri (Mabes Polri)'
+    : (props.selectedPolda?.name || 'Polda Sulawesi Barat'),
+  region: props.selectedCode === 'ALL'
+    ? 'Nasional / Markas Besar Polri'
+    : (props.selectedPolda?.region || 'Sulawesi Barat'),
+  timezone: props.selectedCode === 'ALL'
+    ? 'Asia/Jakarta'
+    : (props.selectedPolda?.timezone || 'Asia/Makassar'),
+  kapolda_name: props.selectedCode === 'ALL'
+    ? 'Irjen Pol. Johnny Eddizon Isir, S.I.K., M.T.C.P.'
+    : (props.selectedPolda?.kapolda_name || 'Irjen Pol. Drs. R. Adang Ginanjar S., M.M.'),
+  kabid_humas_name: props.selectedCode === 'ALL'
+    ? 'Brigjen Pol. Trunoyudo Wisnu Andiko, S.I.K.'
+    : (props.selectedPolda?.kabid_humas_name || 'Kombes Pol. Slamet Wahyudi, S.I.K., M.H.'),
 });
 
 // Modal: Tambah Polda Baru (Mabes)
@@ -157,17 +169,20 @@ const switchTenant = (code) => {
       <div>
         <div class="flex items-center gap-2">
           <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950">
-            Arsitektur Multi-Tenant
+            {{ isNational ? '🇮🇩 Komando Nasional Mabes Polri' : 'Arsitektur Multi-Tenant' }}
           </span>
           <span class="text-xs font-bold text-slate-400">
-            {{ selectedCode === 'ALL' ? 'Mabes Polri (Nasional)' : (selectedPolda?.name || 'Polda Sulawesi Barat') }}
+            {{ isNational ? 'Divisi Humas Polri (Mabes)' : (selectedPolda?.name || 'Polda Sulawesi Barat') }}
           </span>
         </div>
         <h1 class="text-2xl md:text-3xl font-black text-white tracking-tight mt-1">
-          Pengaturan Wilayah Polda & Multi-Tenant Satwil
+          {{ isNational ? 'Pengaturan Divisi Humas Polri & Tata Kelola Nasional' : 'Pengaturan Wilayah Polda & Multi-Tenant Satwil' }}
         </h1>
         <p class="text-xs md:text-sm text-slate-300">
-          Identitas satuan kewilayahan, pimpinan komando, zona waktu operasi, dan manajemen tenant 34 Polda se-Indonesia.
+          {{ isNational
+            ? 'Konfigurasi pimpinan markas komando nasional, zona waktu operasi, biro jajaran, dan orkestrasi 34 Polda se-Indonesia.'
+            : 'Identitas satuan kewilayahan, pimpinan komando, zona waktu operasi, dan manajemen tenant 34 Polda se-Indonesia.'
+          }}
         </p>
       </div>
 
@@ -183,7 +198,7 @@ const switchTenant = (code) => {
         </button>
 
         <button
-          v-else-if="activeTab === 'polres'"
+          v-else-if="activeTab === 'polres' && !isNational"
           @click="showAddPolresModal = true"
           class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:brightness-110 text-slate-950 text-xs font-black shadow-lg shadow-amber-500/20 transition"
         >
@@ -205,27 +220,29 @@ const switchTenant = (code) => {
     <!-- 4 Multi-Tenant Top KPI Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <div class="p-5 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
-        <span class="text-[11px] font-black uppercase text-slate-400">Total Tenant Polda</span>
-        <div class="text-3xl font-black text-white">{{ allPoldas?.length || 5 }}</div>
-        <p class="text-[11px] text-amber-400 font-semibold">Terkoneksi Multi-Wilayah</p>
+        <span class="text-[11px] font-black uppercase text-slate-400">{{ isNational ? 'Cakupan Komando' : 'Total Tenant Polda' }}</span>
+        <div class="text-3xl font-black text-white">{{ isNational ? '34 POLDA' : (allPoldas?.length || 5) }}</div>
+        <p class="text-[11px] text-amber-400 font-semibold">{{ isNational ? 'Konsolidasi Seluruh Indonesia' : 'Terkoneksi Multi-Wilayah' }}</p>
       </div>
 
       <div class="p-5 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
-        <span class="text-[11px] font-black uppercase text-slate-400">Satker Polres Jajaran</span>
-        <div class="text-3xl font-black text-emerald-400">{{ polresList?.length || 6 }}</div>
-        <p class="text-[11px] text-emerald-400">Di Bawah {{ selectedPolda?.code || 'SULBAR' }}</p>
+        <span class="text-[11px] font-black uppercase text-slate-400">{{ isNational ? 'Biro & Satker Mabes' : 'Satker Polres Jajaran' }}</span>
+        <div class="text-3xl font-black text-emerald-400">{{ isNational ? '5 BIRO' : (polresList?.length || 6) }}</div>
+        <p class="text-[11px] text-emerald-400">{{ isNational ? 'Divhumas Mabes Polri' : ('Di Bawah ' + (selectedPolda?.code || 'SULBAR')) }}</p>
       </div>
 
       <div class="p-5 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
         <span class="text-[11px] font-black uppercase text-slate-400">Zona Waktu Operasi</span>
-        <div class="text-2xl font-black text-sky-400 font-mono">{{ selectedPolda?.timezone || 'Asia/Makassar' }}</div>
-        <p class="text-[11px] text-slate-400">Format WITA / UTC+8</p>
+        <div class="text-2xl font-black text-sky-400 font-mono">{{ isNational ? 'Asia/Jakarta' : (selectedPolda?.timezone || 'Asia/Makassar') }}</div>
+        <p class="text-[11px] text-slate-400">{{ isNational ? 'Format WIB / UTC+7' : 'Format WITA / UTC+8' }}</p>
       </div>
 
       <div class="p-5 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
-        <span class="text-[11px] font-black uppercase text-slate-400">Status Multi-Tenant</span>
-        <div class="text-3xl font-black text-white">TERISOLASI</div>
-        <p class="text-[11px] text-emerald-400">RBAC & Data Scoping Aman</p>
+        <span class="text-[11px] font-black uppercase text-slate-400">Status Komando</span>
+        <div class="text-3xl font-black" :class="isNational ? 'text-amber-400' : 'text-white'">
+          {{ isNational ? 'PUSAT MABES' : 'TERISOLASI' }}
+        </div>
+        <p class="text-[11px] text-emerald-400">{{ isNational ? 'Orkestrasi 34 Polda Presisi' : 'RBAC & Data Scoping Aman' }}</p>
       </div>
     </div>
 
@@ -233,52 +250,54 @@ const switchTenant = (code) => {
     <div class="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
       <button
         @click="activeTab = 'identity'"
-        class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap"
+        class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer"
         :class="activeTab === 'identity'
           ? 'bg-amber-400 text-slate-950 font-black shadow-lg shadow-amber-400/20'
           : 'bg-slate-900 text-slate-300 hover:text-white border border-slate-800'"
       >
         <Building2 class="w-4 h-4" />
-        <span>Identitas Polda Terpilih ({{ selectedPolda?.code || 'SULBAR' }})</span>
+        <span>Identitas {{ isNational ? 'Divhumas Polri (Mabes)' : 'Polda Terpilih (' + (selectedPolda?.code || 'SULBAR') + ')' }}</span>
       </button>
 
       <button
         @click="activeTab = 'polres'"
-        class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap"
+        class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer"
         :class="activeTab === 'polres'
           ? 'bg-amber-400 text-slate-950 font-black shadow-lg shadow-amber-400/20'
           : 'bg-slate-900 text-slate-300 hover:text-white border border-slate-800'"
       >
         <MapPin class="w-4 h-4" />
-        <span>Struktur Satwil ({{ polresList?.length || 6 }} Polres)</span>
+        <span>{{ isNational ? 'Struktur Biro Divhumas (5 Biro/Bagian)' : 'Struktur Satwil (' + (polresList?.length || 6) + ' Polres)' }}</span>
       </button>
 
       <button
         @click="activeTab = 'tenants'"
-        class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap"
+        class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer"
         :class="activeTab === 'tenants'
           ? 'bg-amber-400 text-slate-950 font-black shadow-lg shadow-amber-400/20'
           : 'bg-slate-900 text-slate-300 hover:text-white border border-slate-800'"
       >
         <Globe class="w-4 h-4" />
-        <span>Katalog 34 Polda Se-Indonesia (Mabes)</span>
+        <span>Katalog 34 Polda Se-Indonesia &amp; Mabes</span>
       </button>
     </div>
 
     <!-- ========================================================================= -->
-    <!-- TAB 1: IDENTITAS POLDA AKTIF                                              -->
+    <!-- TAB 1: IDENTITAS POLDA / DIVHUMAS AKTIF                                   -->
     <!-- ========================================================================= -->
     <div v-if="activeTab === 'identity'" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
         <div class="flex items-center gap-2 border-b border-slate-800 pb-3">
           <Building2 class="w-4 h-4 text-amber-400" />
-          <h3 class="text-sm font-black text-white uppercase tracking-wider">Identitas Induk Satuan Wilayah</h3>
+          <h3 class="text-sm font-black text-white uppercase tracking-wider">
+            {{ isNational ? 'Identitas Markas Komando Divisi Humas Polri' : 'Identitas Induk Satuan Wilayah' }}
+          </h3>
         </div>
 
         <form @submit.prevent="saveSettings" class="space-y-4 text-xs">
           <div class="grid grid-cols-3 gap-3">
             <div>
-              <label class="block font-bold text-slate-300 mb-1">Kode Satwil</label>
+              <label class="block font-bold text-slate-300 mb-1">Kode Satuan</label>
               <input v-model="form.code" type="text" disabled class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-amber-400 font-mono font-bold" />
             </div>
             <div class="col-span-2">
@@ -289,13 +308,13 @@ const switchTenant = (code) => {
 
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block font-bold text-slate-300 mb-1">Wilayah / Provinsi</label>
+              <label class="block font-bold text-slate-300 mb-1">Wilayah / Domisili Markas</label>
               <input v-model="form.region" type="text" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:border-amber-400" />
             </div>
             <div>
               <label class="block font-bold text-slate-300 mb-1">Zona Waktu Operasional</label>
               <select v-model="form.timezone" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:border-amber-400">
-                <option value="Asia/Jakarta">WIB (UTC+7) - Barat</option>
+                <option value="Asia/Jakarta">WIB (UTC+7) - Barat / Jakarta</option>
                 <option value="Asia/Makassar">WITA (UTC+8) - Tengah</option>
                 <option value="Asia/Jayapura">WIT (UTC+9) - Timur</option>
               </select>
@@ -303,12 +322,19 @@ const switchTenant = (code) => {
           </div>
 
           <div>
-            <label class="block font-bold text-slate-300 mb-1">Nama Kepala Kepolisian Daerah (Kapolda)</label>
-            <input v-model="form.kapolda_name" type="text" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:border-amber-400" />
+            <label class="block font-bold text-slate-300 mb-1">
+              {{ isNational ? 'Kepala Divisi Humas Polri (Kadivhumas Polri)' : 'Nama Kepala Kepolisian Daerah (Kapolda)' }}
+            </label>
+            <input v-model="form.kapolda_name" type="text" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-bold focus:border-amber-400" />
+            <p v-if="isNational" class="text-[10px] text-amber-400 mt-1 font-semibold">
+              ⭐ Pimpinan Tertinggi Komando Kehumasan Polri: Irjen Pol. Johnny Eddizon Isir, S.I.K., M.T.C.P.
+            </p>
           </div>
 
           <div>
-            <label class="block font-bold text-slate-300 mb-1">Nama Kepala Bidang Humas (Kabid Humas)</label>
+            <label class="block font-bold text-slate-300 mb-1">
+              {{ isNational ? 'Kepala Biro Penerangan Masyarakat (Karopenmas)' : 'Nama Kepala Bidang Humas (Kabid Humas)' }}
+            </label>
             <input v-model="form.kabid_humas_name" type="text" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:border-amber-400" />
           </div>
 
@@ -316,10 +342,10 @@ const switchTenant = (code) => {
             <button
               type="submit"
               :disabled="isSubmitting"
-              class="px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black flex items-center gap-2 transition"
+              class="px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black flex items-center gap-2 transition cursor-pointer"
             >
               <Save class="w-4 h-4" />
-              <span>{{ isSubmitting ? 'Menyimpan...' : 'Simpan Data Wilayah' }}</span>
+              <span>{{ isSubmitting ? 'Menyimpan...' : (isNational ? 'Simpan Profil Divhumas' : 'Simpan Data Wilayah') }}</span>
             </button>
           </div>
         </form>
@@ -327,12 +353,45 @@ const switchTenant = (code) => {
 
       <!-- Quick Switcher Sidebar Card -->
       <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
-        <div class="border-b border-slate-800 pb-3">
-          <h3 class="text-sm font-black text-white uppercase tracking-wider">Tenant Aktif Lainnya</h3>
-          <p class="text-xs text-slate-400">Pilih tenant untuk berpindah konteks komando seketika.</p>
+        <div class="border-b border-slate-800 pb-3 flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-black text-white uppercase tracking-wider">Pindah Komando / Tenant</h3>
+            <p class="text-xs text-slate-400">Pilih markas atau Polda jajaran untuk beralih konteks komando.</p>
+          </div>
+          <span class="px-2 py-0.5 rounded text-[9px] font-black bg-amber-400/20 text-amber-400 border border-amber-400/30">
+            Multi-Tenant
+          </span>
         </div>
 
-        <div class="space-y-2.5">
+        <div class="space-y-2.5 max-h-[460px] overflow-y-auto pr-1 custom-scrollbar">
+          <!-- Premier Option: Divhumas Polri (Mabes) -->
+          <div
+            @click="switchTenant('ALL')"
+            class="p-4 rounded-2xl border transition cursor-pointer flex items-center justify-between"
+            :class="selectedCode === 'ALL'
+              ? 'bg-amber-400/15 border-amber-400 text-white shadow-lg shadow-amber-400/15'
+              : 'bg-slate-900/80 border-slate-700/80 text-slate-300 hover:border-amber-400/60'"
+          >
+            <div class="flex items-center gap-3">
+              <div
+                class="w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs shadow-md"
+                :class="selectedCode === 'ALL' ? 'bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950' : 'bg-slate-800 text-amber-400 border border-amber-400/30'"
+              >
+                🇮🇩 ⭐⭐
+              </div>
+              <div>
+                <p class="font-extrabold text-white text-xs flex items-center gap-1.5">
+                  <span>Divisi Humas Polri (Mabes)</span>
+                  <span class="px-1.5 py-0.2 rounded text-[8px] font-black bg-amber-400 text-slate-950 uppercase">Pusat</span>
+                </p>
+                <span class="text-[10px] text-amber-400/90 font-medium">Orkestrasi 34 Polda &bull; Kadivhumas: Irjen Pol. Johnny E. Isir</span>
+              </div>
+            </div>
+
+            <ArrowRight class="w-4 h-4" :class="selectedCode === 'ALL' ? 'text-amber-400' : 'text-slate-600'" />
+          </div>
+
+          <!-- Regional Poldas -->
           <div
             v-for="p in allPoldas"
             :key="p.id"
@@ -362,10 +421,134 @@ const switchTenant = (code) => {
     </div>
 
     <!-- ========================================================================= -->
-    <!-- TAB 2: STRUKTUR SATWIL POLRES JAJARAN                                     -->
+    <!-- TAB 2: STRUKTUR BIRO DIVHUMAS (MABES) ATAU STRUKTUR SATWIL POLRES         -->
     <!-- ========================================================================= -->
     <div v-else-if="activeTab === 'polres'" class="space-y-4">
-      <div class="rounded-3xl bg-[#0b1426] border border-slate-800 shadow-2xl overflow-hidden">
+      <!-- NATIONAL VIEW: STRUKTUR 5 BIRO & BAGIAN DIVHUMAS POLRI -->
+      <div v-if="isNational" class="space-y-4">
+        <div class="rounded-3xl bg-[#0b1426] border border-slate-800 shadow-2xl p-6">
+          <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950">
+                  Markas Besar Polri
+                </span>
+                <span class="text-xs font-bold text-slate-400">Pusat Komando &amp; Pengendalian Kehumasan</span>
+              </div>
+              <h3 class="text-lg font-black text-white uppercase tracking-wider mt-1">
+                Struktur Biro &amp; Bagian Jajaran Divisi Humas Polri
+              </h3>
+              <p class="text-xs text-slate-400">
+                Dipimpin oleh Kadivhumas Polri Irjen Pol. Johnny Eddizon Isir, S.I.K., M.T.C.P. untuk mengorkestrasi 34 Bidhumas Polda jajaran se-Indonesia.
+              </p>
+            </div>
+            <div class="hidden sm:flex items-center gap-2">
+              <span class="px-3 py-1 rounded-xl text-xs font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                5 Biro &amp; Bagian Aktif
+              </span>
+            </div>
+          </div>
+
+          <!-- 5 Biro Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+            <!-- 1. Biropenmas -->
+            <div class="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-amber-400/50 transition space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="px-2 py-0.5 rounded text-[10px] font-black bg-amber-400 text-slate-950 uppercase">BIROPENMAS</span>
+                <span class="text-[10px] text-emerald-400 font-bold">Operasional Utama</span>
+              </div>
+              <h4 class="text-sm font-extrabold text-white">Biro Penerangan Masyarakat</h4>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                Penyampaian siaran pers Mabes, juru bicara resmi kepolisian, konferensi pers nasional, dan rilis klarifikasi isu faktual.
+              </p>
+              <div class="pt-2 border-t border-slate-800/80 text-[11px] text-amber-400 font-semibold">
+                Pimpinan: Karopenmas (Brigjen Pol. Trunoyudo Wisnu Andiko, S.I.K.)
+              </div>
+            </div>
+
+            <!-- 2. Biromultimedia -->
+            <div class="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-amber-400/50 transition space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="px-2 py-0.5 rounded text-[10px] font-black bg-sky-500 text-slate-950 uppercase">BIROMULTIMEDIA</span>
+                <span class="text-[10px] text-sky-400 font-bold">Cyber Patrol &amp; AI</span>
+              </div>
+              <h4 class="text-sm font-extrabold text-white">Biro Multimedia</h4>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                Patroli siber media sosial (𝕏, TikTok, Instagram, YouTube), deteksi tren viral, produksi video edukasi, dan counter narasi terpadu.
+              </p>
+              <div class="pt-2 border-t border-slate-800/80 text-[11px] text-sky-400 font-semibold">
+                Pimpinan: Karomultimedia Divhumas Polri
+              </div>
+            </div>
+
+            <!-- 3. Biropid -->
+            <div class="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-amber-400/50 transition space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-500 text-slate-950 uppercase">BIROPID</span>
+                <span class="text-[10px] text-emerald-400 font-bold">Keterbukaan Publik</span>
+              </div>
+              <h4 class="text-sm font-extrabold text-white">Biro Pengelolaan Info &amp; Dokumentasi</h4>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                Layanan Pejabat Pengelola Informasi &amp; Dokumentasi (PPID), kepatuhan UU KIP, uji konsekuensi, dan digitalisasi arsip kehumasan.
+              </p>
+              <div class="pt-2 border-t border-slate-800/80 text-[11px] text-emerald-400 font-semibold">
+                Pimpinan: Karopid Divhumas Polri
+              </div>
+            </div>
+
+            <!-- 4. Bagrenmin -->
+            <div class="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-amber-400/50 transition space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="px-2 py-0.5 rounded text-[10px] font-black bg-purple-500 text-white uppercase">BAGRENMIN</span>
+                <span class="text-[10px] text-purple-300 font-bold">Manajemen &amp; SDM</span>
+              </div>
+              <h4 class="text-sm font-extrabold text-white">Bagian Perencanaan &amp; Administrasi</h4>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                Penyusunan rencana kerja kehumasan nasional, alokasi anggaran, manajemen personel humas, logistik, dan evaluasi kinerja berkala.
+              </p>
+              <div class="pt-2 border-t border-slate-800/80 text-[11px] text-purple-300 font-semibold">
+                Pimpinan: Kabagrenmin Divhumas Polri
+              </div>
+            </div>
+
+            <!-- 5. Taudd -->
+            <div class="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-amber-400/50 transition space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="px-2 py-0.5 rounded text-[10px] font-black bg-rose-500 text-white uppercase">TAUDD</span>
+                <span class="text-[10px] text-rose-300 font-bold">Pelayanan Markas</span>
+              </div>
+              <h4 class="text-sm font-extrabold text-white">Tata Urusan Dalam (Taudd)</h4>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                Pelayanan kedinasan harian Kadivhumas Polri, protokoler kedinasan, persuratan dinas, dan pengamanan internal markas komando.
+              </p>
+              <div class="pt-2 border-t border-slate-800/80 text-[11px] text-rose-300 font-semibold">
+                Pimpinan: Kataudd Divhumas Polri
+              </div>
+            </div>
+
+            <!-- Drill-down Card -->
+            <div class="p-5 rounded-2xl bg-gradient-to-br from-amber-500/10 via-amber-400/5 to-transparent border border-amber-400/30 flex flex-col justify-between space-y-3">
+              <div class="space-y-1">
+                <span class="text-[10px] font-black uppercase text-amber-400">Kelola Satker Polres</span>
+                <h4 class="text-sm font-black text-white">Tata Satwil Polres Jajaran?</h4>
+                <p class="text-xs text-slate-300 leading-relaxed">
+                  Pilih salah satu Polda jajaran kewilayahan (misal Polda Sulbar) untuk mengonfigurasi struktur Polres di daerah tersebut.
+                </p>
+              </div>
+              <button
+                @click="switchTenant('SULBAR')"
+                class="w-full py-2 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>Kelola Satker Polres (Polda Sulbar)</span>
+                <ArrowRight class="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REGIONAL VIEW: STRUKTUR SATWIL POLRES JAJARAN -->
+      <div v-else class="rounded-3xl bg-[#0b1426] border border-slate-800 shadow-2xl overflow-hidden">
         <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
           <div>
             <h3 class="text-sm font-black text-white uppercase tracking-wider">
@@ -415,10 +598,37 @@ const switchTenant = (code) => {
     </div>
 
     <!-- ========================================================================= -->
-    <!-- TAB 3: KATALOG TENANT POLDA SE-INDONESIA (MABES LEVEL)                    -->
+    <!-- TAB 3: KATALOG TENANT POLDA SE-INDONESIA & MABES                           -->
     <!-- ========================================================================= -->
     <div v-else-if="activeTab === 'tenants'" class="space-y-4">
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <!-- Top Featured Card: Divisi Humas Polri (Mabes) -->
+        <div
+          @click="switchTenant('ALL')"
+          class="col-span-1 md:col-span-2 lg:col-span-3 rounded-3xl bg-gradient-to-r from-[#0d1b33] via-[#0c182b] to-[#0a1424] border-2 border-amber-400/60 p-6 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer hover:border-amber-400 transition"
+        >
+          <div class="flex items-center gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center text-slate-950 font-black text-xl shadow-lg shadow-amber-400/20 flex-shrink-0">
+              ⭐⭐
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-400 text-slate-950">
+                  MARKAS BESAR POLRI
+                </span>
+                <span class="text-xs font-bold text-amber-400">Pusat Orkestrasi Nasional</span>
+              </div>
+              <h4 class="text-lg font-black text-white mt-1">Divisi Hubungan Masyarakat Polri (Divhumas Polri)</h4>
+              <p class="text-xs text-slate-300">
+                Kadivhumas: <strong class="text-white">Irjen Pol. Johnny Eddizon Isir, S.I.K., M.T.C.P.</strong> &bull; Domisili: Jl. Trunojoyo No. 3, Kebayoran Baru, Jakarta Selatan
+              </p>
+            </div>
+          </div>
+          <button class="px-5 py-2.5 rounded-xl bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-2 shadow-lg shadow-amber-400/20 whitespace-nowrap cursor-pointer">
+            <span>Buka Markas Nasional</span>
+            <ArrowRight class="w-4 h-4" />
+          </button>
+        </div>
         <div
           v-for="p in allPoldas"
           :key="p.id"

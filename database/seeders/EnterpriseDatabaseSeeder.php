@@ -140,6 +140,21 @@ class EnterpriseDatabaseSeeder extends Seeder
 
         // 4. SEED USERS MULTI-TENANT
         DB::table('users')->insert([
+            // Pimpinan Tertinggi Divhumas Polri (Komando Nasional)
+            [
+                'polda_id'     => null,
+                'polres_id'    => null,
+                'name'         => 'Irjen Pol. Johnny Eddizon Isir, S.I.K., M.T.C.P.',
+                'username'     => 'kadivhumas',
+                'email'        => 'kadivhumas@polri.go.id',
+                'password'     => Hash::make('DivhumasPolri#2026'),
+                'role'         => 'kadiv_humas',
+                'badge_number' => '75060789',
+                'phone'        => '081119750607',
+                'is_active'    => true,
+                'created_at'   => now(),
+                'updated_at'   => now(),
+            ],
             // Super Admin Mabes Polri (Lintas Polda)
             [
                 'polda_id'     => null,

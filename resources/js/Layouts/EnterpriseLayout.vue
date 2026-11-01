@@ -277,8 +277,8 @@ const navigationGroups = [
         match: ['/personalia'],
       },
       {
-        name: 'Pengaturan Satwil',
-        desc: 'Konfigurasi Polda & Polres',
+        name: 'Pengaturan Satwil & Mabes',
+        desc: 'Konfigurasi Divhumas, Polda & Polres',
         href: '/settings/polda',
         icon: Building2,
         match: ['/settings/polda'],
@@ -634,15 +634,18 @@ const navigationGroups = [
               @click="isUserMenuOpen = !isUserMenuOpen"
               class="flex items-center gap-2 p-1 pl-1.5 pr-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 transition"
             >
-              <div class="w-7 h-7 rounded-lg bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center shadow-sm">
-                P
+              <div
+                class="w-7 h-7 rounded-lg text-slate-950 font-black text-xs flex items-center justify-center shadow-sm"
+                :class="selectedCode === 'ALL' ? 'bg-gradient-to-tr from-amber-400 to-yellow-300 ring-2 ring-amber-400/50 text-[10px]' : 'bg-amber-400'"
+              >
+                {{ selectedCode === 'ALL' ? '⭐⭐' : 'P' }}
               </div>
               <div class="hidden sm:block text-left">
-                <p class="text-xs font-bold text-white leading-tight truncate max-w-[120px]">
-                  Kombes Pol. M. Memo
+                <p class="text-xs font-bold text-white leading-tight truncate max-w-[130px]">
+                  {{ selectedCode === 'ALL' ? 'Irjen Pol. Johnny E. Isir' : (selectedPolda?.kabid_humas_name ? selectedPolda.kabid_humas_name.split('(')[0].trim() : 'Kombes Pol. Slamet Wahyudi') }}
                 </p>
                 <p class="text-[10px] text-amber-400 font-semibold leading-tight">
-                  Kasubbid Penmas
+                  {{ selectedCode === 'ALL' ? 'Kadivhumas Polri' : ('Kabid Humas ' + (selectedPolda?.code || 'SULBAR')) }}
                 </p>
               </div>
               <ChevronDown class="w-3 h-3 text-slate-400 transition" :class="{ 'rotate-180': isUserMenuOpen }" />
@@ -651,11 +654,15 @@ const navigationGroups = [
             <!-- User Menu Dropdown -->
             <div
               v-if="isUserMenuOpen"
-              class="absolute right-0 mt-2 w-56 rounded-2xl bg-[#0b1426] border border-slate-700/80 shadow-2xl p-2 z-50 backdrop-blur-2xl"
+              class="absolute right-0 mt-2 w-64 rounded-2xl bg-[#0b1426] border border-slate-700/80 shadow-2xl p-2 z-50 backdrop-blur-2xl"
             >
               <div class="px-3 py-2 border-b border-slate-800/80">
-                <p class="text-xs font-bold text-white">Kombes Pol. M. Memo, S.I.K</p>
-                <p class="text-[10px] text-amber-400">NRP: 74090123 &bull; Administrator</p>
+                <p class="text-xs font-bold text-white">
+                  {{ selectedCode === 'ALL' ? 'Irjen Pol. Johnny Eddizon Isir, S.I.K., M.T.C.P.' : (selectedPolda?.kabid_humas_name || 'Kombes Pol. Slamet Wahyudi, S.I.K., M.H.') }}
+                </p>
+                <p class="text-[10px] text-amber-400 font-bold">
+                  {{ selectedCode === 'ALL' ? 'NRP: 75060789 • Kadivhumas Polri' : ('NRP: 76040112 • Kabid Humas ' + (selectedPolda?.name || 'Polda Sulbar')) }}
+                </p>
               </div>
               <div class="py-1">
                 <Link
@@ -680,7 +687,7 @@ const navigationGroups = [
                   class="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 text-slate-300 hover:bg-slate-800 hover:text-white transition"
                 >
                   <Building2 class="w-3.5 h-3.5 text-amber-400" />
-                  <span>Pengaturan Polda</span>
+                  <span>{{ selectedCode === 'ALL' ? 'Pengaturan Divhumas' : 'Pengaturan Satwil' }}</span>
                 </Link>
               </div>
               <div class="border-t border-slate-800/80 pt-1">

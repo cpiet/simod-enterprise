@@ -20,23 +20,32 @@ const props = defineProps({
 });
 
 const authMode = ref('password'); // 'password' | 'pin'
-const selectedPoldaId = ref(props.poldas?.[0]?.id || 1);
+const selectedPoldaId = ref('ALL');
 const showPassword = ref(false);
 
 const form = ref({
-  username: '',
-  password: '',
-  pin: '',
+  username: 'kadivhumas',
+  password: 'DivhumasPolri#2026',
+  pin: '750607',
   remember: true,
 });
 
 const isSubmitting = ref(false);
 
+const fillAccount = (user, pass, pin, poldaId) => {
+  form.value.username = user;
+  form.value.password = pass;
+  form.value.pin = pin;
+  selectedPoldaId.value = poldaId;
+};
+
 const handleLogin = () => {
   isSubmitting.value = true;
-  // Redirect to dashboard with active polda parameter
-  const chosenPolda = props.poldas?.find((p) => p.id === selectedPoldaId.value);
-  const poldaCode = chosenPolda ? chosenPolda.code : 'SULBAR';
+  let poldaCode = 'ALL';
+  if (selectedPoldaId.value !== 'ALL') {
+    const chosenPolda = props.poldas?.find((p) => p.id === selectedPoldaId.value);
+    poldaCode = chosenPolda ? chosenPolda.code : 'SULBAR';
+  }
 
   setTimeout(() => {
     isSubmitting.value = false;
@@ -91,16 +100,53 @@ const handleLogin = () => {
                 v-model="selectedPoldaId"
                 class="bg-transparent text-xs font-extrabold text-amber-300 outline-none cursor-pointer pr-1"
               >
+                <option value="ALL" class="bg-slate-900 text-amber-400 font-black">
+                  🇮🇩 Divhumas Polri (Komando Nasional)
+                </option>
                 <option
                   v-for="polda in poldas"
                   :key="polda.id"
                   :value="polda.id"
                   class="bg-slate-900 text-white font-bold"
                 >
-                  {{ polda.name }}
+                  🏛️ {{ polda.name }}
                 </option>
               </select>
             </div>
+          </div>
+        </div>
+
+        <!-- Quick Account Selector Buttons -->
+        <div class="space-y-1.5">
+          <p class="text-[10px] font-black uppercase tracking-wider text-slate-400 text-center">Akun Cepat Komando &amp; Demo:</p>
+          <div class="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              @click="fillAccount('kadivhumas', 'DivhumasPolri#2026', '750607', 'ALL')"
+              class="p-2 rounded-xl border text-center transition cursor-pointer"
+              :class="form.username === 'kadivhumas' ? 'bg-amber-400/20 border-amber-400 text-amber-300' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'"
+            >
+              <p class="text-[10px] font-black">⭐⭐ Kadivhumas</p>
+              <p class="text-[8px] opacity-75">Irjen Johnny Isir</p>
+            </button>
+            <button
+              type="button"
+              @click="fillAccount('superadmin', 'MabesPolri#2026', '800100', 'ALL')"
+              class="p-2 rounded-xl border text-center transition cursor-pointer"
+              :class="form.username === 'superadmin' ? 'bg-rose-500/20 border-rose-400 text-rose-300' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'"
+            >
+              <p class="text-[10px] font-black">Superadmin</p>
+              <p class="text-[8px] opacity-75">Mabes Polri</p>
+            </button>
+            <button
+              type="button"
+              @click="fillAccount('kabid_sulbar', 'SulbarHumas#2026', '760401', (poldas?.[0]?.id || 1))"
+              class="p-2 rounded-xl border text-center transition cursor-pointer"
+              :class="form.username === 'kabid_sulbar' ? 'bg-sky-500/20 border-sky-400 text-sky-300' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'"
+            >
+              <p class="text-[10px] font-black">Kabid Sulbar</p>
+              <p class="text-[8px] opacity-75">Kombes Slamet</p>
+            </button>
           </div>
         </div>
 

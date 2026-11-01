@@ -287,4 +287,46 @@ class EnterpriseFullSuiteTest extends TestCase
         $createPolresRes->assertRedirect();
         $this->assertDatabaseHas('polres', ['polda_id' => $polda->id, 'code' => 'MANOKWARI']);
     }
+
+    public function test_divhumas_polri_national_and_kadivhumas_account(): void
+    {
+        $kadiv = User::create([
+            'polda_id'     => null,
+            'polres_id'    => null,
+            'name'         => 'Irjen Pol. Johnny Eddizon Isir, S.I.K., M.T.C.P.',
+            'username'     => 'kadivhumas_test',
+            'email'        => 'kadivhumas.test@polri.go.id',
+            'password'     => bcrypt('DivhumasPolri#2026'),
+            'role'         => 'kadiv_humas',
+            'badge_number' => '75060789',
+            'phone'        => '081119750607',
+            'is_active'    => true,
+        ]);
+
+        $this->assertTrue($kadiv->isSuperAdmin());
+        $this->assertTrue($kadiv->isPoldaLeader());
+        $this->assertTrue($kadiv->isKadivHumas());
+
+        $this->actingAs($kadiv);
+
+        // Settings Polda with polda=ALL
+        $rSettings = $this->get('/settings/polda?polda=ALL');
+        $rSettings->assertStatus(200);
+
+        // Personalia with polda=ALL
+        $rPersonalia = $this->get('/personalia?polda=ALL');
+        $rPersonalia->assertStatus(200);
+
+        // Create user with polda_id = null (Divhumas / Mabes account)
+        $storeRes = $this->post('/personalia', [
+            'polda_id'     => null,
+            'name'         => 'AKP Staf Divhumas Mabes',
+            'username'     => 'staf_mabes_' . rand(100, 999),
+            'email'        => 'staf.mabes.' . rand(100, 999) . '@polri.go.id',
+            'password'     => 'MabesSecret123',
+            'role'         => 'verifikator',
+            'badge_number' => '82030111',
+        ]);
+        $storeRes->assertRedirect();
+    }
 }

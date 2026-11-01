@@ -47,12 +47,16 @@ SIMOD Enterprise dirancang dengan arsitektur **Modular Monolith Multi-Tenant** y
 
 ## 3. Tingkat Akses (Role-Based Access Control)
 
-1. **Super Admin Mabes Polri** (`super_admin_mabes`):
-   - Akses penuh lintas seluruh Polda (`polda_id = null` atau bypass filter).
-   - Menambah, mengubah status, dan mengaudit seluruh Polda se-Indonesia.
-2. **Admin Polda / Kabid Humas** (`admin_polda`):
+1. **Kadivhumas Polri (Mabes Komando Nasional)** (`kadiv_humas`):
+   - Pimpinan tertinggi komando kehumasan Polri: **Irjen Pol. Johnny Eddizon Isir, S.I.K., M.T.C.P.**
+   - Otoritas tertinggi dan pengawasan terpusat atas 34 Polda se-Indonesia dan 5 Biro/Bagian Divhumas Polri (`polda_id = null`).
+   - Akses penuh ke seluruh modul intelijen, siaran pers pimpinan, penugasan nasional, dan pengawasan satwil.
+2. **Super Admin Mabes Polri** (`super_admin_mabes`):
+   - Akses administratif teknis penuh lintas seluruh Polda (`polda_id = null` atau bypass filter).
+   - Menambah, mengubah status, mengelola konfigurasi multi-tenant, dan mengaudit seluruh Polda se-Indonesia.
+3. **Pimpinan Polda / Kabid Humas** (`polda_leader`):
    - Otoritas tertinggi pada satu wilayah hukum Polda (`polda_id` terkunci).
-   - Mengelola feeds RSS lokal, menerbitkan Siaran Pers pimpinan, dan mendisposisikan tugas ke Polres.
+   - Mengelola feeds RSS lokal, menerbitkan Siaran Pers pimpinan, dan mendisposisikan tugas ke jajaran Polres.
 3. **Operator Satker / Kasi Humas Polres** (`operator_satker`):
    - Mengelola isu dan penugasan yang didelegasikan ke Polres terkait (`polres_id`).
    - Melaporkan perkembangan investigasi lapangan (*task updates*).

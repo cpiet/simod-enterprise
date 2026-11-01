@@ -50,11 +50,16 @@ class User extends Authenticatable
 
     public function isSuperAdmin(): bool
     {
-        return $this->role === 'super_admin_mabes';
+        return in_array($this->role, ['super_admin_mabes', 'kadiv_humas'], true);
     }
 
     public function isPoldaLeader(): bool
     {
-        return in_array($this->role, ['super_admin_mabes', 'polda_leader'], true);
+        return in_array($this->role, ['super_admin_mabes', 'kadiv_humas', 'polda_leader'], true);
+    }
+
+    public function isKadivHumas(): bool
+    {
+        return $this->role === 'kadiv_humas';
     }
 }

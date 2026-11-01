@@ -20,20 +20,21 @@ const props = defineProps({
 
 const isSaved = ref(false);
 
-const roles = ['Superadmin', 'Kabid Humas', 'Kasubbid Penmas', 'Kasihumas Polres', 'Operator'];
+const roles = ['Kadivhumas Polri', 'Superadmin Mabes', 'Kabid Humas', 'Kasubbid Penmas', 'Kasihumas Polres', 'Operator'];
 
 const permissionsMatrix = ref([
-  { module: 'Dashboard & Command Center', perm: [true, true, true, true, true] },
-  { module: 'Radar Media Intelligence & RSS', perm: [true, true, true, true, true] },
-  { module: 'Input Laporan Isu Lapangan', perm: [true, true, true, true, true] },
-  { module: 'Verifikasi & Klarifikasi Isu', perm: [true, true, true, true, false] },
-  { module: 'Penerbitan Siaran Pers Resmi', perm: [true, true, true, false, false] },
-  { module: 'Disposisi & Penugasan Personel', perm: [true, true, true, false, false] },
-  { module: 'Akses Galeri Media & Bukti Privat', perm: [true, true, true, true, true] },
-  { module: 'Unduh Laporan Anev & Eksekutif', perm: [true, true, true, true, false] },
-  { module: 'Manajemen Akun Personalia', perm: [true, true, false, false, false] },
-  { module: 'Pusat Keamanan & Turnstile', perm: [true, false, false, false, false] },
-  { module: 'Backup & Pemulihan Basis Data', perm: [true, false, false, false, false] },
+  { module: 'Dashboard & Command Center', perm: [true, true, true, true, true, true] },
+  { module: 'Radar Media Intelligence & RSS', perm: [true, true, true, true, true, true] },
+  { module: 'Radar Media Sosial (4 Platform)', perm: [true, true, true, true, true, true] },
+  { module: 'Input Laporan Isu Lapangan', perm: [true, true, true, true, true, true] },
+  { module: 'Verifikasi & Klarifikasi Isu', perm: [true, true, true, true, true, false] },
+  { module: 'Penerbitan Siaran Pers Resmi', perm: [true, true, true, true, false, false] },
+  { module: 'Disposisi & Penugasan Personel', perm: [true, true, true, true, false, false] },
+  { module: 'Akses Galeri Media & Bukti Privat', perm: [true, true, true, true, true, true] },
+  { module: 'Unduh Laporan Anev & Eksekutif', perm: [true, true, true, true, true, false] },
+  { module: 'Manajemen Akun Personalia', perm: [true, true, true, false, false, false] },
+  { module: 'Pusat Keamanan & Turnstile', perm: [true, true, false, false, false, false] },
+  { module: 'Backup & Pemulihan Basis Data', perm: [true, true, false, false, false, false] },
 ]);
 
 const saveMatrix = () => {

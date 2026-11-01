@@ -57,17 +57,17 @@ const updatePassword = () => {
       <div>
         <div class="flex items-center gap-2">
           <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950">
-            Identitas Anggota
+            {{ selectedCode === 'ALL' ? '🇮🇩 Komando Mabes Polri' : 'Identitas Anggota' }}
           </span>
           <span class="text-xs font-bold text-slate-400">
-            {{ selectedCode === 'ALL' ? 'Mabes Polri' : selectedPolda?.name }}
+            {{ selectedCode === 'ALL' ? 'Divisi Humas Polri (Nasional)' : selectedPolda?.name }}
           </span>
         </div>
         <h1 class="text-2xl md:text-3xl font-black text-white tracking-tight mt-1">
-          Profil Saya & Keamanan Dinas
+          Profil Saya &amp; Keamanan Dinas
         </h1>
         <p class="text-xs md:text-sm text-slate-300">
-          Informasi identitas personel, kredensial autentikasi, serta konfigurasi PIN cepat 6-digit.
+          Informasi identitas personel, kredensial autentikasi, serta konfigurasi PIN cepat 6-digit komando.
         </p>
       </div>
     </div>
@@ -81,37 +81,51 @@ const updatePassword = () => {
 
           <div class="relative pt-6">
             <div class="w-24 h-24 mx-auto rounded-3xl bg-gradient-to-tr from-amber-500 to-amber-300 p-1 shadow-2xl">
-              <div class="w-full h-full rounded-[22px] bg-[#091122] flex items-center justify-center text-3xl font-black text-amber-400">
-                M
+              <div class="w-full h-full rounded-[22px] bg-[#091122] flex items-center justify-center text-2xl font-black text-amber-400">
+                {{ selectedCode === 'ALL' ? '⭐⭐' : 'M' }}
               </div>
             </div>
-            <h2 class="text-lg font-black text-white mt-4">Kombes Pol. M. Memo, S.I.K</h2>
-            <p class="text-xs font-bold text-amber-400">Kasubbid Penmas Bidhumas</p>
+            <h2 class="text-lg font-black text-white mt-4">
+              {{ selectedCode === 'ALL' ? 'Irjen Pol. Johnny Eddizon Isir, S.I.K., M.T.C.P.' : 'Kombes Pol. M. Memo, S.I.K' }}
+            </h2>
+            <p class="text-xs font-bold text-amber-400">
+              {{ selectedCode === 'ALL' ? 'Kepala Divisi Humas Polri (Kadivhumas)' : 'Kasubbid Penmas Bidhumas' }}
+            </p>
             <span class="inline-block mt-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-              Akun Aktif & Terverifikasi
+              Akun Aktif &amp; Terverifikasi
             </span>
           </div>
 
           <div class="border-t border-slate-800 pt-4 space-y-3 text-left text-xs">
             <div class="flex items-center justify-between">
               <span class="text-slate-400">Pangkat / Korps</span>
-              <span class="font-bold text-white">KOMBES POL</span>
+              <span class="font-bold text-white">
+                {{ selectedCode === 'ALL' ? 'IRJEN POL (⭐⭐)' : 'KOMBES POL' }}
+              </span>
             </div>
             <div class="flex items-center justify-between">
               <span class="text-slate-400">NRP</span>
-              <span class="font-mono font-bold text-amber-400">74090123</span>
+              <span class="font-mono font-bold text-amber-400">
+                {{ selectedCode === 'ALL' ? '75060789' : '74090123' }}
+              </span>
             </div>
             <div class="flex items-center justify-between">
               <span class="text-slate-400">Satuan Kerja</span>
-              <span class="font-bold text-white">Bidhumas Polda Sulbar</span>
+              <span class="font-bold text-white">
+                {{ selectedCode === 'ALL' ? 'Divisi Humas Polri (Mabes)' : (selectedPolda?.name || 'Bidhumas Polda Sulbar') }}
+              </span>
             </div>
             <div class="flex items-center justify-between">
               <span class="text-slate-400">Email Kedinasan</span>
-              <span class="font-bold text-slate-300">memo.humas@polri.go.id</span>
+              <span class="font-bold text-slate-300">
+                {{ selectedCode === 'ALL' ? 'kadivhumas@polri.go.id' : 'memo.humas@polri.go.id' }}
+              </span>
             </div>
             <div class="flex items-center justify-between">
               <span class="text-slate-400">Nomor WhatsApp</span>
-              <span class="font-bold text-slate-300">+62 811-4200-XXXX</span>
+              <span class="font-bold text-slate-300">
+                {{ selectedCode === 'ALL' ? '+62 811-1975-0607' : '+62 811-4200-XXXX' }}
+              </span>
             </div>
           </div>
         </div>

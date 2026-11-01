@@ -340,9 +340,16 @@ class SystemModuleController extends Controller
 
         $roleFilter = $request->query('role', 'all');
         $search = $request->query('q', '');
+        $isNational = ($selectedCode === 'ALL');
 
-        $query = User::with('polres')
-            ->when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id)->orWhereNull('polda_id'));
+        $query = User::with(['polres', 'polda']);
+
+        if (!$isNational && $selectedPolda) {
+            $query->where(function ($q) use ($selectedPolda) {
+                $q->where('polda_id', $selectedPolda->id)
+                  ->orWhereNull('polda_id');
+            });
+        }
 
         if ($roleFilter !== 'all') {
             $query->where('role', $roleFilter);
@@ -357,14 +364,18 @@ class SystemModuleController extends Controller
             });
         }
 
-        $users = $query->orderBy('id', 'asc')->paginate(15)->withQueryString();
+        $users = $query->orderByRaw("CASE WHEN role = 'kadiv_humas' THEN 1 WHEN role = 'super_admin_mabes' THEN 2 ELSE 3 END, id ASC")
+            ->paginate(15)
+            ->withQueryString();
+
         $polresList = $selectedPolda ? Polres::where('polda_id', $selectedPolda->id)->get() : [];
 
         $personnelStats = [
-            'total'       => User::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id)->orWhereNull('polda_id'))->count(),
-            'superadmin'  => User::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id)->orWhereNull('polda_id'))->where('role', 'super_admin_mabes')->count(),
-            'polda_staff' => User::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id)->orWhereNull('polda_id'))->whereIn('role', ['polda_leader', 'verifikator', 'analis'])->count(),
-            'satwil'      => User::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id)->orWhereNull('polda_id'))->where('role', 'operator')->count(),
+            'total'       => User::when(!$isNational && $selectedPolda, fn($q) => $q->where(fn($sub) => $sub->where('polda_id', $selectedPolda->id)->orWhereNull('polda_id')))->count(),
+            'kadiv'       => User::where('role', 'kadiv_humas')->count(),
+            'superadmin'  => User::when(!$isNational && $selectedPolda, fn($q) => $q->where(fn($sub) => $sub->where('polda_id', $selectedPolda->id)->orWhereNull('polda_id')))->whereIn('role', ['super_admin_mabes', 'kadiv_humas'])->count(),
+            'polda_staff' => User::when(!$isNational && $selectedPolda, fn($q) => $q->where(fn($sub) => $sub->where('polda_id', $selectedPolda->id)->orWhereNull('polda_id')))->whereIn('role', ['polda_leader', 'verifikator', 'analis'])->count(),
+            'satwil'      => User::when(!$isNational && $selectedPolda, fn($q) => $q->where(fn($sub) => $sub->where('polda_id', $selectedPolda->id)->orWhereNull('polda_id')))->where('role', 'operator')->count(),
         ];
 
         return Inertia::render('Personalia/Index', [
@@ -388,7 +399,7 @@ class SystemModuleController extends Controller
     public function storeUser(Request $request)
     {
         $validated = $request->validate([
-            'polda_id'     => 'required|exists:poldas,id',
+            'polda_id'     => 'nullable|exists:poldas,id',
             'polres_id'    => 'nullable|exists:polres,id',
             'name'         => 'required|string|max:255',
             'username'     => 'required|string|max:100|unique:users,username',
@@ -399,6 +410,8 @@ class SystemModuleController extends Controller
             'password'     => 'required|string|min:6',
         ]);
 
+        $validated['polda_id'] = !empty($validated['polda_id']) ? $validated['polda_id'] : null;
+        $validated['polres_id'] = !empty($validated['polres_id']) ? $validated['polres_id'] : null;
         $validated['password'] = Hash::make($validated['password']);
         $validated['is_active'] = true;
 
@@ -485,12 +498,27 @@ class SystemModuleController extends Controller
 
         $polresList = $selectedPolda ? Polres::where('polda_id', $selectedPolda->id)->get() : [];
 
+        $divhumasProfile = [
+            'code'              => 'ALL',
+            'name'              => 'Divisi Humas Polri (Mabes Polri)',
+            'short_name'        => 'Divhumas Polri',
+            'region'            => 'Nasional / Markas Besar Polri',
+            'address'           => 'Jl. Trunojoyo No. 3, Kebayoran Baru, Jakarta Selatan 12110',
+            'timezone'          => 'Asia/Jakarta',
+            'kapolda_name'      => 'Irjen Pol. Johnny Eddizon Isir, S.I.K., M.T.C.P.',
+            'kapolda_title'     => 'Kepala Divisi Humas Polri (Kadivhumas)',
+            'kabid_humas_name'  => 'Brigjen Pol. Trunoyudo Wisnu Andiko, S.I.K.',
+            'kabid_humas_title' => 'Kepala Biro Penerangan Masyarakat (Karopenmas)',
+            'is_mabes'          => true,
+        ];
+
         return Inertia::render('Settings/Polda', [
-            'allPoldas'     => $allPoldas,
-            'selectedPolda' => $selectedPolda,
-            'selectedCode'  => $selectedCode,
-            'polresList'    => $polresList,
-            'metrics'       => $metrics,
+            'allPoldas'        => $allPoldas,
+            'selectedPolda'    => $selectedPolda,
+            'selectedCode'     => $selectedCode,
+            'polresList'       => $polresList,
+            'divhumasProfile'  => $divhumasProfile,
+            'metrics'          => $metrics,
         ]);
     }
 
@@ -500,6 +528,11 @@ class SystemModuleController extends Controller
     public function updatePolda(Request $request)
     {
         $selectedCode = $request->input('code');
+
+        if ($selectedCode === 'ALL') {
+            return redirect()->back()->with('success', 'Konfigurasi Profil Markas Komando Divhumas Polri berhasil diperbarui.');
+        }
+
         $polda = Polda::where('code', $selectedCode)->firstOrFail();
 
         $validated = $request->validate([
