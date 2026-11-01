@@ -84,4 +84,31 @@ Data dari **Radar Media Sosial** terintegrasi secara *real-time* ke **Executive 
 5. **Bar Analisis Sentimen Medsos**:
    - Di bawah Matriks 6 Polres, terdapat visualisasi bar multi-warna untuk persentase Positif, Netral, dan Negatif beserta akumulasi interaksi publik (views & likes).
 
+---
+
+## 🇮🇩 6. Mode Skala Nasional & Orkestrasi Divhumas Polri (`polda=ALL`)
+
+Ketika pengguna memilih wilayah **Divhumas Polri** (parameter URL `polda=ALL`), modul Radar Media Sosial secara otomatis beradaptasi menjadi **Komando Cyber Patrol & Social Listening Nasional**:
+
+1. **Agregasi Metrik Nasional**:
+   - Menghitung seluruh postingan dari seluruh Polda dan Satker Mabes tanpa pembatasan `polda_id`.
+   - Menampilkan akumulasi jangkauan publik nasional (jutaan views, ratusan ribu likes, komentar, dan virality index nasional).
+2. **Filter Dinamis Satwil / Polda Jajaran**:
+   - Operator Divhumas dapat memilih opsi **`🌐 Seluruh 34 Polda`** untuk pemantauan arus opini agregat se-Indonesia, atau melakukan *drill-down* ke Polda tertentu (misal **Polda Sulbar**) melalui parameter `satwil`.
+3. **Badge Asal Satwil di Kartu Postingan**:
+   - Setiap kartu postingan di Tab 01 menampilkan badge asal wilayah (contoh: `🏛️ SULBAR`) sehingga analis Mabes Polri dapat langsung mengidentifikasi locus opini publik.
+4. **Radar Tokoh Kritis & KOL Skala Nasional (Tab 02)**:
+   - Menampilkan entitas pengawas dan opini publik tingkat nasional:
+     - **Kompolnas RI** (`@kompolnas_ri`) — Lembaga Pengawas Kepolisian Nasional
+     - **Indonesia Police Watch (IPW)** (`@ipw_watch`) — Lembaga Pemantau Kinerja & Reformasi Polri
+     - **Dewan Pers RI** (`@dewanpers_ri`) — Lembaga Pengawas Etika Pers & Komunikasi Massa
+     - **KontraS** (`@kontras_update`) — Pemantau HAM & Akuntabilitas Aparat
+     - **Najwa Shihab / Narasi Newsroom** (`@narasinewsroom`) — Media Investigasi & Tokoh Opini Publik Kritis
+     - **ISESS (Institute for Security and Strategic Studies)** (`@isess_official`) — Pengamat Keamanan & Kepolisian Nasional
+5. **Tren Tagar & Isu Viral Nasional (Tab 03)**:
+   - Menampilkan tagar bertaraf nasional dengan estimasi volume puluhan hingga ratusan ribu interaksi: `#PolriPresisi`, `#DivhumasPolri`, `#HumasPolri`, `#Kapolri`, `#PilkadaSerentak2026`, `#SiberPolri`, `#KamtibmasKondusif`, dll.
+6. **Integrasi Apify & Akun Target Nasional (Tab 04)**:
+   - Menargetkan akun-akun resmi pimpinan dan korps Mabes Polri (`@divisihumaspri`, `@humaspolri`, `@polripresisi`, `@halo_polisi`, `@ccicpolri`, `@bareskrim.polri`) dan kata kunci pemantauan skala makro.
+
+
 

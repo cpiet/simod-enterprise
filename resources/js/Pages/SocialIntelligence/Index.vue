@@ -38,6 +38,7 @@ const props = defineProps({
   allPoldas: Array,
   selectedPolda: Object,
   selectedCode: String,
+  isNational: Boolean,
   posts: Object, // Paginated
   metrics: Object,
   kolProfiles: Array,
@@ -52,6 +53,7 @@ const selectedSentiment = ref(props.filters?.sentiment || 'all');
 const kolOnly = ref(Boolean(props.filters?.kol));
 const selectedSort = ref(props.filters?.sort || 'latest');
 const searchQuery = ref(props.filters?.q || '');
+const selectedSatwil = ref(props.filters?.satwil || 'all');
 
 const handleFilter = () => {
   router.get('/social-intelligence', {
@@ -62,6 +64,7 @@ const handleFilter = () => {
     kol: kolOnly.value ? 1 : 0,
     sort: selectedSort.value,
     q: searchQuery.value,
+    satwil: selectedSatwil.value,
   }, { preserveState: true, preserveScroll: true });
 };
 
@@ -234,17 +237,20 @@ const formatNumber = (num) => {
       <div>
         <div class="flex items-center gap-2">
           <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950">
-            Cyber Patrol & Social Listening
+            {{ isNational ? 'Cyber Patrol & Social Listening Nasional' : 'Cyber Patrol & Social Listening' }}
           </span>
           <span class="text-xs font-bold text-slate-500 dark:text-slate-400">
-            {{ selectedCode === 'ALL' ? 'Divhumas Polri (Orkestrasi Nasional)' : selectedPolda?.name }}
+            {{ isNational ? 'Divhumas Polri (Komando Nasional & Orkestrasi 34 Polda)' : selectedPolda?.name }}
           </span>
         </div>
         <h1 class="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight mt-1">
-          Radar Intelijen Media Sosial
+          {{ isNational ? 'Radar Intelijen Media Sosial Nasional' : 'Radar Intelijen Media Sosial' }}
         </h1>
         <p class="text-xs md:text-sm text-slate-600 dark:text-slate-300">
-          Pemantauan percakapan publik, sentimen netizen, tren tagar, dan radar tokoh kritis di 𝕏, TikTok, Instagram, dan YouTube.
+          {{ isNational
+            ? 'Pemantauan komprehensif percakapan publik skala nasional, orkestrasi sentimen 34 Polda jajaran, deteksi dini isu viral, dan manajemen narasi Mabes Polri di 𝕏, TikTok, Instagram, dan YouTube.'
+            : 'Pemantauan percakapan publik, sentimen netizen, tren tagar, dan radar tokoh kritis di 𝕏, TikTok, Instagram, dan YouTube.'
+          }}
         </p>
       </div>
 
@@ -441,6 +447,19 @@ const formatNumber = (num) => {
             />
           </div>
 
+          <!-- Satwil / Polda Filter (National Divhumas View) -->
+          <select
+            v-if="isNational"
+            v-model="selectedSatwil"
+            @change="handleFilter"
+            class="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-amber-400"
+          >
+            <option value="all">🌐 Seluruh 34 Polda</option>
+            <option v-for="p in allPoldas" :key="p.id" :value="p.id">
+              {{ p.name }}
+            </option>
+          </select>
+
           <!-- Sentiment Filter -->
           <select
             v-model="selectedSentiment"
@@ -490,13 +509,23 @@ const formatNumber = (num) => {
           <!-- Card Top: Author & Platform -->
           <div class="space-y-3">
             <div class="flex items-center justify-between gap-2">
-              <!-- Platform Pill -->
-              <span
-                class="px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider border"
-                :class="getPlatformBadge(post.platform).class"
-              >
-                {{ getPlatformBadge(post.platform).label }}
-              </span>
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <!-- Platform Pill -->
+                <span
+                  class="px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider border"
+                  :class="getPlatformBadge(post.platform).class"
+                >
+                  {{ getPlatformBadge(post.platform).label }}
+                </span>
+
+                <!-- Satwil / Polda Badge (when isNational) -->
+                <span
+                  v-if="isNational && post.polda"
+                  class="px-2 py-0.5 rounded-lg text-[9px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-300 border border-amber-500/30"
+                >
+                  🏛️ {{ post.polda.code || post.polda.name }}
+                </span>
+              </div>
 
               <!-- Sentiment Pill -->
               <span
@@ -690,10 +719,13 @@ const formatNumber = (num) => {
         <div class="border-b border-slate-200 dark:border-slate-800 pb-3">
           <h2 class="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
             <UserCheck class="w-5 h-5 text-amber-500" />
-            <span>Direktori Tokoh Kritis, Pengamat Hukum & KOL Wilayah</span>
+            <span>{{ isNational ? 'Direktori Tokoh Kritis & Key Opinion Leader (KOL) Skala Nasional' : 'Direktori Tokoh Kritis, Pengamat Hukum & KOL Wilayah' }}</span>
           </h2>
           <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Akun-akun yang memiliki daya jangkau tinggi (*high amplification*) dan secara berkala menyoroti kinerja penegakan hukum dan kamtibmas di Sulawesi Barat.
+            {{ isNational
+              ? 'Akun-akun nasional berpengaruh (pengawas eksternal kepolisian, LSM HAM, jurnalis investigasi, dan analis pertahanan/keamanan) yang menyoroti kebijakan dan isu strategis Polri secara luas.'
+              : `Akun-akun yang memiliki daya jangkau tinggi (*high amplification*) dan secara berkala menyoroti kinerja penegakan hukum dan kamtibmas di ${selectedPolda?.name || 'wilayah jajaran'}.`
+            }}
           </p>
         </div>
 
@@ -747,10 +779,13 @@ const formatNumber = (num) => {
           <div class="border-b border-slate-200 dark:border-slate-800 pb-3">
             <h2 class="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
               <Hash class="w-5 h-5 text-amber-500" />
-              <span>Top Tagar & Isu Paling Banyak Dibicarakan</span>
+              <span>{{ isNational ? 'Top Tagar & Isu Nasional Paling Banyak Dibicarakan' : 'Top Tagar & Isu Paling Banyak Dibicarakan' }}</span>
             </h2>
             <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Daftar kata kunci dan tagar dengan volume percakapan tertinggi sepekan terakhir di Sulbar.
+              {{ isNational
+                ? 'Daftar kata kunci dan tagar nasional seputar kepolisian dengan volume percakapan tertinggi sepekan terakhir.'
+                : `Daftar kata kunci dan tagar dengan volume percakapan tertinggi sepekan terakhir di ${selectedPolda?.name || 'wilayah jajaran'}.`
+              }}
             </p>
           </div>
 
@@ -839,11 +874,14 @@ const formatNumber = (num) => {
               Apify Free Tier Ready
             </span>
             <h2 class="text-base font-black text-slate-900 dark:text-white">
-              Pengaturan Integrasi Apify Scraper & Kata Kunci Pelacakan
+              {{ isNational ? 'Pengaturan Integrasi Apify Scraper Nasional (Divhumas Polri)' : 'Pengaturan Integrasi Apify Scraper & Kata Kunci Pelacakan' }}
             </h2>
           </div>
           <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Gunakan paket gratis Apify (gratis $5/bulan) untuk scraping data X, TikTok, Instagram, dan YouTube.
+            {{ isNational
+              ? 'Konfigurasi crawler skala nasional untuk pemantauan citra Polri, akun kedinasan pimpinan, dan narasi kamtibmas lintas 34 Polda.'
+              : 'Gunakan paket gratis Apify (gratis $5/bulan) untuk scraping data X, TikTok, Instagram, dan YouTube.'
+            }}
           </p>
         </div>
 
@@ -904,7 +942,7 @@ const formatNumber = (num) => {
           <!-- Kata Kunci Pelacakan -->
           <div>
             <label class="block font-black text-slate-800 dark:text-slate-200 mb-1.5 uppercase tracking-wider text-[11px]">
-              KATA KUNCI PEMANTAUAN WILAYAH (PISAHKAN DENGAN KOMA)
+              {{ isNational ? 'KATA KUNCI PEMANTAUAN NASIONAL (PISAHKAN DENGAN KOMA)' : 'KATA KUNCI PEMANTAUAN WILAYAH (PISAHKAN DENGAN KOMA)' }}
             </label>
             <textarea
               v-model="settingsForm.keywords_tracked"
@@ -912,23 +950,29 @@ const formatNumber = (num) => {
               class="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-medium placeholder-slate-400 focus:outline-none focus:border-amber-400 leading-relaxed"
             ></textarea>
             <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-              Contoh: Polda Sulbar, Polresta Mamuju, Polisi Sulbar, Polres Majene, Polres Polman, Lantas Sulbar
+              {{ isNational
+                ? 'Contoh: Divhumas Polri, Kapolri, Mabes Polri, Humas Polri, Bareskrim, Korlantas Polri, Propam Polri, Polisi Presisi, Dumas Presisi'
+                : 'Contoh: Polda Sulbar, Polresta Mamuju, Polisi Sulbar, Polres Majene, Polres Polman, Lantas Sulbar'
+              }}
             </p>
           </div>
 
           <!-- Akun Target Pantauan Khusus -->
           <div>
             <label class="block font-black text-slate-800 dark:text-slate-200 mb-1.5 uppercase tracking-wider text-[11px]">
-              AKUN TARGET PANTAUAN KHUSUS (PROFIL PUBLIK / INSTAGRAM / 𝕏 / TIKTOK / YOUTUBE)
+              {{ isNational ? 'AKUN TARGET PANTAUAN NASIONAL (KANAL RESMI POLRI & PIMPINAN)' : 'AKUN TARGET PANTAUAN KHUSUS (PROFIL PUBLIK / INSTAGRAM / 𝕏 / TIKTOK / YOUTUBE)' }}
             </label>
             <textarea
               v-model="settingsForm.accounts_tracked"
               rows="2"
-              placeholder="@poldasulbar, @polresta_mamuju_official, @tribratanews_sulbar, @sulbar_update"
+              :placeholder="isNational ? '@divisihumaspri, @humaspolri, @polripresisi, @halo_polisi, @ccicpolri, @bareskrim_polri' : '@poldasulbar, @polresta_mamuju_official, @tribratanews_sulbar, @sulbar_update'"
               class="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono placeholder-slate-400 focus:outline-none focus:border-amber-400 leading-relaxed"
             ></textarea>
             <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-              Masukkan username akun publik yang wajib dipantau (pisahkan dengan koma). Crawler akan memprioritaskan penarikan dari akun-akun ini dan menandainya sebagai pantauan prioritas.
+              {{ isNational
+                ? 'Masukkan username akun publik nasional yang wajib dipantau secara berkala oleh mesin pencari crawler Divhumas Polri.'
+                : 'Masukkan username akun publik yang wajib dipantau (pisahkan dengan koma). Crawler akan memprioritaskan penarikan dari akun-akun ini dan menandainya sebagai pantauan prioritas.'
+              }}
             </p>
           </div>
 
