@@ -51,7 +51,7 @@ return new class extends Migration
         Schema::create('social_settings', function (Blueprint $table) {
             $table->id();
             $table->foreignId('polda_id')->unique()->constrained('poldas')->cascadeOnDelete();
-            $table->string('apify_api_token', 255)->nullable();
+            $table->text('apify_api_token')->nullable();
             $table->text('keywords_tracked')->nullable(); // JSON or comma-separated
             $table->string('sync_frequency', 50)->default('every_3_hours');
             $table->boolean('auto_sync_enabled')->default(true);

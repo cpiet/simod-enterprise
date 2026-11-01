@@ -188,7 +188,7 @@ class SocialIntelligenceController extends Controller
 
         $validated = $request->validate([
             'polda_id'          => 'required|exists:poldas,id',
-            'apify_api_token'   => 'nullable|string|max:255',
+            'apify_api_token'   => 'nullable|string|max:1000',
             'keywords_tracked'  => 'nullable|string|max:1000',
             'sync_frequency'    => 'required|string',
             'auto_sync_enabled' => 'required|boolean',

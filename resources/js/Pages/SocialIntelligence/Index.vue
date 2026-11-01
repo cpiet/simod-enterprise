@@ -842,7 +842,7 @@ const formatNumber = (num) => {
           <div>
             <div class="flex items-center justify-between mb-1.5">
               <label class="block font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[11px]">
-                APIFY PERSONAL API TOKEN (KREDENSIAL API)
+                APIFY PERSONAL API TOKEN (MULTI-API TOKEN POOL)
               </label>
               <button
                 type="button"
@@ -851,29 +851,40 @@ const formatNumber = (num) => {
                 class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-bold bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 transition disabled:opacity-40 cursor-pointer"
               >
                 <RefreshCw :class="['w-3 h-3', isTestingConnection ? 'animate-spin' : '']" />
-                <span>{{ isTestingConnection ? 'Menguji...' : 'Uji Koneksi Token' }}</span>
+                <span>{{ isTestingConnection ? 'Menguji Semua...' : 'Uji Koneksi Token' }}</span>
               </button>
             </div>
-            <input
+            <textarea
               v-model="settingsForm.apify_api_token"
-              type="text"
-              placeholder="apify_api_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-              class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono placeholder-slate-400 focus:outline-none focus:border-amber-400"
-            />
+              rows="2"
+              placeholder="apify_api_token1&#10;apify_api_token2 (pisahkan koma atau baris baru untuk multi-akun)"
+              class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono placeholder-slate-400 focus:outline-none focus:border-amber-400 leading-relaxed"
+            ></textarea>
             <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-              Dapatkan token dari menu <a href="https://console.apify.com/account/integrations" target="_blank" class="text-amber-500 underline font-semibold">Apify Console Integrations</a>. Masukkan token Anda untuk mengaktifkan penarikan data live dari internet.
+              <strong class="text-amber-500">Multi-API Pool Ready:</strong> Anda bisa memasukkan 1 atau beberapa token akun Apify (pisahkan dengan koma atau baris baru). Sistem akan otomatis merotasi kuota $5/bulan per akun dan beralih otomatis (*auto-failover*) jika salah satu token habis.
             </p>
 
-            <!-- Status Hasil Uji Koneksi -->
-            <div v-if="testConnectionResult" class="mt-2.5 p-3 rounded-xl border text-xs" :class="testConnectionResult.success ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300' : 'bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-300'">
-              <div class="flex items-start gap-2">
+            <!-- Status Hasil Uji Koneksi Multi-Akun -->
+            <div v-if="testConnectionResult" class="mt-2.5 p-3.5 rounded-xl border text-xs" :class="testConnectionResult.success ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300' : 'bg-rose-500/10 border-rose-500/30 text-rose-800 dark:text-rose-300'">
+              <div class="flex items-start gap-2.5">
                 <CheckCircle2 v-if="testConnectionResult.success" class="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                 <AlertTriangle v-else class="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                <div class="space-y-1">
+                <div class="space-y-2 w-full">
                   <p class="font-bold">{{ testConnectionResult.message }}</p>
-                  <div v-if="testConnectionResult.user" class="text-[11px] opacity-90 space-y-0.5 font-mono">
-                    <p>• Akun: {{ testConnectionResult.user.username }} ({{ testConnectionResult.user.email }})</p>
-                    <p>• Paket: {{ testConnectionResult.user.plan }}</p>
+                  
+                  <div v-if="testConnectionResult.accounts && testConnectionResult.accounts.length" class="space-y-1.5 pt-1 border-t border-emerald-500/20 dark:border-emerald-500/30">
+                    <div v-for="(acc, i) in testConnectionResult.accounts" :key="i" class="flex flex-wrap items-center justify-between p-2 rounded-lg bg-white/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 font-mono text-[11px]">
+                      <div>
+                        <span class="font-black mr-2 text-slate-800 dark:text-slate-200">Akun #{{ i + 1 }}:</span>
+                        <span class="text-slate-700 dark:text-slate-300 font-bold">{{ acc.username || acc.token_masked }}</span>
+                        <span v-if="acc.email" class="text-slate-500 dark:text-slate-400 ml-1">({{ acc.email }})</span>
+                      </div>
+                      <div class="flex items-center gap-1.5 mt-1 sm:mt-0">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="acc.status === 'connected' ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/20 text-rose-600 dark:text-rose-400'">
+                          {{ acc.status === 'connected' ? (acc.plan || 'Active') : 'Gagal' }}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
