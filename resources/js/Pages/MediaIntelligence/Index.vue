@@ -43,6 +43,7 @@ import {
   Download,
   Maximize2,
   Minimize2,
+  Layers,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -117,9 +118,25 @@ const toggleBookmark = async (id) => {
     showToastNotification('Gagal menyimpan bookmark, coba lagi');
   }
 };
+// Dynamic Rows / Tampilan Baris Berita (Grid 3 Kolom per Baris)
+const savedRows = typeof window !== 'undefined' ? parseInt(localStorage.getItem('simod_news_rows') || '5', 10) : 5;
+const selectedRows = ref([3, 5, 8, 10, 15, 17].includes(savedRows) ? savedRows : 5);
+
+const onRowsChange = () => {
+  selectedRows.value = Number(selectedRows.value);
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('simod_news_rows', String(selectedRows.value));
+  }
+  currentPage.value = 1;
+};
+
 // Pagination State
 const currentPage = ref(1);
-const perPage = ref(50);
+const perPage = computed(() => {
+  const num = Number(selectedRows.value) || 5;
+  if (num === 17) return 50; // maks 50 berita
+  return num * 3;
+});
 const handleSearch = () => {
   currentPage.value = 1;
 };
@@ -1010,6 +1027,27 @@ const submitIssue = () => {
           </select>
         </div>
 
+        <!-- Tampilan Baris Dropdown (Custom Dinamis Sesuai Permintaan) -->
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+            <Layers class="w-3.5 h-3.5 text-amber-400" />
+            <span>Tampilan:</span>
+          </span>
+          <select
+            v-model.number="selectedRows"
+            @change="onRowsChange"
+            class="px-3 py-2 rounded-xl text-xs font-bold bg-[#070d19] border border-slate-700 text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+            title="Pilih jumlah baris berita yang ditampilkan per halaman (default 5 baris)"
+          >
+            <option :value="3">3 Baris (9 Berita)</option>
+            <option :value="5">5 Baris (15 Berita) — Default</option>
+            <option :value="8">8 Baris (24 Berita)</option>
+            <option :value="10">10 Baris (30 Berita)</option>
+            <option :value="15">15 Baris (45 Berita)</option>
+            <option :value="17">17 Baris (50 Berita)</option>
+          </select>
+        </div>
+
         <!-- Tombol Bookmark (menampilkan hanya berita tersimpan) -->
         <button
           type="button"
@@ -1053,10 +1091,15 @@ const submitIssue = () => {
         </button>
 
         <!-- Count Indicator -->
-        <div class="text-xs text-slate-400 shrink-0 ml-auto whitespace-nowrap flex items-center gap-1">
+        <div class="text-xs text-slate-400 shrink-0 ml-auto whitespace-nowrap flex items-center gap-1.5">
           <span>Menampilkan</span>
-          <strong class="text-amber-400 font-extrabold">{{ filteredArticles.length }}</strong>
-          <span>siaran berita</span>
+          <strong class="text-amber-400 font-extrabold">{{ paginatedArticles.length }}</strong>
+          <span>dari</span>
+          <strong class="text-white font-extrabold">{{ filteredArticles.length }}</strong>
+          <span>berita</span>
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-900 border border-slate-700 text-slate-300">
+            {{ selectedRows }} Baris
+          </span>
         </div>
       </div>
 
@@ -1226,8 +1269,26 @@ const submitIssue = () => {
             </div>
 
             <p class="text-[11px] text-slate-400 font-medium">
-              Halaman <span class="text-amber-400 font-bold">{{ currentPage }}</span> dari <span class="text-white font-bold">{{ totalPages }}</span> &bull; Menampilkan {{ ((currentPage - 1) * perPage) + 1 }}-{{ Math.min(currentPage * perPage, filteredArticles.length) }} dari {{ filteredArticles.length }} Berita
+              Halaman <span class="text-amber-400 font-bold">{{ currentPage }}</span> dari <span class="text-white font-bold">{{ totalPages }}</span> &bull; Menampilkan {{ ((currentPage - 1) * perPage) + 1 }}-{{ Math.min(currentPage * perPage, filteredArticles.length) }} dari {{ filteredArticles.length }} Berita &bull; <span class="text-amber-400 font-bold">{{ selectedRows }} Baris</span> ({{ perPage }} kartu / hal)
             </p>
+
+            <!-- Quick Row Selector at Bottom -->
+            <div class="flex items-center gap-1.5 text-[11px] text-slate-400">
+              <Layers class="w-3 h-3 text-amber-400" />
+              <span>Tampilan:</span>
+              <div class="inline-flex rounded-lg bg-slate-900 border border-slate-700/80 p-0.5 text-[11px]">
+                <button
+                  v-for="r in [3, 5, 8, 10, 15, 17]"
+                  :key="r"
+                  type="button"
+                  @click="selectedRows = r; onRowsChange()"
+                  class="px-2 py-0.5 rounded transition cursor-pointer font-bold"
+                  :class="selectedRows === r ? 'bg-amber-400 text-slate-950 font-black shadow-sm' : 'text-slate-400 hover:text-white'"
+                >
+                  {{ r }} Baris
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- Right: Next Button -->
