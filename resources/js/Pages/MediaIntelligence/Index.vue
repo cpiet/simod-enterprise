@@ -245,9 +245,10 @@ const downloadWaTxt = () => {
   try {
     const blob = new Blob([whatsappReportText.value], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
+    const isDivhumas = props.selectedCode === 'ALL' || props.selectedPolda?.code === 'DIVHUMAS';
     const link = document.createElement('a');
     link.href = url;
-    link.download = `LAPORAN_WA_KAPOLDA_${props.selectedCode || 'SULBAR'}_${new Date().toISOString().slice(0, 10)}.txt`;
+    link.download = `LAPORAN_WA_${isDivhumas ? 'KADIVHUMAS' : 'KAPOLDA'}_${props.selectedCode || 'SULBAR'}_${new Date().toISOString().slice(0, 10)}.txt`;
     link.click();
     URL.revokeObjectURL(url);
     showToastNotification('✓ Naskah WA berhasil diunduh sebagai file .txt!');
@@ -258,34 +259,39 @@ const downloadWaTxt = () => {
 
 const whatsappReportText = computed(() => {
   const r = props.report || {};
-  const poldaName = props.selectedPolda?.name || 'Polda Sulawesi Barat';
-  const poldaShort = props.selectedCode === 'SULBAR' ? 'Polda Sulbar' : poldaName;
-  const kapoldaTitle = props.selectedPolda?.kapolda_name
-    ? `Bapak Kapolda ${poldaName} (${props.selectedPolda.kapolda_name})`
-    : `Bapak Kapolda ${poldaName}`;
-  const kabidHumasTitle = props.selectedPolda?.kabid_humas_name
-    ? `Kabid Humas ${poldaName} (${props.selectedPolda.kabid_humas_name})`
-    : `Kabid Humas ${poldaName}`;
+  const isDivhumas = props.selectedCode === 'ALL' || props.selectedPolda?.code === 'DIVHUMAS';
+  const poldaName = isDivhumas ? 'Divisi Humas Polri' : (props.selectedPolda?.name || 'Polda Sulawesi Barat');
+  const poldaShort = isDivhumas ? 'Divhumas Polri' : (props.selectedCode === 'SULBAR' ? 'Polda Sulbar' : poldaName);
+  const kapoldaTitle = isDivhumas
+    ? `Bapak Kadivhumas Polri (${props.selectedPolda?.kapolda_name || 'Irjen Pol. Johnny Eddizon Isir, S.I.K., M.T.C.P.'})`
+    : (props.selectedPolda?.kapolda_name
+        ? `Bapak Kapolda ${poldaName} (${props.selectedPolda.kapolda_name})`
+        : `Bapak Kapolda ${poldaName}`);
+  const kabidHumasTitle = isDivhumas
+    ? `Karo Penmas / Analis Intelijen Siber (${props.selectedPolda?.kabid_humas_name || 'Brigjen Pol. Trunoyudo Wisnu Andiko, S.I.K.'})`
+    : (props.selectedPolda?.kabid_humas_name
+        ? `Kabid Humas ${poldaName} (${props.selectedPolda.kabid_humas_name})`
+        : `Kabid Humas ${poldaName}`);
 
   const todayStr = r.report_date
     ? new Date(r.report_date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
     : new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-  const reportTime = r.report_time || '19.03 WITA';
+  const reportTime = r.report_time || (isDivhumas ? '19.00 WIB' : '19.03 WITA');
 
   let s = `*LAPORAN INTELIJEN MEDIA & SENTIMEN OPINI PUBLIK*\n`;
-  s += `*BIDANG HUMAS ${poldaName.toUpperCase()}*\n\n`;
+  s += `*${isDivhumas ? 'DIVISI HUMAS POLRI (ORKESTRASI NASIONAL)' : 'BIDANG HUMAS ' + poldaName.toUpperCase()}*\n\n`;
   s += `Kepada Yth. : ${kapoldaTitle}\n`;
   s += `Dari        : ${kabidHumasTitle}\n`;
   s += `Tanggal     : ${todayStr} (Pukul ${reportTime})\n`;
   s += `Perihal     : Analisis Pemberitaan, Sentimen Opini Publik, dan Rekomendasi Tindak Lanjut\n\n`;
   s += `*Assalamu’alaikum Wr. Wb.*\n`;
   s += `*Selamat Pagi Jenderal,*\n\n`;
-  s += `Mohon izin Jenderal, kami sampaikan laporan hasil analisis pemberitaan dan sentimen opini publik terkait Polri secara nasional serta ${poldaShort} berdasarkan bahan pemantauan media siber dan opini publik yang tersedia.\n\n`;
+  s += `Mohon izin Jenderal, kami sampaikan laporan hasil analisis pemberitaan dan sentimen opini publik terkait institusi Polri secara ${isDivhumas ? 'nasional dan orkestrasi 34 Polda jajaran' : 'nasional serta ' + poldaShort} berdasarkan bahan pemantauan media siber dan opini publik 24 jam terakhir.\n\n`;
 
-  // SECTION I: SITUASI DAN ANALISIS KABID HUMAS
+  // SECTION I: SITUASI DAN ANALISIS
   s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-  s += `*I. SITUASI DAN ANALISIS KABID HUMAS*\n`;
+  s += `*I. SITUASI DAN ANALISIS ${isDivhumas ? 'KADIV HUMAS POLRI' : 'KABID HUMAS'}*\n`;
   s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
   s += `*1. Sentimen Pemberitaan*\n\n`;
   s += `🇮🇩 *Nasional*\n`;
@@ -1048,7 +1054,7 @@ const submitIssue = () => {
                 <!-- Category Badge -->
                 <div class="flex items-center gap-2 pt-1">
                   <span class="px-2.5 py-0.5 rounded-md text-[9px] font-extrabold uppercase bg-slate-900/90 text-slate-300 border border-slate-700/80 tracking-wider">
-                    {{ article.category_badge || article.category || 'REGIONAL SULSELBAR' }}
+                    {{ article.category_badge || article.category || (selectedCode === 'ALL' ? 'NASIONAL & MABES' : 'REGIONAL SULSELBAR') }}
                   </span>
                 </div>
 

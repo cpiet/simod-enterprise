@@ -573,7 +573,7 @@ const navigationGroups = [
               <!-- Individual Poldas -->
               <div class="my-1 border-t border-slate-800/60"></div>
               <button
-                v-for="p in allPoldas"
+                v-for="p in (allPoldas || []).filter(item => item.code !== 'DIVHUMAS')"
                 :key="p.id"
                 @click="switchTenant(p.code)"
                 class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-between transition"

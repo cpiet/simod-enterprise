@@ -31,7 +31,10 @@ class MediaIntelligenceController extends Controller
         $selectedCode = $request->query('polda', 'SULBAR');
         $selectedPolda = null;
 
-        if ($selectedCode !== 'ALL') {
+        if ($selectedCode === 'ALL' || $selectedCode === 'DIVHUMAS') {
+            $selectedPolda = $allPoldas->firstWhere('code', 'DIVHUMAS') ?? Polda::where('code', 'DIVHUMAS')->first();
+            $selectedCode = 'ALL';
+        } else {
             $selectedPolda = $allPoldas->firstWhere('code', $selectedCode);
             if (!$selectedPolda && $allPoldas->isNotEmpty()) {
                 $selectedPolda = $allPoldas->first();
@@ -196,7 +199,8 @@ class MediaIntelligenceController extends Controller
     {
         $rawInput = (string) $request->input('raw_input', '');
         $poldaCode = $request->query('polda', 'SULBAR');
-        $polda = Polda::where('code', $poldaCode)->first() ?? Polda::first();
+        $searchCode = strtoupper($poldaCode) === 'ALL' ? 'DIVHUMAS' : strtoupper($poldaCode);
+        $polda = Polda::where('code', $searchCode)->first() ?? Polda::first();
 
         if (empty(trim($rawInput))) {
             return back()->with('error', 'Teks salinan hasil analisis ChatGPT tidak boleh kosong.');
@@ -380,21 +384,31 @@ class MediaIntelligenceController extends Controller
      */
     protected function generateDynamicPrompt(?Polda $polda): string
     {
-        $name = $polda?->name ?? 'Polda Sulawesi Barat';
-        $short = $polda?->code === 'SULBAR' ? 'Polda Sulbar' : ($polda?->name ?? 'Polda');
-        $tz = 'WITA';
-        $polresList = $polda && $polda->polres ? $polda->polres->pluck('name')->implode(', ') : 'Polresta Mamuju, Polres Majene, Polres Polewali Mandar, Polres Mamasa, Polres Pasangkayu, Polres Mamuju Tengah';
+        $isNational = ($polda?->code === 'DIVHUMAS');
+        if ($isNational) {
+            $name = 'Divisi Humas Polri (Mabes)';
+            $short = 'Divhumas Polri';
+            $tz = 'WIB';
+            $polresList = '34 Polda Jajaran se-Indonesia & Mabes Polri';
+        } else {
+            $name = $polda?->name ?? 'Polda Sulawesi Barat';
+            $short = $polda?->code === 'SULBAR' ? 'Polda Sulbar' : ($polda?->name ?? 'Polda');
+            $tz = ($polda?->timezone === 'Asia/Jakarta') ? 'WIB' : 'WITA';
+            $polresList = $polda && $polda->polres && $polda->polres->isNotEmpty()
+                ? $polda->polres->pluck('name')->implode(', ')
+                : 'Polresta Mamuju, Polres Majene, Polres Polewali Mandar, Polres Mamasa, Polres Pasangkayu, Polres Mamuju Tengah';
+        }
 
         return <<<PROMPT
-ROLE: Bertindak sebagai Senior Media Intelligence Analyst dan Strategic Communication Advisor untuk Polri, khususnya {$name} ({$short}).
+ROLE: Bertindak sebagai Senior Media Intelligence Analyst dan Strategic Communication Advisor untuk Kapolri & Kadiv Humas Polri, khususnya lingkup {$name} ({$short}).
 
 TUGAS HARIAN:
 Lakukan pemantauan pemberitaan terbaru menggunakan tanggal dan waktu aktual ({$tz}), dengan dua cakupan:
-1. NASIONAL: Seluruh isu strategis, trending, sentimen, prestasi, dan krisis reputasi terkait Polri.
-2. {$short}: Pemberitaan khusus {$name}, jajaran Satwil ({$polresList}), isu kamtibmas lokal, pelayanan masyarakat, kritik publik, serta isu nasional yang berdampak terhadap wilayah hukum {$short}.
+1. NASIONAL & MABES: Seluruh isu strategis, trending, sentimen, prestasi, dan krisis reputasi terkait institusi Polri se-Indonesia.
+2. KEWILAYAHAN & JAJARAN: Pemberitaan khusus {$name}, monitoring orkestrasi jajaran ({$polresList}), isu kamtibmas menonjol, pelayanan masyarakat, kritik publik, serta penanganan kasus yang viral.
 
 SUMBER:
-Telusuri media online nasional dan lokal daerah {$short}, Google News, X, Instagram, TikTok, Facebook, YouTube, serta situs resmi Polri. Prioritaskan informasi 24 jam terakhir dan sertakan tautan sumber serta waktu publikasi ({$tz}).
+Telusuri 22 Portal Media Online Nasional Terverifikasi (Antara News, Detikcom, CNN Indonesia, CNBC Indonesia, Liputan6, SINDOnews, Republika, JPNN, Kumparan, BBC Indonesia, dll.), Google News, X (Twitter), Instagram, TikTok, Facebook, YouTube, serta situs resmi Polri. Prioritaskan informasi 24 jam terakhir dan sertakan tautan sumber serta waktu publikasi ({$tz}).
 
 KETENTUAN PENTING:
 - Angka sentimen WAJIB berupa angka bulat (integer) persen dan TIDAK BOLEH bernilai null (contoh: positif: 60, netral: 30, negatif: 10, total harus 100%).
@@ -505,6 +519,112 @@ PROMPT;
      */
     protected function seedDefaultReport(int $poldaId, ?Polda $polda): MediaIntelligenceReport
     {
+        $isNational = ($polda?->code === 'DIVHUMAS');
+        if ($isNational) {
+            return MediaIntelligenceReport::create([
+                'polda_id'                 => $poldaId,
+                'report_date'              => now()->format('Y-m-d'),
+                'report_time'              => '19.00 WIB',
+                'title'                    => 'LAPORAN INTELIJEN MEDIA & SENTIMEN OPINI PUBLIK NASIONAL - DIVISI HUMAS POLRI',
+                'snapshot_national_status' => 'HIJAU - KONDUSIF',
+                'snapshot_national_desc'   => 'Stabilitas kamtibmas dan penegakan hukum siber di 34 Polda jajaran terpantau kondusif dengan tren apresiasi publik meningkat.',
+                'snapshot_sulbar_status'   => 'KUNING - WASPADA',
+                'snapshot_sulbar_desc'     => 'Fokus orkestrasi Divhumas pada penguatan counter narasi hoaks dan pengamanan ruang digital nasional.',
+                'top_concern'              => 'Penguatan orkestrasi komunikasi publik lintas Polda jajaran dan amplifikasi narasi Presisi.',
+                'executive_brief'          => "Situasi kamtibmas dan dinamika pemberitaan institusi Polri di tingkat nasional serta 34 Polda jajaran dalam keadaan aman, tertib, dan kondusif. Sentimen publik terhadap institusi Polri mencapai 86.8% positif, didorong oleh transparansi penegakan hukum, pelayanan digital, dan respon cepat jajaran kehumasan.",
+                'core_decision'            => 'Instruksikan seluruh Kabid Humas Polda jajaran mengamplifikasi rilis resmi Mabes Polri dan memitigasi isu lokal sebelum viral nasional.',
+                'sentiment_national'       => ['positif' => 68, 'netral' => 24, 'negatif' => 8],
+                'sentiment_sulbar'         => ['positif' => 65, 'netral' => 25, 'negatif' => 10],
+                'priority_responses'       => [
+                    'response_0_2h' => [
+                        'title'  => 'Validasi Fakta & Tindak Cepat',
+                        'action' => 'Biro Penmas Divhumas Polri memvalidasi fakta dengan Satker Mabes & Polda terkait untuk satu pintu rilis media.',
+                    ],
+                    'response_2_6h' => [
+                        'title'  => 'Konsolidasi & Klarifikasi Terpadu',
+                        'action' => 'Siapkan doorstop pimpinan, rilis pers terpadu, dan infografis klarifikasi untuk media nasional dan medsos.',
+                    ],
+                    'response_24h'  => [
+                        'title'  => 'Masifikasi Narasi Positif Presisi',
+                        'action' => 'Instruksikan amplifikasi masif ke seluruh akun dinas 34 Polda dan 500+ Polres jajaran.',
+                    ],
+                ],
+                'national_issues'          => [
+                    [
+                        'title'     => 'Kapolri Instruksikan Penguatan Pelayanan Publik dan Transformasi Presisi',
+                        'source'    => 'Antara News | 14.30 WIB',
+                        'url'       => 'https://www.antaranews.com',
+                        'fact'      => 'Apresiasi publik terhadap program Presisi dan modernisasi sarana kepolisian terus menguat.',
+                        'sentiment' => 'Positif',
+                        'virality'  => 'Tinggi',
+                        'risk'      => 'Hijau',
+                    ],
+                    [
+                        'title'     => 'Bareskrim Polri Bongkar Jaringan Kejahatan Siber Lintas Negara',
+                        'source'    => 'Detikcom | 11.20 WIB',
+                        'url'       => 'https://news.detik.com',
+                        'fact'      => 'Pengungkapan sindikat siber internasional diapresiasi warganet dan pakar keamanan siber.',
+                        'sentiment' => 'Positif',
+                        'virality'  => 'Tinggi',
+                        'risk'      => 'Hijau',
+                    ],
+                ],
+                'sulbar_issues'            => [
+                    [
+                        'title'     => 'Divhumas Polri Salurkan Bantuan & Asistensi Komunikasi ke Polda Jajaran',
+                        'source'    => 'Tribrata News | 16.00 WIB',
+                        'url'       => 'https://tribratanews.polri.go.id',
+                        'fact'      => 'Biro PID dan Penmas Divhumas memperkuat kapabilitas tim siber dan multimedia humas kewilayahan.',
+                        'sentiment' => 'Positif',
+                        'virality'  => 'Sedang',
+                        'risk'      => 'Hijau',
+                    ],
+                ],
+                'early_warnings'           => [
+                    [
+                        'level'         => 'KUNING',
+                        'title'         => 'Potensi Disinformasi Digital Jelang Agenda Nasional',
+                        'fact'          => 'Muncul narasi provokatif di platform X dan TikTok yang mencoba mendiskreditkan penegakan hukum.',
+                        'risk'          => 'Dapat mengikis kepercayaan publik jika tidak diklarifikasi dalam waktu 2 jam.',
+                        'response_0_2h' => 'Patroli siber Biro Multimedia dan koordinasi fakta riil dengan Bareskrim.',
+                        'response_2_6h' => 'Rilis infografis cek fakta dan amplifikasi narasi counter hoaks.',
+                        'response_6_24h'=> 'Monitoring respon netizen dan kolaborasi dengan pegiat media/KOL.',
+                        'pic'           => 'Biro Multimedia Divhumas Polri',
+                    ],
+                ],
+                'strategic_contents'       => [
+                    [
+                        'no'       => 1,
+                        'label'    => 'HERO',
+                        'title'    => 'Humanis Presisi: Dedikasi Bhabinkamtibmas Menembus Pelosok Negeri',
+                        'format'   => 'Video Dokumenter Pendek (Reels / TikTok / YouTube Shorts)',
+                        'platform' => 'Instagram, TikTok, YouTube Resmi Divhumas Polri',
+                        'target'   => 'Generasi Muda & Masyarakat Luas',
+                        'priority' => 'Segera',
+                    ],
+                ],
+                'agenda_setting'           => [
+                    [
+                        'day'    => now()->isoFormat('dddd, D MMMM Y'),
+                        'time'   => '10.00 WIB',
+                        'theme'  => 'Transparansi Kinerja Presisi Triwulan',
+                        'format' => 'Konferensi Pers & Live Streaming YouTube Polri TV',
+                        'goal'   => 'Menyampaikan akuntabilitas kinerja kepolisian secara terbuka kepada publik',
+                        'pic'    => 'Biro Penmas Divhumas Polri',
+                    ],
+                ],
+                'recommendations'          => [
+                    [
+                        'target'    => '1 | 0-24 jam',
+                        'issue'     => 'Penguatan Counter Narasi Hoaks Digital',
+                        'action'    => 'Terbitkan bantahan resmi dalam format infografis ringkas dan distribusikan ke seluruh Polda jajaran',
+                        'pic'       => 'Biro Multimedia Divhumas Polri',
+                        'indicator' => 'Counter narasi tampil di halaman pertama mesin pencari dan trending medsos',
+                    ],
+                ],
+                'raw_input'                => 'Laporan Intelijen Media Default Divisi Humas Polri (Mabes Polri)',
+            ]);
+        }
         return MediaIntelligenceReport::create([
             'polda_id'                 => $poldaId,
             'report_date'              => now()->format('Y-m-d'),

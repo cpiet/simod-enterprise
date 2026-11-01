@@ -176,12 +176,13 @@ class RssFeedService
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_ENCODING       => '',
             CURLOPT_MAXREDIRS      => 4,
-            CURLOPT_TIMEOUT        => 4,
-            CURLOPT_CONNECTTIMEOUT => 2,
+            CURLOPT_TIMEOUT        => 8,
+            CURLOPT_CONNECTTIMEOUT => 4,
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_SSL_VERIFYHOST => false,
-            CURLOPT_USERAGENT      => 'SIMOD-Enterprise-Bot/2.0',
+            CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 (compatible; SIMOD-Enterprise/2.0)',
             CURLOPT_HTTPHEADER     => ['Accept: application/rss+xml, application/xml, text/xml, application/atom+xml, text/html;q=0.9, */*;q=0.8'],
         ]);
         $body = curl_exec($ch);
@@ -284,25 +285,36 @@ class RssFeedService
 
     protected function extractImage(\SimpleXMLElement $item, string $raw, array $namespaces): ?string
     {
+        // 1. RSS standard enclosure
         if (isset($item->enclosure)) {
             $url = (string) ($item->enclosure->attributes()['url'] ?? '');
-            if ($url !== '') {
+            if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
                 return $url;
             }
         }
+
+        // 2. Media RSS namespace (media:content, media:thumbnail)
         if (isset($namespaces['media'])) {
             $media = $item->children($namespaces['media']);
             foreach (['content', 'thumbnail'] as $tag) {
                 if (isset($media->{$tag})) {
                     $url = (string) ($media->{$tag}->attributes()['url'] ?? '');
-                    if ($url !== '') {
+                    if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL)) {
                         return $url;
                     }
                 }
             }
         }
 
-        return preg_match('/<img[^>]+src=["\']([^"\']+)["\']/i', $raw, $m) && filter_var($m[1], FILTER_VALIDATE_URL) ? $m[1] : null;
+        // 3. RegEx <img> in raw description or content:encoded (supports src, data-src, data-original)
+        if (preg_match('/<img[^>]+(?:src|data-src|data-original)=["\']([^"\']+)["\']/i', $raw, $m)) {
+            $cleanUrl = html_entity_decode(trim($m[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if (filter_var($cleanUrl, FILTER_VALIDATE_URL)) {
+                return $cleanUrl;
+            }
+        }
+
+        return null;
     }
 
     protected function fetchOgImage(string $url): ?string

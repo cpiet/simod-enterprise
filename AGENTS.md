@@ -90,6 +90,34 @@ Seluruh 29 portal media dikonfigurasi melalui seeder [`SulbarRssFeedsSeeder.php`
 - **Tab Navigasi**: Tab 01 (Radar Multi-Platform), Tab 02 (Tokoh Kritis & KOL Tracker), Tab 03 (Tren Tagar & Isu Viral), Tab 04 (Integrasi Apify & Pengaturan).
 - **Direct One-Click Escalation**: Tombol `🚨 Eskalasi Jadi Isu` pada setiap kartu postingan medsos otomatis mengarahkan ke formulir `/issues/create` dengan pra-isi judul, kategori (`📱 Isu Medsos & Opini Publik`), URL sumber, dan ringkasan.
 
+### 4.5. Radar Media Online Divhumas Polri (22 Feed Nasional Terverifikasi 100% Gambar)
+- **Tenant Scope**: Kode `DIVHUMAS` (ID `10`) atau query parameter `?polda=ALL`.
+- **Daftar 22 Feed Resmi Aktif**:
+  1. ANTARA News Terkini (`https://www.antaranews.com/rss/terkini.xml`)
+  2. ANTARA Top News (`https://www.antaranews.com/rss/top-news.xml`)
+  3. ANTARA Politik & Pemerintahan (`https://www.antaranews.com/rss/politik.xml`)
+  4. ANTARA Hukum & Peradilan (`https://www.antaranews.com/rss/hukum.xml`)
+  5. ANTARA Metro Kriminalitas (`https://www.antaranews.com/rss/metro-kriminalitas.xml`)
+  6. ANTARA Metro Ibukota (`https://www.antaranews.com/rss/metro.xml`)
+  7. ANTARA Ekonomi & Bisnis (`https://www.antaranews.com/rss/ekonomi.xml`)
+  8. Detikcom Berita Nasional (`https://news.detik.com/berita/rss`)
+  9. Detikcom Finance (`https://finance.detik.com/rss`)
+  10. Detikcom Inet & Siber (`https://inet.detik.com/rss`)
+  11. CNN Indonesia Nasional (`https://www.cnnindonesia.com/nasional/rss`)
+  12. CNN Indonesia Ekonomi (`https://www.cnnindonesia.com/ekonomi/rss`)
+  13. CNN Indonesia Teknologi & Siber (`https://www.cnnindonesia.com/teknologi/rss`)
+  14. CNBC Indonesia News (`https://www.cnbcindonesia.com/news/rss`)
+  15. CNBC Indonesia Market & Finansial (`https://www.cnbcindonesia.com/market/rss`)
+  16. Republika Terkini (`https://www.republika.co.id/rss`)
+  17. Liputan6 News & Peristiwa (`https://feed.liputan6.com/rss/news`)
+  18. SINDOnews Nasional (`https://nasional.sindonews.com/rss`)
+  19. SINDOnews Daerah & Satwil (`https://daerah.sindonews.com/rss`)
+  20. JPNN Berita Terkini (`https://www.jpnn.com/rss`)
+  21. Kumparan News (`https://lapi.kumparan.com/v2.0/rss/`)
+  22. BBC News Indonesia (`https://feeds.bbci.co.uk/indonesia/rss.xml`)
+- **Verifikasi Kualitas Gambar**: 100% artikel memiliki thumbnail/cover image resolusi tinggi dari CDN resmi media yang diekstrak melalui parser `RssFeedService` (`enclosure`, `media:content`, `media:thumbnail`, `img src`).
+- **Sinkronisasi CLI**: `php artisan rss:sync --polda=ALL` otomatis memetakan ke tenant Divhumas Polri.
+
 ---
 
 ## 🤖 5. Alur Analisis Intelijen AI (Tab 02, Tab 03, Tab 07)

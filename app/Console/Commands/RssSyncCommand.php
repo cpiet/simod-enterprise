@@ -31,7 +31,11 @@ class RssSyncCommand extends Command
         $this->info('Memulai sinkronisasi berita online RSS...');
 
         if ($poldaCode) {
-            $polda = Polda::where('code', strtoupper($poldaCode))->first();
+            $searchCode = strtoupper($poldaCode);
+            if ($searchCode === 'ALL') {
+                $searchCode = 'DIVHUMAS';
+            }
+            $polda = Polda::where('code', $searchCode)->first();
             if (! $polda) {
                 $this->error("Polda dengan kode [{$poldaCode}] tidak ditemukan.");
                 return self::FAILURE;

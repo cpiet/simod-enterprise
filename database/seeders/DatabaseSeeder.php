@@ -16,6 +16,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             EnterpriseDatabaseSeeder::class,
             MultiTenantPoldasSeeder::class,
+            DivhumasNationalRssFeedsSeeder::class,
             MultiPoldaArticlesHistoricalSeeder::class,
             SocialIntelligenceSeeder::class,
         ]);
