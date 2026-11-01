@@ -46,7 +46,10 @@ class HandleInertiaRequests extends Middleware
         $allPoldas = \App\Models\Polda::withCount('polres')->where('is_active', true)->orderBy('name')->get();
 
         $selectedPolda = null;
-        if ($selectedCode !== 'ALL') {
+        if ($selectedCode === 'ALL' || $selectedCode === 'DIVHUMAS') {
+            $selectedPolda = $allPoldas->firstWhere('code', 'DIVHUMAS') ?? \App\Models\Polda::where('code', 'DIVHUMAS')->first();
+            $selectedCode = 'ALL';
+        } else {
             $selectedPolda = $allPoldas->firstWhere('code', $selectedCode);
             if (!$selectedPolda && $allPoldas->isNotEmpty()) {
                 $selectedPolda = $allPoldas->first();
@@ -66,8 +69,20 @@ class HandleInertiaRequests extends Middleware
             'pending_verify'     => \App\Models\Issue::when($poldaId, fn($q) => $q->where('polda_id', $poldaId))->whereIn('status', ['monitoring', 'investigasi'])->count(),
             'active_tasks'       => \App\Models\Task::when($poldaId, fn($q) => $q->where('polda_id', $poldaId))->where('status', 'in_progress')->count(),
             'total_publications' => \App\Models\Publication::when($poldaId, fn($q) => $q->where('polda_id', $poldaId))->count(),
-            'server_wita'        => now()->setTimezone($selectedPolda->timezone ?? 'Asia/Makassar')->format('d M Y, H:i:s') . ' WITA',
+            'server_wita'        => now()->setTimezone($selectedPolda->timezone ?? 'Asia/Makassar')->format('d M Y, H:i:s') . ($selectedCode === 'ALL' ? ' WIB' : ' WITA'),
         ];
+
+        // Resolusi Peran Aktif & Hak Akses (RBAC)
+        $user = $request->user();
+        $simulatedRole = $request->query('role') ?? $request->session()->get('active_simulated_role');
+        if ($request->has('role')) {
+            $request->session()->put('active_simulated_role', $request->query('role'));
+            $simulatedRole = $request->query('role');
+        }
+
+        $activeRole = $simulatedRole ?: ($user?->role ?: ($selectedCode === 'ALL' ? 'kadiv_humas' : 'polda_leader'));
+        $targetPoldaId = $selectedPolda?->id ?: (\App\Models\Polda::where('code', 'DIVHUMAS')->value('id'));
+        $activePermissions = \App\Models\RolePermission::getPermissionsForRole($activeRole, $targetPoldaId);
 
         return [
             ...parent::share($request),
@@ -75,18 +90,25 @@ class HandleInertiaRequests extends Middleware
             'selectedPolda'  => $selectedPolda,
             'selectedCode'   => $selectedCode,
             'auth' => [
-                'user' => $request->user() ? [
-                    'id' => $request->user()->id,
-                    'name' => $request->user()->name,
-                    'email' => $request->user()->email,
-                    'role' => $request->user()->role ?? 'operator',
-                    'polda' => $request->user()->polda ?? null,
-                ] : null,
+                'user' => $user ? [
+                    'id'    => $user->id,
+                    'name'  => $user->name,
+                    'email' => $user->email,
+                    'role'  => $activeRole,
+                    'polda' => $user->polda ?? null,
+                ] : [
+                    'id'    => 1,
+                    'name'  => $selectedCode === 'ALL' ? 'Irjen Pol. Johnny Eddizon Isir, S.I.K., M.T.C.P.' : ($selectedPolda?->kabid_humas_name ?? 'Kombes Pol. Slamet Wahyudi'),
+                    'email' => 'pimpinan@polri.go.id',
+                    'role'  => $activeRole,
+                ],
+                'role'        => $activeRole,
+                'permissions' => $activePermissions,
             ],
             'sidebarMetrics' => $sidebarMetrics,
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
-                'error' => fn () => $request->session()->get('error'),
+                'error'   => fn () => $request->session()->get('error'),
             ],
         ];
     }

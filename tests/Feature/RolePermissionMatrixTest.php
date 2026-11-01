@@ -119,3 +119,4 @@ class RolePermissionMatrixTest extends TestCase
         $this->assertTrue($kadiv->hasPermission('issues_create'));
     }
 }
+

@@ -309,20 +309,18 @@ class RolePermission extends Model
      */
     public static function isGranted(string $roleKey, string $moduleKey, ?int $poldaId = null): bool
     {
-        // Kadivhumas & Superadmin Mabes memiliki bypass wewenang penuh
-        if (in_array($roleKey, ['kadiv_humas', 'super_admin_mabes'], true)) {
-            return true;
-        }
-
-        // Cari pengaturan spesifik polda
+        // 1. Cari pengaturan spesifik di basis data
         $rec = static::where('role_key', $roleKey)
             ->where('polda_id', $poldaId)
             ->first();
 
-        // Fallback ke pengaturan nasional (polda_id = null)
+        // Fallback jika poldaId spesifik belum ada, cek pengaturan nasional / Mabes
         if (!$rec && $poldaId !== null) {
+            $divhumasId = Polda::where('code', 'DIVHUMAS')->value('id');
             $rec = static::where('role_key', $roleKey)
-                ->whereNull('polda_id')
+                ->where(function ($q) use ($divhumasId) {
+                    $q->whereNull('polda_id')->orWhere('polda_id', $divhumasId);
+                })
                 ->first();
         }
 
@@ -330,7 +328,7 @@ class RolePermission extends Model
             return (bool) $rec->permissions[$moduleKey];
         }
 
-        // Fallback ke standar peran bawaan
+        // 2. Fallback ke standar peran bawaan jika belum ada di database
         foreach (static::defaultRoles() as $def) {
             if ($def['role_key'] === $roleKey) {
                 if (!empty($def['all_granted'])) return true;
@@ -340,4 +338,45 @@ class RolePermission extends Model
 
         return false;
     }
+
+    /**
+     * Ambil seluruh permissions (array associative key => bool) untuk suatu role.
+     */
+    public static function getPermissionsForRole(string $roleKey, ?int $poldaId = null): array
+    {
+        $rec = static::where('role_key', $roleKey)
+            ->where('polda_id', $poldaId)
+            ->first();
+
+        if (!$rec && $poldaId !== null) {
+            $divhumasId = Polda::where('code', 'DIVHUMAS')->value('id');
+            $rec = static::where('role_key', $roleKey)
+                ->where(function ($q) use ($divhumasId) {
+                    $q->whereNull('polda_id')->orWhere('polda_id', $divhumasId);
+                })
+                ->first();
+        }
+
+        if ($rec && is_array($rec->permissions)) {
+            return $rec->permissions;
+        }
+
+        $allModules = array_column(static::defaultModules(), 'key');
+        $perms = [];
+        foreach (static::defaultRoles() as $def) {
+            if ($def['role_key'] === $roleKey) {
+                $granted = !empty($def['all_granted']) ? $allModules : ($def['granted_keys'] ?? []);
+                foreach ($allModules as $k) {
+                    $perms[$k] = in_array($k, $granted, true);
+                }
+                return $perms;
+            }
+        }
+
+        foreach ($allModules as $k) {
+            $perms[$k] = true;
+        }
+        return $perms;
+    }
 }
+

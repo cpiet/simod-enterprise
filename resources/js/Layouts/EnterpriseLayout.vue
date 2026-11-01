@@ -179,6 +179,7 @@ const navigationGroups = [
         match: ['/', '/dashboard', '/command-center'],
         badge: 'LIVE',
         badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+        permission: 'dashboard_view',
       },
       {
         name: 'Radar Media Online',
@@ -188,6 +189,7 @@ const navigationGroups = [
         match: ['/media-intelligence', '/monitoring-media-online'],
         badge: 'ONLINE',
         badgeColor: 'bg-amber-400/20 text-amber-300 border-amber-400/30',
+        permission: 'media_intelligence_view',
       },
       {
         name: 'Radar Media Sosial',
@@ -197,6 +199,7 @@ const navigationGroups = [
         match: ['/social-intelligence'],
         badge: 'RADAR',
         badgeColor: 'bg-sky-500/20 text-sky-400 border border-sky-500/30',
+        permission: 'social_intelligence_view',
       },
     ],
   },
@@ -211,6 +214,7 @@ const navigationGroups = [
         match: ['/issues'],
         exclude: ['/issues/create'],
         badgeKey: 'total_issues',
+        permission: 'issues_view',
       },
       {
         name: 'Input Laporan Baru',
@@ -219,6 +223,7 @@ const navigationGroups = [
         icon: PlusCircle,
         match: ['/issues/create'],
         exact: true,
+        permission: 'issues_create',
       },
       {
         name: 'Antrean Verifikasi',
@@ -228,6 +233,7 @@ const navigationGroups = [
         match: ['/verification-queue'],
         badgeKey: 'pending_verify',
         badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+        permission: 'issues_verify',
       },
       {
         name: 'Disposisi Tugas',
@@ -236,6 +242,7 @@ const navigationGroups = [
         icon: CheckSquare,
         match: ['/tasks'],
         badgeKey: 'active_tasks',
+        permission: 'tasks_disposition',
       },
     ],
   },
@@ -249,6 +256,7 @@ const navigationGroups = [
         icon: Share2,
         match: ['/publications'],
         badgeKey: 'total_publications',
+        permission: 'publications_manage',
       },
       {
         name: 'Galeri Media Aman',
@@ -256,6 +264,7 @@ const navigationGroups = [
         href: '/gallery',
         icon: ImageIcon,
         match: ['/gallery'],
+        permission: 'gallery_access',
       },
       {
         name: 'Laporan & Anev',
@@ -263,6 +272,7 @@ const navigationGroups = [
         href: '/reports',
         icon: FileBarChart2,
         match: ['/reports'],
+        permission: 'reports_export',
       },
     ],
   },
@@ -275,6 +285,7 @@ const navigationGroups = [
         href: '/personalia',
         icon: Users,
         match: ['/personalia'],
+        permission: 'personalia_manage',
       },
       {
         name: 'Pengaturan Satwil & Mabes',
@@ -282,6 +293,7 @@ const navigationGroups = [
         href: '/settings/polda',
         icon: Building2,
         match: ['/settings/polda'],
+        permission: 'polda_settings',
       },
       {
         name: 'Keamanan & Pemeliharaan',
@@ -289,6 +301,7 @@ const navigationGroups = [
         href: '/security',
         icon: ShieldAlert,
         match: ['/security', '/roles', '/audit-logs', '/database/backup', '/maintenance', '/settings/mail', '/maintenance/news-cleanup', '/maintenance/rss-sync'],
+        permissions: ['security_center', 'roles_matrix_manage', 'database_backup', 'maintenance_ops', 'mail_settings'],
       },
       {
         name: 'Profil Saya',
@@ -300,6 +313,55 @@ const navigationGroups = [
     ],
   },
 ];
+
+// RBAC Permissions Enforcement & Filtering
+const userPermissions = computed(() => page.props.auth?.permissions || {});
+const activeUserRole = computed(() => page.props.auth?.role || page.props.auth?.user?.role || (props.selectedCode === 'ALL' ? 'kadiv_humas' : 'polda_leader'));
+
+const isItemVisible = (item) => {
+  if (item.href === '/profile') return true;
+  if (item.permission) {
+    return userPermissions.value[item.permission] !== false;
+  }
+  if (Array.isArray(item.permissions)) {
+    return item.permissions.some(p => userPermissions.value[p] !== false);
+  }
+  return true;
+};
+
+// Filter group yang memiliki minimal 1 modul aktif sesuai izin pengguna
+const visibleNavigationGroups = computed(() => {
+  return navigationGroups.map(group => ({
+    ...group,
+    items: group.items.filter(item => isItemVisible(item))
+  })).filter(group => group.items.length > 0);
+});
+
+// Role Switcher Simulation Definition
+const availableRoles = [
+  { key: 'kadiv_humas', label: 'Kadivhumas Polri', badge: 'Mabes ⭐⭐', name: 'Irjen Pol. Johnny Eddizon Isir' },
+  { key: 'super_admin_mabes', label: 'Superadmin Mabes', badge: 'Superadmin', name: 'Super Administrator Mabes' },
+  { key: 'polda_leader', label: 'Pimpinan Polda', badge: 'Polda', name: 'Kombes Pol. Slamet Wahyudi' },
+  { key: 'verifikator', label: 'Verifikator (Penmas)', badge: 'Verifikator', name: 'AKP Syamsuddin, S.H.' },
+  { key: 'analis', label: 'Analis Intelijen', badge: 'Analis', name: 'Ipda Muhammad Ridwan, S.Kom' },
+  { key: 'operator', label: 'Operator Satwil', badge: 'Operator', name: 'Aipda Hendra Gunawan' },
+];
+
+const activeRoleObj = computed(() => {
+  return availableRoles.find(r => r.key === activeUserRole.value) || {
+    key: activeUserRole.value,
+    label: 'Personel Polri',
+    badge: 'Dinas',
+    name: 'Petugas Humas',
+  };
+});
+
+const switchRole = (newRole) => {
+  isUserMenuOpen.value = false;
+  const url = new URL(window.location.href);
+  url.searchParams.set('role', newRole);
+  router.get(url.pathname, Object.fromEntries(url.searchParams.entries()), { preserveScroll: true });
+};
 </script>
 
 <template>
@@ -337,7 +399,7 @@ const navigationGroups = [
 
       <!-- Scrollable Navigation Items -->
       <div class="flex-1 overflow-y-auto px-3 py-4 space-y-6 custom-scrollbar">
-        <div v-for="group in navigationGroups" :key="group.name" class="space-y-1">
+        <div v-for="group in visibleNavigationGroups" :key="group.name" class="space-y-1">
           <!-- Section Heading -->
           <div
             v-if="!isDesktopSidebarCollapsed"
@@ -467,7 +529,7 @@ const navigationGroups = [
 
       <!-- Mobile Navigation Scroll -->
       <div class="flex-1 overflow-y-auto px-3 py-4 space-y-6">
-        <div v-for="group in navigationGroups" :key="group.name" class="space-y-1">
+        <div v-for="group in visibleNavigationGroups" :key="group.name" class="space-y-1">
           <div class="px-3 pb-1 text-[10px] font-black uppercase tracking-wider text-slate-300/80">
             {{ group.name }}
           </div>
@@ -636,16 +698,16 @@ const navigationGroups = [
             >
               <div
                 class="w-7 h-7 rounded-lg text-slate-950 font-black text-xs flex items-center justify-center shadow-sm"
-                :class="selectedCode === 'ALL' ? 'bg-gradient-to-tr from-amber-400 to-yellow-300 ring-2 ring-amber-400/50 text-[10px]' : 'bg-amber-400'"
+                :class="activeUserRole === 'kadiv_humas' ? 'bg-gradient-to-tr from-amber-400 to-yellow-300 ring-2 ring-amber-400/50 text-[10px]' : 'bg-amber-400'"
               >
-                {{ selectedCode === 'ALL' ? '⭐⭐' : 'P' }}
+                {{ activeUserRole === 'kadiv_humas' ? '⭐⭐' : (activeUserRole === 'super_admin_mabes' ? '🛡️' : activeRoleObj.badge.charAt(0)) }}
               </div>
               <div class="hidden sm:block text-left">
                 <p class="text-xs font-bold text-white leading-tight truncate max-w-[130px]">
-                  {{ selectedCode === 'ALL' ? 'Irjen Pol. Johnny E. Isir' : (selectedPolda?.kabid_humas_name ? selectedPolda.kabid_humas_name.split('(')[0].trim() : 'Kombes Pol. Slamet Wahyudi') }}
+                  {{ activeRoleObj.name }}
                 </p>
-                <p class="text-[10px] text-amber-400 font-semibold leading-tight">
-                  {{ selectedCode === 'ALL' ? 'Kadivhumas Polri' : ('Kabid Humas ' + (selectedPolda?.code || 'SULBAR')) }}
+                <p class="text-[10px] text-amber-400 font-semibold leading-tight flex items-center gap-1">
+                  <span>{{ activeRoleObj.label }}</span>
                 </p>
               </div>
               <ChevronDown class="w-3 h-3 text-slate-400 transition" :class="{ 'rotate-180': isUserMenuOpen }" />
@@ -654,16 +716,46 @@ const navigationGroups = [
             <!-- User Menu Dropdown -->
             <div
               v-if="isUserMenuOpen"
-              class="absolute right-0 mt-2 w-64 rounded-2xl bg-[#0b1426] border border-slate-700/80 shadow-2xl p-2 z-50 backdrop-blur-2xl"
+              class="absolute right-0 mt-2 w-72 rounded-2xl bg-[#0b1426] border border-slate-700/80 shadow-2xl p-2 z-50 backdrop-blur-2xl"
             >
               <div class="px-3 py-2 border-b border-slate-800/80">
+                <div class="flex items-center justify-between gap-1 mb-1">
+                  <span class="text-[9px] uppercase font-black tracking-wider text-slate-400">Akun Personel Aktif:</span>
+                  <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 font-black">
+                    {{ activeRoleObj.badge }}
+                  </span>
+                </div>
                 <p class="text-xs font-bold text-white">
-                  {{ selectedCode === 'ALL' ? 'Irjen Pol. Johnny Eddizon Isir, S.I.K., M.T.C.P.' : (selectedPolda?.kabid_humas_name || 'Kombes Pol. Slamet Wahyudi, S.I.K., M.H.') }}
+                  {{ activeRoleObj.name }}
                 </p>
                 <p class="text-[10px] text-amber-400 font-bold">
-                  {{ selectedCode === 'ALL' ? 'NRP: 75060789 • Kadivhumas Polri' : ('NRP: 76040112 • Kabid Humas ' + (selectedPolda?.name || 'Polda Sulbar')) }}
+                  {{ activeRoleObj.label }}
                 </p>
               </div>
+
+              <!-- Quick Switch Role Selector (Uji Hak Akses & Matriks Otoritas) -->
+              <div class="p-2 border-b border-slate-800/80 bg-slate-900/60 rounded-xl my-1">
+                <div class="text-[10px] font-black uppercase text-slate-400 mb-1.5 flex items-center justify-between">
+                  <span>Uji Simulasi Peran (RBAC)</span>
+                  <span class="text-[9px] text-amber-400">Live Preview</span>
+                </div>
+                <div class="grid grid-cols-2 gap-1.5">
+                  <button
+                    v-for="r in availableRoles"
+                    :key="r.key"
+                    type="button"
+                    @click="switchRole(r.key)"
+                    class="text-left px-2 py-1.5 rounded-lg text-[10px] font-bold transition flex items-center justify-between"
+                    :class="activeUserRole === r.key
+                      ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
+                      : 'bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-800'"
+                  >
+                    <span class="truncate">{{ r.label.split(' ')[0] }}</span>
+                    <span class="text-[8px] opacity-75 font-mono">{{ r.badge.replace('Mabes ', '') }}</span>
+                  </button>
+                </div>
+              </div>
+
               <div class="py-1">
                 <Link
                   :href="`/profile?polda=${selectedCode}`"
@@ -672,6 +764,14 @@ const navigationGroups = [
                 >
                   <UserCheck class="w-3.5 h-3.5 text-amber-400" />
                   <span>Profil & PIN Dinas</span>
+                </Link>
+                <Link
+                  :href="`/roles?polda=${selectedCode}`"
+                  @click="isUserMenuOpen = false"
+                  class="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 text-slate-300 hover:bg-slate-800 hover:text-white transition"
+                >
+                  <KeyRound class="w-3.5 h-3.5 text-amber-400" />
+                  <span>Matriks Hak Akses (RBAC)</span>
                 </Link>
                 <Link
                   :href="`/security?polda=${selectedCode}`"

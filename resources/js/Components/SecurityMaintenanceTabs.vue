@@ -7,18 +7,22 @@ const props = defineProps({ selectedCode: { type: String, default: 'SULBAR' } })
 const page = usePage();
 
 const tabs = [
-  { name: 'Keamanan', href: '/security', icon: ShieldAlert },
-  { name: 'Hak Akses', href: '/roles', icon: KeyRound },
-  { name: 'Audit Log', href: '/audit-logs', icon: History },
-  { name: 'Backup Data', href: '/database/backup', icon: Database },
-  { name: 'Pembersihan Berita', href: '/maintenance/news-cleanup', icon: Eraser },
-  { name: 'Otomasi Sinkron RSS', href: '/maintenance/rss-sync', icon: Radio },
-  { name: 'Mode Pemeliharaan', href: '/maintenance', icon: Wrench },
-  { name: 'Konfigurasi Mail', href: '/settings/mail', icon: Mail },
+  { name: 'Keamanan', href: '/security', icon: ShieldAlert, permission: 'security_center' },
+  { name: 'Hak Akses', href: '/roles', icon: KeyRound, permission: 'roles_matrix_manage' },
+  { name: 'Audit Log', href: '/audit-logs', icon: History, permission: 'security_center' },
+  { name: 'Backup Data', href: '/database/backup', icon: Database, permission: 'database_backup' },
+  { name: 'Pembersihan Berita', href: '/maintenance/news-cleanup', icon: Eraser, permission: 'maintenance_ops' },
+  { name: 'Otomasi Sinkron RSS', href: '/maintenance/rss-sync', icon: Radio, permission: 'maintenance_ops' },
+  { name: 'Mode Pemeliharaan', href: '/maintenance', icon: Wrench, permission: 'maintenance_ops' },
+  { name: 'Konfigurasi Mail', href: '/settings/mail', icon: Mail, permission: 'mail_settings' },
 ];
 
 const currentPath = computed(() => (page.url || '').split('?')[0].replace(/\/+$/, '') || '/');
 const isActive = (href) => currentPath.value === href;
+const userPermissions = computed(() => page.props.auth?.permissions || {});
+const visibleTabs = computed(() => {
+  return tabs.filter(t => !t.permission || userPermissions.value[t.permission] !== false);
+});
 </script>
 
 <template>
@@ -31,7 +35,7 @@ const isActive = (href) => currentPath.value === href;
     <div class="p-2 rounded-2xl bg-[#08101e] border border-slate-800 shadow-xl">
       <div class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2">
         <Link
-          v-for="t in tabs"
+          v-for="t in visibleTabs"
           :key="t.href"
           :href="`${t.href}?polda=${props.selectedCode}`"
           class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-[11px] md:text-xs font-extrabold text-center leading-tight transition"
