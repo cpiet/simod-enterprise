@@ -41,7 +41,7 @@ Sidebar navigasi di [`EnterpriseLayout.vue`](file:///d:/Foto/laragon/www/simod-e
 └── 4. ADMINISTRASI & SISTEM
     ├── Personalia & Petugas         [/personalia] -> Manajemen akun personel & Satker
     ├── Pengaturan Satwil            [/settings/polda] -> Konfigurasi Polda & Polres jajaran
-    ├── Keamanan & Pemeliharaan      [/security] -> Pintu masuk 8 sub-modul pemeliharaan terpadu:
+    ├── Keamanan & Pemeliharaan      [/security] -> Pintu masuk 9 sub-modul pemeliharaan terpadu:
     │   ├── Keamanan Siber           [/security]
     │   ├── Hak Akses (RBAC)         [/roles]
     │   ├── Audit Log                [/audit-logs]
@@ -49,7 +49,8 @@ Sidebar navigasi di [`EnterpriseLayout.vue`](file:///d:/Foto/laragon/www/simod-e
     │   ├── Pembersihan Berita       [/maintenance/news-cleanup]
     │   ├── Otomasi Sinkron RSS      [/maintenance/rss-sync]
     │   ├── Mode Pemeliharaan        [/maintenance]
-    │   └── Konfigurasi Mail (SMTP)  [/settings/mail]
+    │   ├── Konfigurasi Mail (SMTP)  [/settings/mail]
+    │   └── Mesin Intelijen AI (LLM) [/settings/ai]
     └── Profil Saya                  [/profile] -> Kredensial dinas & PIN Cepat
 ```
 
@@ -132,9 +133,10 @@ Seluruh 29 portal media dikonfigurasi melalui seeder [`SulbarRssFeedsSeeder.php`
 3. **Penyimpanan Permanen Basis Data**:
    - Menyimpan hasil analisis ke tabel `media_intelligence_reports` dan memperbarui stempel `ai_settings`.
    - Mengisi seketika seluruh tab: **Tab 02** (Executive Briefing), **Tab 03** (Polarisasi Sentimen), **Tab 05** (EWS), **Tab 06** (Counter Narasi & Rekomendasi), dan **Tab 07** (Naskah WhatsApp Siap Kirim).
-4. **Modal Pengaturan Gemini AI (`showGeminiSettingsModal`)**:
-   - Memungkinkan personel memasukkan API Key dari Google AI Studio (`aistudio.google.com`).
-   - Menyediakan fitur *"Uji Koneksi API"* realtime beserta indikator latensi milidetik.
+4. **Sentralisasi Admin di Keamanan & Pemeliharaan (`/settings/ai`)**:
+   - Master Google Gemini API Key dikonfigurasi tersentralisasi oleh Administrator di menu **Keamanan & Pemeliharaan -> Mesin Intelijen AI**.
+   - Halaman operasional **Radar Media Online (`/media-intelligence`)** tetap bersih, bebas dari input API key yang membingungkan staf.
+   - Menyediakan fitur *"Uji Koneksi API"* realtime beserta indikator latensi milidetik dan audit log.
    - Pilihan model (`gemini-2.5-pro`, `gemini-1.5-pro`, `gemini-2.5-flash`, `gemini-1.5-flash`).
 
 ### 5.2. Opsi Manual (Salin Formula & Tempel Ringkasan AI)

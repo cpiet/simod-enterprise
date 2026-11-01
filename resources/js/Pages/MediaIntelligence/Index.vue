@@ -250,61 +250,10 @@ const copyAiPrompt = () => {
 // GOOGLE GEMINI PRO AUTOMATED MEDIA INTELLIGENCE
 // =========================================================================
 const isAnalyzingGemini = ref(false);
-const showGeminiSettingsModal = ref(false);
-const showApiKeyText = ref(false);
-const isSavingGemini = ref(false);
-const geminiForm = ref({
-  api_key: '',
-  model: props.aiSetting?.gemini_model || 'gemini-2.5-pro',
-  is_auto_analyze: props.aiSetting?.is_auto_analyze || false,
-});
-const isTestingGemini = ref(false);
-const geminiTestResult = ref(null);
-
-const testGeminiConnection = async () => {
-  isTestingGemini.value = true;
-  geminiTestResult.value = null;
-  try {
-    const res = await axios.post(`/media-intelligence/gemini-test?polda=${props.selectedCode}`, {
-      api_key: geminiForm.value.api_key,
-      model: geminiForm.value.model,
-    });
-    geminiTestResult.value = { success: true, message: res.data.message, latency: res.data.latency_ms };
-  } catch (err) {
-    const msg = err.response?.data?.message || err.message || 'Koneksi gagal';
-    geminiTestResult.value = { success: false, message: msg };
-  } finally {
-    isTestingGemini.value = false;
-  }
-};
-
-const saveGeminiSettings = async (runNow = false) => {
-  isSavingGemini.value = true;
-  try {
-    const res = await axios.post(`/media-intelligence/gemini-settings?polda=${props.selectedCode}`, {
-      gemini_api_key: geminiForm.value.api_key,
-      gemini_model: geminiForm.value.model,
-      is_auto_analyze: geminiForm.value.is_auto_analyze,
-      run_analysis_now: runNow,
-    });
-    showGeminiSettingsModal.value = false;
-    showToastNotification(res.data.message || 'Pengaturan Gemini Pro berhasil disimpan!');
-    if (runNow) {
-      router.reload({ preserveScroll: true });
-    }
-  } catch (err) {
-    const msg = err.response?.data?.message || 'Gagal menyimpan pengaturan Gemini.';
-    showToastNotification(msg);
-  } finally {
-    isSavingGemini.value = false;
-  }
-};
 
 const triggerGeminiAnalysis = async () => {
-  // If no API key configured yet, prompt user with modal
-  if (!props.aiSetting?.has_api_key && !geminiForm.value.api_key) {
-    showGeminiSettingsModal.value = true;
-    showToastNotification('Silakan konfigurasikan Google Gemini API Key Anda terlebih dahulu.');
+  if (!props.aiSetting?.has_api_key) {
+    showToastNotification('Kunci API Google Gemini belum dikonfigurasi. Hubungi Administrator di menu Keamanan & Pemeliharaan.');
     return;
   }
 
@@ -314,11 +263,8 @@ const triggerGeminiAnalysis = async () => {
     showToastNotification(`✓ ${res.data.message || 'Analisis intelijen otomatis Gemini Pro selesai!'}`);
     router.reload({ preserveScroll: true });
   } catch (err) {
-    const msg = err.response?.data?.message || 'Analisis Gemini gagal. Periksa API Key atau kuota Gemini Anda.';
+    const msg = err.response?.data?.message || 'Analisis Gemini gagal. Periksa koneksi atau kuota API Gemini.';
     showToastNotification(msg);
-    if (err.response?.status === 422 || err.response?.data?.status === 'missing_api_key') {
-      showGeminiSettingsModal.value = true;
-    }
   } finally {
     isAnalyzingGemini.value = false;
   }
@@ -918,16 +864,6 @@ const submitIssue = () => {
           <Zap v-else class="w-4 h-4 text-slate-950 fill-slate-950" />
           <span>{{ isAnalyzingGemini ? 'Menganalisis Berita...' : '⚡ Analisis Otomatis (Gemini Pro)' }}</span>
           <span v-if="props.aiSetting?.has_api_key" class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse ml-0.5" title="Gemini API Aktif"></span>
-        </button>
-
-        <!-- Button Pengaturan Gemini API -->
-        <button
-          @click="showGeminiSettingsModal = true"
-          class="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-amber-400/40 text-slate-300 hover:text-white text-xs font-bold transition cursor-pointer"
-          title="Pengaturan Google Gemini API Key & Model AI"
-        >
-          <Settings class="w-4 h-4 text-amber-400" />
-          <span class="hidden sm:inline">Pengaturan AI</span>
         </button>
 
         <!-- Button 1: Salin Prompt AI -->
@@ -2463,208 +2399,6 @@ const submitIssue = () => {
             >
               <Copy class="w-4 h-4" />
               <span>Salin Teks ke Clipboard</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ========================================================================= -->
-    <!-- MODAL 5: KONFIGURASI GOOGLE GEMINI PRO AI (ANALISIS OTOMATIS)             -->
-    <!-- ========================================================================= -->
-    <div
-      v-if="showGeminiSettingsModal"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
-    >
-      <div class="w-full max-w-xl rounded-3xl bg-[#0b1426] border border-amber-400/40 shadow-2xl p-6 sm:p-7 space-y-5">
-        <!-- Header -->
-        <div class="flex items-center justify-between border-b border-slate-800 pb-4">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center">
-              <Bot class="w-5 h-5 text-amber-400" />
-            </div>
-            <div>
-              <div class="flex items-center gap-2">
-                <h3 class="text-base font-extrabold text-white">Konfigurasi Google Gemini Pro AI</h3>
-                <span
-                  class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider"
-                  :class="props.aiSetting?.has_api_key ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-400/20 text-amber-300 border border-amber-400/30'"
-                >
-                  {{ props.aiSetting?.has_api_key ? '● Terhubung' : '○ Belum Dikonfigurasi' }}
-                </span>
-              </div>
-              <p class="text-xs text-slate-400">Analisis intelijen media otomatis 1-klik untuk {{ isDivhumas ? 'Divisi Humas Polri (Nasional)' : (selectedPolda?.name || 'Polda Sulbar') }}</p>
-            </div>
-          </div>
-          <button
-            @click="showGeminiSettingsModal = false"
-            class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
-          >
-            <X class="w-5 h-5" />
-          </button>
-        </div>
-
-        <!-- Info / Status Banner -->
-        <div
-          v-if="props.aiSetting?.has_api_key"
-          class="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-xs flex items-start gap-3 text-emerald-300"
-        >
-          <CheckCircle2 class="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-          <div class="space-y-0.5">
-            <p class="font-bold text-white">Google Gemini API Aktif & Siap Digunakan</p>
-            <p class="text-[11px] text-emerald-400/90 font-mono">
-              Key: {{ props.aiSetting?.masked_api_key }} &bull; Model: {{ props.aiSetting?.gemini_model || 'gemini-2.5-pro' }}
-            </p>
-            <p v-if="props.aiSetting?.last_analyzed_at" class="text-[10px] text-slate-400">
-              Analisis terakhir: {{ props.aiSetting?.last_analyzed_at }}
-            </p>
-          </div>
-        </div>
-        <div
-          v-else
-          class="p-3.5 rounded-2xl bg-amber-400/10 border border-amber-400/30 text-xs flex items-start gap-3 text-amber-200"
-        >
-          <Info class="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-          <div class="space-y-1">
-            <p class="font-bold text-white">Aktifkan Analisis Otomatis 1-Klik</p>
-            <p class="text-[11px] text-slate-300 leading-relaxed">
-              Dapatkan Google Gemini API Key secara gratis langsung di
-              <a
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noopener"
-                class="text-amber-400 font-bold underline hover:text-amber-300 inline-flex items-center gap-1"
-              >
-                Google AI Studio <ExternalLink class="w-3 h-3" />
-              </a>. Anda tetap dapat menggunakan salin formula prompt secara manual kapan saja.
-            </p>
-          </div>
-        </div>
-
-        <!-- Form Fields -->
-        <div class="space-y-4 text-xs">
-          <!-- API Key Input -->
-          <div>
-            <div class="flex items-center justify-between mb-1">
-              <label class="font-bold text-slate-200 flex items-center gap-1.5">
-                <Key class="w-3.5 h-3.5 text-amber-400" />
-                <span>Google Gemini API Key</span>
-              </label>
-              <a
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noopener"
-                class="text-[10px] text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1"
-              >
-                <span>Dapatkan API Key Gratis</span>
-                <ExternalLink class="w-3 h-3" />
-              </a>
-            </div>
-            <div class="relative">
-              <input
-                :type="showApiKeyText ? 'text' : 'password'"
-                v-model="geminiForm.api_key"
-                :placeholder="props.aiSetting?.has_api_key ? 'Masukkan API Key baru untuk mengganti (' + props.aiSetting?.masked_api_key + ')' : 'Contoh: AIzaSyB...'"
-                class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-amber-300 font-mono text-xs placeholder-slate-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
-              />
-              <button
-                type="button"
-                @click="showApiKeyText = !showApiKeyText"
-                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                title="Tampilkan / Sembunyikan API Key"
-              >
-                <EyeOff v-if="showApiKeyText" class="w-4 h-4" />
-                <Eye v-else class="w-4 h-4" />
-              </button>
-            </div>
-            <p class="text-[10px] text-slate-400 mt-1">
-              Kunci API disimpan secara aman di basis data lokal terenkripsi server SIMOD Enterprise.
-            </p>
-          </div>
-
-          <!-- Model Selection -->
-          <div>
-            <label class="block font-bold text-slate-200 mb-1 flex items-center gap-1.5">
-              <Cpu class="w-3.5 h-3.5 text-amber-400" />
-              <span>Model Gemini AI</span>
-            </label>
-            <select
-              v-model="geminiForm.model"
-              class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400"
-            >
-              <option value="gemini-2.5-pro">gemini-2.5-pro (Rekomendasi • Nalar Intelijen Paling Akurat & Mendalam)</option>
-              <option value="gemini-1.5-pro">gemini-1.5-pro (Stabil • Analisis Komprehensif & Cepat)</option>
-              <option value="gemini-2.5-flash">gemini-2.5-flash (Kecepatan Tinggi • Sangat Responsif)</option>
-              <option value="gemini-1.5-flash">gemini-1.5-flash (Ekonomis • Respon Kilat)</option>
-            </select>
-          </div>
-
-          <!-- Auto Analyze Checkbox -->
-          <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex items-start gap-3">
-            <input
-              id="auto-analyze-check"
-              type="checkbox"
-              v-model="geminiForm.is_auto_analyze"
-              class="mt-0.5 rounded border-slate-700 text-amber-400 focus:ring-amber-400 bg-slate-800 cursor-pointer"
-            />
-            <label for="auto-analyze-check" class="text-xs cursor-pointer select-none">
-              <strong class="text-white block font-bold">Sinkronisasi Otomatis Setiap Berita Baru</strong>
-              <span class="text-slate-400 text-[11px]">Jalankan analisis AI otomatis setiap jadwal penarikan RSS (scheduler) mendeteksi berita baru.</span>
-            </label>
-          </div>
-
-          <!-- Test Result Banner -->
-          <div
-            v-if="geminiTestResult"
-            class="p-3 rounded-xl text-xs flex items-center justify-between"
-            :class="geminiTestResult.success ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'"
-          >
-            <span class="flex items-center gap-2">
-              <CheckCircle2 v-if="geminiTestResult.success" class="w-4 h-4 text-emerald-400 shrink-0" />
-              <AlertTriangle v-else class="w-4 h-4 text-rose-400 shrink-0" />
-              <span>{{ geminiTestResult.message }}</span>
-            </span>
-            <span v-if="geminiTestResult.latency" class="font-mono font-bold">{{ geminiTestResult.latency }}ms</span>
-          </div>
-        </div>
-
-        <!-- Action Footer -->
-        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-800">
-          <button
-            type="button"
-            @click="testGeminiConnection"
-            :disabled="isTestingGemini"
-            class="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-amber-400/50 text-slate-300 hover:text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-          >
-            <RotateCw v-if="isTestingGemini" class="w-3.5 h-3.5 animate-spin text-amber-400" />
-            <Zap v-else class="w-3.5 h-3.5 text-amber-400" />
-            <span>{{ isTestingGemini ? 'Menguji API...' : 'Uji Koneksi API' }}</span>
-          </button>
-
-          <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
-            <button
-              type="button"
-              @click="showGeminiSettingsModal = false"
-              class="px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-slate-300 hover:text-white transition cursor-pointer"
-            >
-              Batal
-            </button>
-            <button
-              type="button"
-              @click="saveGeminiSettings(false)"
-              :disabled="isSavingGemini"
-              class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white text-xs font-bold transition cursor-pointer disabled:opacity-50"
-            >
-              Simpan Pengaturan
-            </button>
-            <button
-              type="button"
-              @click="saveGeminiSettings(true)"
-              :disabled="isSavingGemini"
-              class="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-black transition shadow-lg shadow-amber-400/20 cursor-pointer disabled:opacity-50"
-            >
-              <Zap class="w-3.5 h-3.5 fill-slate-950" />
-              <span>Simpan & Analisis</span>
             </button>
           </div>
         </div>

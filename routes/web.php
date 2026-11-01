@@ -99,3 +99,8 @@ Route::post('/maintenance/news-cleanup', [\App\Http\Controllers\NewsCleanupContr
 Route::get('/maintenance/rss-sync', [\App\Http\Controllers\RssSyncController::class, 'index'])->name('maintenance.rss-sync');
 Route::post('/maintenance/rss-sync', [\App\Http\Controllers\RssSyncController::class, 'update'])->name('maintenance.rss-sync.update');
 Route::post('/maintenance/rss-sync/trigger', [\App\Http\Controllers\RssSyncController::class, 'triggerSync'])->name('maintenance.rss-sync.trigger');
+
+// Mesin Intelijen AI & LLM Administration Center
+Route::get('/settings/ai', [\App\Http\Controllers\AiSettingController::class, 'index'])->name('settings.ai');
+Route::post('/settings/ai', [\App\Http\Controllers\AiSettingController::class, 'update'])->name('settings.ai.update');
+Route::post('/settings/ai/test', [\App\Http\Controllers\AiSettingController::class, 'testConnection'])->name('settings.ai.test');

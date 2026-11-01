@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
-import { ShieldAlert, KeyRound, History, Database, Eraser, Wrench, Mail, Radio } from 'lucide-vue-next';
+import { ShieldAlert, KeyRound, History, Database, Eraser, Wrench, Mail, Radio, Bot } from 'lucide-vue-next';
 
 const props = defineProps({ selectedCode: { type: String, default: 'SULBAR' } });
 const page = usePage();
@@ -15,6 +15,7 @@ const tabs = [
   { name: 'Otomasi Sinkron RSS', href: '/maintenance/rss-sync', icon: Radio, permission: 'maintenance_ops' },
   { name: 'Mode Pemeliharaan', href: '/maintenance', icon: Wrench, permission: 'maintenance_ops' },
   { name: 'Konfigurasi Mail', href: '/settings/mail', icon: Mail, permission: 'mail_settings' },
+  { name: 'Mesin Intelijen AI', href: '/settings/ai', icon: Bot, permission: 'security_center' },
 ];
 
 const currentPath = computed(() => (page.url || '').split('?')[0].replace(/\/+$/, '') || '/');
@@ -33,7 +34,7 @@ const visibleTabs = computed(() => {
       </span>
     </div>
     <div class="p-2 rounded-2xl bg-[#08101e] border border-slate-800 shadow-xl">
-      <div class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2">
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-2">
         <Link
           v-for="t in visibleTabs"
           :key="t.href"

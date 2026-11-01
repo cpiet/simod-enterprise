@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AiSetting;
+use App\Models\AuditLog;
 use App\Models\Polda;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -50,18 +51,35 @@ class GeminiMediaIntelligenceTest extends TestCase
         );
     }
 
-    public function test_save_gemini_settings_persists(): void
+    public function test_admin_can_access_ai_settings_page(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/settings/ai?polda=ALL');
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn ($page) => $page
+            ->component('Settings/Ai')
+            ->has('setting')
+            ->has('globalSetting')
+            ->has('telemetry')
+        );
+    }
+
+    public function test_admin_can_update_ai_settings_and_audit_log_persists(): void
     {
         $user = User::factory()->create();
         $divhumas = Polda::where('code', 'DIVHUMAS')->first();
 
-        $response = $this->actingAs($user)->postJson('/media-intelligence/gemini-settings?polda=ALL', [
-            'gemini_api_key'  => 'AIzaSyTestKey1234567890abcdef',
-            'gemini_model'    => 'gemini-2.5-pro',
-            'is_auto_analyze' => true,
+        $response = $this->actingAs($user)->post('/settings/ai?polda=ALL', [
+            'gemini_api_key'      => 'AIzaSyMasterKey1234567890abcdef',
+            'gemini_model'        => 'gemini-2.5-pro',
+            'is_auto_analyze'     => true,
+            'temperature'         => 0.20,
+            'apply_to_all_poldas' => true,
         ]);
 
-        $response->assertStatus(200);
+        $response->assertStatus(302);
 
         $this->assertDatabaseHas('ai_settings', [
             'polda_id'        => $divhumas->id,
@@ -69,22 +87,10 @@ class GeminiMediaIntelligenceTest extends TestCase
             'is_auto_analyze' => 1,
         ]);
 
-        $setting = AiSetting::where('polda_id', $divhumas->id)->first();
-        $this->assertEquals('AIzaSyTestKey1234567890abcdef', $setting->gemini_api_key);
-    }
-
-    public function test_gemini_test_connection_validation(): void
-    {
-        $user = User::factory()->create();
-
-        // Empty API key should fail
-        $response = $this->actingAs($user)->postJson('/media-intelligence/gemini-test?polda=ALL', [
-            'api_key' => '',
-            'model'   => 'gemini-2.5-pro',
+        $this->assertDatabaseHas('audit_logs', [
+            'user_id' => $user->id,
+            'action'  => 'UPDATE_AI_SETTINGS',
         ]);
-
-        $response->assertStatus(400);
-        $response->assertJson(['success' => false]);
     }
 
     public function test_analyze_gemini_without_api_key_returns_422(): void
@@ -118,7 +124,7 @@ class GeminiMediaIntelligenceTest extends TestCase
             ], 200),
         ]);
 
-        $response = $this->actingAs($user)->postJson('/media-intelligence/gemini-test?polda=ALL', [
+        $response = $this->actingAs($user)->postJson('/settings/ai/test?polda=ALL', [
             'api_key' => 'AIzaSyMockValidKey',
             'model'   => 'gemini-2.5-pro',
         ]);

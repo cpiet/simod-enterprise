@@ -297,10 +297,10 @@ const navigationGroups = [
       },
       {
         name: 'Keamanan & Pemeliharaan',
-        desc: 'Keamanan, Hak Akses, Audit, Backup, Pembersihan, Sinkron RSS',
+        desc: 'Keamanan, Hak Akses, Audit, Backup, Pembersihan, Sinkron RSS, Mesin AI',
         href: '/security',
         icon: ShieldAlert,
-        match: ['/security', '/roles', '/audit-logs', '/database/backup', '/maintenance', '/settings/mail', '/maintenance/news-cleanup', '/maintenance/rss-sync'],
+        match: ['/security', '/roles', '/audit-logs', '/database/backup', '/maintenance', '/settings/mail', '/maintenance/news-cleanup', '/maintenance/rss-sync', '/settings/ai'],
         permissions: ['security_center', 'roles_matrix_manage', 'database_backup', 'maintenance_ops', 'mail_settings'],
       },
       {
