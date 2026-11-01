@@ -38,7 +38,7 @@ const visibleTabs = computed(() => {
         <Link
           v-for="t in visibleTabs"
           :key="t.href"
-          :href="`${t.href}?polda=${props.selectedCode}`"
+          :href="t.href"
           class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-[11px] md:text-xs font-extrabold text-center leading-tight transition"
           :class="isActive(t.href)
             ? 'bg-amber-500/20 text-amber-400 border-2 border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.25)]'

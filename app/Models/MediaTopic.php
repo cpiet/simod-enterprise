@@ -63,3 +63,4 @@ class MediaTopic extends Model
         return array_values(array_unique($clean));
     }
 }
+

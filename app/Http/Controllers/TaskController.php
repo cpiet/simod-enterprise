@@ -15,19 +15,9 @@ class TaskController extends Controller
      */
     public function index(Request $request): Response
     {
-        $selectedCode = $request->query('polda', 'SULBAR');
-        $statusFilter = $request->query('status', 'all');
-
         $allPoldas = Polda::withCount('polres')->where('is_active', true)->get();
-        $selectedPolda = null;
-
-        if ($selectedCode !== 'ALL') {
-            $selectedPolda = Polda::where('code', $selectedCode)->first();
-            if (! $selectedPolda) {
-                $selectedPolda = $allPoldas->first();
-                $selectedCode = $selectedPolda ? $selectedPolda->code : 'SULBAR';
-            }
-        }
+        [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
+        $statusFilter = $request->query('status', 'all');
 
         $query = Task::with(['polres', 'issue', 'updates'])->latest();
 

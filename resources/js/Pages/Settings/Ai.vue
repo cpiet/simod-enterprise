@@ -30,6 +30,7 @@ import {
   Server,
   Radio,
   Sliders,
+  RotateCcw,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -105,7 +106,7 @@ const testConnection = async (testPool = true) => {
   testResult.value = null;
 
   try {
-    const res = await axios.post(`/settings/ai/test?polda=${props.selectedCode}`, {
+    const res = await axios.post('/settings/ai/test', {
       raw_api_keys_text: form.gemini_api_key,
       model: form.gemini_model,
       test_pool: testPool,
@@ -138,10 +139,23 @@ const parsedKeysCount = computed(() => {
   return form.gemini_api_key.split(/[\r\n,;]+/).map(k => k.trim()).filter(Boolean).length;
 });
 
+// Format Validation Warning helper
+const hasKeyFormatWarning = computed(() => {
+  if (!form.gemini_api_key) return false;
+  const lines = form.gemini_api_key.split(/[\r\n,;]+/).map(s => s.trim()).filter(Boolean);
+  return lines.some(l => l.includes(' ') || (l.startsWith('AIzaSy') && l.length !== 39));
+});
+
+const restoreSavedKeys = () => {
+  if (props.setting?.raw_api_keys_text) {
+    form.gemini_api_key = props.setting.raw_api_keys_text;
+  }
+};
+
 // Submit Form with Toast Notification
 const submitSettings = () => {
   form.raw_api_keys_text = form.gemini_api_key;
-  form.post(`/settings/ai?polda=${props.selectedCode}`, {
+  form.post('/settings/ai', {
     preserveScroll: true,
     onSuccess: () => {
       saveSuccessToast.value = true;
@@ -411,6 +425,16 @@ const submitSettings = () => {
                   </label>
                   <div class="flex items-center gap-2">
                     <button
+                      v-if="props.setting?.raw_api_keys_text && form.gemini_api_key !== props.setting.raw_api_keys_text"
+                      type="button"
+                      @click="restoreSavedKeys"
+                      class="text-[11px] text-amber-400 hover:text-amber-300 flex items-center gap-1 transition cursor-pointer font-bold"
+                      title="Pulihkan kunci tersimpan dari basis data"
+                    >
+                      <RotateCcw class="w-3.5 h-3.5" />
+                      <span>Pulihkan Kunci DB</span>
+                    </button>
+                    <button
                       type="button"
                       @click="showRawKeys = !showRawKeys"
                       class="text-[11px] text-slate-400 hover:text-amber-300 flex items-center gap-1 transition cursor-pointer"
@@ -432,10 +456,16 @@ const submitSettings = () => {
                     :class="[
                       'w-full px-4 py-3 rounded-2xl bg-slate-900 border text-xs font-mono placeholder-slate-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 leading-relaxed transition',
                       showRawKeys ? 'text-amber-300' : 'text-slate-300 [text-security:disc] [-webkit-text-security:disc]',
-                      form.gemini_api_key ? 'border-slate-700' : 'border-amber-500/50'
+                      hasKeyFormatWarning ? 'border-rose-500 focus:border-rose-400 focus:ring-rose-400' : (form.gemini_api_key ? 'border-slate-700' : 'border-amber-500/50')
                     ]"
                     placeholder="AIzaSy... (Kunci Utama 1)&#10;AIzaSy... (Kunci Cadangan 2)&#10;AIzaSy... (Kunci Cadangan 3)&#10;(Tempel 1 atau beberapa API key dipisahkan baris baru atau koma)"
                   ></textarea>
+
+                  <!-- Real-time format warning -->
+                  <div v-if="hasKeyFormatWarning" class="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-[11px] flex items-center gap-2 mt-1.5 animate-pulse">
+                    <AlertTriangle class="w-4 h-4 shrink-0 text-rose-400" />
+                    <span>Format Kunci Tidak Standar: Terdeteksi spasi atau karakter terpotong. Google Gemini API Key resmi wajib persis 39 karakter tanpa spasi.</span>
+                  </div>
                 </div>
 
                 <div class="p-3.5 rounded-xl bg-slate-900/70 border border-slate-800 text-[11px] text-slate-300 leading-relaxed space-y-1">

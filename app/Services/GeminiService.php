@@ -23,8 +23,19 @@ class GeminiService
 
         foreach ($tokens as $t) {
             $t = trim($t);
-            if (!empty($t) && !in_array($t, $clean, true)) {
-                $clean[] = $t;
+            if (empty($t)) {
+                continue;
+            }
+
+            // Extract exact 39-character Gemini API Key if surrounded by labels, comments, or quotes
+            if (preg_match('/(AIzaSy[A-Za-z0-9_-]{33})/', $t, $match)) {
+                $candidate = $match[1];
+            } else {
+                $candidate = $t;
+            }
+
+            if (!empty($candidate) && !in_array($candidate, $clean, true)) {
+                $clean[] = $candidate;
             }
         }
 
@@ -122,6 +133,13 @@ class GeminiService
             return [
                 'success' => false,
                 'message' => 'Gemini API Key tidak boleh kosong.',
+            ];
+        }
+
+        if (str_contains($apiKey, ' ') || preg_match('/[^A-Za-z0-9_-]/', $apiKey)) {
+            return [
+                'success' => false,
+                'message' => 'Format Gemini API Key tidak valid (terdeteksi spasi atau karakter ilegal). Pastikan kunci disalin lengkap tanpa spasi.',
             ];
         }
 

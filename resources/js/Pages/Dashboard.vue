@@ -193,7 +193,7 @@ const layerLapangan = ref(true);
           <!-- Quick Action Buttons -->
           <div class="flex flex-wrap items-center gap-2.5 pt-2">
             <Link
-              :href="`/issues/create?polda=${selectedCode}`"
+              href="/issues/create"
               class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 text-xs font-black transition shadow-lg shadow-amber-500/20"
             >
               <PlusCircle class="w-4 h-4" />
@@ -201,7 +201,7 @@ const layerLapangan = ref(true);
             </Link>
 
             <Link
-              :href="`/social-intelligence?polda=${selectedCode}`"
+              href="/social-intelligence"
               class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold transition"
             >
               <Radio class="w-4 h-4 text-amber-400" />
@@ -209,7 +209,7 @@ const layerLapangan = ref(true);
             </Link>
 
             <Link
-              :href="`/media-intelligence?polda=${selectedCode}`"
+              href="/media-intelligence"
               class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold transition"
             >
               <Newspaper class="w-4 h-4 text-sky-400" />
@@ -217,7 +217,7 @@ const layerLapangan = ref(true);
             </Link>
 
             <Link
-              :href="`/reports?polda=${selectedCode}`"
+              href="/reports"
               class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold transition"
             >
               <FileBarChart2 class="w-4 h-4 text-emerald-400" />
@@ -225,7 +225,7 @@ const layerLapangan = ref(true);
             </Link>
 
             <Link
-              :href="`/verification-queue?polda=${selectedCode}`"
+              href="/verification-queue"
               class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold transition"
             >
               <CheckCircle2 class="w-4 h-4 text-amber-400" />
@@ -264,7 +264,7 @@ const layerLapangan = ref(true);
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
       <!-- 1. Radar Media Online -->
       <Link
-        :href="`/media-intelligence?polda=${selectedCode}`"
+        href="/media-intelligence"
         class="p-4 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1.5 hover:border-sky-500/50 transition group block"
       >
         <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
@@ -282,7 +282,7 @@ const layerLapangan = ref(true);
 
       <!-- 2. Radar Media Sosial -->
       <Link
-        :href="`/social-intelligence?polda=${selectedCode}`"
+        href="/social-intelligence"
         class="p-4 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1.5 hover:border-amber-500/50 transition group block"
       >
         <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
@@ -308,7 +308,7 @@ const layerLapangan = ref(true);
 
       <!-- 3. Isu Prioritas Atensi -->
       <Link
-        :href="`/issues?polda=${selectedCode}&priority=critical`"
+        href="/issues?priority=critical"
         class="p-4 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1.5 hover:border-rose-500/50 transition group block"
       >
         <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
@@ -329,7 +329,7 @@ const layerLapangan = ref(true);
 
       <!-- 4. Laporan Lapangan Polres -->
       <Link
-        :href="`/issues?polda=${selectedCode}`"
+        href="/issues"
         class="p-4 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1.5 hover:border-amber-500/50 transition group block"
       >
         <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
@@ -345,7 +345,7 @@ const layerLapangan = ref(true);
 
       <!-- 5. Tindak Lanjut Selesai -->
       <Link
-        :href="`/tasks?polda=${selectedCode}`"
+        href="/tasks"
         class="p-4 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1.5 hover:border-emerald-500/50 transition group block"
       >
         <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
@@ -696,7 +696,7 @@ const layerLapangan = ref(true);
 
                 <div class="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between">
                   <Link
-                    :href="`/issues?polda=${selectedCode}&polres=${p.code}`"
+                    :href="`/issues?polres=${p.code}`"
                     class="text-[10px] font-bold text-amber-400 hover:underline flex items-center gap-1"
                   >
                     <span>Lihat Laporan Polres</span>
@@ -761,7 +761,7 @@ const layerLapangan = ref(true);
               Atensi Pimpinan ({{ atensiCount }})
             </span>
           </div>
-          <Link :href="`/media-intelligence?polda=${selectedCode}`" class="text-amber-400 font-bold hover:underline inline-flex items-center gap-1 text-xs">
+          <Link href="/media-intelligence" class="text-amber-400 font-bold hover:underline inline-flex items-center gap-1 text-xs">
             <span>Buka Radar Media Online</span>
             <ArrowRight class="w-3.5 h-3.5" />
           </Link>
@@ -821,7 +821,7 @@ const layerLapangan = ref(true);
             </div>
 
             <Link
-              :href="activeTrendingTab === 'social' ? `/social-intelligence?polda=${selectedCode}` : `/issues?polda=${selectedCode}`"
+              :href="activeTrendingTab === 'social' ? '/social-intelligence' : '/issues'"
               class="text-[10px] text-amber-400 font-bold hover:underline shrink-0"
             >
               Semua &rarr;
@@ -883,7 +883,7 @@ const layerLapangan = ref(true);
             <div v-if="!topViralSocialPosts || topViralSocialPosts.length === 0" class="text-center py-6 text-slate-400 text-xs">
               <Radio class="w-6 h-6 mx-auto mb-2 text-slate-600" />
               <p>Belum ada postingan medsos viral tersimpan.</p>
-              <Link :href="`/social-intelligence?polda=${selectedCode}`" class="text-amber-400 hover:underline font-bold mt-1 inline-block">
+              <Link href="/social-intelligence" class="text-amber-400 hover:underline font-bold mt-1 inline-block">
                 Sinkronkan Apify Sekarang &rarr;
               </Link>
             </div>
@@ -1042,7 +1042,7 @@ const layerLapangan = ref(true);
           </div>
 
           <Link
-            :href="activeStreamTab === 'social' ? `/social-intelligence?polda=${selectedCode}` : `/media-intelligence?polda=${selectedCode}`"
+            :href="activeStreamTab === 'social' ? '/social-intelligence' : '/media-intelligence'"
             class="text-xs text-amber-400 font-bold hover:underline flex items-center gap-1"
           >
             <span>Buka Selengkapnya</span>
@@ -1138,7 +1138,7 @@ const layerLapangan = ref(true);
           <div v-if="!liveSocialPosts || liveSocialPosts.length === 0" class="text-center py-8 text-slate-400 text-xs">
             <Radio class="w-8 h-8 mx-auto mb-2 text-slate-600 animate-pulse" />
             <p>Belum ada postingan medsos terkini.</p>
-            <Link :href="`/social-intelligence?polda=${selectedCode}`" class="text-amber-400 hover:underline font-bold mt-1 inline-block">
+            <Link href="/social-intelligence" class="text-amber-400 hover:underline font-bold mt-1 inline-block">
               Buka Radar Media Sosial &rarr;
             </Link>
           </div>

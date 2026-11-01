@@ -18,7 +18,10 @@ class SocialIntelligenceController extends Controller
      */
     public function index(Request $request): Response
     {
-        $selectedCode = $request->query('polda', 'SULBAR');
+        $allPoldas = Polda::withCount('polres')->where('is_active', true)->get();
+        [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
+        $isNational = ($selectedCode === 'ALL');
+
         $platform = $request->query('platform', 'all');
         $sentiment = $request->query('sentiment', 'all');
         $kolOnly = $request->boolean('kol', false);
@@ -26,18 +29,6 @@ class SocialIntelligenceController extends Controller
         $search = $request->query('q', '');
         $activeTab = $request->query('tab', 'radar');
         $satwil = $request->query('satwil', 'all');
-
-        $allPoldas = Polda::withCount('polres')->where('is_active', true)->get();
-        $selectedPolda = null;
-        $isNational = ($selectedCode === 'ALL');
-
-        if (!$isNational) {
-            $selectedPolda = Polda::with(['polres'])->where('code', $selectedCode)->first();
-            if (!$selectedPolda) {
-                $selectedPolda = $allPoldas->first();
-                $selectedCode = $selectedPolda ? $selectedPolda->code : 'SULBAR';
-            }
-        }
 
         // Base query
         $query = SocialPost::with(['polres', 'polda']);

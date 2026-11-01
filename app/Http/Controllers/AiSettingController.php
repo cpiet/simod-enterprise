@@ -22,9 +22,8 @@ class AiSettingController extends Controller
     public function index(Request $request): Response
     {
         $allPoldas = Polda::where('is_active', true)->get();
-        $selectedCode = $request->query('polda', 'ALL');
-        $searchCode = strtoupper($selectedCode) === 'ALL' ? 'DIVHUMAS' : strtoupper($selectedCode);
-        $selectedPolda = Polda::where('code', $searchCode)->first() ?? Polda::first();
+        [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
+        $selectedPolda = $selectedPolda ?? Polda::first();
 
         $geminiService = new GeminiService();
         $aiSetting = AiSetting::forPolda($selectedPolda->id);
@@ -119,9 +118,8 @@ class AiSettingController extends Controller
             'apply_to_all_poldas' => 'nullable|boolean',
         ]);
 
-        $poldaCode = $request->query('polda', 'ALL');
-        $searchCode = strtoupper($poldaCode) === 'ALL' ? 'DIVHUMAS' : strtoupper($poldaCode);
-        $selectedPolda = Polda::where('code', $searchCode)->first() ?? Polda::first();
+        [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
+        $selectedPolda = $selectedPolda ?? Polda::first();
 
         $geminiService = new GeminiService();
         $aiSetting = AiSetting::forPolda($selectedPolda->id);
@@ -193,9 +191,8 @@ class AiSettingController extends Controller
         $rawApiKey = $request->input('api_key') ?: $request->input('raw_api_keys_text');
         $model = $request->input('model', 'gemini-3.5-flash-lite');
 
-        $poldaCode = $request->query('polda', 'ALL');
-        $searchCode = strtoupper($poldaCode) === 'ALL' ? 'DIVHUMAS' : strtoupper($poldaCode);
-        $selectedPolda = Polda::where('code', $searchCode)->first() ?? Polda::first();
+        [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
+        $selectedPolda = $selectedPolda ?? Polda::first();
 
         $geminiService = new GeminiService();
 

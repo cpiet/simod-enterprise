@@ -24,19 +24,7 @@ class SystemModuleController extends Controller
     protected function getBaseData(Request $request): array
     {
         $allPoldas = Polda::withCount('polres')->where('is_active', true)->get();
-        $selectedCode = $request->query('polda', 'SULBAR');
-        $selectedPolda = null;
-
-        if ($selectedCode === 'ALL' || $selectedCode === 'DIVHUMAS') {
-            $selectedPolda = Polda::where('code', 'DIVHUMAS')->first();
-            $selectedCode = 'ALL';
-        } else {
-            $selectedPolda = Polda::where('code', $selectedCode)->first();
-            if (! $selectedPolda) {
-                $selectedPolda = $allPoldas->first();
-                $selectedCode = $selectedPolda ? $selectedPolda->code : 'SULBAR';
-            }
-        }
+        [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
 
         $metrics = [
             'total_issues'       => Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),

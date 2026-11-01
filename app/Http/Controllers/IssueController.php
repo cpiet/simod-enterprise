@@ -22,23 +22,15 @@ class IssueController extends Controller
      */
     public function index(Request $request): Response
     {
-        $selectedCode = $request->query('polda', 'SULBAR');
+        $allPoldas = Polda::withCount('polres')->where('is_active', true)->get();
+        [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
+        $isNational = ($selectedCode === 'ALL');
+
         $statusFilter = $request->query('status', 'all');
         $priorityFilter = $request->query('priority', 'all');
         $categoryFilter = $request->query('category', 'all');
         $polresFilter = $request->query('polres', 'all');
         $search = $request->query('q', '');
-
-        $allPoldas = Polda::withCount('polres')->where('is_active', true)->get();
-        $selectedPolda = null;
-
-        if ($selectedCode !== 'ALL') {
-            $selectedPolda = Polda::with(['polres'])->where('code', $selectedCode)->first();
-            if (! $selectedPolda) {
-                $selectedPolda = $allPoldas->first();
-                $selectedCode = $selectedPolda ? $selectedPolda->code : 'SULBAR';
-            }
-        }
 
         $polresList = $selectedPolda ? $selectedPolda->polres : Polres::where('is_active', true)->get();
 

@@ -26,18 +26,8 @@ class DashboardController extends Controller
             $q->where('is_active', true)->orderBy('name');
         }])->where('is_active', true)->orderBy('name')->get();
 
-        $selectedCode = $request->query('polda', 'SULBAR');
-        $selectedPolda = null;
-
-        if ($selectedCode !== 'ALL') {
-            $selectedPolda = $allPoldas->firstWhere('code', $selectedCode);
-            if (!$selectedPolda && $allPoldas->isNotEmpty()) {
-                $selectedPolda = $allPoldas->first();
-                $selectedCode = $selectedPolda->code;
-            }
-        }
-
-        $poldaId = $selectedPolda ? $selectedPolda->id : ($allPoldas->first()?->id ?? 1);
+        [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
+        $poldaId = $poldaId ?? ($selectedPolda?->id ?? ($allPoldas->first()?->id ?? 1));
         $isNational = ($selectedCode === 'ALL');
 
         // 1. KPI METRICS (100% Dynamic from DB - National or Specific Polda)

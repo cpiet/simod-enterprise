@@ -32,23 +32,7 @@ class MediaIntelligenceController extends Controller
             $q->where('is_active', true)->orderBy('name');
         }])->where('is_active', true)->orderBy('name')->get();
 
-        $selectedCode = $request->query('polda', 'SULBAR');
-        $selectedPolda = null;
-
-        if ($selectedCode === 'ALL' || $selectedCode === 'DIVHUMAS') {
-            $selectedPolda = $allPoldas->firstWhere('code', 'DIVHUMAS') ?? Polda::where('code', 'DIVHUMAS')->first();
-            $selectedCode = 'ALL';
-        } else {
-            $selectedPolda = $allPoldas->firstWhere('code', $selectedCode);
-            if (!$selectedPolda && $allPoldas->isNotEmpty()) {
-                $selectedPolda = $allPoldas->first();
-                $selectedCode = $selectedPolda->code;
-            }
-        }
-
-        if (!$selectedPolda) {
-            $selectedPolda = $allPoldas->first() ?? Polda::first();
-        }
+        [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
 
         // Active Polda ID fallback
         $poldaId = $selectedPolda ? $selectedPolda->id : ($allPoldas->first()?->id ?? 1);

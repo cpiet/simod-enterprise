@@ -35,12 +35,23 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
-        // 1. Multi-Tenant Session & Query Parameter Synchronization
-        $selectedCode = $request->query('polda');
-        if (!empty($selectedCode)) {
+        // 1. Multi-Tenant Session & Security Enforcement (Anti-Tampering & RBAC Lock)
+        $user = $request->user();
+        if ($user && !$user->isSuperAdmin() && $user->polda_id) {
+            // Regional Officer: Hard-locked to their designated Polda
+            $userPolda = $user->polda ?? \App\Models\Polda::find($user->polda_id);
+            $selectedCode = $userPolda?->code ?? 'SULBAR';
             $request->session()->put('active_polda_code', $selectedCode);
+            $request->session()->put('active_polda_id', $userPolda?->id);
         } else {
-            $selectedCode = $request->session()->get('active_polda_code', 'SULBAR');
+            // Mabes / Super Admin: Read from query (if explicitly passed in test/cli) or session
+            $queryCode = $request->query('polda');
+            if (!empty($queryCode)) {
+                $selectedCode = strtoupper(trim($queryCode));
+                $request->session()->put('active_polda_code', $selectedCode);
+            } else {
+                $selectedCode = $request->session()->get('active_polda_code', 'ALL');
+            }
         }
 
         $allPoldas = \App\Models\Polda::withCount('polres')->where('is_active', true)->orderBy('name')->get();

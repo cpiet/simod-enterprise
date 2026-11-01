@@ -9,11 +9,15 @@ use App\Http\Controllers\PublicationController;
 use App\Http\Controllers\SocialIntelligenceController;
 use App\Http\Controllers\SystemModuleController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TenantController;
 use Illuminate\Support\Facades\Route;
 
 // Authentication Routes
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.post');
+
+// Multi-Tenant Context Switcher (CSRF Protected & RBAC Enforced)
+Route::post('/tenant/switch', [TenantController::class, 'switchTenant'])->name('tenant.switch');
 
 // Dashboard & Media Intelligence
 Route::get('/', [DashboardController::class, 'index'])->name('dashboard');

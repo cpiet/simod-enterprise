@@ -59,10 +59,7 @@ const isDesktopSidebarCollapsed = ref(false);
 
 const switchTenant = (code) => {
   isTenantMenuOpen.value = false;
-  // Preserve current pathname but change polda query
-  const url = new URL(window.location.href);
-  url.searchParams.set('polda', code);
-  router.get(url.pathname, { polda: code }, { preserveScroll: true });
+  router.post('/tenant/switch', { code }, { preserveScroll: true });
 };
 
 // Merged global & page metrics for accurate dynamic badges across all routes
@@ -363,7 +360,7 @@ const switchRole = (newRole) => {
     >
       <!-- Top Brand Header -->
       <div class="h-16 px-4 flex items-center justify-between border-b border-slate-800/80 bg-[#0b1426]">
-        <Link :href="`/?polda=${selectedCode}`" class="flex items-center gap-3 overflow-hidden group">
+        <Link href="/" class="flex items-center gap-3 overflow-hidden group">
           <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 p-0.5 shadow-lg shadow-amber-500/20 group-hover:scale-105 transition duration-200 flex-shrink-0 flex items-center justify-center">
             <div class="w-full h-full bg-[#0a1224] rounded-[14px] flex items-center justify-center">
               <Shield class="w-5 h-5 text-amber-400" />
@@ -401,7 +398,7 @@ const switchRole = (newRole) => {
           <Link
             v-for="item in group.items"
             :key="item.name"
-            :href="`${item.href}?polda=${selectedCode}`"
+            :href="item.href"
             class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition group relative"
             :class="isRouteActive(item)
               ? 'bg-amber-400 text-slate-950 font-black shadow-md shadow-amber-400/20'
@@ -524,7 +521,7 @@ const switchRole = (newRole) => {
           <Link
             v-for="item in group.items"
             :key="item.name"
-            :href="`${item.href}?polda=${selectedCode}`"
+            :href="item.href"
             @click="isMobileSidebarOpen = false"
             class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition"
             :class="isRouteActive(item)
@@ -665,7 +662,7 @@ const switchRole = (newRole) => {
 
           <!-- Notification Bell -->
           <Link
-            :href="`/verification-queue?polda=${selectedCode}`"
+            href="/verification-queue"
             class="relative p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition"
             title="Antrean Verifikasi Siaga"
           >
@@ -746,7 +743,7 @@ const switchRole = (newRole) => {
 
               <div class="py-1">
                 <Link
-                  :href="`/profile?polda=${selectedCode}`"
+                  href="/profile"
                   @click="isUserMenuOpen = false"
                   class="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 text-slate-300 hover:bg-slate-800 hover:text-white transition"
                 >
@@ -754,7 +751,7 @@ const switchRole = (newRole) => {
                   <span>Profil & PIN Dinas</span>
                 </Link>
                 <Link
-                  :href="`/roles?polda=${selectedCode}`"
+                  href="/roles"
                   @click="isUserMenuOpen = false"
                   class="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 text-slate-300 hover:bg-slate-800 hover:text-white transition"
                 >
@@ -762,7 +759,7 @@ const switchRole = (newRole) => {
                   <span>Matriks Hak Akses (RBAC)</span>
                 </Link>
                 <Link
-                  :href="`/security?polda=${selectedCode}`"
+                  href="/security"
                   @click="isUserMenuOpen = false"
                   class="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 text-slate-300 hover:bg-slate-800 hover:text-white transition"
                 >
@@ -770,7 +767,7 @@ const switchRole = (newRole) => {
                   <span>Pusat Keamanan</span>
                 </Link>
                 <Link
-                  :href="`/settings/polda?polda=${selectedCode}`"
+                  href="/settings/polda"
                   @click="isUserMenuOpen = false"
                   class="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 text-slate-300 hover:bg-slate-800 hover:text-white transition"
                 >
