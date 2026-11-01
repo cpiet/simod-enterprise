@@ -120,14 +120,25 @@ Seluruh 29 portal media dikonfigurasi melalui seeder [`SulbarRssFeedsSeeder.php`
 
 ---
 
-## 🤖 5. Alur Analisis Intelijen AI (Tab 02, Tab 03, Tab 07)
+## 🤖 5. Alur Analisis Intelijen AI (Otomatis Gemini Pro & Manual Prompt)
 
-1. **Salin Prompt AI**: Di Tab 01, tombol *"Salin Prompt AI"* merangkum konteks situasi wilayah dan berita terkini menjadi formula prompt terstandar analis intelijen siber Polri.
-2. **Tempel Ringkasan AI**: Hasil keluaran ChatGPT / Claude / Gemini ditempelkan pada modal *"Tempel Ringkasan AI"*.
+### 5.1. Analisis Otomatis 1-Klik (Google Gemini Pro Engine - Default)
+1. **Tombol Utama `⚡ Analisis Otomatis (Gemini Pro)`**: Terletak pada top-command bar di Radar Media Online. Memanggil API backend `POST /media-intelligence/analyze-gemini`.
+2. **Mesin Cerdas `GeminiService`**:
+   - Menarik 30 berita terkini sesuai tenant aktif (Divhumas Polri / Polda).
+   - Menginjeksikan konteks berita ke dalam formula prompt Senior Media Analyst Mabes Polri.
+   - Memanggil endpoint Google Gemini (`gemini-2.5-pro` dengan fallback bertingkat ke `gemini-1.5-pro` dan `gemini-2.5-flash`).
+   - Menerima keluaran terstruktur JSON murni (`responseMimeType: application/json`).
 3. **Penyimpanan Permanen Basis Data**:
-   - Controller [`MediaIntelligenceController::storeAiBriefing`](file:///d:/Foto/laragon/www/simod-enterprise/app/Http/Controllers/MediaIntelligenceController.php) mem-parsing payload JSON / naskah dan menyimpannya ke tabel **`media_intelligence_reports`**.
-   - Halaman selalu memuat laporan **paling mutakhir** (`latest()->first()`) sesuai Polda yang aktif.
-   - Mengisi otomatis: **Tab 02** (Executive Briefing & Respon Cepat), **Tab 03** (Polarisasi Sentimen), **Tab 05** (EWS), **Tab 06** (Counter Narasi), dan **Tab 07** (Naskah WhatsApp Siap Kirim ke Pimpinan).
+   - Menyimpan hasil analisis ke tabel `media_intelligence_reports` dan memperbarui stempel `ai_settings`.
+   - Mengisi seketika seluruh tab: **Tab 02** (Executive Briefing), **Tab 03** (Polarisasi Sentimen), **Tab 05** (EWS), **Tab 06** (Counter Narasi & Rekomendasi), dan **Tab 07** (Naskah WhatsApp Siap Kirim).
+4. **Modal Pengaturan Gemini AI (`showGeminiSettingsModal`)**:
+   - Memungkinkan personel memasukkan API Key dari Google AI Studio (`aistudio.google.com`).
+   - Menyediakan fitur *"Uji Koneksi API"* realtime beserta indikator latensi milidetik.
+   - Pilihan model (`gemini-2.5-pro`, `gemini-1.5-pro`, `gemini-2.5-flash`, `gemini-1.5-flash`).
+
+### 5.2. Opsi Manual (Salin Formula & Tempel Ringkasan AI)
+- **Tetap Dipertahankan Berdampingan**: Tombol *"Salin Prompt AI"*, *"Lihat Prompt"*, dan *"Tempel Ringkasan AI"* tetap aktif dan dapat digunakan kapan saja jika pengguna ingin menganalisis menggunakan antarmuka eksternal ChatGPT Plus (GPT-4o), Claude 3.5 Sonnet, atau akun web Gemini secara manual.
 
 ---
 

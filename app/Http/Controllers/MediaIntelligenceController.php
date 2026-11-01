@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AiSetting;
 use App\Models\EarlyWarning;
 use App\Models\Issue;
 use App\Models\MediaArticle;
@@ -10,6 +11,7 @@ use App\Models\MediaIntelligenceReport;
 use App\Models\Polda;
 use App\Models\Polres;
 use App\Models\PressRelease;
+use App\Services\GeminiService;
 use App\Services\RssFeedService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -162,6 +164,19 @@ class MediaIntelligenceController extends Controller
         // Dynamic AI Prompt Template (Tenant-Aware)
         $aiPromptTemplate = $this->generateDynamicPrompt($selectedPolda);
 
+        // Gemini AI Settings & Key Status
+        $geminiService = new GeminiService();
+        $rawApiKey = $geminiService->getApiKey($selectedPolda->id);
+        $aiSettingModel = AiSetting::where('polda_id', $selectedPolda->id)->first();
+        $aiSetting = [
+            'has_api_key'     => !empty($rawApiKey),
+            'masked_api_key'  => $geminiService->maskApiKey($rawApiKey),
+            'gemini_model'    => $aiSettingModel?->gemini_model ?? $geminiService->getModel($selectedPolda->id),
+            'is_auto_analyze' => (bool) ($aiSettingModel?->is_auto_analyze ?? false),
+            'last_analyzed_at'=> $aiSettingModel?->last_analyzed_at ? $aiSettingModel->last_analyzed_at->diffForHumans() : null,
+            'last_status'     => $aiSettingModel?->last_status,
+        ];
+
         // System metrics
         $metrics = [
             'total_poldas'   => $allPoldas->count(),
@@ -186,6 +201,7 @@ class MediaIntelligenceController extends Controller
             'categoriesList'   => $categoriesList,
             'report'           => $report,
             'aiPromptTemplate' => $aiPromptTemplate,
+            'aiSetting'        => $aiSetting,
             'issues'           => $issues,
             'pressReleases'    => $pressReleases,
             'metrics'          => $metrics,
@@ -388,6 +404,219 @@ class MediaIntelligenceController extends Controller
             'latency_ms' => $latency,
             'message'    => "Gagal menghubungi URL feed (HTTP {$httpCode}, {$latency}ms)",
         ], 400);
+    }
+
+    /**
+     * Jalankan analisis intelijen media otomatis menggunakan Google Gemini Pro.
+     */
+    public function analyzeGemini(Request $request): RedirectResponse|JsonResponse
+    {
+        $poldaCode = $request->query('polda', 'SULBAR');
+        $searchCode = strtoupper($poldaCode) === 'ALL' ? 'DIVHUMAS' : strtoupper($poldaCode);
+        $polda = Polda::where('code', $searchCode)->first() ?? Polda::first();
+
+        $geminiService = new GeminiService();
+        $apiKey = $geminiService->getApiKey($polda->id);
+
+        if (empty($apiKey)) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'status'  => 'missing_api_key',
+                    'message' => 'Google Gemini API Key belum diatur. Silakan masukkan API Key Anda pada pengaturan Gemini.',
+                ], 422);
+            }
+            return back()->with('error', 'Google Gemini API Key belum diatur. Silakan masukkan API Key Anda.');
+        }
+
+        // Fetch latest articles for this Polda (up to 30)
+        $articles = MediaArticle::where('polda_id', $polda->id)
+            ->latest('pub_date')
+            ->latest('id')
+            ->limit(30)
+            ->get()
+            ->map(function ($a) {
+                return [
+                    'title'       => $a->title,
+                    'source_name' => $a->source_name,
+                    'category'    => $a->category,
+                    'pub_date'    => $a->pub_date ? $a->pub_date->format('d M Y, H.i') : '',
+                    'time_ago'    => $a->created_at ? $a->created_at->diffForHumans() : '',
+                    'summary'     => $a->summary,
+                    'link'        => $a->url,
+                ];
+            })
+            ->toArray();
+
+        $promptTemplate = $this->generateDynamicPrompt($polda);
+        $model = $geminiService->getModel($polda->id);
+
+        $result = $geminiService->analyzeMediaArticles($polda, $articles, $promptTemplate, $apiKey, $model);
+
+        $aiSetting = AiSetting::forPolda($polda->id);
+
+        if (!$result['success']) {
+            $aiSetting->update([
+                'last_status' => 'error',
+                'last_error'  => $result['message'] ?? 'Gagal memproses analisis Gemini Pro.',
+            ]);
+
+            if ($request->wantsJson()) {
+                return response()->json($result, 500);
+            }
+            return back()->with('error', $result['message']);
+        }
+
+        $parsed = $result['data'];
+        $rawText = $result['raw_text'] ?? json_encode($parsed);
+
+        // Process sentiments & map keys
+        $calcSentiment = function ($s, array $issues = []) {
+            $pos = isset($s['positif']) ? (int) $s['positif'] : (isset($s['positive']) ? (int) $s['positive'] : null);
+            $net = isset($s['netral']) ? (int) $s['netral'] : (isset($s['neutral']) ? (int) $s['neutral'] : null);
+            $neg = isset($s['negatif']) ? (int) $s['negatif'] : (isset($s['negative']) ? (int) $s['negative'] : null);
+
+            if (($pos === null || $pos === 0) && ($net === null || $net === 0) && ($neg === null || $neg === 0) && !empty($issues)) {
+                $total = count($issues);
+                $pCount = 0; $nCount = 0; $ngCount = 0;
+                foreach ($issues as $iss) {
+                    $sent = strtolower($iss['sentiment'] ?? '');
+                    if (str_contains($sent, 'positif')) $pCount++;
+                    elseif (str_contains($sent, 'negatif')) $ngCount++;
+                    else $nCount++;
+                }
+                $pos = (int) round(($pCount / $total) * 100);
+                $neg = (int) round(($ngCount / $total) * 100);
+                $net = max(0, 100 - ($pos + $neg));
+            }
+
+            return [
+                'positif' => $pos !== null ? $pos : 65,
+                'netral'  => $net !== null ? $net : 25,
+                'negatif' => $neg !== null ? $neg : 10,
+            ];
+        };
+
+        $natIssues = $parsed['national_issues'] ?? [];
+        $sulIssues = $parsed['regional_issues'] ?? $parsed['satwil_issues'] ?? $parsed['sulbar_issues'] ?? [];
+
+        $isNational = ($polda->code === 'DIVHUMAS');
+        $tz = ($isNational || $polda->timezone === 'Asia/Jakarta') ? 'WIB' : 'WITA';
+
+        $snapshotSatwilStatus = $parsed['snapshot_satwil_status'] ?? $parsed['snapshot_regional_status'] ?? $parsed['snapshot_sulbar_status'] ?? 'HIJAU - KONDUSIF';
+        $snapshotSatwilDesc = $parsed['snapshot_satwil_desc'] ?? $parsed['snapshot_regional_desc'] ?? $parsed['snapshot_sulbar_desc']
+            ?? ($isNational ? 'Dinamika kamtibmas dan sentimen opini publik di 34 Polda jajaran terpantau aman dan kondusif.' : 'Situasi kamtibmas kewilayahan terpantau aman dan terkendali.');
+
+        $sentimentSatwilRaw = $parsed['sentiment_satwil'] ?? $parsed['sentiment_regional'] ?? $parsed['sentiment_sulbar'] ?? [];
+
+        $report = MediaIntelligenceReport::create([
+            'polda_id'                 => $polda->id,
+            'report_date'              => $parsed['report_date'] ?? now()->format('Y-m-d'),
+            'report_time'              => $parsed['report_time'] ?? (now()->format('H.i') . ' ' . $tz),
+            'title'                    => $parsed['title'] ?? ('LAPORAN INTELIJEN MEDIA & SENTIMEN OPINI PUBLIK ' . ($isNational ? 'NASIONAL - DIVISI HUMAS POLRI' : $polda->name)),
+            'snapshot_national_status' => $parsed['snapshot_national_status'] ?? 'HIJAU - KONDUSIF',
+            'snapshot_national_desc'   => $parsed['snapshot_national_desc'] ?? 'Dinamika isu nasional Polri stabil dengan pengawasan intensif ruang siber dan keterbukaan informasi.',
+            'snapshot_sulbar_status'   => $snapshotSatwilStatus,
+            'snapshot_sulbar_desc'     => $snapshotSatwilDesc,
+            'top_concern'              => $parsed['top_concern'] ?? 'Perhatian khusus pimpinan terhadap situasi Harkamtibmas terkini.',
+            'executive_brief'          => $parsed['executive_brief'] ?? 'Situasi kamtibmas terpantau kondusif.',
+            'core_decision'            => $parsed['core_decision'] ?? ($isNational ? 'Instruksikan amplifikasi rilis satu pintu dan orkestrasi 34 Polda jajaran.' : 'Tingkatkan patroli gabungan dan klarifikasi satu pintu oleh Kabid Humas.'),
+            'sentiment_national'       => $calcSentiment($parsed['sentiment_national'] ?? [], $natIssues),
+            'sentiment_sulbar'         => $calcSentiment($sentimentSatwilRaw, $sulIssues),
+            'priority_responses'       => $parsed['priority_responses'] ?? [
+                'response_0_2h' => ['title' => 'Validasi Fakta', 'action' => 'Koordinasi satu pintu dengan Satker/Polda terkait.'],
+                'response_2_6h' => ['title' => 'Konsolidasi & Klarifikasi', 'action' => 'Siapkan rilis pers dan materi counter narasi terpadu.'],
+                'response_24h'  => ['title' => 'Amplifikasi Citra Positif', 'action' => 'Masifikasi publikasi humanis dan keterbukaan informasi Polri Presisi.'],
+            ],
+            'national_issues'          => $natIssues,
+            'sulbar_issues'            => $sulIssues,
+            'early_warnings'           => $parsed['early_warnings'] ?? [],
+            'strategic_contents'       => $parsed['strategic_contents'] ?? [],
+            'agenda_setting'           => $parsed['agenda_setting'] ?? [],
+            'recommendations'          => $parsed['recommendations'] ?? [],
+            'raw_input'                => $rawText,
+        ]);
+
+        $aiSetting->update([
+            'last_analyzed_at' => now(),
+            'last_status'      => 'success',
+            'last_error'       => null,
+        ]);
+
+        $modelUsed = $result['model_used'] ?? $model;
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => "Analisis otomatis Google Gemini ({$modelUsed}) berhasil diperbarui!",
+                'report'  => $report,
+                'model'   => $modelUsed,
+            ]);
+        }
+
+        return back()->with('success', "Analisis intelijen otomatis Gemini Pro ({$modelUsed}) berhasil diperbarui!");
+    }
+
+    /**
+     * Simpan / Perbarui Pengaturan Google Gemini API.
+     */
+    public function updateGeminiSettings(Request $request): RedirectResponse|JsonResponse
+    {
+        $validated = $request->validate([
+            'gemini_api_key'  => 'nullable|string',
+            'gemini_model'    => 'required|string|in:gemini-2.5-pro,gemini-1.5-pro,gemini-2.5-flash,gemini-1.5-flash',
+            'is_auto_analyze' => 'nullable|boolean',
+        ]);
+
+        $poldaCode = $request->query('polda', 'SULBAR');
+        $searchCode = strtoupper($poldaCode) === 'ALL' ? 'DIVHUMAS' : strtoupper($poldaCode);
+        $polda = Polda::where('code', $searchCode)->first() ?? Polda::first();
+
+        $aiSetting = AiSetting::forPolda($polda->id);
+
+        $updateData = [
+            'gemini_model'    => $validated['gemini_model'],
+            'is_auto_analyze' => (bool) ($validated['is_auto_analyze'] ?? false),
+        ];
+
+        if (array_key_exists('gemini_api_key', $validated) && !empty(trim((string) $validated['gemini_api_key']))) {
+            $updateData['gemini_api_key'] = trim($validated['gemini_api_key']);
+        }
+
+        $aiSetting->update($updateData);
+
+        if ($request->boolean('run_analysis_now')) {
+            return $this->analyzeGemini($request);
+        }
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Pengaturan Google Gemini Pro berhasil disimpan.',
+            ]);
+        }
+
+        return back()->with('success', 'Pengaturan Google Gemini Pro berhasil disimpan.');
+    }
+
+    /**
+     * Uji koneksi ke Google Gemini API.
+     */
+    public function testGeminiConnection(Request $request): JsonResponse
+    {
+        $apiKey = $request->input('api_key');
+        $model = $request->input('model', 'gemini-2.5-pro');
+
+        $poldaCode = $request->query('polda', 'SULBAR');
+        $searchCode = strtoupper($poldaCode) === 'ALL' ? 'DIVHUMAS' : strtoupper($poldaCode);
+        $polda = Polda::where('code', $searchCode)->first() ?? Polda::first();
+
+        $geminiService = new GeminiService();
+        $apiKey = $apiKey ?: $geminiService->getApiKey($polda->id);
+
+        $result = $geminiService->testConnection($apiKey, $model);
+
+        return response()->json($result, $result['success'] ? 200 : 400);
     }
 
     /**
