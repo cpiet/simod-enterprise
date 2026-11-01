@@ -130,8 +130,9 @@ class SocialIntelligenceController extends Controller
         ];
 
         // Settings
+        $poldaIdForSetting = $selectedPolda?->id ?? Polda::where('code', 'SULBAR')->first()?->id ?? Polda::first()?->id ?? 5;
         $settings = SocialSetting::firstOrCreate(
-            ['polda_id' => $selectedPolda?->id ?? 1],
+            ['polda_id' => $poldaIdForSetting],
             [
                 'keywords_tracked'  => 'Polda Sulbar, Polresta Mamuju, Polisi Sulbar, Polres Majene, Polres Polman',
                 'sync_frequency'    => 'every_3_hours',
@@ -178,6 +179,13 @@ class SocialIntelligenceController extends Controller
      */
     public function updateSettings(Request $request)
     {
+        $poldaId = $request->input('polda_id');
+        if (!$poldaId || !Polda::where('id', $poldaId)->exists()) {
+            $sulbar = Polda::where('code', 'SULBAR')->first();
+            $poldaId = $sulbar ? $sulbar->id : Polda::first()?->id ?? 5;
+            $request->merge(['polda_id' => $poldaId]);
+        }
+
         $validated = $request->validate([
             'polda_id'          => 'required|exists:poldas,id',
             'apify_api_token'   => 'nullable|string|max:255',
@@ -196,9 +204,9 @@ class SocialIntelligenceController extends Controller
             'user_id'      => auth()->id(),
             'action'       => 'social_settings.update',
             'subject_type' => 'social_setting',
-            'subject_id'   => $validated['polda_id'],
-            'ip_address'   => $request->ip(),
-            'user_agent'   => $request->userAgent(),
+            'subject_id'   => (string) $validated['polda_id'],
+            'ip_address'   => $request->ip() ?? '127.0.0.1',
+            'user_agent'   => $request->userAgent() ?? 'System',
             'metadata'     => ['keywords' => $validated['keywords_tracked'] ?? ''],
             'created_at'   => now(),
         ]);
@@ -222,7 +230,12 @@ class SocialIntelligenceController extends Controller
      */
     public function sync(Request $request, ApifySyncService $service)
     {
-        $poldaId = (int) $request->input('polda_id', 1);
+        $poldaId = (int) $request->input('polda_id');
+        if (!$poldaId || !Polda::where('id', $poldaId)->exists()) {
+            $sulbar = Polda::where('code', 'SULBAR')->first();
+            $poldaId = $sulbar ? $sulbar->id : Polda::first()?->id ?? 5;
+        }
+
         $result = $service->syncPolda($poldaId);
 
         if (!$result['success']) {

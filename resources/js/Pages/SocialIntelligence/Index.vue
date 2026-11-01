@@ -91,8 +91,10 @@ const toggleBookmark = (id) => {
 
 // Form Settings Apify
 const isSavingSettings = ref(false);
+const saveFeedback = ref(null);
+
 const settingsForm = ref({
-  polda_id: props.selectedPolda?.id || 1,
+  polda_id: props.selectedPolda?.id || props.settings?.polda_id || 5,
   apify_api_token: props.settings?.apify_api_token || '',
   keywords_tracked: props.settings?.keywords_tracked || 'Polda Sulbar, Polresta Mamuju, Polisi Sulbar, Polres Majene, Polres Polman',
   sync_frequency: props.settings?.sync_frequency || 'every_3_hours',
@@ -101,8 +103,27 @@ const settingsForm = ref({
 
 const saveSettings = () => {
   isSavingSettings.value = true;
+  saveFeedback.value = null;
+
   router.post('/social-intelligence/settings', settingsForm.value, {
     preserveScroll: true,
+    onSuccess: () => {
+      saveFeedback.value = {
+        type: 'success',
+        message: '✓ Konfigurasi Apify dan kata kunci monitoring berhasil disimpan ke sistem!',
+      };
+      setTimeout(() => {
+        if (saveFeedback.value?.type === 'success') {
+          saveFeedback.value = null;
+        }
+      }, 6000);
+    },
+    onError: (errs) => {
+      saveFeedback.value = {
+        type: 'error',
+        message: Object.values(errs).join(', ') || 'Terjadi kesalahan saat menyimpan pengaturan.',
+      };
+    },
     onFinish: () => {
       isSavingSettings.value = false;
     },
@@ -253,6 +274,22 @@ const formatNumber = (num) => {
         >
           <span>+ Buat Laporan Isu</span>
         </Link>
+      </div>
+    </div>
+
+    <!-- Flash / Toast Alert Messages -->
+    <div v-if="$page.props.flash?.success || $page.props.flash?.error" class="transition-all duration-300">
+      <div v-if="$page.props.flash.success" class="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-xs font-bold flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <CheckCircle2 class="w-4 h-4 text-emerald-500 shrink-0" />
+          <span>{{ $page.props.flash.success }}</span>
+        </div>
+      </div>
+      <div v-if="$page.props.flash.error" class="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-800 dark:text-rose-300 text-xs font-bold flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <AlertTriangle class="w-4 h-4 text-rose-500 shrink-0" />
+          <span>{{ $page.props.flash.error }}</span>
+        </div>
       </div>
     </div>
 
@@ -893,7 +930,24 @@ const formatNumber = (num) => {
             </div>
           </div>
 
-          <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+          <!-- Feedback Notifikasi Simpan -->
+          <div v-if="saveFeedback" class="p-3.5 rounded-xl text-xs font-bold flex items-center gap-2.5" :class="saveFeedback.type === 'success' ? 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-700 dark:text-emerald-300' : 'bg-rose-500/15 border border-rose-500/40 text-rose-700 dark:text-rose-300'">
+            <CheckCircle2 v-if="saveFeedback.type === 'success'" class="w-4 h-4 text-emerald-500 shrink-0" />
+            <AlertTriangle v-else class="w-4 h-4 text-rose-500 shrink-0" />
+            <span>{{ saveFeedback.message }}</span>
+          </div>
+
+          <div class="flex items-center justify-between gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+            <button
+              type="button"
+              @click="triggerSync"
+              :disabled="isSyncing || !settingsForm.apify_api_token"
+              class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 transition disabled:opacity-40 cursor-pointer"
+            >
+              <RefreshCw :class="['w-3.5 h-3.5', isSyncing ? 'animate-spin' : '']" />
+              <span>{{ isSyncing ? 'Sedang Menarik Data...' : '⚡ Tarik Data Live Apify Sekarang' }}</span>
+            </button>
+
             <button
               type="submit"
               :disabled="isSavingSettings"
