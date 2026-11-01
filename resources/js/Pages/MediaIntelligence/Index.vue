@@ -461,9 +461,29 @@ const whatsappReportText = computed(() => {
     issueNum++;
   });
 
-  // SECTION II: SARAN LANGKAH TINDAK LANJUT
+  // SECTION II: KAJIAN RESIKO & DAMPAK JIKA TIDAK DIMITIGASI (ATENSI KHUSUS PIMPINAN)
   s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-  s += `*II. SARAN LANGKAH TINDAK LANJUT*\n`;
+  s += `*II. KAJIAN RESIKO & DAMPAK JIKA TIDAK DIMITIGASI*\n`;
+  s += `*(ATENSI KHUSUS & INTENS PIMPINAN)*\n`;
+  s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+  s += `Telaah intelijen media dan pemantauan opini publik memetakan potensi eskalasi krisis apabila tidak segera dilakukan mitigasi humanis dan transparan berbasis fakta riil:\n\n`;
+
+  if (r.early_warnings && r.early_warnings.length > 0) {
+    r.early_warnings.forEach((ew, eIdx) => {
+      s += `*${eIdx + 1}. Ancaman/Isu: ${ew.title}*\n`;
+      if (ew.kamtibmas_aspect) s += `• Dimensi Kamtibmas: ${ew.kamtibmas_aspect}\n`;
+      s += `• Fakta Singkat: ${ew.fact}\n`;
+      s += `• Dampak Fatal Jika Tanpa Mitigasi: ${ew.unmitigated_risk || ew.risk || 'Keterlambatan klarifikasi berisiko memicu framing sepihak netizen dan mobilisasi massa.'}\n\n`;
+    });
+  } else {
+    s += `• *Dampak Jangka Pendek (0–6 Jam):* Terjadi kekosongan informasi (information vacuum) yang diisi spekulasi liar dan framing negatif buzzer di media sosial.\n\n`;
+    s += `• *Dampak Eskalasi Kamtibmas (6–24 Jam):* Masuknya liputan kritis media arus utama nasional, potensi provokasi berkembang menjadi aksi unjuk rasa atau gesekan fisik kewilayahan.\n\n`;
+    s += `• *Doktrin Mitigasi Humanis & Transparan:* Mengakui fakta riil secara jujur (tanpa defensif), menyampaikan empati mendalam pada korban/warga, serta merilis kronologi 5W+1H berbasis bukti empiris dalam 2 jam pertama.\n\n`;
+  }
+
+  // SECTION III: SARAN LANGKAH TINDAK LANJUT
+  s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  s += `*III. SARAN LANGKAH TINDAK LANJUT*\n`;
   s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
   if (r.recommendations && r.recommendations.length > 0) {
     r.recommendations.forEach((rec, idx) => {
@@ -505,9 +525,9 @@ const whatsappReportText = computed(() => {
     s += `Sosialisasi layanan Contact Center Polri 110 terus digencarkan agar masyarakat dapat menyampaikan informasi gangguan kamtibmas secara cepat dan gratis.\n\n`;
   }
 
-  // SECTION III: SARAN KOORDINASI DAN EVALUASI
+  // SECTION IV: SARAN KOORDINASI DAN EVALUASI
   s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-  s += `*III. SARAN KOORDINASI DAN EVALUASI*\n`;
+  s += `*IV. SARAN KOORDINASI DAN EVALUASI*\n`;
   s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
   s += `Untuk mendukung tindak lanjut yang terukur, kami menyarankan pola koordinasi berjenjang:\n\n`;
 
@@ -520,9 +540,9 @@ const whatsappReportText = computed(() => {
   s += `• *Tahap Evaluasi (24 jam):* ${resp24h}\n\n`;
   s += `Alur waktu koordinasi tersebut dapat disesuaikan dengan eskalasi urgensi dan petunjuk pimpinan.\n\n`;
 
-  // SECTION IV: KESIMPULAN DAN PERTIMBANGAN
+  // SECTION V: KESIMPULAN DAN PERTIMBANGAN
   s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-  s += `*IV. KESIMPULAN DAN PERTIMBANGAN KEPADA ${isDiv ? 'BAPAK KAPOLRI & KADIVHUMAS' : 'BAPAK KAPOLDA'}*\n`;
+  s += `*V. KESIMPULAN DAN PERTIMBANGAN KEPADA ${isDiv ? 'BAPAK KAPOLRI & KADIVHUMAS' : 'BAPAK KAPOLDA'}*\n`;
   s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
   let sitStatus = (isDiv ? (r.snapshot_satwil_status || r.snapshot_national_status) : r.snapshot_sulbar_status) || 'HIJAU - KONDUSIF';
@@ -1416,6 +1436,65 @@ const submitIssue = () => {
         </div>
       </div>
 
+      <!-- Kajian Risiko Pimpinan & Doktrin Kehumasan Humanis Transparan -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Box 1: Kajian Risiko Jika Tidak Dimitigasi (Unmitigated Impact) -->
+        <div class="p-5 rounded-3xl bg-gradient-to-br from-rose-950/40 via-[#0b1426] to-[#070d1d] border border-rose-500/40 shadow-xl space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-black uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
+              <AlertTriangle class="w-4 h-4 text-rose-400" />
+              <span>Kajian Dampak &amp; Risiko Tanpa Mitigasi Cepat</span>
+            </span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-rose-500/20 text-rose-300 border border-rose-500/40">
+              Atensi Intens Pimpinan
+            </span>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Keterlambatan atau ketidaktepatan respon kehumasan berisiko memicu <strong>kekosongan informasi</strong> dalam 0-6 jam pertama. Tanpa rilis terbuka berbasis fakta, narasi sepihak buzzer akan mendominasi algoritma dan bereskalasi menjadi framing kritis media massa serta potensi mobilisasi massa dalam 6-24 jam.
+          </p>
+          <div class="grid grid-cols-3 gap-2 pt-1 text-[11px] font-mono">
+            <div class="p-2 rounded-xl bg-slate-900/90 border border-slate-800">
+              <span class="text-amber-400 block font-bold text-[10px]">0–6 Jam:</span>
+              <span class="text-slate-300">Viralitas Liar &amp; Framing Negatif</span>
+            </div>
+            <div class="p-2 rounded-xl bg-slate-900/90 border border-slate-800">
+              <span class="text-rose-400 block font-bold text-[10px]">6–24 Jam:</span>
+              <span class="text-slate-300">Tekanan Media &amp; Aksi Wilayah</span>
+            </div>
+            <div class="p-2 rounded-xl bg-slate-900/90 border border-slate-800">
+              <span class="text-purple-400 block font-bold text-[10px]">&gt;24 Jam:</span>
+              <span class="text-slate-300">Krisis Kepercayaan Publik</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Box 2: Doktrin Kehumasan: Humanis, Transparan & Berbasis Fakta -->
+        <div class="p-5 rounded-3xl bg-gradient-to-br from-emerald-950/40 via-[#0b1426] to-[#070d1d] border border-emerald-500/40 shadow-xl space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+              <ShieldCheck class="w-4 h-4 text-emerald-400" />
+              <span>Doktrin Humas: Humanis, Transparan &amp; Faktual</span>
+            </span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+              Standar Mabes Polri
+            </span>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Menghadapi isu sensitif, personel kehumasan <strong>DILARANG bersikap defensif</strong> atau menutupi kekurangan prosedur di lapangan. Kedepankan empati tulus kepada masyarakat, sampaikan kebenaran kronologi riil <strong>5W+1H</strong> secara terbuka, dan paparkan tindakan korektif nyata demi menjaga marwah institusi.
+          </p>
+          <div class="grid grid-cols-2 gap-2 pt-1 text-[11px]">
+            <div class="p-2 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center gap-2">
+              <span class="text-emerald-400 font-bold">✓</span>
+              <span class="text-slate-200">Keterbukaan Fakta Terverifikasi</span>
+            </div>
+            <div class="p-2 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center gap-2">
+              <span class="text-emerald-400 font-bold">✓</span>
+              <span class="text-slate-200">Pendampingan Humanis Korban</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Grid 2 Col: Isu Nasional vs Isu Kewilayahan -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Isu Nasional -->
@@ -1460,6 +1539,17 @@ const submitIssue = () => {
                 </span>
               </div>
               <p class="text-slate-300 leading-relaxed">{{ iss.fact }}</p>
+
+              <!-- Impact Kamtibmas & Unmitigated Risk Badges -->
+              <div v-if="iss.kamtibmas_impact" class="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-200">
+                <strong class="text-amber-400 font-bold block mb-0.5">🛡️ Dampak Kamtibmas:</strong>
+                <span>{{ iss.kamtibmas_impact }}</span>
+              </div>
+              <div v-if="iss.unmitigated_risk" class="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-[11px] text-rose-200">
+                <strong class="text-rose-400 font-bold block mb-0.5">⚠️ Risiko Jika Tanpa Mitigasi Cepat:</strong>
+                <span>{{ iss.unmitigated_risk }}</span>
+              </div>
+
               <div class="text-[10px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/60 flex-wrap gap-2">
                 <span class="flex items-center gap-1 font-mono text-slate-400">
                   <Radio class="w-3 h-3 text-amber-400" />
@@ -1526,6 +1616,16 @@ const submitIssue = () => {
                 </span>
               </div>
               <p class="text-slate-300 leading-relaxed">{{ iss.fact }}</p>
+
+              <!-- Impact Kamtibmas & Unmitigated Risk Badges -->
+              <div v-if="iss.kamtibmas_impact" class="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-200">
+                <strong class="text-amber-400 font-bold block mb-0.5">🛡️ Dampak Kamtibmas Wilayah:</strong>
+                <span>{{ iss.kamtibmas_impact }}</span>
+              </div>
+              <div v-if="iss.unmitigated_risk" class="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-[11px] text-rose-200">
+                <strong class="text-rose-400 font-bold block mb-0.5">⚠️ Risiko Jika Tanpa Mitigasi Cepat:</strong>
+                <span>{{ iss.unmitigated_risk }}</span>
+              </div>
               <div class="text-[10px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/60 flex-wrap gap-2">
                 <span class="flex items-center gap-1 font-mono text-slate-400">
                   <Radio class="w-3 h-3 text-amber-400" />
@@ -1815,33 +1915,65 @@ const submitIssue = () => {
       <div
         v-for="(ew, idx) in (report?.early_warnings || [])"
         :key="idx"
-        class="rounded-3xl bg-[#0b1426] border border-amber-400/40 p-6 shadow-xl space-y-3"
+        class="rounded-3xl bg-[#0b1426] border border-amber-400/40 p-6 shadow-xl space-y-4"
       >
-        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3 flex-wrap gap-2">
           <div class="flex items-center gap-2">
-            <span class="px-2.5 py-0.5 rounded text-[10px] font-black uppercase bg-amber-400 text-slate-950">
+            <span
+              class="px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider"
+              :class="ew.level === 'MERAH' ? 'bg-rose-500 text-white shadow-md' : 'bg-amber-400 text-slate-950'"
+            >
               LEVEL {{ ew.level }}
             </span>
             <h3 class="text-sm font-black text-white">{{ ew.title }}</h3>
           </div>
           <span class="text-xs font-mono text-slate-400">PIC: {{ ew.pic }}</span>
         </div>
+
         <p class="text-xs text-slate-300 leading-relaxed">{{ ew.fact }}</p>
-        <div class="p-3 rounded-xl bg-slate-900 text-xs text-rose-300">
-          <strong>Potensi Risiko:</strong> {{ ew.risk }}
+
+        <!-- Dimensi Kamtibmas & Dampak Fatal Jika Tidak Dimitigasi (Unmitigated Impact) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 text-xs text-amber-300 space-y-1">
+            <strong class="block text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
+              <span>⚖️ Dimensi Kamtibmas Terancam:</span>
+            </strong>
+            <span class="text-slate-200">{{ ew.kamtibmas_aspect || 'Harkamtibmas Fisik, Ruang Siber & Reputasi Institusi Nasional' }}</span>
+          </div>
+
+          <div class="p-3.5 rounded-2xl bg-rose-950/60 border border-rose-500/50 text-xs text-rose-200 space-y-1 shadow-lg">
+            <strong class="block text-[11px] font-black text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
+              <AlertTriangle class="w-3.5 h-3.5 text-rose-400 shrink-0" />
+              <span>Kajian Dampak Fatal Jika Tanpa Mitigasi Cepat (6–24 Jam):</span>
+            </strong>
+            <span class="leading-relaxed">{{ ew.unmitigated_risk || ew.risk || 'Keterlambatan klarifikasi resmi berisiko memicu framing negatif liar netizen, liputan kritis media arus utama, serta potensi mobilisasi massa.' }}</span>
+          </div>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 text-xs">
-          <div class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
-            <strong class="text-amber-400 block text-[10px]">0-2 Jam:</strong>
-            <span class="text-slate-300">{{ ew.response_0_2h }}</span>
-          </div>
-          <div class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
-            <strong class="text-amber-400 block text-[10px]">2-6 Jam:</strong>
-            <span class="text-slate-300">{{ ew.response_2_6h }}</span>
-          </div>
-          <div class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
-            <strong class="text-amber-400 block text-[10px]">6-24 Jam:</strong>
-            <span class="text-slate-300">{{ ew.response_6_24h }}</span>
+
+        <!-- 3-Phase Response Timeline (Humanis, Transparan & Berbasis Bukti) -->
+        <div class="space-y-1.5 pt-1">
+          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+            Rencana Aksi Mitigasi Berjenjang (Standar Mabes Polri):
+          </span>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+              <strong class="text-amber-400 block text-[10px] uppercase font-bold tracking-wider">
+                Tahap 0–2 Jam (Validasi &amp; Empati):
+              </strong>
+              <span class="text-slate-300 leading-relaxed">{{ ew.response_0_2h }}</span>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+              <strong class="text-sky-400 block text-[10px] uppercase font-bold tracking-wider">
+                Tahap 2–6 Jam (Rilis Transparan &amp; Fakta):
+              </strong>
+              <span class="text-slate-300 leading-relaxed">{{ ew.response_2_6h }}</span>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+              <strong class="text-emerald-400 block text-[10px] uppercase font-bold tracking-wider">
+                Tahap 6–24 Jam (Evaluasi &amp; Pemulihan):
+              </strong>
+              <span class="text-slate-300 leading-relaxed">{{ ew.response_6_24h }}</span>
+            </div>
           </div>
         </div>
       </div>

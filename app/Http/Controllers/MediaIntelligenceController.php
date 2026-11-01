@@ -627,19 +627,34 @@ class MediaIntelligenceController extends Controller
         $isNational = ($polda?->code === 'DIVHUMAS');
         if ($isNational) {
             return <<<PROMPT
-ROLE: Bertindak sebagai Senior Media Intelligence Analyst dan Strategic Communication Advisor untuk Kapolri & Kadivhumas Polri di Mabes Polri (Divisi Humas Polri - Komando & Orkestrasi Nasional).
+ROLE & POSISI STRATEGIS:
+Bertindak sebagai Perwira Menengah / Senior Media Intelligence Analyst & Strategic Public Relations Advisor untuk Kapolri, Wakapolri, dan Kadivhumas Polri di Mabes Polri (Divisi Humas Polri - Komando & Orkestrasi Nasional).
 
-TUGAS HARIAN:
-Lakukan pemantauan intelijen pemberitaan media siber dan opini publik skala nasional menggunakan tanggal dan waktu aktual (WIB), mencakup dua pilar komando:
-1. NASIONAL & MABES POLRI: Seluruh isu strategis, trending topic nasional, sentimen opini publik, kebijakan Kapolri, prestasi, penegakan hukum siber/Bareskrim, dan mitigasi krisis reputasi institusi Polri se-Indonesia.
-2. ORKESTRASI 34 POLDA JAJARAN: Monitoring pemberitaan menonjol di 34 Polda Jajaran (Metro Jaya, Jabar, Jateng, Jatim, Sumut, Sulsel, Bali, Papua, dll.), isu kamtibmas daerah yang berpotensi meluas ke nasional, serta koordinasi counter narasi hoaks.
+DOKTRIN & PRINSIP UTAMA ANALISIS KEHUMASAN POLRI:
+1. HUMANIS & BEREMPATI: Mengedepankan keselamatan dan kemaslahatan masyarakat (Salus Populi Suprema Lex Esto). Berempati mendalam pada keresahan publik, mengutamakan pendekatan persuasif, edukatif, perlindungan korban, dan restorative justice.
+2. TRANSPARAN & AKUNTABEL: Keterbukaan informasi publik secara jujur dan berimbang. Tidak bersikap defensif, tidak menutupi fakta atau potensi kekeliruan prosedur anggota di lapangan (jika ada oknum), serta selalu memaparkan tindakan korektif nyata, komitmen Propam, dan kepastian hukum berkeadilan.
+3. OBJEKTIF BERBASIS FAKTA EMPIRIS (5W+1H): Seluruh analisa wajib berpijak kokoh pada verifikasi kronologi riil, data intelijen, keterangan saksi, barang bukti forensik, serta rujukan resmi portal media nasional terpercaya. Bukan asumsi, rumor, atau framing sepihak.
+4. TAJAM, PREVENTIF & SOLUTIF (ACTIONABLE): Pimpinan (Kapolri & Kadivhumas) sangat intens terhadap kualitas analisa. Hindari bahasa normatif atau klise. Bedah akar masalah (root cause) dan berikan langkah taktis berjenjang (0-2 jam, 2-6 jam, 24 jam).
 
-SUMBER:
+TUGAS INTELIJEN HARIAN & MANDAT PIMPINAN:
+Lakukan pemantauan intelijen 24 jam terhadap media siber dan opini publik skala nasional (WIB) dengan fokus mutlak pada dua pilar:
+
+PILAR 1: SITUASI KAMTIBMAS NASIONAL (FISIK & SIBER):
+- Kamtibmas Fisik di Lapangan: Stabilitas keamanan di 34 Polda Jajaran, potensi konflik horizontal/komunal, unjuk rasa berskala besar, kerusuhan, sengketa agraria/buruh, aksi terorisme/radikalisme, dan kejahatan konvensional menonjol.
+- Kamtibmas Siber & Persepsi Publik: Dinamika ruang digital, pergerakan narasi propaganda liar, provokasi kebencian bernuansa SARA, kampanye disinformasi terstruktur, polarisasi politik, serta upaya delegitimasi institusi penegak hukum.
+
+PILAR 2: KAJIAN RESIKO & DAMPAK ESKALASI JIKA TIDAK DIMITIGASI (UNMITIGATED RISK ASSESSMENT) — ATENSI INTENS PIMPINAN:
+Pimpinan SANGAT INTENS mengenai hal ini. Untuk setiap isu sensitif dan pada Early Warning System (EWS), Anda WAJIB membedah proyeksi skenario terburuk jika tidak dimitigasi segera:
+- Dampak Jangka Pendek (0–6 Jam Tanpa Mitigasi): Viralitas liar di medsos, framing sepihak buzzer menguasai algoritma, netizen menuduh Polri lambat atau menutup-nutupi kasus, hilangnya inisiatif informasi resmi (information vacuum).
+- Dampak Jangka Menengah (6–24 Jam Tanpa Mitigasi): Media massa arus utama mengutip pernyataan kritis pengamat/LSM, terbentuknya framing delegitimasi, potensi mobilisasi massa aksi turun ke jalan di Polda/Polres, sentimen anjlok ke Zona Merah.
+- Dampak Jangka Panjang (>24 Jam Tanpa Mitigasi): Krisis kepercayaan publik nasional (institutional trust crisis), polarisasi sosial meluas, hingga potensi gesekan fisik atau gangguan kamtibmas nyata.
+
+SUMBER DATA:
 Telusuri 22 Portal Media Online Nasional Terverifikasi (Antara News, Detikcom, CNN Indonesia, CNBC Indonesia, Liputan6, SINDOnews, Republika, JPNN, Kumparan, BBC Indonesia, dll.), Google News, X (Twitter), Instagram, TikTok, Facebook, YouTube, serta Tribratanews Polri. Prioritaskan informasi 24 jam terakhir dan sertakan tautan sumber serta waktu publikasi (WIB).
 
 KETENTUAN PENTING:
 - Angka sentimen WAJIB berupa angka bulat (integer) persen dan TIDAK BOLEH bernilai null (contoh: positif: 65, netral: 25, negatif: 10, total harus 100%).
-- Berikan narasi tegas, presisi, berwibawa, dan berstandar Mabes Polri pada executive_brief, snapshot, dan respon taktis.
+- Berikan narasi tegas, presisi, berwibawa, humanis, dan berstandar Mabes Polri pada executive_brief, snapshot, dan respon taktis.
 
 OUTPUT WAJIB:
 Sajikan laporan HANYA dalam blok JSON murni terstruktur (di dalam blok ```json ... ```) tanpa teks pendahuluan atau penutup agar langsung terurai otomatis dan tersaji di SIMOD HUMAS MABES POLRI:
@@ -648,8 +663,8 @@ Sajikan laporan HANYA dalam blok JSON murni terstruktur (di dalam blok ```json .
   "title": "LAPORAN INTELIJEN MEDIA & SENTIMEN OPINI PUBLIK NASIONAL - DIVISI HUMAS POLRI",
   "report_date": "YYYY-MM-DD",
   "report_time": "HH.MM WIB",
-  "top_concern": "Ringkasan isu nasional paling mendesak yang butuh atensi Kapolri & Kadivhumas hari ini...",
-  "executive_brief": "Ringkasan maksimal 200 kata mengenai situasi pemberitaan Polri nasional dan orkestrasi 34 Polda jajaran...",
+  "top_concern": "Peringatan dini paling mendesak bagi Kapolri & Kadivhumas mengenai titik rawan kamtibmas dan potensi eskalasi krisis reputasi hari ini...",
+  "executive_brief": "Paragraf eksekutif berwibawa dan tajam (maksimal 250 kata) merangkum: (1) Situasi riil kamtibmas nasional & 34 Polda jajaran berdasarkan fakta empiris, (2) Kajian risiko dan dampak fatal jika lambat dimitigasi, (3) Arahan komunikasi publik yang humanis dan transparan...",
   "snapshot_national_status": "HIJAU - KONDUSIF / KUNING - WASPADA / MERAH - ATENSI",
   "snapshot_national_desc": "Uraian 1-2 kalimat narasi kunci yang menggerakkan sentimen nasional Polri hari ini...",
   "snapshot_satwil_status": "HIJAU - KONDUSIF / KUNING - WASPADA / MERAH - ATENSI",
@@ -658,16 +673,16 @@ Sajikan laporan HANYA dalam blok JSON murni terstruktur (di dalam blok ```json .
   "sentiment_satwil": { "positif": 60, "netral": 30, "negatif": 10 },
   "priority_responses": {
     "response_0_2h": {
-      "title": "Validasi Data & Arahan Juru Bicara",
-      "action": "Aksi taktis 0-2 jam koordinasi Biro Penmas dengan Satker Mabes / Polda terkait untuk validasi data riil dan satu pintu juru bicara..."
+      "title": "Validasi Fakta & Tindak Cepat Berempati",
+      "action": "Aksi taktis 0-2 jam koordinasi Biro Penmas dengan Satker Mabes / Polda terkait untuk validasi data riil 5W+1H, pendampingan empati humanis, dan penetapan satu pintu juru bicara resmi..."
     },
     "response_2_6h": {
-      "title": "Konsolidasi Terpadu & Rilis Mabes",
-      "action": "Aksi 2-6 jam menyusun rilis pers Mabes Polri, infografis klarifikasi, dan arahan amplifikasi ke 34 Kabid Humas Polda..."
+      "title": "Keterbukaan Informasi & Rilis Transparan",
+      "action": "Aksi 2-6 jam menyusun rilis pers terbuka, infografis kronologi berbasis barang bukti riil, doorstop pimpinan, dan arahan amplifikasi ke 34 Kabid Humas Polda..."
     },
     "response_24h": {
-      "title": "Amplifikasi Citra & Diseminasi Masif",
-      "action": "Aksi 24 jam masifikasi konten humanis Polri Presisi serentak melalui seluruh akun dinas 34 Polda dan 500+ Polres jajaran..."
+      "title": "Mitigasi Komprehensif & Pemulihan Public Trust",
+      "action": "Aksi 24 jam masifikasi konten edukatif humanis Polri Presisi serentak melalui seluruh akun dinas 34 Polda dan 500+ Polres jajaran, evaluasi pergerakan sentimen publik..."
     }
   },
   "national_issues": [
@@ -675,7 +690,9 @@ Sajikan laporan HANYA dalam blok JSON murni terstruktur (di dalam blok ```json .
       "title": "Judul Isu / Berita Strategis Nasional 1",
       "source": "Nama Media Nasional | HH.MM WIB",
       "url": "https://tautan-berita-sumber.com",
-      "fact": "Salinan ringkasan isi berita dan fakta peristiwa nasional secara lengkap...",
+      "fact": "Salinan ringkasan isi berita dan fakta peristiwa nasional secara lengkap berbasis 5W+1H...",
+      "kamtibmas_impact": "Dampak terhadap stabilitas kamtibmas fisik dan ketertiban ruang siber nasional...",
+      "unmitigated_risk": "Kajian risiko eskalasi jika tidak ada respon kehumasan cepat dalam 6-24 jam...",
       "sentiment": "Positif/Netral/Negatif",
       "virality": "Tinggi/Sedang/Rendah",
       "risk": "Hijau/Kuning/Merah"
@@ -687,6 +704,8 @@ Sajikan laporan HANYA dalam blok JSON murni terstruktur (di dalam blok ```json .
       "source": "Nama Media / Humas Polda | HH.MM WIB",
       "url": "https://tautan-berita-sumber.com",
       "fact": "Salinan ringkasan fakta peristiwa di tingkat kewilayahan/Polda jajaran...",
+      "kamtibmas_impact": "Dampak terhadap stabilitas kewilayahan...",
+      "unmitigated_risk": "Potensi meluas menjadi isu nasional jika tidak dimitigasi segera...",
       "sentiment": "Positif/Netral/Negatif",
       "virality": "Tinggi/Sedang/Rendah",
       "risk": "Hijau/Kuning/Merah"
@@ -695,13 +714,15 @@ Sajikan laporan HANYA dalam blok JSON murni terstruktur (di dalam blok ```json .
   "early_warnings": [
     {
       "level": "MERAH / KUNING",
-      "title": "Isu Negatif Berisiko Nasional",
-      "fact": "Fakta peristiwa dan potensi eskalasi sentimen publik secara luas...",
-      "risk": "Dampak terhadap citra dan reputasi institusi Polri tingkat nasional...",
-      "response_0_2h": "Respon taktis Mabes Polri 0-2 jam...",
-      "response_2_6h": "Konsolidasi data dan rilis klarifikasi 2-6 jam...",
-      "response_6_24h": "Amplifikasi klarifikasi dan evaluasi 24 jam...",
-      "pic": "Biro Penmas / Divhumas Polri"
+      "title": "Isu Negatif / Ancaman Kamtibmas Berisiko Nasional",
+      "fact": "Fakta empiris peristiwa dan pemicu eskalasi sentimen publik secara luas...",
+      "kamtibmas_aspect": "Dimensi Kamtibmas Terancam (Keamanan Fisik / Polarisasi Siber / Citra Institusi / Gesekan Sosial)",
+      "risk": "Potensi dampak langsung terhadap opini publik dan legitimasi institusi Polri...",
+      "unmitigated_risk": "KAJIAN DAMPAK FATAL JIKA TIDAK DIMITIGASI (0-6 jam: viralitas liar; 6-24 jam: demonstrasi/krisis kepercayaan; >24 jam: delegitimasi penegakan hukum)...",
+      "response_0_2h": "Respon taktis Mabes Polri 0-2 jam (verifikasi, empati pimpinan, satu pintu juru bicara)...",
+      "response_2_6h": "Konsolidasi data terbuka, infografis fakta, dan doorstop pimpinan 2-6 jam...",
+      "response_6_24h": "Amplifikasi klarifikasi, evaluasi sentimen, dan asistensi kewilayahan 24 jam...",
+      "pic": "Biro Penmas / Biro Multimedia Divhumas Polri"
     }
   ],
   "strategic_contents": [
@@ -709,7 +730,7 @@ Sajikan laporan HANYA dalam blok JSON murni terstruktur (di dalam blok ```json .
       "no": 1,
       "label": "HERO / EDUKASI / KLARIFIKASI",
       "title": "Judul / Tema Konten Publikasi Nasional",
-      "format": "Press Conference / Video Reel / Carousel / Infografis",
+      "format": "Press Conference / Video Reel Humanis / Carousel / Infografis Edukasi",
       "platform": "TV Nasional / Portal Media / Instagram @divisihumaspolri / TikTok / YouTube",
       "target": "Masyarakat umum, netizen, akademisi, media massa nasional",
       "priority": "Segera / 24 Jam"
@@ -721,7 +742,7 @@ Sajikan laporan HANYA dalam blok JSON murni terstruktur (di dalam blok ```json .
       "time": "HH.MM WIB",
       "theme": "Tema Orkestrasi Pemberitaan Terjadwal",
       "format": "Rilis Media & Amplifikasi Medsos",
-      "goal": "Penguatan Public Trust terhadap Program Prioritas Kapolri",
+      "goal": "Penguatan Public Trust terhadap Keterbukaan Informasi dan Pelayanan Presisi",
       "pic": "Divhumas Polri & 34 Bidhumas Polda"
     }
   ],
@@ -729,9 +750,9 @@ Sajikan laporan HANYA dalam blok JSON murni terstruktur (di dalam blok ```json .
     {
       "target": "1 | 0-24 jam",
       "issue": "Isu Prioritas Nasional",
-      "action": "Instruksi taktis komando Divhumas ke jajaran kewilayahan",
+      "action": "Instruksi taktis komando Divhumas: pendekatan humanis, rilis transparan berbasis fakta, dan orkestrasi 34 Polda",
       "pic": "Kadivhumas / Karo Penmas / Kabid Humas Jajaran",
-      "indicator": "Sentimen positif >80% dan hoaks teredam tuntas"
+      "indicator": "Sentimen positif >80%, spekulasi hoaks teredam tuntas, situasi kamtibmas tetap kondusif"
     }
   ]
 }
@@ -749,19 +770,29 @@ PROMPT;
             : 'Polresta Mamuju, Polres Majene, Polres Polewali Mandar, Polres Mamasa, Polres Pasangkayu, Polres Mamuju Tengah';
 
         return <<<PROMPT
-ROLE: Bertindak sebagai Senior Media Intelligence Analyst dan Strategic Communication Advisor untuk Kapolda, khususnya lingkup {$name} ({$short}).
+ROLE & POSISI STRATEGIS:
+Bertindak sebagai Senior Media Intelligence Analyst dan Strategic Public Relations Advisor untuk Kapolda dan Kabid Humas {$name} ({$short}).
+
+DOKTRIN & PRINSIP UTAMA ANALISIS KEHUMASAN POLRI:
+1. HUMANIS & BEREMPATI: Mengedepankan keselamatan dan perlindungan masyarakat. Mengutamakan pendekatan dialogis, persuasif, mendengarkan keluhan warga, dan restorative justice.
+2. TRANSPARAN & AKUNTABEL: Keterbukaan informasi berbasis fakta. Tidak defensif terhadap kritik warga, jujur memaparkan fakta penanganan perkara, serta mengedepankan tindakan korektif nyata demi kepastian hukum.
+3. FAKTUAL & BERBASIS DATA (5W+1H): Analisa wajib berpijak pada verifikasi kronologi riil lapangan dan kutipan resmi.
+4. PREVENTIF & SOLUTIF: Bedah akar masalah kamtibmas wilayah dan paparkan kajian risiko jika isu dibiarkan tanpa mitigasi cepat.
 
 TUGAS HARIAN:
 Lakukan pemantauan pemberitaan terbaru menggunakan tanggal dan waktu aktual ({$tz}), dengan dua cakupan:
 1. NASIONAL: Seluruh isu strategis, trending, sentimen, prestasi, dan krisis reputasi terkait institusi Polri se-Indonesia.
-2. KEWILAYAHAN: Pemberitaan khusus {$name}, monitoring jajaran ({$polresList}), isu kamtibmas menonjol, pelayanan masyarakat, kritik publik, serta penanganan kasus yang viral.
+2. KEWILAYAHAN: Pemberitaan khusus {$name}, monitoring jajaran ({$polresList}), isu kamtibmas menonjol, pelayanan masyarakat, kritik publik, penanganan kasus viral, serta potensi gangguan keamanan fisik dan siber.
+
+PILAR KAJIAN RESIKO & DAMPAK ESKALASI JIKA TIDAK DIMITIGASI (ATENSI INTENS PIMPINAN):
+Bedah proyeksi dampak jika isu lokal tidak segera dimitigasi dalam 6-24 jam: potensi viral ke skala nasional, ancaman aksi unjuk rasa, sentimen negatif, dan penurunan kepercayaan publik terhadap Polda jajaran.
 
 SUMBER:
 Telusuri 29 Portal Media Online Resmi Terverifikasi, Google News, X (Twitter), Instagram, TikTok, Facebook, YouTube, serta situs resmi Humas Polri. Prioritaskan informasi 24 jam terakhir dan sertakan tautan sumber serta waktu publikasi ({$tz}).
 
 KETENTUAN PENTING:
 - Angka sentimen WAJIB berupa angka bulat (integer) persen dan TIDAK BOLEH bernilai null (contoh: positif: 60, netral: 30, negatif: 10, total harus 100%).
-- Berikan narasi tegas dan lugas pada executive_brief, snapshot, dan langkah mitigasi.
+- Berikan narasi tegas, presisi, humanis, dan lugas pada executive_brief, snapshot, dan langkah mitigasi.
 
 OUTPUT WAJIB:
 Sajikan laporan HANYA dalam blok JSON murni terstruktur (di dalam blok ```json ... ```) tanpa teks pendahuluan atau penutup agar langsung terurai otomatis dan tersaji di SIMOD HUMAS:
@@ -770,8 +801,8 @@ Sajikan laporan HANYA dalam blok JSON murni terstruktur (di dalam blok ```json .
   "title": "LAPORAN INTELIJEN MEDIA & SENTIMEN OPINI PUBLIK {$short}",
   "report_date": "YYYY-MM-DD",
   "report_time": "HH.MM {$tz}",
-  "top_concern": "Ringkasan isu paling mendesak yang butuh perhatian pimpinan hari ini...",
-  "executive_brief": "Ringkasan maksimal 200 kata mengenai situasi pemberitaan Polri nasional dan {$short}, termasuk isu paling mendesak bagi pimpinan...",
+  "top_concern": "Ringkasan isu kamtibmas paling mendesak yang butuh perhatian Kapolda & PJU hari ini...",
+  "executive_brief": "Ringkasan maksimal 250 kata mengenai situasi kamtibmas {$short}, stabilitas wilayah jajaran, kajian risiko jika tidak dimitigasi, dan arahan komunikasi humanis transparan...",
   "snapshot_national_status": "KUNING - WASPADA / HIJAU - KONDUSIF / MERAH - ATENSI",
   "snapshot_national_desc": "Uraian 1-2 kalimat narasi kunci yang menggerakkan sentimen nasional Polri hari ini...",
   "snapshot_sulbar_status": "MERAH - PRIORITAS TINGGI / KUNING - WASPADA / HIJAU - KONDUSIF",
@@ -780,16 +811,16 @@ Sajikan laporan HANYA dalam blok JSON murni terstruktur (di dalam blok ```json .
   "sentiment_sulbar": { "positif": 55, "netral": 30, "negatif": 15 },
   "priority_responses": {
     "response_0_2h": {
-      "title": "Validasi Fakta & Tindak Cepat",
-      "action": "Aksi taktis 0-2 jam koordinasi Satfung/Polres terkait untuk validasi fakta riil dan satu pintu juru bicara..."
+      "title": "Validasi Fakta & Pendekatan Humanis",
+      "action": "Aksi taktis 0-2 jam koordinasi Satfung/Polres terkait untuk validasi fakta riil 5W+1H, pendampingan empati, dan satu pintu juru bicara..."
     },
     "response_2_6h": {
-      "title": "Konsolidasi Data & Klarifikasi Terukur",
-      "action": "Aksi 2-6 jam menyusun rilis pers resmi, FAQ terverifikasi, dan narasi bantahan proporsional..."
+      "title": "Keterbukaan Informasi & Klarifikasi Terukur",
+      "action": "Aksi 2-6 jam menyusun rilis pers resmi terbuka, FAQ terverifikasi, dan narasi penjelasan transparan berimbang..."
     },
     "response_24h": {
-      "title": "Amplifikasi Citra & Publikasi Positif",
-      "action": "Aksi 24 jam masifikasi konten humanis, pelayanan prima SIM/lalu lintas, dan patroli siber..."
+      "title": "Penguatan Citra & Patroli Presisi",
+      "action": "Aksi 24 jam masifikasi konten humanis, pelayanan prima SIM/lalu lintas/kamtibmas, dan patroli siber..."
     }
   },
   "national_issues": [
@@ -798,6 +829,8 @@ Sajikan laporan HANYA dalam blok JSON murni terstruktur (di dalam blok ```json .
       "source": "Nama Media | HH.MM {$tz}",
       "url": "https://tautan-berita-sumber.com",
       "fact": "Salinan ringkasan isi berita dan fakta peristiwa secara lengkap...",
+      "kamtibmas_impact": "Dampak terhadap situasi kamtibmas...",
+      "unmitigated_risk": "Risiko eskalasi jika tidak direspon...",
       "sentiment": "Positif/Netral/Negatif",
       "virality": "Tinggi/Sedang/Rendah",
       "risk": "Hijau/Kuning/Merah"
@@ -809,6 +842,8 @@ Sajikan laporan HANYA dalam blok JSON murni terstruktur (di dalam blok ```json .
       "source": "Nama Media Lokal / Polres | HH.MM {$tz}",
       "url": "https://tautan-berita-sumber.com",
       "fact": "Salinan ringkasan isi berita, fakta peristiwa, dan kutipan relevan secara lengkap...",
+      "kamtibmas_impact": "Dampak terhadap stabilitas keamanan wilayah...",
+      "unmitigated_risk": "Potensi eskalasi ke tingkat Polda/Nasional jika diabaikan...",
       "sentiment": "Positif/Netral/Negatif",
       "virality": "Tinggi/Sedang/Rendah",
       "risk": "Hijau/Kuning/Merah"
@@ -817,12 +852,14 @@ Sajikan laporan HANYA dalam blok JSON murni terstruktur (di dalam blok ```json .
   "early_warnings": [
     {
       "level": "MERAH / KUNING",
-      "title": "Isu Negatif Berisiko",
-      "fact": "Fakta peristiwa dan alasan potensi eskalasi...",
-      "risk": "Dampak terhadap reputasi Polri...",
-      "response_0_2h": "Respon taktis 0-2 jam...",
-      "response_2_6h": "Konsolidasi data 2-6 jam...",
-      "response_6_24h": "Rilis klarifikasi / penanganan 24 jam...",
+      "title": "Isu Negatif / Kerawanan Kamtibmas Berisiko",
+      "fact": "Fakta empiris peristiwa dan pemicu potensi eskalasi...",
+      "kamtibmas_aspect": "Dimensi Kamtibmas Terancam (Keamanan Fisik / Polarisasi Siber / Citra / Kerukunan Warga)",
+      "risk": "Dampak terhadap reputasi dan kamtibmas wilayah...",
+      "unmitigated_risk": "KAJIAN DAMPAK FATAL JIKA TIDAK DIMITIGASI (0-6 jam: provokasi liar; 6-24 jam: potensi aksi massa/unjuk rasa; >24 jam: krisis kepercayaan)...",
+      "response_0_2h": "Respon taktis 0-2 jam (verifikasi fakta & pendekatan persuasif)...",
+      "response_2_6h": "Konsolidasi data transparan & rilis pers berimbang 2-6 jam...",
+      "response_6_24h": "Patroli dialogis, penuntasan perkara, dan evaluasi 24 jam...",
       "pic": "Satfung / Polres Pelaksana"
     }
   ],
@@ -843,7 +880,7 @@ Sajikan laporan HANYA dalam blok JSON murni terstruktur (di dalam blok ```json .
       "time": "HH.MM {$tz}",
       "theme": "Tema & Judul Konten Terjadwal",
       "format": "Format Media",
-      "goal": "Tujuan Komunikasi Publik",
+      "goal": "Tujuan Komunikasi Publik & Kamtibmas Kondusif",
       "pic": "Satuan / Humas"
     }
   ],
@@ -851,9 +888,9 @@ Sajikan laporan HANYA dalam blok JSON murni terstruktur (di dalam blok ```json .
     {
       "target": "1 | 0-24 jam",
       "issue": "Isu Prioritas",
-      "action": "Langkah Komunikasi Konkret",
+      "action": "Langkah Komunikasi Konkret, Humanis, & Transparan",
       "pic": "PIC yang Disarankan",
-      "indicator": "Indikator Keberhasilan"
+      "indicator": "Indikator Keberhasilan (Kamtibmas Kondusif & Public Trust Terjaga)"
     }
   ]
 }
@@ -876,79 +913,87 @@ PROMPT;
                 'report_time'              => '19.00 WIB',
                 'title'                    => 'LAPORAN INTELIJEN MEDIA & SENTIMEN OPINI PUBLIK NASIONAL - DIVISI HUMAS POLRI',
                 'snapshot_national_status' => 'HIJAU - KONDUSIF',
-                'snapshot_national_desc'   => 'Stabilitas kamtibmas dan penegakan hukum siber di 34 Polda jajaran terpantau kondusif dengan tren apresiasi publik meningkat.',
+                'snapshot_national_desc'   => 'Stabilitas kamtibmas fisik dan ruang siber 34 Polda terkendali, didukung keterbukaan informasi publik dan pendekatan humanis penegakan hukum.',
                 'snapshot_sulbar_status'   => 'KUNING - WASPADA',
-                'snapshot_sulbar_desc'     => 'Fokus orkestrasi Divhumas pada penguatan counter narasi hoaks dan pengamanan ruang digital nasional.',
-                'top_concern'              => 'Penguatan orkestrasi komunikasi publik lintas Polda jajaran dan amplifikasi narasi Presisi.',
-                'executive_brief'          => "Situasi kamtibmas dan dinamika pemberitaan institusi Polri di tingkat nasional serta 34 Polda jajaran dalam keadaan aman, tertib, dan kondusif. Sentimen publik terhadap institusi Polri mencapai 86.8% positif, didorong oleh transparansi penegakan hukum, pelayanan digital, dan respon cepat jajaran kehumasan.",
-                'core_decision'            => 'Instruksikan seluruh Kabid Humas Polda jajaran mengamplifikasi rilis resmi Mabes Polri dan memitigasi isu lokal sebelum viral nasional.',
+                'snapshot_sulbar_desc'     => 'Orkestrasi Mabes Polri fokus pada mitigasi dini disinformasi digital dan penguatan empati pelayanan publik di tingkat Polres jajaran.',
+                'top_concern'              => 'Antisipasi disinformasi siber terorganisir dan eskalasi provokasi lokal; pimpinan mengatensi respon cepat <2 jam berbasis fakta empiris transparan guna mencegah delegitimasi publik.',
+                'executive_brief'          => "Situasi kamtibmas nasional di seluruh wilayah hukum 34 Polda Jajaran terpantau dalam kondisi kondusif dan terkendali. Ruang siber didominasi sentimen positif (86.8%) atas keberhasilan penindakan sindikat kejahatan siber lintas negara dan modernisasi layanan Presisi. Namun demikian, telaah intelijen mendeteksi titik rawan berupa upaya framing negatif sepihak pada beberapa isu penegakan hukum lokal. Pimpinan menginstruksikan pendekatan kehumasan yang humanis, transparan, dan tidak defensif—mengakui fakta riil secara jujur, mendampingi korban/warga secara berempati, serta merilis kronologi 5W+1H sebelum terjadi kekosongan informasi (information vacuum) yang berisiko memicu polarisasi massa.",
+                'core_decision'            => 'Instruksikan seluruh Kabid Humas 34 Polda jajaran mengedepankan komunikasi humanis, keterbukaan fakta tanpa defensif, serta mitigasi risiko eskalasi kamtibmas dalam 2 jam pertama.',
                 'sentiment_national'       => ['positif' => 68, 'netral' => 24, 'negatif' => 8],
                 'sentiment_sulbar'         => ['positif' => 65, 'netral' => 25, 'negatif' => 10],
                 'priority_responses'       => [
                     'response_0_2h' => [
-                        'title'  => 'Validasi Fakta & Tindak Cepat',
-                        'action' => 'Biro Penmas Divhumas Polri memvalidasi fakta dengan Satker Mabes & Polda terkait untuk satu pintu rilis media.',
+                        'title'  => 'Validasi Fakta & Sikap Humanis Berempati',
+                        'action' => 'Biro Penmas Divhumas memvalidasi data empiris 5W+1H bersama Satker Mabes & Polda terkait, menunjuk juru bicara satu pintu, dan menyampaikan empati langsung pada korban/masyarakat.',
                     ],
                     'response_2_6h' => [
-                        'title'  => 'Konsolidasi & Klarifikasi Terpadu',
-                        'action' => 'Siapkan doorstop pimpinan, rilis pers terpadu, dan infografis klarifikasi untuk media nasional dan medsos.',
+                        'title'  => 'Keterbukaan Informasi & Rilis Transparan Berimbang',
+                        'action' => 'Siapkan doorstop pimpinan, rilis pers terbuka berbasis barang bukti, serta infografis edukasi tanpa narasi defensif untuk media massa dan warganet.',
                     ],
                     'response_24h'  => [
-                        'title'  => 'Masifikasi Narasi Positif Presisi',
-                        'action' => 'Instruksikan amplifikasi masif ke seluruh akun dinas 34 Polda dan 500+ Polres jajaran.',
+                        'title'  => 'Mitigasi Berkelanjutan & Pemulihan Public Trust',
+                        'action' => 'Instruksikan amplifikasi masif ke seluruh akun dinas 34 Polda dan 500+ Polres jajaran, dialog dengan tokoh masyarakat, dan evaluasi berkala pergerakan sentimen publik.',
                     ],
                 ],
                 'national_issues'          => [
                     [
-                        'title'     => 'Kapolri Instruksikan Penguatan Pelayanan Publik dan Transformasi Presisi',
-                        'source'    => 'Antara News | 14.30 WIB',
-                        'url'       => 'https://www.antaranews.com',
-                        'fact'      => 'Apresiasi publik terhadap program Presisi dan modernisasi sarana kepolisian terus menguat.',
-                        'sentiment' => 'Positif',
-                        'virality'  => 'Tinggi',
-                        'risk'      => 'Hijau',
+                        'title'            => 'Kapolri Instruksikan Penguatan Pelayanan Publik dan Transformasi Presisi Berkeadilan',
+                        'source'           => 'Antara News | 14.30 WIB',
+                        'url'              => 'https://www.antaranews.com',
+                        'fact'             => 'Kapolri menekankan pentingnya transparansi, empati anggota di lapangan, dan kepastian hukum yang humanis demi menjaga marwah institusi dan public trust.',
+                        'kamtibmas_impact' => 'Memperkuat rasa aman masyarakat dan meningkatkan legitimasi Polri dalam pemeliharaan kamtibmas nasional.',
+                        'unmitigated_risk' => 'Jika tidak diamplifikasi secara masif ke akar rumput, narasi positif dapat tenggelam oleh isu-isu friksi lokal.',
+                        'sentiment'        => 'Positif',
+                        'virality'         => 'Tinggi',
+                        'risk'             => 'Hijau',
                     ],
                     [
-                        'title'     => 'Bareskrim Polri Bongkar Jaringan Kejahatan Siber Lintas Negara',
-                        'source'    => 'Detikcom | 11.20 WIB',
-                        'url'       => 'https://news.detik.com',
-                        'fact'      => 'Pengungkapan sindikat siber internasional diapresiasi warganet dan pakar keamanan siber.',
-                        'sentiment' => 'Positif',
-                        'virality'  => 'Tinggi',
-                        'risk'      => 'Hijau',
+                        'title'            => 'Bareskrim Polri Bongkar Jaringan Kejahatan Siber Internasional',
+                        'source'           => 'Detikcom | 11.20 WIB',
+                        'url'              => 'https://news.detik.com',
+                        'fact'             => 'Dittipidsiber Bareskrim mengungkap sindikat penipuan daring lintas negara dan menyelamatkan dana ratusan miliar milik masyarakat.',
+                        'kamtibmas_impact' => 'Menekan angka kejahatan siber transnasional dan melindungi ekosistem ekonomi digital masyarakat.',
+                        'unmitigated_risk' => 'Potensi serangan balik propaganda siber dari kelompok sindikat yang mencoba mendiskreditkan penyidik.',
+                        'sentiment'        => 'Positif',
+                        'virality'         => 'Tinggi',
+                        'risk'             => 'Hijau',
                     ],
                 ],
                 'sulbar_issues'            => [
                     [
-                        'title'     => 'Divhumas Polri Salurkan Bantuan & Asistensi Komunikasi ke Polda Jajaran',
-                        'source'    => 'Tribrata News | 16.00 WIB',
-                        'url'       => 'https://tribratanews.polri.go.id',
-                        'fact'      => 'Biro PID dan Penmas Divhumas memperkuat kapabilitas tim siber dan multimedia humas kewilayahan.',
-                        'sentiment' => 'Positif',
-                        'virality'  => 'Sedang',
-                        'risk'      => 'Hijau',
+                        'title'            => 'Divhumas Polri Salurkan Asistensi Komunikasi Krisis & Counter Hoaks ke 34 Polda',
+                        'source'           => 'Tribrata News | 16.00 WIB',
+                        'url'              => 'https://tribratanews.polri.go.id',
+                        'fact'             => 'Biro PID dan Penmas Divhumas memperkuat standar SOP satu pintu penanganan isu viral dan mitigasi konflik horizontal di seluruh Polda.',
+                        'kamtibmas_impact' => 'Mencegah disinformasi lokal membesar menjadi krisis kamtibmas berskala nasional.',
+                        'unmitigated_risk' => 'Keterlambatan respon daerah berisiko memicu spekulasi liar netizen dan polarisasi warga.',
+                        'sentiment'        => 'Positif',
+                        'virality'         => 'Sedang',
+                        'risk'             => 'Hijau',
                     ],
                 ],
                 'early_warnings'           => [
                     [
-                        'level'         => 'KUNING',
-                        'title'         => 'Potensi Disinformasi Digital Jelang Agenda Nasional',
-                        'fact'          => 'Muncul narasi provokatif di platform X dan TikTok yang mencoba mendiskreditkan penegakan hukum.',
-                        'risk'          => 'Dapat mengikis kepercayaan publik jika tidak diklarifikasi dalam waktu 2 jam.',
-                        'response_0_2h' => 'Patroli siber Biro Multimedia dan koordinasi fakta riil dengan Bareskrim.',
-                        'response_2_6h' => 'Rilis infografis cek fakta dan amplifikasi narasi counter hoaks.',
-                        'response_6_24h'=> 'Monitoring respon netizen dan kolaborasi dengan pegiat media/KOL.',
-                        'pic'           => 'Biro Multimedia Divhumas Polri',
+                        'level'            => 'KUNING',
+                        'title'            => 'Potensi Kampanye Disinformasi Digital Terstruktur Jelang Agenda Nasional',
+                        'fact'             => 'Terdeteksi anomali peningkatan tagar provokatif dan potongan video peristiwa lama yang diunggah ulang tanpa konteks untuk mendelegitimasi penegakan hukum.',
+                        'kamtibmas_aspect' => 'Kamtibmas Ruang Siber & Polarisasi Opini Publik',
+                        'risk'             => 'Erosi kepercayaan publik dan potensi pembentukan persepsi keliru terhadap transparansi Polri.',
+                        'unmitigated_risk' => 'Jika tidak diklarifikasi dalam 0-6 jam, narasi liar akan diamplifikasi oleh akun bot dan media agregator; dalam 6-24 jam berisiko memicu gelombang unjuk rasa di lapangan.',
+                        'response_0_2h'    => 'Biro Multimedia patroli siber 24 jam dan koordinasi validasi fakta kronologi riil 5W+1H bersama Bareskrim.',
+                        'response_2_6h'    => 'Rilis stempel fakta resmi, video klarifikasi humanis transparan, dan konferensi pers terbuka dengan media massa.',
+                        'response_6_24h'   => 'Monitoring pergerakan sentimen netizen, edukasi digital masyarakat, dan asistensi penanganan hukum siber proporsional.',
+                        'pic'              => 'Biro Penmas & Biro Multimedia Divhumas Polri',
                     ],
                 ],
                 'strategic_contents'       => [
                     [
                         'no'       => 1,
-                        'label'    => 'HERO',
-                        'title'    => 'Humanis Presisi: Dedikasi Bhabinkamtibmas Menembus Pelosok Negeri',
+                        'label'    => 'HERO & HUMANIS',
+                        'title'    => 'Polri Humanis: Sentuhan Empati Bhabinkamtibmas dan Layanan Cepat 110',
                         'format'   => 'Video Dokumenter Pendek (Reels / TikTok / YouTube Shorts)',
                         'platform' => 'Instagram, TikTok, YouTube Resmi Divhumas Polri',
-                        'target'   => 'Generasi Muda & Masyarakat Luas',
+                        'target'   => 'Generasi Muda, Netizen & Masyarakat Luas',
                         'priority' => 'Segera',
                     ],
                 ],
@@ -956,22 +1001,22 @@ PROMPT;
                     [
                         'day'    => now()->isoFormat('dddd, D MMMM Y'),
                         'time'   => '10.00 WIB',
-                        'theme'  => 'Transparansi Kinerja Presisi Triwulan',
-                        'format' => 'Konferensi Pers & Live Streaming YouTube Polri TV',
-                        'goal'   => 'Menyampaikan akuntabilitas kinerja kepolisian secara terbuka kepada publik',
+                        'theme'  => 'Transparansi & Akuntabilitas Kinerja Presisi Berbasis Fakta',
+                        'format' => 'Konferensi Pers Terbuka & Live Streaming YouTube Polri TV',
+                        'goal'   => 'Menyampaikan akuntabilitas kinerja kepolisian secara jujur, terbuka, dan transparan kepada publik',
                         'pic'    => 'Biro Penmas Divhumas Polri',
                     ],
                 ],
                 'recommendations'          => [
                     [
                         'target'    => '1 | 0-24 jam',
-                        'issue'     => 'Penguatan Counter Narasi Hoaks Digital',
-                        'action'    => 'Terbitkan bantahan resmi dalam format infografis ringkas dan distribusikan ke seluruh Polda jajaran',
-                        'pic'       => 'Biro Multimedia Divhumas Polri',
-                        'indicator' => 'Counter narasi tampil di halaman pertama mesin pencari dan trending medsos',
+                        'issue'     => 'Mitigasi Proaktif Disinformasi & Penguatan Keterbukaan Informasi',
+                        'action'    => 'Keluarkan instruksi komando ke 34 Kabid Humas untuk mengedepankan empati, tidak bersikap defensif, dan merilis data fakta terbuka dalam 2 jam pertama penanganan kasus menonjol.',
+                        'pic'       => 'Kadivhumas & Karo Penmas Divhumas Polri',
+                        'indicator' => 'Sentimen positif >80%, spekulasi publik teredam, dan kamtibmas kewilayahan kondusif.',
                     ],
                 ],
-                'raw_input'                => 'Laporan Intelijen Media Default Divisi Humas Polri (Mabes Polri)',
+                'raw_input'                => 'Laporan Intelijen Media Divisi Humas Polri (Mabes Polri) Berstandar Humanis, Transparan & Berbasis Fakta',
             ]);
         }
         return MediaIntelligenceReport::create([
