@@ -79,6 +79,8 @@ Route::post('/settings/polres/create', [SystemModuleController::class, 'storePol
 Route::get('/security', [SystemModuleController::class, 'securityCenter'])->name('security.center');
 Route::post('/security', [SystemModuleController::class, 'updateSecurity'])->name('security.update');
 Route::get('/roles', [SystemModuleController::class, 'rolesMatrix'])->name('roles.matrix');
+Route::post('/roles', [SystemModuleController::class, 'updateRolesMatrix'])->name('roles.update');
+Route::post('/roles/reset', [SystemModuleController::class, 'resetRolesMatrix'])->name('roles.reset');
 Route::get('/settings/mail', [SystemModuleController::class, 'mailSettings'])->name('settings.mail');
 // Database Backup & Restore Center
 Route::get('/database/backup', [\App\Http\Controllers\DatabaseBackupController::class, 'index'])->name('database.backup');

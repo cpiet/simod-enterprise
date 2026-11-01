@@ -8,9 +8,11 @@ use App\Models\MediaFile;
 use App\Models\Polda;
 use App\Models\Polres;
 use App\Models\Publication;
+use App\Models\RolePermission;
 use App\Models\SecuritySetting;
 use App\Models\Task;
 use App\Models\User;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -26,7 +28,10 @@ class SystemModuleController extends Controller
         $selectedCode = $request->query('polda', 'SULBAR');
         $selectedPolda = null;
 
-        if ($selectedCode !== 'ALL') {
+        if ($selectedCode === 'ALL' || $selectedCode === 'DIVHUMAS') {
+            $selectedPolda = Polda::where('code', 'DIVHUMAS')->first();
+            $selectedCode = 'ALL';
+        } else {
             $selectedPolda = Polda::where('code', $selectedCode)->first();
             if (! $selectedPolda) {
                 $selectedPolda = $allPoldas->first();
@@ -684,12 +689,101 @@ class SystemModuleController extends Controller
     {
         [$allPoldas, $selectedPolda, $selectedCode, $metrics] = $this->getBaseData($request);
 
+        $targetPoldaId = $selectedPolda ? $selectedPolda->id : null;
+        if ($selectedCode === 'ALL') {
+            $targetPoldaId = Polda::where('code', 'DIVHUMAS')->value('id');
+        }
+
+        $modules = RolePermission::defaultModules();
+        $roleMatrix = RolePermission::getMatrixForPolda($targetPoldaId);
+
         return Inertia::render('Settings/Roles', [
             'allPoldas'     => $allPoldas,
             'selectedPolda' => $selectedPolda,
             'selectedCode'  => $selectedCode,
             'metrics'       => $metrics,
+            'modules'       => $modules,
+            'roleMatrix'    => $roleMatrix,
+            'targetPoldaId' => $targetPoldaId,
         ]);
+    }
+
+    /**
+     * Perbarui Hak Akses & Matriks Otoritas (RBAC)
+     */
+    public function updateRolesMatrix(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'matrix'               => 'required|array',
+            'matrix.*.role_key'    => 'required|string',
+            'matrix.*.permissions' => 'required|array',
+            'polda_id'             => 'nullable|integer',
+        ]);
+
+        $selectedCode = $request->query('polda', 'ALL');
+        $targetPoldaId = $validated['polda_id'] ?? null;
+        if (!$targetPoldaId && $selectedCode !== 'ALL') {
+            $targetPoldaId = Polda::where('code', $selectedCode)->value('id');
+        } elseif ($selectedCode === 'ALL') {
+            $targetPoldaId = Polda::where('code', 'DIVHUMAS')->value('id');
+        }
+
+        $rolesCount = 0;
+        foreach ($validated['matrix'] as $row) {
+            $roleKey = $row['role_key'];
+            $perms = $row['permissions'];
+
+            RolePermission::updateOrCreate(
+                [
+                    'polda_id' => $targetPoldaId,
+                    'role_key' => $roleKey,
+                ],
+                [
+                    'role_name'   => $row['role_name'] ?? ucwords(str_replace('_', ' ', $roleKey)),
+                    'description' => $row['description'] ?? null,
+                    'permissions' => $perms,
+                    'updated_by'  => auth()->id(),
+                ]
+            );
+            $rolesCount++;
+        }
+
+        AuditLog::create([
+            'user_id'    => auth()->id(),
+            'action'     => 'update_rbac_matrix',
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'details'    => "Memperbarui matriks hak akses untuk {$rolesCount} peran otoritas pada polda_id: " . ($targetPoldaId ?? 'Nasional'),
+        ]);
+
+        return back()->with('success', "Matriks Hak Akses & Otoritas untuk {$rolesCount} peran berhasil disimpan secara permanen!");
+    }
+
+    /**
+     * Reset Matriks Hak Akses ke Standar Bawaan Polri
+     */
+    public function resetRolesMatrix(Request $request): RedirectResponse
+    {
+        $selectedCode = $request->query('polda', 'ALL');
+        $targetPoldaId = null;
+        if ($selectedCode === 'ALL') {
+            $targetPoldaId = Polda::where('code', 'DIVHUMAS')->value('id');
+        } else {
+            $targetPoldaId = Polda::where('code', $selectedCode)->value('id');
+        }
+
+        RolePermission::where('polda_id', $targetPoldaId)->delete();
+        RolePermission::getMatrixForPolda($targetPoldaId);
+
+        AuditLog::create([
+            'user_id'    => auth()->id(),
+            'action'     => 'reset_rbac_matrix',
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'details'    => "Mereset matriks hak akses ke standar Polri Presisi pada polda_id: " . ($targetPoldaId ?? 'Nasional'),
+        ]);
+
+        return back()->with('success', "Matriks Hak Akses berhasil direset ke standar resmi Polri Presisi!");
     }
 
     /**

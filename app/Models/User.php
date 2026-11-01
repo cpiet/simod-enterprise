@@ -62,4 +62,9 @@ class User extends Authenticatable
     {
         return $this->role === 'kadiv_humas';
     }
+
+    public function hasPermission(string $moduleKey): bool
+    {
+        return RolePermission::isGranted($this->role ?? 'operator', $moduleKey, $this->polda_id);
+    }
 }

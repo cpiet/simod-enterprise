@@ -163,3 +163,4 @@ class DivhumasNationalRssFeedsSeeder extends Seeder
         }
     }
 }
+
