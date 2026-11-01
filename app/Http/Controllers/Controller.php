@@ -58,4 +58,18 @@ abstract class Controller
 
         return [$selectedCode, $selectedPolda, $selectedPolda?->id];
     }
+
+    /**
+     * Proteksi Direct Parameter Tampering (IDOR) antar-satwil:
+     * Memastikan personel kewilayahan tidak dapat mengakses atau memanipulasi ID record milik Polda lain.
+     */
+    protected function authorizeTenantRecord(Request $request, object $record): void
+    {
+        $user = $request->user();
+        if ($user && !$user->isSuperAdmin() && $user->polda_id && isset($record->polda_id)) {
+            if ((int) $record->polda_id !== (int) $user->polda_id) {
+                abort(403, 'Akses Ditolak: Anda tidak memiliki otoritas untuk mengakses atau memodifikasi data milik satuan wilayah lain.');
+            }
+        }
+    }
 }

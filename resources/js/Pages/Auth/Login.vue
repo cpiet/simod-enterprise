@@ -47,10 +47,18 @@ const handleLogin = () => {
     poldaCode = chosenPolda ? chosenPolda.code : 'SULBAR';
   }
 
-  setTimeout(() => {
-    isSubmitting.value = false;
-    router.visit(`/?polda=${poldaCode}`);
-  }, 400);
+  router.post('/login', {
+    username: form.value.username,
+    password: form.value.password,
+    pin: form.value.pin,
+    remember: form.value.remember,
+    polda_id: selectedPoldaId.value,
+    polda_code: poldaCode,
+  }, {
+    onFinish: () => {
+      isSubmitting.value = false;
+    },
+  });
 };
 </script>
 
@@ -183,6 +191,14 @@ const handleLogin = () => {
 
         <!-- Form Login -->
         <form @submit.prevent="handleLogin" class="space-y-4">
+          <div
+            v-if="errors?.username"
+            class="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs font-bold flex items-center gap-2"
+          >
+            <AlertCircle class="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{{ errors.username }}</span>
+          </div>
+
           <!-- Password Mode Inputs -->
           <div v-if="authMode === 'password'" class="space-y-4">
             <!-- Username Input -->

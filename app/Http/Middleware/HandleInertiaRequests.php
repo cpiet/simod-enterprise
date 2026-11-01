@@ -94,12 +94,14 @@ class HandleInertiaRequests extends Middleware
         $activeRole = $simulatedRole ?: ($user?->role ?: ($selectedCode === 'ALL' ? 'kadiv_humas' : 'polda_leader'));
         $targetPoldaId = $selectedPolda?->id ?: (\App\Models\Polda::where('code', 'DIVHUMAS')->value('id'));
         $activePermissions = \App\Models\RolePermission::getPermissionsForRole($activeRole, $targetPoldaId);
+        $dynamicNavigation = \App\Models\MenuItem::getNavigationForUser($activeRole, $activePermissions);
 
         return [
             ...parent::share($request),
             'allPoldas'      => $allPoldas,
             'selectedPolda'  => $selectedPolda,
             'selectedCode'   => $selectedCode,
+            'navigation'     => $dynamicNavigation,
             'auth' => [
                 'user' => $user ? [
                     'id'    => $user->id,

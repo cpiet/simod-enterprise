@@ -98,17 +98,8 @@ class IssueController extends Controller
      */
     public function show(Request $request, $id): Response
     {
-        $selectedCode = $request->query('polda', 'SULBAR');
         $allPoldas = Polda::withCount('polres')->where('is_active', true)->get();
-        $selectedPolda = null;
-
-        if ($selectedCode !== 'ALL') {
-            $selectedPolda = Polda::with(['polres'])->where('code', $selectedCode)->first();
-            if (! $selectedPolda) {
-                $selectedPolda = $allPoldas->first();
-                $selectedCode = $selectedPolda ? $selectedPolda->code : 'SULBAR';
-            }
-        }
+        [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
 
         $issue = Issue::with([
             'polda',
@@ -120,6 +111,8 @@ class IssueController extends Controller
             'publications',
             'pressReleases',
         ])->findOrFail($id);
+
+        $this->authorizeTenantRecord($request, $issue);
 
         $metrics = [
             'total_issues'   => Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
@@ -141,17 +134,8 @@ class IssueController extends Controller
      */
     public function create(Request $request): Response
     {
-        $selectedCode = $request->query('polda', 'SULBAR');
         $allPoldas = Polda::withCount('polres')->where('is_active', true)->get();
-        $selectedPolda = null;
-
-        if ($selectedCode !== 'ALL') {
-            $selectedPolda = Polda::with(['polres'])->where('code', $selectedCode)->first();
-            if (! $selectedPolda) {
-                $selectedPolda = $allPoldas->first();
-                $selectedCode = $selectedPolda ? $selectedPolda->code : 'SULBAR';
-            }
-        }
+        [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
 
         $polresList = $selectedPolda ? $selectedPolda->polres : Polres::where('is_active', true)->get();
 
@@ -258,12 +242,7 @@ class IssueController extends Controller
             'created_at'   => now(),
         ]);
 
-        $selectedCode = $request->query('polda');
-        if (!$selectedCode && $issue->polda) {
-            $selectedCode = $issue->polda->code;
-        }
-
-        return redirect()->route('issues.index', ['polda' => $selectedCode ?? 'SULBAR'])
+        return redirect()->route('issues.index')
             ->with('success', "✓ Laporan {$reportCode} berhasil dibuat dan diajukan ke sistem.");
     }
 
@@ -272,17 +251,12 @@ class IssueController extends Controller
      */
     public function exportCsv(Request $request)
     {
-        $selectedCode = $request->query('polda', 'SULBAR');
+        [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
         $statusFilter = $request->query('status', 'all');
         $priorityFilter = $request->query('priority', 'all');
         $categoryFilter = $request->query('category', 'all');
         $polresFilter = $request->query('polres', 'all');
         $search = $request->query('q', '');
-
-        $selectedPolda = null;
-        if ($selectedCode !== 'ALL') {
-            $selectedPolda = Polda::where('code', $selectedCode)->first();
-        }
 
         $query = Issue::with(['polres', 'polda', 'creator'])->latest();
 
@@ -359,6 +333,7 @@ class IssueController extends Controller
     public function verify(Request $request, $id)
     {
         $issue = Issue::findOrFail($id);
+        $this->authorizeTenantRecord($request, $issue);
         $fromStatus = $issue->status;
         $toStatus = $request->input('target_status', 'investigasi');
         $reason = $request->input('reason', 'Laporan telah ditelaah fakta lapangannya dan dinyatakan terverifikasi sah.');
@@ -386,6 +361,7 @@ class IssueController extends Controller
     public function returnIssue(Request $request, $id)
     {
         $issue = Issue::findOrFail($id);
+        $this->authorizeTenantRecord($request, $issue);
         $reason = $request->input('reason');
         if (empty(trim((string) $reason))) {
             return redirect()->back()->with('error', 'Wajib mencantumkan alasan pengembalian/catatan revisi.');
@@ -414,6 +390,7 @@ class IssueController extends Controller
     public function resolve(Request $request, $id)
     {
         $issue = Issue::findOrFail($id);
+        $this->authorizeTenantRecord($request, $issue);
         $resolvedNote = $request->input('resolved_note');
         if (empty(trim((string) $resolvedNote))) {
             return redirect()->back()->with('error', 'Wajib mencantumkan catatan hasil penanganan tuntas.');
@@ -443,6 +420,7 @@ class IssueController extends Controller
     public function close(Request $request, $id)
     {
         $issue = Issue::findOrFail($id);
+        $this->authorizeTenantRecord($request, $issue);
         $fromStatus = $issue->status;
 
         $issue->update([
@@ -467,6 +445,7 @@ class IssueController extends Controller
     public function updateClarification(Request $request, $id)
     {
         $issue = Issue::findOrFail($id);
+        $this->authorizeTenantRecord($request, $issue);
 
         $validated = $request->validate([
             'is_hoax'                => 'required|boolean',
@@ -502,6 +481,7 @@ class IssueController extends Controller
     public function createTask(Request $request, $id)
     {
         $issue = Issue::findOrFail($id);
+        $this->authorizeTenantRecord($request, $issue);
 
         $validated = $request->validate([
             'title'            => 'required|string|max:255',
@@ -535,6 +515,7 @@ class IssueController extends Controller
     public function createRelease(Request $request, $id)
     {
         $issue = Issue::findOrFail($id);
+        $this->authorizeTenantRecord($request, $issue);
 
         $validated = $request->validate([
             'channel'       => 'required|in:tribratanews,instagram,facebook,twitter,tiktok,youtube,siaran_pers',

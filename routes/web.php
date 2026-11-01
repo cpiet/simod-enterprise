@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\IssueController;
 use App\Http\Controllers\MediaIntelligenceController;
+use App\Http\Controllers\MenuManagementController;
 use App\Http\Controllers\PressReleaseController;
 use App\Http\Controllers\PublicationController;
 use App\Http\Controllers\SocialIntelligenceController;
@@ -12,9 +13,13 @@ use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TenantController;
 use Illuminate\Support\Facades\Route;
 
-// Authentication Routes
-Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-Route::post('/login', [AuthController::class, 'login'])->name('login.post');
+// Authentication Routes (Protected by 'guest' middleware for login & session invalidation for logout)
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
+    Route::post('/login', [AuthController::class, 'login'])->name('login.post');
+});
+Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+Route::get('/logout', [AuthController::class, 'logout'])->name('logout.get');
 
 // Multi-Tenant Context Switcher (CSRF Protected & RBAC Enforced)
 Route::post('/tenant/switch', [TenantController::class, 'switchTenant'])->name('tenant.switch');
@@ -119,3 +124,12 @@ Route::post('/maintenance/rss-sync/trigger', [\App\Http\Controllers\RssSyncContr
 Route::get('/settings/ai', [\App\Http\Controllers\AiSettingController::class, 'index'])->name('settings.ai');
 Route::post('/settings/ai', [\App\Http\Controllers\AiSettingController::class, 'update'])->name('settings.ai.update');
 Route::post('/settings/ai/test', [\App\Http\Controllers\AiSettingController::class, 'testConnection'])->name('settings.ai.test');
+
+// Manajemen Menu & Navigasi Dinamis (Database-Driven Menu Architecture)
+Route::get('/settings/menus', [MenuManagementController::class, 'index'])->name('settings.menus');
+Route::post('/settings/menus', [MenuManagementController::class, 'store'])->name('settings.menus.store');
+Route::put('/settings/menus/{id}', [MenuManagementController::class, 'update'])->name('settings.menus.update');
+Route::post('/settings/menus/{id}/toggle', [MenuManagementController::class, 'toggle'])->name('settings.menus.toggle');
+Route::post('/settings/menus/{id}/move', [MenuManagementController::class, 'move'])->name('settings.menus.move');
+Route::delete('/settings/menus/{id}', [MenuManagementController::class, 'destroy'])->name('settings.menus.delete');
+Route::post('/settings/menus/reset', [MenuManagementController::class, 'resetDefaults'])->name('settings.menus.reset');

@@ -98,3 +98,4 @@ Hasil analisis menghasilkan:
 - **Polarisasi Sentimen**: Rasio sentimen Positif, Netral, dan Negatif.
 - **Rekomendasi Taktis & Counter-Narasi**: Langkah konkret juru bicara Polri.
 - **Naskah WhatsApp Siap Kirim**: Draf pesan singkat berformat dinas untuk laporan cepat ke pimpinan.
+

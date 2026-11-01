@@ -77,6 +77,7 @@ class TaskController extends Controller
     public function addUpdate(Request $request, $id)
     {
         $task = Task::findOrFail($id);
+        $this->authorizeTenantRecord($request, $task);
         $request->validate(['note' => 'required|string']);
 
         $task->updates()->create([

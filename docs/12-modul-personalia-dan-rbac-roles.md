@@ -114,3 +114,4 @@ Cakupan pengujian:
 4. `test_can_reset_personnel_password`: Memastikan reset password dinas berhasil dan password terenkripsi bcrypt.
 5. `test_can_delete_personnel_with_protections`: Memastikan penghapusan akun non-master berjalan dan akun master terlindungi.
 6. `test_regional_admin_cannot_promote_to_mabes_or_edit_mabes_personnel`: Memastikan pembatasan wilayah (admin polda tidak bisa membuat/mengedit akun Mabes).
+

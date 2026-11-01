@@ -24,6 +24,7 @@ Dokumentasi ini memandu arsitektur, seluruh perintah CLI, modul operasional, int
 | **12** | [12. Modul Personalia & Matriks Hak Akses (RBAC)](12-modul-personalia-dan-rbac-roles.md) | Tata kelola personel, proteksi akun master, anti-self-lockout, dan integrasi matriks 17 modul `/roles`. |
 | **13** | [13. Keamanan Tenant & Mesin Intelijen AI](13-keamanan-tenant-dan-mesin-intelijen-ai.md) | Keamanan URL tenant (POST session-based), Smart Dossier Atensi Pimpinan, dan Multi-API Gemini failover. |
 | **14** | [14. Katalog RSS Media Online Nasional](14-katalog-rss-media-online-nasional.md) | Registri feed media online nasional, endpoints valid, dan protokol polling ingestion pipeline. |
+| **15** | [15. Manajemen Menu Dinamis & Portabilitas Multi-Domain](15-manajemen-menu-dinamis-dan-portabilitas-multi-domain.md) | Navigasi berbasis basis data (`/settings/menus`), portabilitas multi-hosting, dan keamanan sesi (`PreventBackHistory`). |
 
 ---
 

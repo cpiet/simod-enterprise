@@ -30,7 +30,58 @@ import {
   PlusCircle,
   Sun,
   Moon,
+  History,
+  Eraser,
+  Wrench,
+  Bot,
+  Globe,
+  Lock,
 } from 'lucide-vue-next';
+
+const iconMap = {
+  Shield,
+  ShieldAlert,
+  Radio,
+  Building2,
+  Flame,
+  Clock,
+  Layers,
+  Users,
+  CheckCircle2,
+  ChevronDown,
+  Bell,
+  Share2,
+  CheckSquare,
+  Menu,
+  X,
+  LayoutDashboard,
+  Image: ImageIcon,
+  ImageIcon,
+  FileBarChart2,
+  KeyRound,
+  Mail,
+  Database,
+  UserCheck,
+  LogOut,
+  SlidersHorizontal,
+  Check,
+  PlusCircle,
+  Sun,
+  Moon,
+  History,
+  Eraser,
+  Wrench,
+  Bot,
+  Globe,
+  Lock,
+};
+
+const resolveIcon = (icon) => {
+  if (typeof icon === 'string') {
+    return iconMap[icon] || Layers;
+  }
+  return icon || Layers;
+};
 
 const props = defineProps({
   allPoldas: {
@@ -314,13 +365,22 @@ const isItemVisible = (item) => {
   return true;
 };
 
-// Filter group yang memiliki minimal 1 modul aktif sesuai izin pengguna
+// Filter group yang memiliki minimal 1 modul aktif sesuai izin pengguna (Mendukung DB-Driven Navigation)
 const visibleNavigationGroups = computed(() => {
+  const dynamicGroups = page.props.navigation?.sidebarGroups;
+  if (Array.isArray(dynamicGroups) && dynamicGroups.length > 0) {
+    return dynamicGroups;
+  }
   return navigationGroups.map(group => ({
     ...group,
     items: group.items.filter(item => isItemVisible(item))
   })).filter(group => group.items.length > 0);
 });
+
+const handleLogout = () => {
+  isUserMenuOpen.value = false;
+  router.post('/logout');
+};
 
 // Role Switcher Simulation Definition
 const availableRoles = [
@@ -395,52 +455,71 @@ const switchRole = (newRole) => {
           <div v-else class="h-px bg-slate-800/80 my-2"></div>
 
           <!-- Nav Links -->
-          <Link
-            v-for="item in group.items"
-            :key="item.name"
-            :href="item.href"
-            class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition group relative"
-            :class="isRouteActive(item)
-              ? 'bg-amber-400 text-slate-950 font-black shadow-md shadow-amber-400/20'
-              : 'text-slate-200 hover:text-white hover:bg-slate-800/70'"
-            :title="isDesktopSidebarCollapsed ? item.name : undefined"
-          >
-            <!-- Active Indicator Pill on left -->
-            <div
-              v-if="isRouteActive(item) && !isDesktopSidebarCollapsed"
-              class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r bg-slate-950"
-            ></div>
+          <div v-for="item in group.items" :key="item.id || item.name" class="space-y-1">
+            <Link
+              :href="item.href"
+              class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition group relative"
+              :class="isRouteActive(item)
+                ? 'bg-amber-400 text-slate-950 font-black shadow-md shadow-amber-400/20'
+                : 'text-slate-200 hover:text-white hover:bg-slate-800/70'"
+              :title="isDesktopSidebarCollapsed ? item.name : undefined"
+            >
+              <!-- Active Indicator Pill on left -->
+              <div
+                v-if="isRouteActive(item) && !isDesktopSidebarCollapsed"
+                class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r bg-slate-950"
+              ></div>
 
-            <component
-              :is="item.icon"
-              class="w-4 h-4 flex-shrink-0 transition-transform group-hover:scale-110"
-              :class="isRouteActive(item) ? 'text-slate-950' : 'text-slate-300 group-hover:text-amber-400'"
-            />
+              <component
+                :is="resolveIcon(item.icon)"
+                class="w-4 h-4 flex-shrink-0 transition-transform group-hover:scale-110"
+                :class="isRouteActive(item) ? 'text-slate-950' : 'text-slate-300 group-hover:text-amber-400'"
+              />
 
-            <div v-if="!isDesktopSidebarCollapsed" class="min-w-0 flex-1">
-              <div class="flex items-center justify-between">
-                <span class="truncate">{{ item.name }}</span>
+              <div v-if="!isDesktopSidebarCollapsed" class="min-w-0 flex-1">
+                <div class="flex items-center justify-between">
+                  <span class="truncate">{{ item.name }}</span>
 
-                <!-- Static Badge -->
-                <span
-                  v-if="item.badge"
-                  class="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-black uppercase border"
-                  :class="isRouteActive(item) ? 'bg-slate-950 text-amber-400 border-slate-900' : (item.badgeColor || 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700')"
-                >
-                  {{ item.badge }}
-                </span>
+                  <!-- Static Badge -->
+                  <span
+                    v-if="item.badge"
+                    class="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-black uppercase border"
+                    :class="isRouteActive(item) ? 'bg-slate-950 text-amber-400 border-slate-900' : (item.badgeColor || 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700')"
+                  >
+                    {{ item.badge }}
+                  </span>
 
-                <!-- Dynamic Metric Badge -->
-                <span
-                  v-else-if="item.badgeKey && displayMetrics[item.badgeKey]"
-                  class="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-black"
-                  :class="isRouteActive(item) ? 'bg-slate-950 text-amber-400' : (item.badgeColor || 'bg-amber-100 text-amber-800 border border-amber-300 dark:bg-slate-800 dark:text-amber-400 dark:border-slate-700/60')"
-                >
-                  {{ displayMetrics[item.badgeKey] }}
-                </span>
+                  <!-- Dynamic Metric Badge -->
+                  <span
+                    v-else-if="item.badgeKey && displayMetrics[item.badgeKey]"
+                    class="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-black"
+                    :class="isRouteActive(item) ? 'bg-slate-950 text-amber-400' : (item.badgeColor || 'bg-amber-100 text-amber-800 border border-amber-300 dark:bg-slate-800 dark:text-amber-400 dark:border-slate-700/60')"
+                  >
+                    {{ displayMetrics[item.badgeKey] }}
+                  </span>
+                </div>
               </div>
+            </Link>
+
+            <!-- Nested Sub-Menus (if configured by Admin) -->
+            <div
+              v-if="!isDesktopSidebarCollapsed && Array.isArray(item.children) && item.children.length > 0"
+              class="pl-6 space-y-1 border-l border-slate-800 ml-5"
+            >
+              <Link
+                v-for="sub in item.children"
+                :key="sub.id || sub.name"
+                :href="sub.href"
+                class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition"
+                :class="isRouteActive(sub)
+                  ? 'bg-amber-400/20 text-amber-300 font-bold border border-amber-400/30'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'"
+              >
+                <component :is="resolveIcon(sub.icon)" class="w-3.5 h-3.5 shrink-0" />
+                <span class="truncate flex-1">{{ sub.name }}</span>
+              </Link>
             </div>
-          </Link>
+          </div>
         </div>
       </div>
 
@@ -518,37 +597,57 @@ const switchRole = (newRole) => {
           <div class="px-3 pb-1 text-[10px] font-black uppercase tracking-wider text-slate-300/80">
             {{ group.name }}
           </div>
-          <Link
-            v-for="item in group.items"
-            :key="item.name"
-            :href="item.href"
-            @click="isMobileSidebarOpen = false"
-            class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition"
-            :class="isRouteActive(item)
-              ? 'bg-amber-400 text-slate-950 font-black'
-              : 'text-slate-300 hover:text-white hover:bg-slate-800/80'"
-          >
-            <component :is="item.icon" class="w-4 h-4" />
-            <span class="flex-1">{{ item.name }}</span>
-
-            <!-- Static Badge Mobile -->
-            <span
-              v-if="item.badge"
-              class="px-1.5 py-0.5 rounded text-[9px] font-black uppercase border"
-              :class="isRouteActive(item) ? 'bg-slate-950 text-amber-400 border-slate-900' : (item.badgeColor || 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700')"
+          <div v-for="item in group.items" :key="item.id || item.name" class="space-y-1">
+            <Link
+              :href="item.href"
+              @click="isMobileSidebarOpen = false"
+              class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition"
+              :class="isRouteActive(item)
+                ? 'bg-amber-400 text-slate-950 font-black'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800/80'"
             >
-              {{ item.badge }}
-            </span>
+              <component :is="resolveIcon(item.icon)" class="w-4 h-4" />
+              <span class="flex-1">{{ item.name }}</span>
 
-            <!-- Dynamic Metric Badge Mobile -->
-            <span
-              v-else-if="item.badgeKey && displayMetrics[item.badgeKey]"
-              class="px-2 py-0.5 rounded-full text-[10px] font-black"
-              :class="isRouteActive(item) ? 'bg-slate-950 text-amber-400' : 'bg-amber-100 text-amber-800 border border-amber-300 dark:bg-slate-800 dark:text-amber-400'"
+              <!-- Static Badge Mobile -->
+              <span
+                v-if="item.badge"
+                class="px-1.5 py-0.5 rounded text-[9px] font-black uppercase border"
+                :class="isRouteActive(item) ? 'bg-slate-950 text-amber-400 border-slate-900' : (item.badgeColor || 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700')"
+              >
+                {{ item.badge }}
+              </span>
+
+              <!-- Dynamic Metric Badge Mobile -->
+              <span
+                v-else-if="item.badgeKey && displayMetrics[item.badgeKey]"
+                class="px-2 py-0.5 rounded-full text-[10px] font-black"
+                :class="isRouteActive(item) ? 'bg-slate-950 text-amber-400' : 'bg-amber-100 text-amber-800 border border-amber-300 dark:bg-slate-800 dark:text-amber-400'"
+              >
+                {{ displayMetrics[item.badgeKey] }}
+              </span>
+            </Link>
+
+            <!-- Nested Sub-Menus Mobile -->
+            <div
+              v-if="Array.isArray(item.children) && item.children.length > 0"
+              class="pl-6 space-y-1 border-l border-slate-800 ml-5"
             >
-              {{ displayMetrics[item.badgeKey] }}
-            </span>
-          </Link>
+              <Link
+                v-for="sub in item.children"
+                :key="sub.id || sub.name"
+                :href="sub.href"
+                @click="isMobileSidebarOpen = false"
+                class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition"
+                :class="isRouteActive(sub)
+                  ? 'bg-amber-400/20 text-amber-300 font-bold'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'"
+              >
+                <component :is="resolveIcon(sub.icon)" class="w-3.5 h-3.5 shrink-0" />
+                <span class="truncate flex-1">{{ sub.name }}</span>
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -759,6 +858,14 @@ const switchRole = (newRole) => {
                   <span>Matriks Hak Akses (RBAC)</span>
                 </Link>
                 <Link
+                  href="/settings/menus"
+                  @click="isUserMenuOpen = false"
+                  class="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 text-slate-300 hover:bg-slate-800 hover:text-white transition"
+                >
+                  <SlidersHorizontal class="w-3.5 h-3.5 text-amber-400" />
+                  <span>Manajemen Menu Dinamis</span>
+                </Link>
+                <Link
                   href="/security"
                   @click="isUserMenuOpen = false"
                   class="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 text-slate-300 hover:bg-slate-800 hover:text-white transition"
@@ -776,14 +883,14 @@ const switchRole = (newRole) => {
                 </Link>
               </div>
               <div class="border-t border-slate-800/80 pt-1">
-                <Link
-                  href="/login"
-                  @click="isUserMenuOpen = false"
-                  class="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition"
+                <button
+                  type="button"
+                  @click="handleLogout"
+                  class="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition cursor-pointer"
                 >
                   <LogOut class="w-3.5 h-3.5 text-rose-400" />
                   <span>Keluar Sesi (Logout)</span>
-                </Link>
+                </button>
               </div>
             </div>
           </div>
