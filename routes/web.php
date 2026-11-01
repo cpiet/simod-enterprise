@@ -84,6 +84,10 @@ Route::get('/reports', [SystemModuleController::class, 'reports'])->name('report
 Route::get('/reports/export/csv', [SystemModuleController::class, 'exportReportsCsv'])->name('reports.export.csv');
 Route::get('/personalia', [SystemModuleController::class, 'personalia'])->name('personalia.index');
 Route::post('/personalia', [SystemModuleController::class, 'storeUser'])->name('personalia.store');
+Route::put('/personalia/{id}', [SystemModuleController::class, 'updateUser'])->name('personalia.update');
+Route::post('/personalia/{id}/toggle-status', [SystemModuleController::class, 'toggleUserStatus'])->name('personalia.toggle-status');
+Route::post('/personalia/{id}/reset-password', [SystemModuleController::class, 'resetUserPassword'])->name('personalia.reset-password');
+Route::delete('/personalia/{id}', [SystemModuleController::class, 'deleteUser'])->name('personalia.delete');
 Route::get('/audit-logs', [SystemModuleController::class, 'auditLogs'])->name('audit-logs.index');
 Route::get('/profile', [SystemModuleController::class, 'profile'])->name('profile.index');
 Route::get('/settings/polda', [SystemModuleController::class, 'poldaSettings'])->name('settings.polda');

@@ -64,3 +64,4 @@ class TenantController extends Controller
         return back()->with('success', "Beralih ke {$polda->name}.");
     }
 }
+

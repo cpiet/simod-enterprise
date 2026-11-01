@@ -21,6 +21,9 @@ Dokumentasi ini memandu arsitektur, seluruh perintah CLI, modul operasional, int
 | **09** | [09. Katalog Lengkap 19 Modul & Paritas Fitur](09-katalog-lengkap-19-modul-simod-enterprise.md) | Pemetaan lengkap seluruh 19 modul operasional dan arsitektur sidebar 4 pilar terpadu. |
 | **10** | [10. Daftar Lengkap 29 Sumber RSS Feed Sulbar](10-daftar-rss-feed-resmi-sulbar.md) | Rincian 29 portal resmi Sulbar & nasional, status Cloudflare bypass, dan proxy Google News. |
 | **11** | [11. Radar Media Sosial & Apify](11-modul-radar-media-sosial-apify.md) | Monitoring 𝕏, TikTok, Instagram, YouTube, Multi-API Token Pool, target akun, dan thumbnail HD. |
+| **12** | [12. Modul Personalia & Matriks Hak Akses (RBAC)](12-modul-personalia-dan-rbac-roles.md) | Tata kelola personel, proteksi akun master, anti-self-lockout, dan integrasi matriks 17 modul `/roles`. |
+| **13** | [13. Keamanan Tenant & Mesin Intelijen AI](13-keamanan-tenant-dan-mesin-intelijen-ai.md) | Keamanan URL tenant (POST session-based), Smart Dossier Atensi Pimpinan, dan Multi-API Gemini failover. |
+| **14** | [14. Katalog RSS Media Online Nasional](14-katalog-rss-media-online-nasional.md) | Registri feed media online nasional, endpoints valid, dan protokol polling ingestion pipeline. |
 
 ---
 
@@ -39,14 +42,14 @@ php artisan migrate --seed
 # 4. Bangun aset frontend
 npm run build
 
-# 5. Jalankan server lokal (opsional bila tidak menggunakan virtual host Laragon)
-php artisan serve --port=8000
-
-# 6. Jalankan automated test suite
+# 5. Jalankan automated test suite (72 tests, 381 assertions)
 php artisan test
 
-# 7. Jalankan sinkronisasi berita RSS aman (dengan Mutex Lock)
+# 6. Jalankan sinkronisasi berita RSS aman (dengan Mutex Lock)
 php artisan rss:sync --polda=SULBAR
+
+# 7. Sinkronisasi berita nasional Divhumas Polri
+php artisan rss:sync --polda=ALL
 ```
 
 ---

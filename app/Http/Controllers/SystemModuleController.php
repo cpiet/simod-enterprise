@@ -15,6 +15,7 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -326,13 +327,15 @@ class SystemModuleController extends Controller
     }
 
     /**
-     * Manajemen Personalia & Pengguna (Parity with SIMOD-HUMAS PersonaliaView)
+     * Manajemen Personalia & Pengguna Berdasarkan Otoritas Berjenjang (RBAC).
      */
     public function personalia(Request $request): Response
     {
         [$allPoldas, $selectedPolda, $selectedCode, $metrics] = $this->getBaseData($request);
 
         $roleFilter = $request->query('role', 'all');
+        $polresFilter = $request->query('polres', 'all');
+        $statusFilter = $request->query('status', 'all');
         $search = $request->query('q', '');
         $isNational = ($selectedCode === 'ALL');
 
@@ -349,49 +352,99 @@ class SystemModuleController extends Controller
             $query->where('role', $roleFilter);
         }
 
+        if ($polresFilter !== 'all') {
+            if ($polresFilter === 'none') {
+                $query->whereNull('polres_id');
+            } else {
+                $query->where('polres_id', $polresFilter);
+            }
+        }
+
+        if ($statusFilter !== 'all') {
+            $query->where('is_active', $statusFilter === 'active');
+        }
+
         if (!empty($search)) {
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                   ->orWhere('badge_number', 'like', "%{$search}%")
                   ->orWhere('username', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%");
             });
         }
 
-        $users = $query->orderByRaw("CASE WHEN role = 'kadiv_humas' THEN 1 WHEN role = 'super_admin_mabes' THEN 2 ELSE 3 END, id ASC")
+        $users = $query->orderByRaw("CASE WHEN role = 'kadiv_humas' THEN 1 WHEN role = 'super_admin_mabes' THEN 2 WHEN role = 'polda_leader' THEN 3 ELSE 4 END, id ASC")
             ->paginate(15)
             ->withQueryString();
 
-        $polresList = $selectedPolda ? Polres::where('polda_id', $selectedPolda->id)->get() : [];
+        $polresList = $selectedPolda ? Polres::where('polda_id', $selectedPolda->id)->get() : Polres::where('is_active', true)->get();
+
+        $targetPoldaId = $selectedPolda ? $selectedPolda->id : null;
+        if ($selectedCode === 'ALL') {
+            $targetPoldaId = Polda::where('code', 'DIVHUMAS')->value('id');
+        }
+
+        $modules = RolePermission::defaultModules();
+        $roleMatrix = RolePermission::getMatrixForPolda($targetPoldaId);
+
+        // Map role matrix with permission counts for quick inspection
+        $rolesWithStats = array_map(function ($r) use ($modules) {
+            $grantedCount = 0;
+            foreach ($modules as $m) {
+                if (!empty($r['permissions'][$m['key']])) {
+                    $grantedCount++;
+                }
+            }
+            $r['granted_count'] = $grantedCount;
+            $r['total_count'] = count($modules);
+            return $r;
+        }, $roleMatrix);
+
+        $baseCountQuery = User::when(!$isNational && $selectedPolda, fn($q) => $q->where(fn($sub) => $sub->where('polda_id', $selectedPolda->id)->orWhereNull('polda_id')));
 
         $personnelStats = [
-            'total'       => User::when(!$isNational && $selectedPolda, fn($q) => $q->where(fn($sub) => $sub->where('polda_id', $selectedPolda->id)->orWhereNull('polda_id')))->count(),
+            'total'       => (clone $baseCountQuery)->count(),
+            'active'      => (clone $baseCountQuery)->where('is_active', true)->count(),
+            'inactive'    => (clone $baseCountQuery)->where('is_active', false)->count(),
             'kadiv'       => User::where('role', 'kadiv_humas')->count(),
-            'superadmin'  => User::when(!$isNational && $selectedPolda, fn($q) => $q->where(fn($sub) => $sub->where('polda_id', $selectedPolda->id)->orWhereNull('polda_id')))->whereIn('role', ['super_admin_mabes', 'kadiv_humas'])->count(),
-            'polda_staff' => User::when(!$isNational && $selectedPolda, fn($q) => $q->where(fn($sub) => $sub->where('polda_id', $selectedPolda->id)->orWhereNull('polda_id')))->whereIn('role', ['polda_leader', 'verifikator', 'analis'])->count(),
-            'satwil'      => User::when(!$isNational && $selectedPolda, fn($q) => $q->where(fn($sub) => $sub->where('polda_id', $selectedPolda->id)->orWhereNull('polda_id')))->where('role', 'operator')->count(),
+            'superadmin'  => (clone $baseCountQuery)->whereIn('role', ['super_admin_mabes', 'kadiv_humas'])->count(),
+            'polda_staff' => (clone $baseCountQuery)->whereIn('role', ['polda_leader', 'verifikator', 'analis'])->count(),
+            'satwil'      => (clone $baseCountQuery)->where('role', 'operator')->count(),
         ];
 
+        $authUser = $request->user();
+        $canManageAll = $authUser ? $authUser->isSuperAdmin() : false;
+
         return Inertia::render('Personalia/Index', [
-            'allPoldas'      => $allPoldas,
-            'selectedPolda'  => $selectedPolda,
-            'selectedCode'   => $selectedCode,
-            'users'          => $users,
-            'polresList'     => $polresList,
-            'personnelStats' => $personnelStats,
-            'filters'        => [
-                'role' => $roleFilter,
-                'q'    => $search,
+            'allPoldas'       => $allPoldas,
+            'selectedPolda'   => $selectedPolda,
+            'selectedCode'    => $selectedCode,
+            'users'           => $users,
+            'polresList'      => $polresList,
+            'personnelStats'  => $personnelStats,
+            'roleMatrix'      => $rolesWithStats,
+            'modules'         => $modules,
+            'canManageAll'    => $canManageAll,
+            'currentUserId'   => $authUser?->id,
+            'currentUserRole' => $authUser?->role,
+            'filters'         => [
+                'role'   => $roleFilter,
+                'polres' => $polresFilter,
+                'status' => $statusFilter,
+                'q'      => $search,
             ],
-            'metrics'        => $metrics,
+            'metrics'         => $metrics,
         ]);
     }
 
     /**
-     * Tambah Akun Personel Baru
+     * Tambah Akun Personel Baru Berdasarkan Otoritas Berjenjang
      */
-    public function storeUser(Request $request)
+    public function storeUser(Request $request): RedirectResponse
     {
+        $authUser = $request->user();
+
         $validated = $request->validate([
             'polda_id'     => 'nullable|exists:poldas,id',
             'polres_id'    => 'nullable|exists:polres,id',
@@ -402,16 +455,251 @@ class SystemModuleController extends Controller
             'role'         => 'required|string',
             'phone'        => 'nullable|string|max:50',
             'password'     => 'required|string|min:6',
+            'is_active'    => 'nullable|boolean',
         ]);
+
+        // Authority Check: Regional officers cannot create Mabes-level accounts
+        if ($authUser && !$authUser->isSuperAdmin()) {
+            if (in_array($validated['role'], ['kadiv_humas', 'super_admin_mabes'], true)) {
+                return back()->with('error', 'Akses Ditolak: Hanya Mabes Polri yang memiliki wewenang untuk mendaftarkan akun tingkat Kadivhumas atau Superadmin Mabes.');
+            }
+            if ($authUser->polda_id) {
+                $validated['polda_id'] = $authUser->polda_id;
+            }
+        }
 
         $validated['polda_id'] = !empty($validated['polda_id']) ? $validated['polda_id'] : null;
         $validated['polres_id'] = !empty($validated['polres_id']) ? $validated['polres_id'] : null;
         $validated['password'] = Hash::make($validated['password']);
-        $validated['is_active'] = true;
+        $validated['is_active'] = $request->boolean('is_active', true);
 
-        User::create($validated);
+        $user = User::create($validated);
 
-        return redirect()->back()->with('success', 'Akun personel berhasil didaftarkan ke sistem.');
+        AuditLog::create([
+            'polda_id'     => $user->polda_id,
+            'user_id'      => auth()->id(),
+            'action'       => 'personalia.create',
+            'subject_type' => 'user',
+            'subject_id'   => (string) $user->id,
+            'metadata'     => [
+                'name'         => $user->name,
+                'username'     => $user->username,
+                'role'         => $user->role,
+                'badge_number' => $user->badge_number,
+            ],
+            'ip_address'   => $request->ip() ?: '127.0.0.1',
+            'user_agent'   => $request->userAgent() ?: 'System',
+            'created_at'   => now(),
+        ]);
+
+        return redirect()->back()->with('success', "Akun personel {$user->name} ({$user->role}) berhasil didaftarkan ke sistem.");
+    }
+
+    /**
+     * Edit / Perbarui Data Akun Personel & Otoritas
+     */
+    public function updateUser(Request $request, int $id): RedirectResponse
+    {
+        $user = User::findOrFail($id);
+        $authUser = $request->user();
+
+        // Authority Check: Regional officers cannot edit Mabes-level accounts
+        if ($authUser && !$authUser->isSuperAdmin()) {
+            if (in_array($user->role, ['kadiv_humas', 'super_admin_mabes'], true)) {
+                return back()->with('error', 'Akses Ditolak: Anda tidak memiliki wewenang untuk mengedit akun pimpinan Mabes Polri.');
+            }
+            if ($authUser->polda_id && $user->polda_id && $user->polda_id !== $authUser->polda_id) {
+                return back()->with('error', 'Akses Ditolak: Anda hanya memiliki wewenang untuk mengelola personel di wilayah Polda Anda.');
+            }
+        }
+
+        $validated = $request->validate([
+            'name'         => 'required|string|max:255',
+            'username'     => ['required', 'string', 'max:100', Rule::unique('users')->ignore($user->id)],
+            'email'        => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
+            'badge_number' => 'nullable|string|max:50',
+            'role'         => 'required|string',
+            'polda_id'     => 'nullable|exists:poldas,id',
+            'polres_id'    => 'nullable|exists:polres,id',
+            'phone'        => 'nullable|string|max:50',
+            'password'     => 'nullable|string|min:6',
+            'is_active'    => 'nullable|boolean',
+        ]);
+
+        // Prevent self-role-demotion or self-deactivation
+        if ($authUser && $authUser->id === $user->id) {
+            $validated['role'] = $user->role;
+            $validated['is_active'] = true;
+        }
+
+        // Authority Check: Non-Mabes cannot promote to Mabes role
+        if ($authUser && !$authUser->isSuperAdmin() && in_array($validated['role'], ['kadiv_humas', 'super_admin_mabes'], true)) {
+            return back()->with('error', 'Akses Ditolak: Hanya Mabes Polri yang dapat menetapkan role tingkat Mabes.');
+        }
+
+        $updateData = [
+            'name'         => $validated['name'],
+            'username'     => $validated['username'],
+            'email'        => $validated['email'],
+            'badge_number' => $validated['badge_number'] ?? null,
+            'role'         => $validated['role'],
+            'polda_id'     => !empty($validated['polda_id']) ? $validated['polda_id'] : null,
+            'polres_id'    => !empty($validated['polres_id']) ? $validated['polres_id'] : null,
+            'phone'        => $validated['phone'] ?? null,
+            'is_active'    => $request->boolean('is_active', true),
+        ];
+
+        if (!empty($validated['password'])) {
+            $updateData['password'] = Hash::make($validated['password']);
+        }
+
+        $user->update($updateData);
+
+        AuditLog::create([
+            'polda_id'     => $user->polda_id,
+            'user_id'      => auth()->id(),
+            'action'       => 'personalia.update',
+            'subject_type' => 'user',
+            'subject_id'   => (string) $user->id,
+            'metadata'     => [
+                'name'    => $user->name,
+                'role'    => $user->role,
+                'changes' => array_keys($updateData),
+            ],
+            'ip_address'   => $request->ip() ?: '127.0.0.1',
+            'user_agent'   => $request->userAgent() ?: 'System',
+            'created_at'   => now(),
+        ]);
+
+        return redirect()->back()->with('success', "Data personel {$user->name} berhasil diperbarui.");
+    }
+
+    /**
+     * Ubah Status Aktif / Non-Aktif Personel (Anti-Self-Lockout Protected)
+     */
+    public function toggleUserStatus(Request $request, int $id): RedirectResponse
+    {
+        $user = User::findOrFail($id);
+        $authUser = $request->user();
+
+        // Prevent self-deactivation
+        if ($authUser && $authUser->id === $user->id) {
+            return back()->with('error', 'Operasi Ditolak: Anda tidak dapat menonaktifkan akun Anda sendiri yang sedang aktif.');
+        }
+
+        // Protect primary master accounts
+        if ($user->id === 1 || in_array($user->username, ['kadivhumas', 'superadmin'], true)) {
+            return back()->with('error', 'Operasi Ditolak: Akun pimpinan utama sistem dilindungi dan tidak dapat dinonaktifkan.');
+        }
+
+        if ($authUser && !$authUser->isSuperAdmin() && in_array($user->role, ['kadiv_humas', 'super_admin_mabes'], true)) {
+            return back()->with('error', 'Akses Ditolak: Anda tidak memiliki wewenang untuk mengubah status akun pimpinan Mabes Polri.');
+        }
+
+        $user->is_active = !$user->is_active;
+        $user->save();
+
+        $statusStr = $user->is_active ? 'diaktifkan' : 'dinonaktifkan';
+
+        AuditLog::create([
+            'polda_id'     => $user->polda_id,
+            'user_id'      => auth()->id(),
+            'action'       => 'personalia.toggle_status',
+            'subject_type' => 'user',
+            'subject_id'   => (string) $user->id,
+            'metadata'     => [
+                'name'      => $user->name,
+                'is_active' => $user->is_active,
+            ],
+            'ip_address'   => $request->ip() ?: '127.0.0.1',
+            'user_agent'   => $request->userAgent() ?: 'System',
+            'created_at'   => now(),
+        ]);
+
+        return redirect()->back()->with('success', "Akun personel {$user->name} berhasil {$statusStr}.");
+    }
+
+    /**
+     * Reset Password Dinas Personel
+     */
+    public function resetUserPassword(Request $request, int $id): RedirectResponse
+    {
+        $user = User::findOrFail($id);
+        $authUser = $request->user();
+
+        if ($authUser && !$authUser->isSuperAdmin() && in_array($user->role, ['kadiv_humas', 'super_admin_mabes'], true)) {
+            return back()->with('error', 'Akses Ditolak: Anda tidak memiliki wewenang untuk mereset password akun pimpinan Mabes Polri.');
+        }
+
+        $validated = $request->validate([
+            'new_password' => 'required|string|min:6',
+        ]);
+
+        $user->password = Hash::make($validated['new_password']);
+        $user->save();
+
+        AuditLog::create([
+            'polda_id'     => $user->polda_id,
+            'user_id'      => auth()->id(),
+            'action'       => 'personalia.reset_password',
+            'subject_type' => 'user',
+            'subject_id'   => (string) $user->id,
+            'metadata'     => [
+                'name' => $user->name,
+            ],
+            'ip_address'   => $request->ip() ?: '127.0.0.1',
+            'user_agent'   => $request->userAgent() ?: 'System',
+            'created_at'   => now(),
+        ]);
+
+        return redirect()->back()->with('success', "Password dinas untuk personel {$user->name} berhasil direset.");
+    }
+
+    /**
+     * Hapus Akun Personel (Anti-Self-Destruction & Protected Master Accounts)
+     */
+    public function deleteUser(Request $request, int $id): RedirectResponse
+    {
+        $user = User::findOrFail($id);
+        $authUser = $request->user();
+
+        // Self-delete prevention
+        if ($authUser && $authUser->id === $user->id) {
+            return back()->with('error', 'Operasi Ditolak: Anda tidak dapat menghapus akun Anda sendiri yang sedang aktif.');
+        }
+
+        // Primary master accounts protection
+        if ($user->id === 1 || in_array($user->username, ['kadivhumas', 'superadmin'], true)) {
+            return back()->with('error', 'Operasi Ditolak: Akun induk pimpinan sistem dilindungi dan kebal dari penghapusan.');
+        }
+
+        // Authority Check: Regional officers cannot delete Mabes personnel
+        if ($authUser && !$authUser->isSuperAdmin() && in_array($user->role, ['kadiv_humas', 'super_admin_mabes'], true)) {
+            return back()->with('error', 'Akses Ditolak: Anda tidak memiliki wewenang untuk menghapus akun pimpinan Mabes Polri.');
+        }
+
+        $userName = $user->name;
+        $userRole = $user->role;
+        $userPolda = $user->polda_id;
+
+        $user->delete();
+
+        AuditLog::create([
+            'polda_id'     => $userPolda,
+            'user_id'      => auth()->id(),
+            'action'       => 'personalia.delete',
+            'subject_type' => 'user',
+            'subject_id'   => (string) $id,
+            'metadata'     => [
+                'name' => $userName,
+                'role' => $userRole,
+            ],
+            'ip_address'   => $request->ip() ?: '127.0.0.1',
+            'user_agent'   => $request->userAgent() ?: 'System',
+            'created_at'   => now(),
+        ]);
+
+        return redirect()->back()->with('success', "Akun personel {$userName} ({$userRole}) telah berhasil dihapus dari sistem.");
     }
 
     /**

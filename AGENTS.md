@@ -185,4 +185,13 @@ Saat Anda (Agent) diminta memodifikasi kode ini:
      `ngrok http --domain=humped-obvious-blatantly.ngrok-free.dev --host-header=simod-enterprise.test 80`
    - Tunnel ini mengarahkan domain publik tetap `https://humped-obvious-blatantly.ngrok-free.dev` ke vhost Laragon Apache `simod-enterprise.test:80`.
    - Konfigurasi `trustProxies` dan `URL::forceScheme('https')` di Laravel menjamin seluruh CSS/JS Vite dan form Inertia bekerja secara mulus di internet publik tanpa mixed-content block.
+6. **Keamanan URL Tenant (Anti-Tampering)**:
+   - Dilarang membuat link atau tombol yang mengoper parameter query plaintext `?polda=...`.
+   - Selalu gunakan endpoint POST terotentikasi `POST /tenant/switch` dengan payload `polda_id` untuk isolasi sesi yang aman dan kebal manipulasi URL.
+7. **Integritas Personalia & Proteksi Akun Master**:
+   - Akun master sistem (`id: 1`, `kadivhumas`, `superadmin`, `cpiet`) berstatus kebal dari penghapusan (`deleteUser`) dan deaktivasi (`toggleUserStatus`).
+   - Sesi pengguna aktif dilarang menghapus akunnya sendiri (*anti-self deletion*) atau mencabut status aktifnya sendiri (*anti-self lockout*).
+   - Otoritas personel terhubung erat ke matriks 17 modul pada 4 pilar di `/roles`.
+8. **Smart Dossier / Topik Atensi Pimpinan**:
+   - Fitur atensi khusus kasus sensitif pimpinan di `/media-intelligence` untuk pemantauan instan dan konteks laporan khusus pada mesin Gemini AI.
 
