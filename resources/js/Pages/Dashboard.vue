@@ -213,7 +213,7 @@ const layerLapangan = ref(true);
               class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold transition"
             >
               <Newspaper class="w-4 h-4 text-sky-400" />
-              <span>Media Online ({{ kpi?.total_articles || 0 }}) &rarr;</span>
+              <span>Radar Media Online ({{ kpi?.total_articles || 0 }}) &rarr;</span>
             </Link>
 
             <Link
@@ -262,13 +262,13 @@ const layerLapangan = ref(true);
     <!-- 2. 5 OPERATIONAL KPI CARDS (Media Online, Medsos, Isu, Dumas, Tugas)      -->
     <!-- ========================================================================= -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-      <!-- 1. Media Online -->
+      <!-- 1. Radar Media Online -->
       <Link
         :href="`/media-intelligence?polda=${selectedCode}`"
         class="p-4 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1.5 hover:border-sky-500/50 transition group block"
       >
         <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
-          <span class="group-hover:text-white transition">Media Online</span>
+          <span class="group-hover:text-white transition">Radar Media Online</span>
           <Newspaper class="w-4 h-4 text-sky-400" />
         </div>
         <div class="flex items-baseline justify-between">
@@ -760,7 +760,7 @@ const layerLapangan = ref(true);
             </span>
           </div>
           <Link :href="`/media-intelligence?polda=${selectedCode}`" class="text-amber-400 font-bold hover:underline inline-flex items-center gap-1 text-xs">
-            <span>Buka Monitoring Media Online</span>
+            <span>Buka Radar Media Online</span>
             <ArrowRight class="w-3.5 h-3.5" />
           </Link>
         </div>

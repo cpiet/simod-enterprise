@@ -181,8 +181,8 @@ const navigationGroups = [
         badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
       },
       {
-        name: 'Media Online',
-        desc: 'Radar 29 RSS & Berita Satwil',
+        name: 'Radar Media Online',
+        desc: 'Agregasi 29 RSS & Berita Satwil',
         href: '/media-intelligence',
         icon: Radio,
         match: ['/media-intelligence', '/monitoring-media-online'],

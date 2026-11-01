@@ -24,7 +24,7 @@ Sidebar navigasi di [`EnterpriseLayout.vue`](file:///d:/Foto/laragon/www/simod-e
 ```
 ├── 1. KOMANDO & INTELIJEN
 │   ├── Command Center               [/] -> Ringkasan Eksekutif, Peta Situasi & EWS
-│   ├── Media Online                 [/media-intelligence] -> Radar 29 RSS, Executive Briefing, Naskah WA
+│   ├── Radar Media Online           [/media-intelligence] -> Radar 29 RSS, Executive Briefing, Naskah WA
 │   └── Radar Media Sosial           [/social-intelligence] -> Pantauan 𝕏, TikTok, IG, YT, KOL & Apify
 │
 ├── 2. MANAJEMEN ISU & TUGAS

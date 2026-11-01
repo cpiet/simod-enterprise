@@ -9,12 +9,12 @@ Dokumen ini mencatat pemetaan lengkap seluruh 19 modul pada **SIMOD Enterprise M
 | No | Modul | Rute URL | Pengontrol (Controller) | Tampilan (Inertia Vue) | Pilar Hierarki |
 |:---|:---|:---|:---|:---|:---|
 | 1 | **Command Center** | `/` & `/dashboard` | `DashboardController` | `Dashboard.vue` | Komando & Intelijen |
-| 2 | **Media Online (Radar 29 RSS)** | `/media-intelligence` | `MediaIntelligenceController` | `MediaIntelligence/Index.vue` | Komando & Intelijen |
+| 2 | **Radar Media Online (29 RSS)** | `/media-intelligence` | `MediaIntelligenceController` | `MediaIntelligence/Index.vue` | Komando & Intelijen |
 | 3 | **Radar Media Sosial** | `/social-intelligence` | `SocialIntelligenceController` | `SocialIntelligence/Index.vue` | Komando & Intelijen |
-| 3 | **Laporan Polres & Isu** | `/issues` | `IssueController` | `Issues/Index.vue` | Manajemen Isu & Tugas |
-| 4 | **Input Laporan Baru** | `/issues/create` | `IssueController` | `Issues/Create.vue` | Manajemen Isu & Tugas |
-| 5 | **Antrean Verifikasi** | `/verification-queue` | `SystemModuleController` | `VerificationQueue/Index.vue` | Manajemen Isu & Tugas |
-| 6 | **Disposisi Tugas** | `/tasks` | `TaskController` | `Tasks/Index.vue` | Manajemen Isu & Tugas |
+| 4 | **Laporan Polres & Isu** | `/issues` | `IssueController` | `Issues/Index.vue` | Manajemen Isu & Tugas |
+| 5 | **Input Laporan Baru** | `/issues/create` | `IssueController` | `Issues/Create.vue` | Manajemen Isu & Tugas |
+| 6 | **Antrean Verifikasi** | `/verification-queue` | `SystemModuleController` | `VerificationQueue/Index.vue` | Manajemen Isu & Tugas |
+| 7 | **Disposisi Tugas** | `/tasks` | `TaskController` | `Tasks/Index.vue` | Manajemen Isu & Tugas |
 | 7 | **Publikasi Multi-Kanal** | `/publications` | `PublicationController` | `Publications/Index.vue` | Publikasi & Dokumentasi |
 | 8 | **Galeri Media Aman** | `/gallery` | `SystemModuleController` | `Gallery/Index.vue` | Publikasi & Dokumentasi |
 | 9 | **Laporan & Rekap Anev** | `/reports` | `SystemModuleController` | `Reports/Index.vue` | Publikasi & Dokumentasi |

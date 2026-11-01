@@ -7,7 +7,7 @@ Platform intelijen media, monitoring opini publik, dan manajemen operasional keh
 ## 🌟 Fitur Utama
 
 - **Multi-Tenant Architecture**: Pemisahan data dan konteks operasional antar Polda dan jajaran Satwil (Polres/Polresta) di seluruh Indonesia.
-- **Media Online Intelligence (Radar 29 RSS)**: Agregasi paralel 29 portal media resmi Sulbar & nasional dengan Fair Quota, Mutex Lock, dan bypass Cloudflare Google News RSS.
+- **Radar Media Online (29 Portal RSS Feeds)**: Agregasi paralel 29 portal media resmi Sulbar & nasional dengan Fair Quota, Mutex Lock, dan bypass Cloudflare Google News RSS.
 - **Radar Media Sosial (Cyber Patrol & Social Listening)**: Pemantauan opini publik di 𝕏 (Twitter), TikTok, Instagram, dan YouTube terintegrasi Apify Multi-API Token Pool dengan auto-failover, pelacakan akun target khusus, dan ekstraksi thumbnail HD video.
 - **Early Warning System (EWS)**: Deteksi dini isu viral atau berpotensi krisis dengan klasifikasi urgensi (Tinggi, Sedang, Rendah).
 - **Issue & Crisis Management**: Siklus penanganan isu menyeluruh dari eskalasi hingga resolusi lengkap dengan Counter Narasi & Press Release resmi.

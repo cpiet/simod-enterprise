@@ -726,7 +726,7 @@ const submitIssue = () => {
             Klasifikasi: Rahasia Terbatas / Command Center
           </span>
           <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40">
-            📰 Monitoring Media Online & Agregasi Pers
+            📰 Radar Media Online & Agregasi Pers
           </span>
           <span class="flex items-center gap-1 text-[11px] font-bold text-emerald-400">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
@@ -734,7 +734,7 @@ const submitIssue = () => {
           </span>
         </div>
         <h1 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
-          Monitoring Media Online &bull; {{ selectedCode === 'ALL' ? 'KONSOLIDASI NASIONAL MABES POLRI' : selectedPolda?.name }}
+          Radar Media Online &bull; {{ selectedCode === 'ALL' ? 'KONSOLIDASI NASIONAL MABES POLRI' : selectedPolda?.name }}
         </h1>
         <p class="text-xs md:text-sm text-slate-300 max-w-2xl leading-relaxed">
           Pusat Agregasi Berita Pers & Media Siber Real-Time, Analisis Isu Strategis Nasional Polri, Executive Briefing Harian Pimpinan, dan Naskah WhatsApp Terstandarisasi.
