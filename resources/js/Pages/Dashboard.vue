@@ -410,7 +410,7 @@ const layerLapangan = ref(true);
               v-model="selectedSatwilCode"
               class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-bold text-slate-300 focus:outline-none focus:border-amber-400"
             >
-              <option value="ALL">Semua Satwil (6 Polres)</option>
+              <option value="ALL">{{ selectedCode === 'ALL' ? 'Semua Jajaran Satwil' : 'Semua Satwil (6 Polres)' }}</option>
               <option v-for="p in polresStatuses" :key="p.id" :value="p.code">
                 {{ p.name }} ({{ p.status }})
               </option>
@@ -438,7 +438,7 @@ const layerLapangan = ref(true);
 
           <span class="text-xs font-mono text-emerald-400 flex items-center gap-1.5">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            6 Satwil Terpantau Aktif
+            {{ selectedCode === 'ALL' ? '34 Polda Terpantau Aktif' : '6 Satwil Terpantau Aktif' }}
           </span>
         </div>
 

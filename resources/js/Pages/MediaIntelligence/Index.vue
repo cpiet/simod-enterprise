@@ -61,18 +61,29 @@ const props = defineProps({
   metrics: Object,
 });
 
+// Tenant Detection: Divhumas (Mabes Polri) vs Polda Wilayah
+const isDivhumas = computed(() => props.selectedCode === 'ALL' || props.selectedPolda?.code === 'DIVHUMAS');
+
 // Active Navigation Tab (01-07)
 const activeTab = ref('01');
 
-const tabs = [
+const tabs = computed(() => [
   { id: '01', name: '01. Berita Online (Live RSS)', badge: 'LIVE', icon: Radio },
   { id: '02', name: '02. Executive Briefing Pimpinan', badge: 'ANALISIS', icon: Newspaper },
   { id: '03', name: '03. Sentimen Berita', badge: null, icon: Zap },
-  { id: '04', name: '04. Statistik Satwil', badge: null, icon: MapPin },
+  { id: '04', name: isDivhumas.value ? '04. Orkestrasi 34 Polda' : '04. Statistik Satwil', badge: null, icon: MapPin },
   { id: '05', name: '05. Early Warning (EWS)', badge: 'EWS', icon: Shield },
   { id: '06', name: '06. Narasi & Rekomendasi', badge: null, icon: Award },
   { id: '07', name: '07. Naskah WA Pimpinan', badge: 'WA RESMI', icon: MessageSquare },
-];
+]);
+
+// Dynamic Categories from Server/Articles
+const availableCategories = computed(() => {
+  if (props.categoriesList && props.categoriesList.length > 0) {
+    return props.categoriesList.filter((c) => c.name && c.name !== 'Semua Kategori');
+  }
+  return [];
+});
 
 // Bookmark disimpan di database (tidak ikut dibersihkan oleh Pembersihan Berita)
 const bookmarkedIds = ref((props.sampleArticles || []).filter((a) => a.is_bookmarked).map((a) => String(a.id)));
@@ -245,10 +256,9 @@ const downloadWaTxt = () => {
   try {
     const blob = new Blob([whatsappReportText.value], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const isDivhumas = props.selectedCode === 'ALL' || props.selectedPolda?.code === 'DIVHUMAS';
     const link = document.createElement('a');
     link.href = url;
-    link.download = `LAPORAN_WA_${isDivhumas ? 'KADIVHUMAS' : 'KAPOLDA'}_${props.selectedCode || 'SULBAR'}_${new Date().toISOString().slice(0, 10)}.txt`;
+    link.download = `LAPORAN_WA_${isDivhumas.value ? 'KADIVHUMAS_MABES' : 'KAPOLDA'}_${props.selectedCode || 'SULBAR'}_${new Date().toISOString().slice(0, 10)}.txt`;
     link.click();
     URL.revokeObjectURL(url);
     showToastNotification('✓ Naskah WA berhasil diunduh sebagai file .txt!');
@@ -259,16 +269,16 @@ const downloadWaTxt = () => {
 
 const whatsappReportText = computed(() => {
   const r = props.report || {};
-  const isDivhumas = props.selectedCode === 'ALL' || props.selectedPolda?.code === 'DIVHUMAS';
-  const poldaName = isDivhumas ? 'Divisi Humas Polri' : (props.selectedPolda?.name || 'Polda Sulawesi Barat');
-  const poldaShort = isDivhumas ? 'Divhumas Polri' : (props.selectedCode === 'SULBAR' ? 'Polda Sulbar' : poldaName);
-  const kapoldaTitle = isDivhumas
+  const isDiv = isDivhumas.value;
+  const poldaName = isDiv ? 'Divisi Humas Polri' : (props.selectedPolda?.name || 'Polda Sulawesi Barat');
+  const poldaShort = isDiv ? 'Divhumas Polri' : (props.selectedCode === 'SULBAR' ? 'Polda Sulbar' : poldaName);
+  const kapoldaTitle = isDiv
     ? `Bapak Kadivhumas Polri (${props.selectedPolda?.kapolda_name || 'Irjen Pol. Johnny Eddizon Isir, S.I.K., M.T.C.P.'})`
     : (props.selectedPolda?.kapolda_name
         ? `Bapak Kapolda ${poldaName} (${props.selectedPolda.kapolda_name})`
         : `Bapak Kapolda ${poldaName}`);
-  const kabidHumasTitle = isDivhumas
-    ? `Karo Penmas / Analis Intelijen Siber (${props.selectedPolda?.kabid_humas_name || 'Brigjen Pol. Trunoyudo Wisnu Andiko, S.I.K.'})`
+  const kabidHumasTitle = isDiv
+    ? `Karo Penmas / Analis Intelijen Siber Mabes Polri (${props.selectedPolda?.kabid_humas_name || 'Brigjen Pol. Trunoyudo Wisnu Andiko, S.I.K.'})`
     : (props.selectedPolda?.kabid_humas_name
         ? `Kabid Humas ${poldaName} (${props.selectedPolda.kabid_humas_name})`
         : `Kabid Humas ${poldaName}`);
@@ -277,47 +287,51 @@ const whatsappReportText = computed(() => {
     ? new Date(r.report_date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
     : new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-  const reportTime = r.report_time || (isDivhumas ? '19.00 WIB' : '19.03 WITA');
+  const reportTime = r.report_time || (isDiv ? '19.00 WIB' : '19.03 WITA');
 
   let s = `*LAPORAN INTELIJEN MEDIA & SENTIMEN OPINI PUBLIK*\n`;
-  s += `*${isDivhumas ? 'DIVISI HUMAS POLRI (ORKESTRASI NASIONAL)' : 'BIDANG HUMAS ' + poldaName.toUpperCase()}*\n\n`;
+  s += `*${isDiv ? 'DIVISI HUMAS POLRI (ORKESTRASI NASIONAL)' : 'BIDANG HUMAS ' + poldaName.toUpperCase()}*\n\n`;
   s += `Kepada Yth. : ${kapoldaTitle}\n`;
   s += `Dari        : ${kabidHumasTitle}\n`;
   s += `Tanggal     : ${todayStr} (Pukul ${reportTime})\n`;
   s += `Perihal     : Analisis Pemberitaan, Sentimen Opini Publik, dan Rekomendasi Tindak Lanjut\n\n`;
   s += `*Assalamu’alaikum Wr. Wb.*\n`;
   s += `*Selamat Pagi Jenderal,*\n\n`;
-  s += `Mohon izin Jenderal, kami sampaikan laporan hasil analisis pemberitaan dan sentimen opini publik terkait institusi Polri secara ${isDivhumas ? 'nasional dan orkestrasi 34 Polda jajaran' : 'nasional serta ' + poldaShort} berdasarkan bahan pemantauan media siber dan opini publik 24 jam terakhir.\n\n`;
+  s += `Mohon izin Jenderal, kami sampaikan laporan hasil analisis pemberitaan dan sentimen opini publik terkait institusi Polri secara ${isDiv ? 'nasional dan orkestrasi 34 Polda jajaran' : 'nasional serta ' + poldaShort} berdasarkan bahan pemantauan media siber dan opini publik 24 jam terakhir.\n\n`;
 
   // SECTION I: SITUASI DAN ANALISIS
   s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-  s += `*I. SITUASI DAN ANALISIS ${isDivhumas ? 'KADIV HUMAS POLRI' : 'KABID HUMAS'}*\n`;
+  s += `*I. SITUASI DAN ANALISIS ${isDiv ? 'KADIV HUMAS POLRI' : 'KABID HUMAS'}*\n`;
   s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
   s += `*1. Sentimen Pemberitaan*\n\n`;
   s += `🇮🇩 *Nasional*\n`;
-  s += `• Positif: ${r.sentiment_national?.positif ?? 60}%\n`;
-  s += `• Netral : ${r.sentiment_national?.netral ?? 30}%\n`;
+  s += `• Positif: ${r.sentiment_national?.positif ?? 65}%\n`;
+  s += `• Netral : ${r.sentiment_national?.netral ?? 25}%\n`;
   s += `• Negatif: ${r.sentiment_national?.negatif ?? 10}%\n\n`;
 
-  s += `📍 *${poldaShort}*\n`;
-  s += `• Positif: ${r.sentiment_sulbar?.positif ?? 55}%\n`;
-  s += `• Netral : ${r.sentiment_sulbar?.netral ?? 30}%\n`;
-  s += `• Negatif: ${r.sentiment_sulbar?.negatif ?? 15}%\n\n`;
+  s += `📍 *${isDiv ? 'Sentimen Kewilayahan (34 Polda Jajaran)' : poldaShort}*\n`;
+  s += `• Positif: ${(r.sentiment_satwil || r.sentiment_sulbar)?.positif ?? (isDiv ? 60 : 55)}%\n`;
+  s += `• Netral : ${(r.sentiment_satwil || r.sentiment_sulbar)?.netral ?? 30}%\n`;
+  s += `• Negatif: ${(r.sentiment_satwil || r.sentiment_sulbar)?.negatif ?? (isDiv ? 10 : 15)}%\n\n`;
 
   s += `*Analisis Perkembangan:*\n`;
-  if (r.snapshot_sulbar_desc) {
+  if (isDiv && (r.snapshot_satwil_desc || r.snapshot_sulbar_desc)) {
+    s += `${r.snapshot_satwil_desc || r.snapshot_sulbar_desc}\n\n`;
+  } else if (!isDiv && r.snapshot_sulbar_desc) {
     s += `${r.snapshot_sulbar_desc}\n\n`;
   } else if (r.executive_brief) {
     s += `${r.executive_brief}\n\n`;
   } else {
-    s += `Berdasarkan pemantauan media siber dan 29 portal berita resmi terverifikasi, situasi kamtibmas di wilayah hukum ${poldaShort} terpantau relatif aman dan kondusif dengan dominasi sentimen positif atas akselerasi patroli presisi dan pelayanan prima kepolisian.\n\n`;
+    s += isDiv
+      ? `Berdasarkan pemantauan intelijen media siber dan 22 portal berita online nasional terverifikasi, situasi kamtibmas di seluruh wilayah hukum 34 Polda jajaran terpantau relatif aman dan kondusif dengan dominasi sentimen positif atas akselerasi program Presisi, transparansi penegakan hukum, dan pelayanan publik kepolisian.\n\n`
+      : `Berdasarkan pemantauan media siber dan 29 portal berita resmi terverifikasi, situasi kamtibmas di wilayah hukum ${poldaShort} terpantau relatif aman dan kondusif dengan dominasi sentimen positif atas akselerasi patroli presisi dan pelayanan prima kepolisian.\n\n`;
   }
 
   // SECTION I.B: ISU STRATEGIS NASIONAL POLRI
   const nationalIssues = r.national_issues && r.national_issues.length > 0 ? r.national_issues : [];
   if (nationalIssues.length > 0) {
     s += `🇮🇩 *ISU STRATEGIS NASIONAL POLRI*\n`;
-    s += `Status Isu Nasional: *${r.snapshot_national_status || 'KUNING - WASPADA'}*\n\n`;
+    s += `Status Isu Nasional: *${r.snapshot_national_status || 'HIJAU - KONDUSIF'}*\n\n`;
     nationalIssues.forEach((iss, nIdx) => {
       s += `*A.${nIdx + 1}. ${iss.title}*\n`;
       s += `• Fakta: ${iss.fact}\n`;
@@ -328,33 +342,56 @@ const whatsappReportText = computed(() => {
     });
   }
 
-  // SECTION I.C: ISU KEWILAYAHAN DAERAH & POLRES
-  s += `📍 *ISU KEWILAYAHAN ${poldaShort.toUpperCase()} & POLRES JAJARAN*\n\n`;
-  const sulbarIssues = r.sulbar_issues && r.sulbar_issues.length > 0
-    ? r.sulbar_issues.slice(0, 4)
-    : [
-        {
-          title: 'Pengamanan Intensif Tahapan Pilkada Serentak di Mamuju',
-          fact: 'Satgas Operasi Mantap Praja Polresta Mamuju memperketat pengamanan 24 jam di Kantor KPU Sulbar dan Bawaslu, menjaga stabilitas pesta demokrasi.',
-          source: 'Humas Polri & Radar Sulbar',
-          sentiment: 'Positif',
-        },
-        {
-          title: 'Klarifikasi Tim Siber atas Hoaks Isu Begal di Tarailu',
-          fact: 'Subdit Siber Ditreskrimsus dan Humas Mateng mengonfirmasi video beredar merupakan insiden tahun 2021 di luar provinsi dan jalur trans dipatroli rutin aman.',
-          source: 'Subdit Siber & WhatsApp',
-          sentiment: 'Positif',
-        },
-        {
-          title: 'Penertiban Jukir Liar di Kawasan Pantai Manakarra',
-          fact: 'Merespons keluhan video warga di media sosial, Polresta Mamuju bersama Dishub menertibkan jukir liar untuk menjamin kenyamanan ruang publik.',
-          source: 'TikTok & Media Siber',
-          sentiment: 'Netral',
-        },
-      ];
+  // SECTION I.C: ISU KEWILAYAHAN DAERAH / 34 POLDA
+  s += `📍 *${isDiv ? 'ISU MENONJOL 34 POLDA JAJARAN & KEWILAYAHAN' : 'ISU KEWILAYAHAN ' + poldaShort.toUpperCase() + ' & POLRES JAJARAN'}*\n\n`;
+  const regionalIssues = (r.regional_issues && r.regional_issues.length > 0)
+    ? r.regional_issues.slice(0, 4)
+    : (r.sulbar_issues && r.sulbar_issues.length > 0)
+      ? r.sulbar_issues.slice(0, 4)
+      : isDiv
+        ? [
+            {
+              title: 'Polda Metro Jaya & Bareskrim Ungkap Sindikat Penipuan Daring Lintas Negara',
+              fact: 'Polda Metro Jaya bersama Bareskrim Polri berhasil mengungkap jaringan penipuan daring internasional dan menyelamatkan aset korban, menuai apresiasi luas dari publik.',
+              source: 'Antara News & Detikcom',
+              sentiment: 'Positif',
+            },
+            {
+              title: 'Polda Jabar Pastikan Pengamanan Jalur Vital dan Kamtibmas Kondusif',
+              fact: 'Jajaran Polda Jawa Barat meningkatkan patroli presisi di titik rawan kamtibmas dan jalur logistik nasional, situasi terpantau aman dan tertib.',
+              source: 'CNN Indonesia & Humas Jabar',
+              sentiment: 'Positif',
+            },
+            {
+              title: 'Divhumas Salurkan Asistensi Digital & Counter Hoaks ke 34 Bidhumas Polda',
+              fact: 'Biro Penmas Divhumas mengonsolidasikan narasi satu pintu dan asistensi konten edukasi ke seluruh jajaran Polda se-Indonesia.',
+              source: 'Tribrata News Mabes',
+              sentiment: 'Positif',
+            },
+          ]
+        : [
+            {
+              title: 'Pengamanan Intensif Tahapan Pilkada Serentak di Mamuju',
+              fact: 'Satgas Operasi Mantap Praja Polresta Mamuju memperketat pengamanan 24 jam di Kantor KPU Sulbar dan Bawaslu, menjaga stabilitas pesta demokrasi.',
+              source: 'Humas Polri & Radar Sulbar',
+              sentiment: 'Positif',
+            },
+            {
+              title: 'Klarifikasi Tim Siber atas Hoaks Isu Begal di Tarailu',
+              fact: 'Subdit Siber Ditreskrimsus dan Humas Mateng mengonfirmasi video beredar merupakan insiden tahun 2021 di luar provinsi dan jalur trans dipatroli rutin aman.',
+              source: 'Subdit Siber & WhatsApp',
+              sentiment: 'Positif',
+            },
+            {
+              title: 'Penertiban Jukir Liar di Kawasan Pantai Manakarra',
+              fact: 'Merespons keluhan video warga di media sosial, Polresta Mamuju bersama Dishub menertibkan jukir liar untuk menjamin kenyamanan ruang publik.',
+              source: 'TikTok & Media Siber',
+              sentiment: 'Netral',
+            },
+          ];
 
   let issueNum = 2;
-  sulbarIssues.forEach((iss) => {
+  regionalIssues.forEach((iss) => {
     s += `*${issueNum}. Isu: ${iss.title}*\n`;
     if (iss.source) {
       s += `Pemberitaan ${iss.source} menyoroti: ${iss.fact}\n\n`;
@@ -383,14 +420,28 @@ const whatsappReportText = computed(() => {
   s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
   if (r.recommendations && r.recommendations.length > 0) {
     r.recommendations.forEach((rec, idx) => {
-      s += `*${idx + 1}. Terkait ${rec.issue}*\n`;
-      s += `${rec.action}\n`;
+      s += `*${idx + 1}. Terkait ${rec.issue || rec.title || 'Isu Strategis'}*\n`;
+      s += `${rec.action || rec.desc || ''}\n`;
       if (rec.pic) {
         s += `Satuan Pelaksana (PIC): ${rec.pic}\n\n`;
       } else {
         s += `\n`;
       }
     });
+  } else if (isDiv) {
+    s += `*1. Terkait Penguatan Agenda Setting Nasional*\n`;
+    s += `Mengorkestrasi seluruh 34 Bidhumas Polda jajaran untuk menyebarluaskan narasi positif penegakan hukum Presisi Mabes Polri dan program prioritas Kapolri.\n`;
+    s += `Satuan Pelaksana (PIC): Biro Penmas Divhumas Polri & 34 Kabid Humas Polda\n\n`;
+
+    s += `*2. Terkait Counter Narasi Hoaks & Disinformasi Siber*\n`;
+    s += `Biro Multimedia Divhumas dan Dittipidsiber Bareskrim aktif melakukan fact-checking 24 jam dan menerbitkan stempel HOAKS resmi pada setiap disinformasi viral skala nasional.\n`;
+    s += `Satuan Pelaksana (PIC): Biro Multimedia Divhumas & Dittipidsiber Bareskrim\n\n`;
+
+    s += `*3. Terkait Monitoring Media dan Opini Publik Nasional*\n`;
+    s += `Divisi Humas Polri mengoptimalkan pemantauan 22 portal media online nasional terverifikasi, Google News, dan media sosial. Setiap isu sensitif dilaporkan secara berjenjang beserta tautan rujukan dan waktu publikasi WIB.\n\n`;
+
+    s += `*4. Terkait Pelayanan Pengaduan & Dumas Presisi (110)*\n`;
+    s += `Sosialisasi layanan Contact Center Polri 110 dan aplikasi Dumas Presisi terus digencarkan secara nasional untuk kemudahan masyarakat melaporkan gangguan kamtibmas.\n\n`;
   } else {
     s += `*1. Terkait Pengamanan Tahapan Pilkada Serentak*\n`;
     s += `Memperkuat koordinasi Sat Samapta, Intelkam, dan jajaran Polres dalam pengawalan logistik dan stabilitas kamtibmas.\n`;
@@ -399,13 +450,13 @@ const whatsappReportText = computed(() => {
     s += `*2. Terkait Penanggulangan Isu Hoaks & Provokasi*\n`;
     s += `Subdit Siber dan Tim Humas aktif 24 jam melakukan fact-checking dan menerbitkan stempel HOAKS resmi pada setiap disinformasi viral.\n`;
     s += `Satuan Pelaksana (PIC): Subdit Siber Ditreskrimsus & Bidhumas\n\n`;
+
+    s += `*3. Terkait Monitoring Media dan Opini Publik*\n`;
+    s += `Bidang Humas terus mengoptimalkan pemantauan 29 portal media online resmi, Google News, dan media sosial. Setiap isu sensitif dilaporkan secara berjenjang beserta tautan rujukan dan waktu publikasi WITA.\n\n`;
+
+    s += `*4. Terkait Pelayanan Pengaduan Masyarakat (110)*\n`;
+    s += `Sosialisasi layanan Contact Center Polri 110 terus digencarkan agar masyarakat dapat menyampaikan informasi gangguan kamtibmas secara cepat dan gratis.\n\n`;
   }
-
-  s += `*3. Terkait Monitoring Media dan Opini Publik*\n`;
-  s += `Bidang Humas terus mengoptimalkan pemantauan 29 portal media online resmi, Google News, dan media sosial. Setiap isu sensitif dilaporkan secara berjenjang beserta tautan rujukan dan waktu publikasi WITA.\n\n`;
-
-  s += `*4. Terkait Pelayanan Pengaduan Masyarakat (110)*\n`;
-  s += `Sosialisasi layanan Contact Center Polri 110 terus digencarkan agar masyarakat dapat menyampaikan informasi gangguan kamtibmas secara cepat dan gratis.\n\n`;
 
   // SECTION III: SARAN KOORDINASI DAN EVALUASI
   s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
@@ -413,8 +464,8 @@ const whatsappReportText = computed(() => {
   s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
   s += `Untuk mendukung tindak lanjut yang terukur, kami menyarankan pola koordinasi berjenjang:\n\n`;
 
-  const resp0_2h = r.priority_responses?.response_0_2h?.action || 'Validasi fakta lapangan dan koordinasi cepat dengan satuan fungsi terkait (0-2 jam).';
-  const resp2_6h = r.priority_responses?.response_2_6h?.action || 'Konsolidasi data, penyusunan FAQ kedinasan, dan rilis pers satu pintu (2-6 jam).';
+  const resp0_2h = r.priority_responses?.response_0_2h?.action || (isDiv ? 'Validasi fakta lapangan dengan Biro Penmas / Polda jajaran (0-2 jam).' : 'Validasi fakta lapangan dan koordinasi cepat dengan satuan fungsi terkait (0-2 jam).');
+  const resp2_6h = r.priority_responses?.response_2_6h?.action || (isDiv ? 'Konsolidasi data Mabes, rilis pers terpadu, dan instruksi amplifikasi 34 Polda (2-6 jam).' : 'Konsolidasi data, penyusunan FAQ kedinasan, dan rilis pers satu pintu (2-6 jam).');
   const resp24h  = r.priority_responses?.response_24h?.action  || 'Rangkum perkembangan penanganan isu dan evaluasi respons netizen dalam 24 jam.';
 
   s += `• *Tahap Awal (0–2 jam):* ${resp0_2h}\n\n`;
@@ -424,10 +475,10 @@ const whatsappReportText = computed(() => {
 
   // SECTION IV: KESIMPULAN DAN PERTIMBANGAN
   s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-  s += `*IV. KESIMPULAN DAN PERTIMBANGAN KEPADA BAPAK KAPOLDA*\n`;
+  s += `*IV. KESIMPULAN DAN PERTIMBANGAN KEPADA ${isDiv ? 'BAPAK KAPOLRI & KADIVHUMAS' : 'BAPAK KAPOLDA'}*\n`;
   s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
-  let sitStatus = r.snapshot_sulbar_status || 'KUNING - WASPADA';
+  let sitStatus = (isDiv ? (r.snapshot_satwil_status || r.snapshot_national_status) : r.snapshot_sulbar_status) || 'HIJAU - KONDUSIF';
   s += `Jenderal, berdasarkan data pemantauan terpadu, situasi komunikasi publik ${poldaShort} saat ini dinilai berada pada kategori *${sitStatus}*.\n\n`;
 
   if (r.top_concern) {
@@ -439,12 +490,18 @@ const whatsappReportText = computed(() => {
   s += `2. Komunikasi publik konsisten mengedepankan transparansi, pendekatan humanis, dan manfaat nyata bagi warga.\n`;
   s += `3. Monitoring media siber berkelanjutan guna deteksi dini potensi anomali opini publik.\n\n`;
 
-  s += `Demikian kami laporkan sebagai bahan pertimbangan Bapak Kapolda. Atas arahan dan petunjuk lebih lanjut, kami siap laksanakan.\n\n`;
+  s += `Demikian kami laporkan sebagai bahan pertimbangan Bapak ${isDiv ? 'Kapolri dan Kadivhumas Polri' : 'Kapolda'}. Atas arahan dan petunjuk lebih lanjut, kami siap laksanakan.\n\n`;
   s += `Hormat kami,\n`;
-  s += `*BIDANG HUMAS ${poldaName.toUpperCase()}*\n\n`;
+  s += `*${isDiv ? 'DIVISI HUMAS POLRI' : 'BIDANG HUMAS ' + poldaName.toUpperCase()}*\n\n`;
   s += `_Tembusan:_\n`;
-  s += `_1. Wakapolda ${poldaName}_\n`;
-  s += `_2. Irwasda ${poldaName}_\n\n`;
+  if (isDiv) {
+    s += `_1. Bapak Kapolri_\n`;
+    s += `_2. Bapak Wakapolri_\n`;
+    s += `_3. Bapak Irwasum Polri_\n\n`;
+  } else {
+    s += `_1. Wakapolda ${poldaName}_\n`;
+    s += `_2. Irwasda ${poldaName}_\n\n`;
+  }
   s += `*Wassalamu’alaikum Wr. Wb.*`;
 
   return s;
@@ -487,7 +544,7 @@ const showRssManagerModal = ref(false);
 const newFeedForm = ref({
   name: '',
   url: '',
-  category: 'Regional Sulselbar',
+  category: isDivhumas.value ? 'Nasional' : 'Regional Sulselbar',
 });
 const testResult = ref(null);
 const isTestingUrl = ref(false);
@@ -525,7 +582,7 @@ const submitNewRssSource = () => {
   }, {
     preserveScroll: true,
     onSuccess: () => {
-      newFeedForm.value = { name: '', url: '', category: 'Regional Sulselbar' };
+      newFeedForm.value = { name: '', url: '', category: isDivhumas.value ? 'Nasional' : 'Regional Sulselbar' };
       testResult.value = null;
       toastMessage.value = 'Sumber RSS baru berhasil ditambahkan!';
       setTimeout(() => {
@@ -798,8 +855,8 @@ const submitIssue = () => {
           <span>Portal RSS Terdaftar</span>
           <Radio class="w-4 h-4 text-amber-400" />
         </div>
-        <p class="text-2xl md:text-3xl font-black text-white">{{ mediaFeeds?.length || 29 }} Portal</p>
-        <p class="text-[11px] text-slate-400">{{ mediaFeeds?.length || 29 }} Portal Sulbar & Nasional</p>
+        <p class="text-2xl md:text-3xl font-black text-white">{{ mediaFeeds?.length || (isDivhumas ? 22 : 29) }} Portal</p>
+        <p class="text-[11px] text-slate-400">{{ isDivhumas ? (mediaFeeds?.length || 22) + ' Portal Media Nasional Terverifikasi' : (mediaFeeds?.length || 29) + ' Portal Sulbar & Nasional' }}</p>
       </div>
 
       <div class="p-5 rounded-2xl bg-[#0b1426] border border-slate-800 shadow-lg space-y-1">
@@ -829,9 +886,9 @@ const submitIssue = () => {
           <TrendingUp class="w-4 h-4 text-emerald-400" />
         </div>
         <p class="text-2xl md:text-3xl font-black text-emerald-400">
-          {{ report?.sentiment_sulbar?.positif || 84.2 }}%
+          {{ (isDivhumas ? report?.sentiment_national?.positif : (report?.sentiment_satwil?.positif || report?.sentiment_sulbar?.positif)) || 84.2 }}%
         </p>
-        <p class="text-[11px] text-slate-400">Kondusifitas Wilayah Tinggi</p>
+        <p class="text-[11px] text-slate-400">{{ isDivhumas ? 'Kondusifitas Nasional Terjaga' : 'Kondusifitas Wilayah Tinggi' }}</p>
       </div>
     </div>
 
@@ -942,11 +999,14 @@ const submitIssue = () => {
             @change="currentPage = 1"
             class="px-3 py-2 rounded-xl text-xs font-bold bg-[#070d19] border border-slate-700 text-white focus:outline-none focus:border-amber-400 cursor-pointer"
           >
-            <option value="all">Semua Kategori</option>
-            <option value="Regional Sulselbar">Regional Sulselbar</option>
-            <option value="Nasional & Umum">Nasional & Umum</option>
-            <option value="Hukum & Kriminal">Hukum & Kriminal</option>
-            <option value="Google News RSS">Google News RSS</option>
+            <option value="all">Semua Kategori ({{ sampleArticles?.length || 0 }})</option>
+            <option
+              v-for="cat in availableCategories"
+              :key="cat.name"
+              :value="cat.name"
+            >
+              {{ cat.name }} ({{ cat.count }})
+            </option>
           </select>
         </div>
 
@@ -1054,7 +1114,7 @@ const submitIssue = () => {
                 <!-- Category Badge -->
                 <div class="flex items-center gap-2 pt-1">
                   <span class="px-2.5 py-0.5 rounded-md text-[9px] font-extrabold uppercase bg-slate-900/90 text-slate-300 border border-slate-700/80 tracking-wider">
-                    {{ article.category_badge || article.category || (selectedCode === 'ALL' ? 'NASIONAL & MABES' : 'REGIONAL SULSELBAR') }}
+                    {{ article.category_badge || article.category || (isDivhumas ? 'NASIONAL & MABES' : 'REGIONAL') }}
                   </span>
                 </div>
 
@@ -1305,31 +1365,31 @@ const submitIssue = () => {
           </div>
         </div>
 
-        <!-- Isu Kewilayahan Polda & Polres -->
+        <!-- Isu Kewilayahan Polda & Polres / 34 Polda Jajaran -->
         <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
           <div class="flex items-center justify-between border-b border-slate-800 pb-3 flex-wrap gap-2">
             <div class="flex items-center gap-2">
               <MapPin class="w-4 h-4 text-rose-400" />
               <h3 class="text-sm font-black text-white uppercase tracking-wider">
-                Isu Kewilayahan {{ selectedCode === 'ALL' ? 'Divhumas Polri & Seluruh Polda' : (selectedPolda?.name || 'Polda & Jajaran Polres') }}
+                Isu Kewilayahan {{ isDivhumas ? '34 Polda Jajaran se-Indonesia' : (selectedPolda?.name || 'Polda & Jajaran Polres') }}
               </h3>
             </div>
             <span
               class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border"
               :class="[
-                (report?.snapshot_sulbar_status || '').includes('MERAH')
+                (report?.snapshot_satwil_status || report?.snapshot_sulbar_status || '').includes('MERAH')
                   ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                  : (report?.snapshot_sulbar_status || '').includes('HIJAU')
+                  : (report?.snapshot_satwil_status || report?.snapshot_sulbar_status || '').includes('HIJAU')
                     ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                     : 'bg-amber-400/20 text-amber-300 border-amber-400/40'
               ]"
             >
-              {{ report?.snapshot_sulbar_status || 'KUNING - WASPADA' }}
+              {{ report?.snapshot_satwil_status || report?.snapshot_sulbar_status || 'KUNING - WASPADA' }}
             </span>
           </div>
           <div class="space-y-3">
             <div
-              v-for="(iss, idx) in (report?.sulbar_issues || [])"
+              v-for="(iss, idx) in (report?.regional_issues || report?.sulbar_issues || [])"
               :key="idx"
               class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5 text-xs hover:border-slate-700 transition"
             >
@@ -1496,24 +1556,32 @@ const submitIssue = () => {
           <p class="text-xs text-slate-300 leading-relaxed">{{ report?.snapshot_national_desc }}</p>
         </div>
 
-        <!-- Sentiment Sulbar -->
+        <!-- Sentiment Wilayah / 34 Polda Jajaran -->
         <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
-          <h3 class="text-sm font-black text-white uppercase tracking-wider">Sentimen Publik Sulawesi Barat</h3>
+          <h3 class="text-sm font-black text-white uppercase tracking-wider">
+            {{ isDivhumas ? 'Sentimen Kewilayahan 34 Polda Jajaran' : ('Sentimen Publik ' + (selectedPolda?.name || 'Sulawesi Barat')) }}
+          </h3>
           <div class="flex items-center justify-around py-4">
             <div class="text-center">
-              <span class="text-3xl font-black text-emerald-400">{{ report?.sentiment_sulbar?.positif || 55 }}%</span>
+              <span class="text-3xl font-black text-emerald-400">
+                {{ (report?.sentiment_satwil || report?.sentiment_sulbar)?.positif || (isDivhumas ? 60 : 55) }}%
+              </span>
               <p class="text-xs text-slate-400">Positif</p>
             </div>
             <div class="text-center">
-              <span class="text-3xl font-black text-amber-400">{{ report?.sentiment_sulbar?.netral || 30 }}%</span>
+              <span class="text-3xl font-black text-amber-400">
+                {{ (report?.sentiment_satwil || report?.sentiment_sulbar)?.netral || 30 }}%
+              </span>
               <p class="text-xs text-slate-400">Netral</p>
             </div>
             <div class="text-center">
-              <span class="text-3xl font-black text-rose-400">{{ report?.sentiment_sulbar?.negatif || 15 }}%</span>
+              <span class="text-3xl font-black text-rose-400">
+                {{ (report?.sentiment_satwil || report?.sentiment_sulbar)?.negatif || (isDivhumas ? 10 : 15) }}%
+              </span>
               <p class="text-xs text-slate-400">Negatif</p>
             </div>
           </div>
-          <p class="text-xs text-slate-300 leading-relaxed">{{ report?.snapshot_sulbar_desc }}</p>
+          <p class="text-xs text-slate-300 leading-relaxed">{{ report?.snapshot_satwil_desc || report?.snapshot_sulbar_desc }}</p>
         </div>
       </div>
 
@@ -1541,12 +1609,62 @@ const submitIssue = () => {
     </div>
 
     <!-- ========================================================================= -->
-    <!-- TAB 04: STATISTIK SATWIL (6 POLRES SULBAR)                                 -->
+    <!-- TAB 04: STATISTIK SATWIL (ORKESTRASI 34 POLDA / POLRES JAJARAN)            -->
     <!-- ========================================================================= -->
     <div v-show="activeTab === '04'" class="space-y-4">
       <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl">
-        <h3 class="text-sm font-black text-white uppercase tracking-wider mb-4">Pemetaan Kondusifitas 6 Polres Jajaran Sulbar</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-2 mb-4">
+          <div>
+            <h3 class="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+              <MapPin class="w-4 h-4 text-amber-400" />
+              <span>{{ isDivhumas ? 'Pemetaan Orkestrasi 34 Polda Jajaran se-Indonesia' : ('Pemetaan Kondusifitas Jajaran ' + (selectedPolda?.name || 'Polda Sulbar')) }}</span>
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">
+              {{ isDivhumas ? 'Monitoring komando Divhumas Polri atas stabilitas kamtibmas dan sentimen opini publik kewilayahan se-Indonesia.' : 'Pantauan kondusifitas dan sentimen kamtibmas di tingkat Polres jajaran.' }}
+            </p>
+          </div>
+          <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0 self-start sm:self-auto">
+            {{ isDivhumas ? '34 Polda Terpantau Kondusif' : ((selectedPolda?.polres?.length || 6) + ' Polres Jajaran Aktif') }}
+          </span>
+        </div>
+
+        <!-- Mode Divhumas: Grid 34 Polda Jajaran -->
+        <div v-if="isDivhumas" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div
+            v-for="polda in (allPoldas?.filter(p => p.code !== 'DIVHUMAS') || [])"
+            :key="polda.code"
+            class="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-amber-400/50 transition-all space-y-2.5"
+          >
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <span class="font-bold text-white block text-sm">{{ polda.name }}</span>
+                <span class="text-[10px] font-mono text-slate-400 uppercase tracking-wider">{{ polda.code }} • Zona {{ polda.timezone === 'Asia/Jakarta' ? 'WIB' : (polda.timezone === 'Asia/Jayapura' ? 'WIT' : 'WITA') }}</span>
+              </div>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
+                Kondusif
+              </span>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Stabilitas kamtibmas wilayah terpantau aman dan tertib. Koordinasi rilis terpadu bersama {{ polda.polres?.length || 0 }} Polres jajaran.
+            </p>
+            <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+              <span class="flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span>Sentimen: <strong class="text-emerald-400">86% Positif</strong></span>
+              </span>
+              <a
+                :href="'/media-intelligence?polda=' + polda.code"
+                class="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400 hover:text-amber-300 transition"
+              >
+                <span>Pantau Wilayah</span>
+                <ExternalLink class="w-3 h-3" />
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mode Polda Wilayah: Grid Polres Jajaran -->
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div
             v-for="polres in (selectedPolda?.polres || [
               { name: 'Polresta Mamuju', code: 'MAMUJU' },
@@ -1861,7 +1979,7 @@ const submitIssue = () => {
         <textarea
           v-model="pasteAiInput"
           rows="12"
-          placeholder="Tempelkan teks / JSON di sini (contoh: ```json { 'title': '...', 'sentiment_sulbar': { 'positif': 60 } } ```)..."
+          placeholder="Tempelkan teks / JSON di sini (contoh: ```json { 'title': '...', 'sentiment_national': { 'positif': 65 } } ```)..."
           class="w-full p-4 rounded-2xl bg-slate-900 border border-slate-700 text-xs font-mono text-amber-300 placeholder-slate-500 focus:outline-none focus:border-amber-400 leading-relaxed"
         ></textarea>
 
@@ -1897,7 +2015,7 @@ const submitIssue = () => {
             <SlidersHorizontal class="w-5 h-5 text-amber-400" />
             <div>
               <h3 class="text-base font-extrabold text-white">Manajemen Sumber Feed RSS Media</h3>
-              <p class="text-xs text-slate-400">Konfigurasi URL portal berita daring untuk wilayah {{ selectedPolda?.name }}</p>
+              <p class="text-xs text-slate-400">Konfigurasi URL portal berita daring untuk {{ isDivhumas ? 'Divisi Humas Polri (Nasional)' : (selectedPolda?.name || 'Polda Sulbar') }}</p>
             </div>
           </div>
           <button @click="showRssManagerModal = false" class="text-slate-400 hover:text-white">
@@ -1914,7 +2032,7 @@ const submitIssue = () => {
               <input
                 v-model="newFeedForm.name"
                 type="text"
-                placeholder="Contoh: Tribratanews Sulbar"
+                :placeholder="isDivhumas ? 'Contoh: Tribratanews atau CNN Indonesia' : 'Contoh: Tribratanews Sulbar'"
                 class="w-full px-3 py-2 rounded-xl bg-[#0b1426] border border-slate-700 text-white"
               />
             </div>
@@ -1924,10 +2042,21 @@ const submitIssue = () => {
                 v-model="newFeedForm.category"
                 class="w-full px-3 py-2 rounded-xl bg-[#0b1426] border border-slate-700 text-white"
               >
-                <option>Regional Sulselbar</option>
-                <option>Nasional & Umum</option>
-                <option>Hukum & Kriminal</option>
-                <option>Google News RSS</option>
+                <template v-if="isDivhumas">
+                  <option>Nasional</option>
+                  <option>Harkamtibmas</option>
+                  <option>Hukum & Kriminal</option>
+                  <option>Ekonomi</option>
+                  <option>Teknologi</option>
+                  <option>Politik</option>
+                  <option>Regional Jajaran</option>
+                </template>
+                <template v-else>
+                  <option>Regional Sulselbar</option>
+                  <option>Nasional & Umum</option>
+                  <option>Hukum & Kriminal</option>
+                  <option>Google News RSS</option>
+                </template>
               </select>
             </div>
             <div>
@@ -2125,7 +2254,7 @@ const submitIssue = () => {
         </div>
 
         <p class="text-xs text-slate-300 leading-relaxed">
-          Salin seluruh formula prompt di bawah ini, lalu tempelkan ke kolom chat AI. Formula ini telah disesuaikan secara otomatis dengan wilayah satuan <strong>{{ selectedPolda?.name || 'Polda Sulbar' }}</strong> dan jajaran Polres terkait.
+          Salin seluruh formula prompt di bawah ini, lalu tempelkan ke kolom chat AI. Formula ini telah disesuaikan secara otomatis dengan satuan komando <strong>{{ isDivhumas ? 'Divisi Humas Polri (Mabes Polri)' : (selectedPolda?.name || 'Polda Sulbar') }}</strong> dan jajaran {{ isDivhumas ? '34 Polda se-Indonesia' : 'Polres terkait' }}.
         </p>
 
         <div class="relative flex-1 overflow-hidden rounded-2xl border border-slate-700 bg-slate-950">

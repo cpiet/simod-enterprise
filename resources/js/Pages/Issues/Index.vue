@@ -417,7 +417,7 @@ const getPriorityBadgeClass = (priority) => {
           <div class="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
             <Building2 class="w-3.5 h-3.5 text-amber-500" />
             <span>Satwil:</span>
-            <span class="font-bold text-slate-900 dark:text-white">{{ issue.polres?.name || issue.polda?.name || 'Polda Sulbar' }}</span>
+            <span class="font-bold text-slate-900 dark:text-white">{{ issue.polres?.name || issue.polda?.name || (selectedCode === 'ALL' ? 'Divhumas Polri' : 'Polda Sulbar') }}</span>
           </div>
         </div>
 

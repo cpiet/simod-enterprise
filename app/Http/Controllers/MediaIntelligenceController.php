@@ -213,15 +213,17 @@ class MediaIntelligenceController extends Controller
         }
 
         if (!$parsed) {
+            $isNat = ($polda->code === 'DIVHUMAS');
+            $tz = ($isNat || $polda->timezone === 'Asia/Jakarta') ? 'WIB' : 'WITA';
             // Text based fallback
             $parsed = [
-                'title'           => 'LAPORAN INTELIJEN MEDIA & SENTIMEN OPINI PUBLIK ' . ($polda->name ?? 'POLDA'),
+                'title'           => 'LAPORAN INTELIJEN MEDIA & SENTIMEN OPINI PUBLIK ' . ($isNat ? 'NASIONAL - DIVISI HUMAS POLRI' : ($polda->name ?? 'POLDA')),
                 'report_date'     => now()->format('Y-m-d'),
-                'report_time'     => now()->format('H.i') . ' WITA',
+                'report_time'     => now()->format('H.i') . ' ' . $tz,
                 'executive_brief' => mb_substr($rawInput, 0, 500),
                 'top_concern'     => 'Hasil analisis mandiri intelijen media dari ChatGPT.',
-                'sentiment_national' => ['positif' => 60, 'netral' => 30, 'negatif' => 10],
-                'sentiment_sulbar'   => ['positif' => 55, 'netral' => 30, 'negatif' => 15],
+                'sentiment_national' => ['positif' => 65, 'netral' => 25, 'negatif' => 10],
+                'sentiment_satwil'   => ['positif' => 60, 'netral' => 30, 'negatif' => 10],
             ];
         }
 
@@ -246,33 +248,42 @@ class MediaIntelligenceController extends Controller
             }
 
             return [
-                'positif' => $pos !== null ? $pos : 55,
+                'positif' => $pos !== null ? $pos : 60,
                 'netral'  => $net !== null ? $net : 30,
-                'negatif' => $neg !== null ? $neg : 15,
+                'negatif' => $neg !== null ? $neg : 10,
             ];
         };
 
         $natIssues = $parsed['national_issues'] ?? [];
-        $sulIssues = $parsed['sulbar_issues'] ?? [];
+        $sulIssues = $parsed['regional_issues'] ?? $parsed['satwil_issues'] ?? $parsed['sulbar_issues'] ?? [];
+
+        $isNational = ($polda->code === 'DIVHUMAS');
+        $tz = ($isNational || $polda->timezone === 'Asia/Jakarta') ? 'WIB' : 'WITA';
+
+        $snapshotSatwilStatus = $parsed['snapshot_satwil_status'] ?? $parsed['snapshot_regional_status'] ?? $parsed['snapshot_sulbar_status'] ?? 'HIJAU - KONDUSIF';
+        $snapshotSatwilDesc = $parsed['snapshot_satwil_desc'] ?? $parsed['snapshot_regional_desc'] ?? $parsed['snapshot_sulbar_desc']
+            ?? ($isNational ? 'Dinamika kamtibmas dan sentimen opini publik di 34 Polda jajaran terpantau aman dan kondusif.' : 'Situasi kamtibmas kewilayahan terpantau aman dan terkendali.');
+
+        $sentimentSatwilRaw = $parsed['sentiment_satwil'] ?? $parsed['sentiment_regional'] ?? $parsed['sentiment_sulbar'] ?? [];
 
         MediaIntelligenceReport::create([
             'polda_id'                 => $polda->id,
             'report_date'              => $parsed['report_date'] ?? now()->format('Y-m-d'),
-            'report_time'              => $parsed['report_time'] ?? now()->format('H.i') . ' WITA',
-            'title'                    => $parsed['title'] ?? ('LAPORAN INTELIJEN MEDIA & SENTIMEN OPINI PUBLIK ' . $polda->name),
-            'snapshot_national_status' => $parsed['snapshot_national_status'] ?? 'KUNING - WASPADA',
-            'snapshot_national_desc'   => $parsed['snapshot_national_desc'] ?? 'Dinamika isu nasional Polri relatif stabil dengan pengawasan ruang siber.',
-            'snapshot_sulbar_status'   => $parsed['snapshot_sulbar_status'] ?? 'MERAH - PRIORITAS TINGGI',
-            'snapshot_sulbar_desc'     => $parsed['snapshot_sulbar_desc'] ?? 'Perlu akselerasi mitigasi isu lokal di wilayah pesisir dan pengamanan tahapan Pilkada.',
+            'report_time'              => $parsed['report_time'] ?? (now()->format('H.i') . ' ' . $tz),
+            'title'                    => $parsed['title'] ?? ('LAPORAN INTELIJEN MEDIA & SENTIMEN OPINI PUBLIK ' . ($isNational ? 'NASIONAL - DIVISI HUMAS POLRI' : $polda->name)),
+            'snapshot_national_status' => $parsed['snapshot_national_status'] ?? 'HIJAU - KONDUSIF',
+            'snapshot_national_desc'   => $parsed['snapshot_national_desc'] ?? 'Dinamika isu nasional Polri stabil dengan pengawasan intensif ruang siber dan keterbukaan informasi.',
+            'snapshot_sulbar_status'   => $snapshotSatwilStatus,
+            'snapshot_sulbar_desc'     => $snapshotSatwilDesc,
             'top_concern'              => $parsed['top_concern'] ?? 'Perhatian khusus pimpinan terhadap situasi Harkamtibmas terkini.',
             'executive_brief'          => $parsed['executive_brief'] ?? $rawInput,
-            'core_decision'            => $parsed['core_decision'] ?? 'Tingkatkan patroli gabungan dan klarifikasi satu pintu oleh Kabid Humas.',
+            'core_decision'            => $parsed['core_decision'] ?? ($isNational ? 'Instruksikan amplifikasi rilis satu pintu dan orkestrasi 34 Polda jajaran.' : 'Tingkatkan patroli gabungan dan klarifikasi satu pintu oleh Kabid Humas.'),
             'sentiment_national'       => $calcSentiment($parsed['sentiment_national'] ?? [], $natIssues),
-            'sentiment_sulbar'         => $calcSentiment($parsed['sentiment_sulbar'] ?? [], $sulIssues),
+            'sentiment_sulbar'         => $calcSentiment($sentimentSatwilRaw, $sulIssues),
             'priority_responses'       => $parsed['priority_responses'] ?? [
-                'response_0_2h' => ['title' => 'Validasi Fakta', 'action' => 'Koordinasi satu pintu dengan Satker/Polres terkait.'],
-                'response_2_6h' => ['title' => 'Konsolidasi & Klarifikasi', 'action' => 'Siapkan rilis pers dan materi counter narasi.'],
-                'response_24h'  => ['title' => 'Amplifikasi Citra Positif', 'action' => 'Masifikasi publikasi humanis dan bansos kepolisian.'],
+                'response_0_2h' => ['title' => 'Validasi Fakta', 'action' => 'Koordinasi satu pintu dengan Satker/Polda terkait.'],
+                'response_2_6h' => ['title' => 'Konsolidasi & Klarifikasi', 'action' => 'Siapkan rilis pers dan materi counter narasi terpadu.'],
+                'response_24h'  => ['title' => 'Amplifikasi Citra Positif', 'action' => 'Masifikasi publikasi humanis dan keterbukaan informasi Polri Presisi.'],
             ],
             'national_issues'          => $natIssues,
             'sulbar_issues'            => $sulIssues,
@@ -386,36 +397,145 @@ class MediaIntelligenceController extends Controller
     {
         $isNational = ($polda?->code === 'DIVHUMAS');
         if ($isNational) {
-            $name = 'Divisi Humas Polri (Mabes)';
-            $short = 'Divhumas Polri';
-            $tz = 'WIB';
-            $polresList = '34 Polda Jajaran se-Indonesia & Mabes Polri';
-        } else {
-            $name = $polda?->name ?? 'Polda Sulawesi Barat';
-            $short = $polda?->code === 'SULBAR' ? 'Polda Sulbar' : ($polda?->name ?? 'Polda');
-            $tz = ($polda?->timezone === 'Asia/Jakarta') ? 'WIB' : 'WITA';
-            $polresList = $polda && $polda->polres && $polda->polres->isNotEmpty()
-                ? $polda->polres->pluck('name')->implode(', ')
-                : 'Polresta Mamuju, Polres Majene, Polres Polewali Mandar, Polres Mamasa, Polres Pasangkayu, Polres Mamuju Tengah';
+            return <<<PROMPT
+ROLE: Bertindak sebagai Senior Media Intelligence Analyst dan Strategic Communication Advisor untuk Kapolri & Kadivhumas Polri di Mabes Polri (Divisi Humas Polri - Komando & Orkestrasi Nasional).
+
+TUGAS HARIAN:
+Lakukan pemantauan intelijen pemberitaan media siber dan opini publik skala nasional menggunakan tanggal dan waktu aktual (WIB), mencakup dua pilar komando:
+1. NASIONAL & MABES POLRI: Seluruh isu strategis, trending topic nasional, sentimen opini publik, kebijakan Kapolri, prestasi, penegakan hukum siber/Bareskrim, dan mitigasi krisis reputasi institusi Polri se-Indonesia.
+2. ORKESTRASI 34 POLDA JAJARAN: Monitoring pemberitaan menonjol di 34 Polda Jajaran (Metro Jaya, Jabar, Jateng, Jatim, Sumut, Sulsel, Bali, Papua, dll.), isu kamtibmas daerah yang berpotensi meluas ke nasional, serta koordinasi counter narasi hoaks.
+
+SUMBER:
+Telusuri 22 Portal Media Online Nasional Terverifikasi (Antara News, Detikcom, CNN Indonesia, CNBC Indonesia, Liputan6, SINDOnews, Republika, JPNN, Kumparan, BBC Indonesia, dll.), Google News, X (Twitter), Instagram, TikTok, Facebook, YouTube, serta Tribratanews Polri. Prioritaskan informasi 24 jam terakhir dan sertakan tautan sumber serta waktu publikasi (WIB).
+
+KETENTUAN PENTING:
+- Angka sentimen WAJIB berupa angka bulat (integer) persen dan TIDAK BOLEH bernilai null (contoh: positif: 65, netral: 25, negatif: 10, total harus 100%).
+- Berikan narasi tegas, presisi, berwibawa, dan berstandar Mabes Polri pada executive_brief, snapshot, dan respon taktis.
+
+OUTPUT WAJIB:
+Sajikan laporan HANYA dalam blok JSON murni terstruktur (di dalam blok ```json ... ```) tanpa teks pendahuluan atau penutup agar langsung terurai otomatis dan tersaji di SIMOD HUMAS MABES POLRI:
+
+{
+  "title": "LAPORAN INTELIJEN MEDIA & SENTIMEN OPINI PUBLIK NASIONAL - DIVISI HUMAS POLRI",
+  "report_date": "YYYY-MM-DD",
+  "report_time": "HH.MM WIB",
+  "top_concern": "Ringkasan isu nasional paling mendesak yang butuh atensi Kapolri & Kadivhumas hari ini...",
+  "executive_brief": "Ringkasan maksimal 200 kata mengenai situasi pemberitaan Polri nasional dan orkestrasi 34 Polda jajaran...",
+  "snapshot_national_status": "HIJAU - KONDUSIF / KUNING - WASPADA / MERAH - ATENSI",
+  "snapshot_national_desc": "Uraian 1-2 kalimat narasi kunci yang menggerakkan sentimen nasional Polri hari ini...",
+  "snapshot_satwil_status": "HIJAU - KONDUSIF / KUNING - WASPADA / MERAH - ATENSI",
+  "snapshot_satwil_desc": "Uraian 1-2 kalimat narasi kunci terkait stabilitas kamtibmas dan dinamika 34 Polda jajaran hari ini...",
+  "sentiment_national": { "positif": 65, "netral": 25, "negatif": 10 },
+  "sentiment_satwil": { "positif": 60, "netral": 30, "negatif": 10 },
+  "priority_responses": {
+    "response_0_2h": {
+      "title": "Validasi Data & Arahan Juru Bicara",
+      "action": "Aksi taktis 0-2 jam koordinasi Biro Penmas dengan Satker Mabes / Polda terkait untuk validasi data riil dan satu pintu juru bicara..."
+    },
+    "response_2_6h": {
+      "title": "Konsolidasi Terpadu & Rilis Mabes",
+      "action": "Aksi 2-6 jam menyusun rilis pers Mabes Polri, infografis klarifikasi, dan arahan amplifikasi ke 34 Kabid Humas Polda..."
+    },
+    "response_24h": {
+      "title": "Amplifikasi Citra & Diseminasi Masif",
+      "action": "Aksi 24 jam masifikasi konten humanis Polri Presisi serentak melalui seluruh akun dinas 34 Polda dan 500+ Polres jajaran..."
+    }
+  },
+  "national_issues": [
+    {
+      "title": "Judul Isu / Berita Strategis Nasional 1",
+      "source": "Nama Media Nasional | HH.MM WIB",
+      "url": "https://tautan-berita-sumber.com",
+      "fact": "Salinan ringkasan isi berita dan fakta peristiwa nasional secara lengkap...",
+      "sentiment": "Positif/Netral/Negatif",
+      "virality": "Tinggi/Sedang/Rendah",
+      "risk": "Hijau/Kuning/Merah"
+    }
+  ],
+  "regional_issues": [
+    {
+      "title": "Judul Isu Menonjol Polda Jajaran (Contoh: Polda Metro Jaya / Polda Jabar / dll.)",
+      "source": "Nama Media / Humas Polda | HH.MM WIB",
+      "url": "https://tautan-berita-sumber.com",
+      "fact": "Salinan ringkasan fakta peristiwa di tingkat kewilayahan/Polda jajaran...",
+      "sentiment": "Positif/Netral/Negatif",
+      "virality": "Tinggi/Sedang/Rendah",
+      "risk": "Hijau/Kuning/Merah"
+    }
+  ],
+  "early_warnings": [
+    {
+      "level": "MERAH / KUNING",
+      "title": "Isu Negatif Berisiko Nasional",
+      "fact": "Fakta peristiwa dan potensi eskalasi sentimen publik secara luas...",
+      "risk": "Dampak terhadap citra dan reputasi institusi Polri tingkat nasional...",
+      "response_0_2h": "Respon taktis Mabes Polri 0-2 jam...",
+      "response_2_6h": "Konsolidasi data dan rilis klarifikasi 2-6 jam...",
+      "response_6_24h": "Amplifikasi klarifikasi dan evaluasi 24 jam...",
+      "pic": "Biro Penmas / Divhumas Polri"
+    }
+  ],
+  "strategic_contents": [
+    {
+      "no": 1,
+      "label": "HERO / EDUKASI / KLARIFIKASI",
+      "title": "Judul / Tema Konten Publikasi Nasional",
+      "format": "Press Conference / Video Reel / Carousel / Infografis",
+      "platform": "TV Nasional / Portal Media / Instagram @divisihumaspolri / TikTok / YouTube",
+      "target": "Masyarakat umum, netizen, akademisi, media massa nasional",
+      "priority": "Segera / 24 Jam"
+    }
+  ],
+  "agenda_setting": [
+    {
+      "day": "Hari, Tgl",
+      "time": "HH.MM WIB",
+      "theme": "Tema Orkestrasi Pemberitaan Terjadwal",
+      "format": "Rilis Media & Amplifikasi Medsos",
+      "goal": "Penguatan Public Trust terhadap Program Prioritas Kapolri",
+      "pic": "Divhumas Polri & 34 Bidhumas Polda"
+    }
+  ],
+  "recommendations": [
+    {
+      "target": "1 | 0-24 jam",
+      "issue": "Isu Prioritas Nasional",
+      "action": "Instruksi taktis komando Divhumas ke jajaran kewilayahan",
+      "pic": "Kadivhumas / Karo Penmas / Kabid Humas Jajaran",
+      "indicator": "Sentimen positif >80% dan hoaks teredam tuntas"
+    }
+  ]
+}
+
+BERIKUT DATA BERITA / POSTINGAN UNTUK DIANALISIS:
+[Tempelkan teks berita, rangkuman patroli siber, atau link isu di sini]
+PROMPT;
         }
 
+        $name = $polda?->name ?? 'Polda Sulawesi Barat';
+        $short = $polda?->code === 'SULBAR' ? 'Polda Sulbar' : ($polda?->name ?? 'Polda');
+        $tz = ($polda?->timezone === 'Asia/Jakarta') ? 'WIB' : 'WITA';
+        $polresList = $polda && $polda->polres && $polda->polres->isNotEmpty()
+            ? $polda->polres->pluck('name')->implode(', ')
+            : 'Polresta Mamuju, Polres Majene, Polres Polewali Mandar, Polres Mamasa, Polres Pasangkayu, Polres Mamuju Tengah';
+
         return <<<PROMPT
-ROLE: Bertindak sebagai Senior Media Intelligence Analyst dan Strategic Communication Advisor untuk Kapolri & Kadiv Humas Polri, khususnya lingkup {$name} ({$short}).
+ROLE: Bertindak sebagai Senior Media Intelligence Analyst dan Strategic Communication Advisor untuk Kapolda, khususnya lingkup {$name} ({$short}).
 
 TUGAS HARIAN:
 Lakukan pemantauan pemberitaan terbaru menggunakan tanggal dan waktu aktual ({$tz}), dengan dua cakupan:
-1. NASIONAL & MABES: Seluruh isu strategis, trending, sentimen, prestasi, dan krisis reputasi terkait institusi Polri se-Indonesia.
-2. KEWILAYAHAN & JAJARAN: Pemberitaan khusus {$name}, monitoring orkestrasi jajaran ({$polresList}), isu kamtibmas menonjol, pelayanan masyarakat, kritik publik, serta penanganan kasus yang viral.
+1. NASIONAL: Seluruh isu strategis, trending, sentimen, prestasi, dan krisis reputasi terkait institusi Polri se-Indonesia.
+2. KEWILAYAHAN: Pemberitaan khusus {$name}, monitoring jajaran ({$polresList}), isu kamtibmas menonjol, pelayanan masyarakat, kritik publik, serta penanganan kasus yang viral.
 
 SUMBER:
-Telusuri 22 Portal Media Online Nasional Terverifikasi (Antara News, Detikcom, CNN Indonesia, CNBC Indonesia, Liputan6, SINDOnews, Republika, JPNN, Kumparan, BBC Indonesia, dll.), Google News, X (Twitter), Instagram, TikTok, Facebook, YouTube, serta situs resmi Polri. Prioritaskan informasi 24 jam terakhir dan sertakan tautan sumber serta waktu publikasi ({$tz}).
+Telusuri 29 Portal Media Online Resmi Terverifikasi, Google News, X (Twitter), Instagram, TikTok, Facebook, YouTube, serta situs resmi Humas Polri. Prioritaskan informasi 24 jam terakhir dan sertakan tautan sumber serta waktu publikasi ({$tz}).
 
 KETENTUAN PENTING:
 - Angka sentimen WAJIB berupa angka bulat (integer) persen dan TIDAK BOLEH bernilai null (contoh: positif: 60, netral: 30, negatif: 10, total harus 100%).
 - Berikan narasi tegas dan lugas pada executive_brief, snapshot, dan langkah mitigasi.
 
 OUTPUT WAJIB:
-Sajikan laporan HANYA dalam blok JSON murni terstruktur (di dalam blok ```json ... ```) tanpa teks pendahuluan atau penutup agar langsung terurai otomatis dan tersaji mewah di SIMOD HUMAS:
+Sajikan laporan HANYA dalam blok JSON murni terstruktur (di dalam blok ```json ... ```) tanpa teks pendahuluan atau penutup agar langsung terurai otomatis dan tersaji di SIMOD HUMAS:
 
 {
   "title": "LAPORAN INTELIJEN MEDIA & SENTIMEN OPINI PUBLIK {$short}",

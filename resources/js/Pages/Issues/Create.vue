@@ -28,6 +28,7 @@ const props = defineProps({
 });
 
 const isSubmitting = ref(false);
+const isNational = computed(() => props.selectedCode === 'ALL' || props.selectedPolda?.code === 'DIVHUMAS');
 
 const categories = [
   {
@@ -191,7 +192,7 @@ const submitReport = (targetStatus = 'submitted') => {
             Buat Laporan Baru
           </h1>
           <p class="text-xs md:text-sm text-slate-600 dark:text-slate-300">
-            Formulir pelaporan operasional dokumentasi & pemantauan opini publik Humas Polda Sulbar.
+            Formulir pelaporan operasional dokumentasi & pemantauan opini publik {{ isNational ? 'Divisi Humas Polri (Mabes Polri)' : (selectedPolda?.name || 'Humas Polda Sulbar') }}.
           </p>
         </div>
       </div>

@@ -837,27 +837,27 @@ const formatNumber = (num) => {
               <span>Jam Puncak Obrolan Netizen</span>
             </h3>
             <p class="text-[11px] text-slate-500 dark:text-slate-400">
-              Waktu WITA paling aktif warganet Sulbar
+              {{ isNational ? 'Waktu WIB paling aktif warganet nasional' : 'Waktu WITA paling aktif warganet Sulbar' }}
             </p>
           </div>
 
           <div class="space-y-3 text-xs">
             <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
               <span class="text-[10px] text-slate-500 font-bold block">Puncak Siang:</span>
-              <p class="font-black text-slate-900 dark:text-white text-sm">11.30 – 13.30 WITA</p>
+              <p class="font-black text-slate-900 dark:text-white text-sm">{{ isNational ? '11.30 – 13.30 WIB' : '11.30 – 13.30 WITA' }}</p>
               <p class="text-[10px] text-slate-500">Isu keluhan pelayanan & lalin siang hari</p>
             </div>
 
             <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
               <span class="text-[10px] text-slate-500 font-bold block">Puncak Malam:</span>
-              <p class="font-black text-amber-500 text-sm">19.00 – 22.00 WITA</p>
+              <p class="font-black text-amber-500 text-sm">{{ isNational ? '19.00 – 22.00 WIB' : '19.00 – 22.00 WITA' }}</p>
               <p class="text-[10px] text-slate-500">Puncak viralisasi video TikTok & opini medsos X</p>
             </div>
 
             <div class="p-4 rounded-2xl bg-amber-50 dark:bg-amber-400/10 border border-amber-300 dark:border-amber-400/30 text-[11px] text-amber-900 dark:text-amber-200 space-y-1">
               <p class="font-bold">💡 Rekomendasi Jam Rilis Konter Narasi:</p>
               <p class="leading-relaxed">
-                Rilis siaran pers atau infografis klarifikasi paling efektif didistribusikan pada pukul <strong>12.00 WITA</strong> atau <strong>19.30 WITA</strong> agar menjangkau 70% pengguna aktif.
+                Rilis siaran pers atau infografis klarifikasi paling efektif didistribusikan pada pukul <strong>{{ isNational ? '12.00 WIB' : '12.00 WITA' }}</strong> atau <strong>{{ isNational ? '19.30 WIB' : '19.30 WITA' }}</strong> agar menjangkau 70% pengguna aktif.
               </p>
             </div>
           </div>

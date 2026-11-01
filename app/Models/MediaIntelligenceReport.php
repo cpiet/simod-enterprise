@@ -47,6 +47,33 @@ class MediaIntelligenceReport extends Model
         'recommendations'    => 'array',
     ];
 
+    protected $appends = [
+        'sentiment_satwil',
+        'regional_issues',
+        'snapshot_satwil_status',
+        'snapshot_satwil_desc',
+    ];
+
+    public function getSentimentSatwilAttribute()
+    {
+        return $this->sentiment_sulbar;
+    }
+
+    public function getRegionalIssuesAttribute()
+    {
+        return $this->sulbar_issues;
+    }
+
+    public function getSnapshotSatwilStatusAttribute()
+    {
+        return $this->snapshot_sulbar_status;
+    }
+
+    public function getSnapshotSatwilDescAttribute()
+    {
+        return $this->snapshot_sulbar_desc;
+    }
+
     public function polda(): BelongsTo
     {
         return $this->belongsTo(Polda::class);
