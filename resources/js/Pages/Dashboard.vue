@@ -31,6 +31,10 @@ import {
   Map as MapIcon,
   X,
   Filter,
+  ThumbsUp,
+  Eye,
+  Play,
+  Share2,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -38,6 +42,9 @@ const props = defineProps({
   selectedPolda: Object,
   selectedCode: String,
   kpi: Object,
+  socialStats: Object,
+  topViralSocialPosts: Array,
+  liveSocialPosts: Array,
   polresStatuses: Array,
   overallSituation: Object,
   topIssues: Array,
@@ -50,6 +57,44 @@ const props = defineProps({
 
 // View mode: 'map' (Peta Interaktif) or 'cards' (Matriks Kartu)
 const viewMode = ref('map');
+
+// Tabs for Trending & Live Stream
+const activeTrendingTab = ref('social'); // 'social' | 'issues'
+const activeStreamTab = ref('social'); // 'social' | 'media'
+
+// Helper formatters
+const formatNumber = (num) => {
+  if (!num && num !== 0) return '0';
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
+  return num.toString();
+};
+
+const formatTimeAgo = (dateStr) => {
+  if (!dateStr) return 'Baru saja';
+  const d = new Date(dateStr);
+  const diff = (Date.now() - d.getTime()) / 1000;
+  if (diff < 60) return 'Baru saja';
+  if (diff < 3600) return Math.floor(diff / 60) + ' mnt lalu';
+  if (diff < 86400) return Math.floor(diff / 3600) + ' jam lalu';
+  return Math.floor(diff / 86400) + ' hari lalu';
+};
+
+const getPlatformBadge = (platform) => {
+  switch (platform?.toLowerCase()) {
+    case 'youtube':
+      return { label: 'YouTube', color: 'bg-rose-500/20 text-rose-300 border-rose-500/40', badgeColor: 'bg-rose-600' };
+    case 'tiktok':
+      return { label: 'TikTok', color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40', badgeColor: 'bg-cyan-600' };
+    case 'instagram':
+      return { label: 'Instagram', color: 'bg-pink-500/20 text-pink-300 border-pink-500/40', badgeColor: 'bg-pink-600' };
+    case 'x':
+    case 'twitter':
+      return { label: '𝕏', color: 'bg-slate-700/40 text-slate-200 border-slate-600/50', badgeColor: 'bg-slate-700' };
+    default:
+      return { label: platform || 'Medsos', color: 'bg-slate-800 text-slate-300 border-slate-700', badgeColor: 'bg-slate-800' };
+  }
+};
 
 // Satwil filter / focus
 const selectedSatwilCode = ref('ALL');
@@ -142,7 +187,7 @@ const layerLapangan = ref(true);
             Dashboard Media Intelligence & Kamtibmas
           </h1>
           <p class="text-xs md:text-sm text-slate-300 max-w-2xl leading-relaxed">
-            Monitoring terpadu pemberitaan, media sosial, laporan lapangan, dan analisis sentimen untuk mendukung pengambilan keputusan cepat dan tepat bagi pimpinan <strong>{{ selectedCode === 'ALL' ? 'Mabes Polri' : selectedPolda?.name }}</strong>.
+            Monitoring terpadu pemberitaan 29 portal media online, radar 4 platform media sosial (𝕏, TikTok, Instagram, YouTube), laporan lapangan 6 Polres, dan analisis sentimen pimpinan <strong>{{ selectedCode === 'ALL' ? 'Mabes Polri' : selectedPolda?.name }}</strong>.
           </p>
 
           <!-- Quick Action Buttons -->
@@ -156,26 +201,42 @@ const layerLapangan = ref(true);
             </Link>
 
             <Link
+              :href="`/social-intelligence?polda=${selectedCode}`"
+              class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold transition"
+            >
+              <Radio class="w-4 h-4 text-amber-400" />
+              <span>Radar Medsos ({{ socialStats?.total_posts || 0 }}) &rarr;</span>
+            </Link>
+
+            <Link
+              :href="`/media-intelligence?polda=${selectedCode}`"
+              class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold transition"
+            >
+              <Newspaper class="w-4 h-4 text-sky-400" />
+              <span>Media Online ({{ kpi?.total_articles || 0 }}) &rarr;</span>
+            </Link>
+
+            <Link
               :href="`/reports?polda=${selectedCode}`"
               class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold transition"
             >
-              <FileBarChart2 class="w-4 h-4 text-amber-400" />
-              <span>Unduh Rekap Eksekutif</span>
+              <FileBarChart2 class="w-4 h-4 text-emerald-400" />
+              <span>Unduh Rekap</span>
             </Link>
 
             <Link
               :href="`/verification-queue?polda=${selectedCode}`"
               class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold transition"
             >
-              <CheckCircle2 class="w-4 h-4 text-emerald-400" />
-              <span>Buka Antrean Verifikasi ({{ kpi?.pending_verify || 0 }}) &rarr;</span>
+              <CheckCircle2 class="w-4 h-4 text-amber-400" />
+              <span>Verifikasi ({{ kpi?.pending_verify || 0 }})</span>
             </Link>
           </div>
         </div>
 
         <!-- Right: Public Sentiment Gauge Dynamic -->
         <div class="p-6 rounded-3xl bg-[#091122]/90 border border-amber-400/30 shadow-2xl flex flex-col items-center text-center space-y-2 shrink-0">
-          <span class="text-[10px] font-black uppercase tracking-wider text-slate-400">Indeks Citra Publik</span>
+          <span class="text-[10px] font-black uppercase tracking-wider text-slate-400">Indeks Citra Publik Terpadu</span>
           <div class="flex items-baseline gap-2">
             <span class="text-5xl font-black text-amber-400 tracking-tight">{{ publicIndex?.score || 78 }}%</span>
             <span class="text-xs font-bold text-emerald-400 flex items-center">
@@ -192,69 +253,111 @@ const layerLapangan = ref(true);
           >
             Kategori: {{ publicIndex?.status || 'Positif' }}
           </span>
-          <p class="text-[10px] text-slate-400">Periode 7 Hari Terakhir</p>
+          <p class="text-[10px] text-slate-400 font-medium">Media Online + Medsos (7 Hari)</p>
         </div>
       </div>
     </div>
 
     <!-- ========================================================================= -->
-    <!-- 2. 4 OPERATIONAL KPI CARDS (100% Dynamic)                                 -->
+    <!-- 2. 5 OPERATIONAL KPI CARDS (Media Online, Medsos, Isu, Dumas, Tugas)      -->
     <!-- ========================================================================= -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="p-5 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+      <!-- 1. Media Online -->
+      <Link
+        :href="`/media-intelligence?polda=${selectedCode}`"
+        class="p-4 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1.5 hover:border-sky-500/50 transition group block"
+      >
         <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
-          <span>Total Berita Pantauan</span>
+          <span class="group-hover:text-white transition">Media Online</span>
           <Newspaper class="w-4 h-4 text-sky-400" />
         </div>
         <div class="flex items-baseline justify-between">
-          <p class="text-3xl font-black text-white">{{ kpi?.total_articles || 0 }}</p>
-          <span class="text-xs font-bold text-emerald-400 flex items-center gap-0.5">
-            <TrendingUp class="w-3 h-3" /> Aktif
+          <p class="text-2xl md:text-3xl font-black text-white">{{ kpi?.total_articles || 0 }}</p>
+          <span class="text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+            {{ kpi?.active_feeds_count || 29 }} Portal
           </span>
         </div>
-        <p class="text-[11px] text-slate-400">{{ kpi?.active_feeds_count || 29 }} Portal RSS Terverifikasi</p>
-      </div>
+        <p class="text-[11px] text-slate-400">Agregasi Berimbang Fair Quota</p>
+      </Link>
 
-      <div class="p-5 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
+      <!-- 2. Radar Media Sosial -->
+      <Link
+        :href="`/social-intelligence?polda=${selectedCode}`"
+        class="p-4 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1.5 hover:border-amber-500/50 transition group block"
+      >
         <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
-          <span>Isu Prioritas Atensi</span>
+          <span class="group-hover:text-white transition">Radar Media Sosial</span>
+          <Radio class="w-4 h-4 text-amber-400 animate-pulse" />
+        </div>
+        <div class="flex items-baseline justify-between">
+          <p class="text-2xl md:text-3xl font-black text-amber-400">{{ socialStats?.total_posts || 0 }}</p>
+          <span class="text-[10px] font-black text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+            4 Platform
+          </span>
+        </div>
+        <div class="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
+          <span>{{ socialStats?.platforms?.youtube || 0 }} YT</span>
+          <span>•</span>
+          <span>{{ socialStats?.platforms?.tiktok || 0 }} TT</span>
+          <span>•</span>
+          <span>{{ socialStats?.platforms?.instagram || 0 }} IG</span>
+          <span>•</span>
+          <span>{{ socialStats?.platforms?.x || 0 }} 𝕏</span>
+        </div>
+      </Link>
+
+      <!-- 3. Isu Prioritas Atensi -->
+      <Link
+        :href="`/issues?polda=${selectedCode}&priority=critical`"
+        class="p-4 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1.5 hover:border-rose-500/50 transition group block"
+      >
+        <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
+          <span class="group-hover:text-white transition">Isu Prioritas Atensi</span>
           <Flame class="w-4 h-4 text-rose-400" />
         </div>
         <div class="flex items-baseline justify-between">
-          <p class="text-3xl font-black text-rose-400">{{ kpi?.priority_issues || 0 }}</p>
+          <p class="text-2xl md:text-3xl font-black text-rose-400">{{ kpi?.priority_issues || 0 }}</p>
           <span
             class="px-2 py-0.5 rounded text-[10px] font-black"
-            :class="kpi?.priority_issues > 0 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : 'bg-emerald-500/20 text-emerald-300'"
+            :class="kpi?.priority_issues > 0 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'"
           >
             {{ kpi?.priority_issues > 0 ? 'Siaga' : 'Terkendali' }}
           </span>
         </div>
-        <p class="text-[11px] text-slate-400">Perlu Atensi & Tanggapan Cepat</p>
-      </div>
+        <p class="text-[11px] text-slate-400">Perlu Respon & Klarifikasi</p>
+      </Link>
 
-      <div class="p-5 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
+      <!-- 4. Laporan Lapangan Polres -->
+      <Link
+        :href="`/issues?polda=${selectedCode}`"
+        class="p-4 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1.5 hover:border-amber-500/50 transition group block"
+      >
         <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
-          <span>Laporan Lapangan Polres</span>
-          <MapPin class="w-4 h-4 text-amber-400" />
+          <span class="group-hover:text-white transition">Laporan Lapangan</span>
+          <MapPin class="w-4 h-4 text-emerald-400" />
         </div>
         <div class="flex items-baseline justify-between">
-          <p class="text-3xl font-black text-amber-400">{{ kpi?.field_reports || 0 }}</p>
+          <p class="text-2xl md:text-3xl font-black text-white">{{ kpi?.field_reports || 0 }}</p>
           <span class="text-xs font-bold text-amber-300">{{ kpi?.pending_verify || 0 }} pending</span>
         </div>
-        <p class="text-[11px] text-slate-400">Dumas & Insiden Kamtibmas</p>
-      </div>
+        <p class="text-[11px] text-slate-400">Dumas & Kamtibmas 6 Polres</p>
+      </Link>
 
-      <div class="p-5 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
+      <!-- 5. Tindak Lanjut Selesai -->
+      <Link
+        :href="`/tasks?polda=${selectedCode}`"
+        class="p-4 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1.5 hover:border-emerald-500/50 transition group block"
+      >
         <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
-          <span>Tindak Lanjut Selesai</span>
+          <span class="group-hover:text-white transition">Tindak Lanjut Tugas</span>
           <CheckCircle2 class="w-4 h-4 text-emerald-400" />
         </div>
         <div class="flex items-baseline justify-between">
-          <p class="text-3xl font-black text-emerald-400">{{ kpi?.tasks_resolved || 0 }}</p>
+          <p class="text-2xl md:text-3xl font-black text-emerald-400">{{ kpi?.tasks_resolved || 0 }}</p>
           <span class="text-xs font-bold text-emerald-300">{{ kpi?.task_completion_rate || 100 }}% Selesai</span>
         </div>
         <p class="text-[11px] text-slate-400">Disposisi & Klarifikasi Media</p>
-      </div>
+      </Link>
     </div>
 
     <!-- ========================================================================= -->
@@ -663,13 +766,18 @@ const layerLapangan = ref(true);
         </div>
       </div>
 
-      <!-- Col 3: Sentimen 7 Hari & Top 5 Isu (100% Dynamic) -->
+      <!-- Col 3: Sentimen 7 Hari & Top Viral / Isu (100% Dynamic) -->
       <div class="space-y-6">
         <!-- 7-Day Trend Chart -->
         <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
           <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-            <h3 class="text-xs font-black text-white uppercase tracking-wider">Tren Sentimen Publik (7 Hari)</h3>
-            <span class="text-[10px] font-bold text-emerald-400 font-mono">{{ avgPositivePct || 84 }}% Rata-rata Positif</span>
+            <div>
+              <h3 class="text-xs font-black text-white uppercase tracking-wider">Tren Sentimen Publik (7 Hari)</h3>
+              <p class="text-[10px] text-slate-400">Agregasi Media Online & Medsos</p>
+            </div>
+            <span class="text-[10px] font-bold text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+              {{ avgPositivePct || 84 }}% Rata-rata Positif
+            </span>
           </div>
 
           <!-- Bar Visualizer -->
@@ -688,16 +796,99 @@ const layerLapangan = ref(true);
           </div>
         </div>
 
-        <!-- Top 5 Isu Kamtibmas -->
+        <!-- Top Trending Switcher: Viral Medsos vs Isu Kamtibmas -->
         <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
-          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-            <h3 class="text-xs font-black text-white uppercase tracking-wider">Top 5 Isu Kamtibmas Sulbar</h3>
-            <Link :href="`/issues?polda=${selectedCode}`" class="text-[10px] text-amber-400 font-bold hover:underline">
-              Semua Isu &rarr;
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3 gap-2">
+            <div class="inline-flex rounded-xl bg-slate-900 border border-slate-800 p-0.5 text-[10px] font-bold">
+              <button
+                type="button"
+                @click="activeTrendingTab = 'social'"
+                class="px-2.5 py-1 rounded-lg transition"
+                :class="activeTrendingTab === 'social' ? 'bg-amber-400 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'"
+              >
+                🔥 Top Viral Medsos
+              </button>
+              <button
+                type="button"
+                @click="activeTrendingTab = 'issues'"
+                class="px-2.5 py-1 rounded-lg transition"
+                :class="activeTrendingTab === 'issues' ? 'bg-amber-400 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'"
+              >
+                🚨 Isu Kamtibmas ({{ topIssues?.length || 0 }})
+              </button>
+            </div>
+
+            <Link
+              :href="activeTrendingTab === 'social' ? `/social-intelligence?polda=${selectedCode}` : `/issues?polda=${selectedCode}`"
+              class="text-[10px] text-amber-400 font-bold hover:underline shrink-0"
+            >
+              Semua &rarr;
             </Link>
           </div>
 
-          <div class="space-y-3">
+          <!-- TAB 1: TOP VIRAL MEDSOS -->
+          <div v-if="activeTrendingTab === 'social'" class="space-y-3">
+            <div
+              v-for="(post, idx) in topViralSocialPosts"
+              :key="post.id || idx"
+              class="p-3 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-2 text-xs hover:border-slate-700 transition"
+            >
+              <div class="flex items-center justify-between gap-1">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span class="font-black text-amber-400 text-[11px]">#{{ idx + 1 }}</span>
+                  <span
+                    class="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border shrink-0"
+                    :class="getPlatformBadge(post.platform).color"
+                  >
+                    {{ getPlatformBadge(post.platform).label }}
+                  </span>
+                  <span class="text-[11px] font-bold text-slate-300 truncate">
+                    {{ post.author_handle || post.author_name }}
+                  </span>
+                </div>
+                <span class="font-mono text-[10px] text-rose-400 font-black bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20 shrink-0 flex items-center gap-0.5">
+                  <Flame class="w-2.5 h-2.5 text-rose-400" />
+                  {{ post.virality_score }}%
+                </span>
+              </div>
+
+              <p class="font-medium text-slate-200 text-xs line-clamp-2 leading-snug">
+                {{ post.content }}
+              </p>
+
+              <div class="flex items-center justify-between pt-1 border-t border-slate-800/60 text-[10px] text-slate-400">
+                <div class="flex items-center gap-2.5">
+                  <span class="flex items-center gap-1">
+                    <Eye class="w-3 h-3 text-sky-400" />
+                    {{ formatNumber(post.views_count) }}
+                  </span>
+                  <span class="flex items-center gap-1">
+                    <ThumbsUp class="w-3 h-3 text-emerald-400" />
+                    {{ formatNumber(post.likes_count) }}
+                  </span>
+                </div>
+                <a
+                  :href="post.post_url"
+                  target="_blank"
+                  class="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 hover:underline"
+                >
+                  <span>Buka Post</span>
+                  <ExternalLink class="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+
+            <div v-if="!topViralSocialPosts || topViralSocialPosts.length === 0" class="text-center py-6 text-slate-400 text-xs">
+              <Radio class="w-6 h-6 mx-auto mb-2 text-slate-600" />
+              <p>Belum ada postingan medsos viral tersimpan.</p>
+              <Link :href="`/social-intelligence?polda=${selectedCode}`" class="text-amber-400 hover:underline font-bold mt-1 inline-block">
+                Sinkronkan Apify Sekarang &rarr;
+              </Link>
+            </div>
+          </div>
+
+          <!-- TAB 2: TOP ISU KAMTIBMAS -->
+          <div v-else class="space-y-3">
             <div
               v-for="(iss, idx) in topIssues"
               :key="iss.id || idx"
@@ -712,83 +903,243 @@ const layerLapangan = ref(true);
               </div>
               <p class="font-bold text-white text-xs line-clamp-2 leading-snug">{{ iss.title }}</p>
             </div>
+
+            <div v-if="!topIssues || topIssues.length === 0" class="text-center py-6 text-slate-400 text-xs">
+              <p>Belum ada isu prioritas terdaftar.</p>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
     <!-- ========================================================================= -->
-    <!-- 4. BOTTOM GRID: MATRIKS OPINI 6 POLRES & RADAR LIVE STREAM                -->
+    <!-- 4. BOTTOM GRID: MATRIKS OPINI 6 POLRES & INTELLIGENCE LIVE STREAM         -->
     <!-- ========================================================================= -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- Left: Matriks Kondusifitas Opini 6 Polres -->
-      <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-2xl space-y-4">
-        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-          <h3 class="text-sm font-black text-white uppercase tracking-wider">Matriks Kondusifitas Opini 6 Polres Jajaran</h3>
-          <span class="text-xs text-slate-400">Polda Sulbar</span>
+      <!-- Left: Matriks Kondusifitas Opini 6 Polres & Bar Sentimen Medsos -->
+      <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-2xl space-y-4 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 class="text-sm font-black text-white uppercase tracking-wider">Matriks Kondusifitas Opini 6 Polres Jajaran</h3>
+            <span class="text-xs text-slate-400">{{ selectedPolda?.name || 'Polda Sulbar' }}</span>
+          </div>
+
+          <div class="overflow-x-auto mt-3">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="border-b border-slate-800 text-[10px] font-black uppercase text-slate-400">
+                  <th class="py-2.5">Satwil</th>
+                  <th class="py-2.5">Skor Opini</th>
+                  <th class="py-2.5">Status</th>
+                  <th class="py-2.5 text-right">Isu Aktif</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/60">
+                <tr
+                  v-for="p in polresStatuses"
+                  :key="p.id"
+                  @click="selectPolresPin(p); viewMode = 'map'"
+                  class="hover:bg-slate-900/40 transition cursor-pointer"
+                >
+                  <td class="py-3 font-bold text-white flex items-center gap-2">
+                    <span
+                      class="w-2 h-2 rounded-full"
+                      :class="{
+                        'bg-rose-500': p.status === 'ATENSI',
+                        'bg-amber-400': p.status === 'WASPADA',
+                        'bg-emerald-400': p.status === 'KONDUSIF',
+                      }"
+                    ></span>
+                    <span>{{ p.name }}</span>
+                  </td>
+                  <td class="py-3 font-mono font-bold text-emerald-400">{{ p.score }}</td>
+                  <td class="py-3">
+                    <span
+                      class="px-2 py-0.5 rounded text-[9px] font-black uppercase"
+                      :class="{
+                        'bg-rose-500/20 text-rose-300 border border-rose-500/30': p.status === 'ATENSI',
+                        'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30': p.status === 'KONDUSIF',
+                        'bg-amber-400/20 text-amber-300 border border-amber-400/30': p.status === 'WASPADA',
+                      }"
+                    >
+                      {{ p.status }}
+                    </span>
+                  </td>
+                  <td class="py-3 text-right font-bold text-amber-400">{{ p.issues_count }} Isu</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        <div class="overflow-x-auto">
-          <table class="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr class="border-b border-slate-800 text-[10px] font-black uppercase text-slate-400">
-                <th class="py-2.5">Satwil</th>
-                <th class="py-2.5">Skor Opini</th>
-                <th class="py-2.5">Status</th>
-                <th class="py-2.5 text-right">Isu Aktif</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-800/60">
-              <tr
-                v-for="p in polresStatuses"
-                :key="p.id"
-                @click="selectPolresPin(p); viewMode = 'map'"
-                class="hover:bg-slate-900/40 transition cursor-pointer"
-              >
-                <td class="py-3 font-bold text-white flex items-center gap-2">
-                  <span
-                    class="w-2 h-2 rounded-full"
-                    :class="{
-                      'bg-rose-500': p.status === 'ATENSI',
-                      'bg-amber-400': p.status === 'WASPADA',
-                      'bg-emerald-400': p.status === 'KONDUSIF',
-                    }"
-                  ></span>
-                  <span>{{ p.name }}</span>
-                </td>
-                <td class="py-3 font-mono font-bold text-emerald-400">{{ p.score }}</td>
-                <td class="py-3">
-                  <span
-                    class="px-2 py-0.5 rounded text-[9px] font-black uppercase"
-                    :class="{
-                      'bg-rose-500/20 text-rose-300 border border-rose-500/30': p.status === 'ATENSI',
-                      'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30': p.status === 'KONDUSIF',
-                      'bg-amber-400/20 text-amber-300 border border-amber-400/30': p.status === 'WASPADA',
-                    }"
-                  >
-                    {{ p.status }}
-                  </span>
-                </td>
-                <td class="py-3 text-right font-bold text-amber-400">{{ p.issues_count }} Isu</td>
-              </tr>
-            </tbody>
-          </table>
+        <!-- Mini Bar Analisis Sentimen Medsos -->
+        <div class="mt-4 pt-4 border-t border-slate-800 space-y-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-bold text-slate-300 flex items-center gap-1.5">
+              <Radio class="w-3.5 h-3.5 text-amber-400" />
+              <span>Komposisi Sentimen Radar Medsos</span>
+            </span>
+            <span class="text-[10px] text-slate-400 font-mono">
+              Total {{ socialStats?.total_posts || 0 }} Postingan
+            </span>
+          </div>
+
+          <div class="h-2.5 rounded-full bg-slate-900 overflow-hidden flex">
+            <div
+              class="bg-emerald-500 transition-all duration-300"
+              :style="{ width: (socialStats?.sentiment?.positif || 60) + '%' }"
+              :title="`Positif: ${socialStats?.sentiment?.positif || 0}%`"
+            ></div>
+            <div
+              class="bg-slate-600 transition-all duration-300"
+              :style="{ width: (socialStats?.sentiment?.netral || 25) + '%' }"
+              :title="`Netral: ${socialStats?.sentiment?.netral || 0}%`"
+            ></div>
+            <div
+              class="bg-rose-500 transition-all duration-300"
+              :style="{ width: (socialStats?.sentiment?.negatif || 15) + '%' }"
+              :title="`Negatif: ${socialStats?.sentiment?.negatif || 0}%`"
+            ></div>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-between text-[10px] text-slate-400 pt-1 gap-2">
+            <span class="text-emerald-400 font-bold">● Positif {{ socialStats?.sentiment?.positif || 0 }}%</span>
+            <span class="text-slate-400 font-bold">● Netral {{ socialStats?.sentiment?.netral || 0 }}%</span>
+            <span class="text-rose-400 font-bold">● Negatif {{ socialStats?.sentiment?.negatif || 0 }}%</span>
+            <span class="text-sky-400 font-bold">Interaksi: {{ formatNumber((socialStats?.views_count || 0) + (socialStats?.likes_count || 0)) }}</span>
+          </div>
         </div>
       </div>
 
-      <!-- Right: Radar Sindikasi Media Live (Latest 6 Articles) -->
+      <!-- Right: Feed Intelijen Real-Time Terpadu (Tabs: Medsos Live vs 29 RSS Berita) -->
       <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-2xl space-y-4">
-        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-          <div class="flex items-center gap-2">
-            <Radio class="w-4 h-4 text-amber-400 animate-pulse" />
-            <h3 class="text-sm font-black text-white uppercase tracking-wider">Radar Sindikasi Media Live</h3>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+          <div class="inline-flex rounded-xl bg-slate-900 border border-slate-800 p-0.5 text-xs font-bold">
+            <button
+              type="button"
+              @click="activeStreamTab = 'social'"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition"
+              :class="activeStreamTab === 'social' ? 'bg-amber-400 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'"
+            >
+              <Radio class="w-3.5 h-3.5" />
+              <span>Radar Medsos Live ({{ liveSocialPosts?.length || 0 }})</span>
+            </button>
+            <button
+              type="button"
+              @click="activeStreamTab = 'media'"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition"
+              :class="activeStreamTab === 'media' ? 'bg-amber-400 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'"
+            >
+              <Newspaper class="w-3.5 h-3.5" />
+              <span>Radar Berita 29 RSS ({{ liveRadarArticles?.length || 0 }})</span>
+            </button>
           </div>
-          <Link :href="`/media-intelligence?polda=${selectedCode}`" class="text-xs text-amber-400 font-bold hover:underline">
-            Buka Radar Selengkapnya &rarr;
+
+          <Link
+            :href="activeStreamTab === 'social' ? `/social-intelligence?polda=${selectedCode}` : `/media-intelligence?polda=${selectedCode}`"
+            class="text-xs text-amber-400 font-bold hover:underline flex items-center gap-1"
+          >
+            <span>Buka Selengkapnya</span>
+            <ArrowRight class="w-3.5 h-3.5" />
           </Link>
         </div>
 
-        <div class="space-y-3">
+        <!-- TAB STREAM 1: RADAR MEDSOS LIVE -->
+        <div v-if="activeStreamTab === 'social'" class="space-y-3">
+          <div
+            v-for="post in liveSocialPosts"
+            :key="post.id"
+            class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition space-y-2 text-xs"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-1.5 min-w-0">
+                <span
+                  class="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border shrink-0"
+                  :class="getPlatformBadge(post.platform).color"
+                >
+                  {{ getPlatformBadge(post.platform).label }}
+                </span>
+                <span class="font-bold text-white truncate text-[11px]">
+                  {{ post.author_handle || post.author_name }}
+                </span>
+              </div>
+              <span class="text-[10px] text-slate-400 font-mono shrink-0">
+                {{ formatTimeAgo(post.posted_at) }}
+              </span>
+            </div>
+
+            <!-- Content with optional thumbnail -->
+            <div class="flex items-start gap-3">
+              <div
+                v-if="post.thumbnail_url"
+                class="w-20 h-14 rounded-xl overflow-hidden shrink-0 border border-slate-800 relative bg-slate-950 group"
+              >
+                <img
+                  :src="post.thumbnail_url"
+                  :alt="post.author_name"
+                  class="w-full h-full object-cover group-hover:scale-110 transition duration-300"
+                  loading="lazy"
+                />
+                <div
+                  v-if="post.platform === 'youtube' || post.platform === 'tiktok'"
+                  class="absolute inset-0 bg-black/30 flex items-center justify-center"
+                >
+                  <div class="w-5 h-5 rounded-full bg-rose-600/90 text-white flex items-center justify-center shadow">
+                    <Play class="w-2.5 h-2.5 fill-white ml-0.5" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex-1 min-w-0">
+                <p class="text-slate-300 line-clamp-2 leading-relaxed text-[11px]">
+                  {{ post.content }}
+                </p>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-1 border-t border-slate-800/60 text-[10px] text-slate-400">
+              <div class="flex items-center gap-3">
+                <span class="flex items-center gap-1">
+                  <Eye class="w-3 h-3 text-sky-400" />
+                  {{ formatNumber(post.views_count) }}
+                </span>
+                <span class="flex items-center gap-1">
+                  <ThumbsUp class="w-3 h-3 text-emerald-400" />
+                  {{ formatNumber(post.likes_count) }}
+                </span>
+                <span
+                  class="px-1.5 py-0.2 rounded text-[9px] font-black uppercase"
+                  :class="{
+                    'bg-emerald-500/10 text-emerald-300': post.sentiment === 'positif',
+                    'bg-slate-500/10 text-slate-300': post.sentiment === 'netral',
+                    'bg-rose-500/10 text-rose-300': post.sentiment === 'negatif',
+                  }"
+                >
+                  {{ post.sentiment }}
+                </span>
+              </div>
+              <a
+                :href="post.post_url"
+                target="_blank"
+                class="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 hover:underline"
+              >
+                <span>Lihat</span>
+                <ExternalLink class="w-3 h-3" />
+              </a>
+            </div>
+          </div>
+
+          <div v-if="!liveSocialPosts || liveSocialPosts.length === 0" class="text-center py-8 text-slate-400 text-xs">
+            <Radio class="w-8 h-8 mx-auto mb-2 text-slate-600 animate-pulse" />
+            <p>Belum ada postingan medsos terkini.</p>
+            <Link :href="`/social-intelligence?polda=${selectedCode}`" class="text-amber-400 hover:underline font-bold mt-1 inline-block">
+              Buka Radar Media Sosial &rarr;
+            </Link>
+          </div>
+        </div>
+
+        <!-- TAB STREAM 2: RADAR BERITA 29 RSS -->
+        <div v-else class="space-y-3">
           <div
             v-for="art in liveRadarArticles"
             :key="art.id"
@@ -808,6 +1159,10 @@ const layerLapangan = ref(true);
             <p class="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
               {{ art.summary }}
             </p>
+          </div>
+
+          <div v-if="!liveRadarArticles || liveRadarArticles.length === 0" class="text-center py-8 text-slate-400 text-xs">
+            <p>Belum ada berita online tersimpan.</p>
           </div>
         </div>
       </div>

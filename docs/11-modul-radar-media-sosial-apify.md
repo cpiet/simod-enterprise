@@ -64,3 +64,24 @@ Modul ini telah diuji dan kompatibel penuh dengan tunnel Ngrok untuk kebutuhan p
 ngrok http --domain=humped-obvious-blatantly.ngrok-free.dev --host-header=simod-enterprise.test 80
 ```
 - Konfigurasi `trustProxies` pada `bootstrap/app.php` dan `URL::forceScheme('https')` pada `AppServiceProvider.php` menjamin seluruh CSS/JS Vite dan formulir Inertia berjalan mulus tanpa masalah *mixed content*.
+
+---
+
+## 🏛️ 5. Konvergensi Intelijen Terpadu di Command Center (`/`)
+
+Data dari **Radar Media Sosial** terintegrasi secara *real-time* ke **Executive Command Center Presisi** ([`Dashboard.vue`](../resources/js/Pages/Dashboard.vue) & [`DashboardController`](../app/Http/Controllers/DashboardController.php)):
+
+1. **5 Kartu Eksekutif KPI Utama**:
+   - Menampilkan kartu khusus **Radar Media Sosial** bersanding dengan **Media Online (29 RSS)**, **Isu Prioritas Atensi**, **Laporan Dumas Lapangan**, dan **Tindak Lanjut Tugas**.
+   - Menyajikan jumlah total postingan aktif, status breakdown 4 platform (YouTube, TikTok, Instagram, 𝕏), serta shortcut langsung ke modul Radar Medsos.
+2. **Indeks Citra Publik Terpadu & Tren Sentimen 7 Hari**:
+   - Menggabungkan perhitungan polarisasi sentimen (*favorability ratio*) dari pemberitaan media online, postingan medsos, dan laporan dumas.
+3. **Tab Switcher Tren: 🔥 Top Viral Medsos vs 🚨 Isu Kamtibmas**:
+   - Pimpinan dapat beralih cepat dalam satu blok ringkas untuk melihat postingan paling viral di media sosial (dilengkapi persentase virality score, views, likes, dan link sumber) atau daftar isu kamtibmas prioritas.
+4. **Feed Intelijen Real-Time Terpadu (Dual-Tab Stream)**:
+   - **Tab 1 — Radar Medsos Live**: Menampilkan kartu postingan terkini lengkap dengan badge platform, thumbnail video HD (dengan icon play overlay untuk YouTube/TikTok), handle akun, ringkasan konten, dan sentimen.
+   - **Tab 2 — Radar Berita 29 RSS**: Menampilkan headline berita terkini dari 29 portal media online resmi.
+5. **Bar Analisis Sentimen Medsos**:
+   - Di bawah Matriks 6 Polres, terdapat visualisasi bar multi-warna untuk persentase Positif, Netral, dan Negatif beserta akumulasi interaksi publik (views & likes).
+
+

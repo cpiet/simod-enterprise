@@ -9,6 +9,7 @@ use App\Models\MediaFeed;
 use App\Models\Polda;
 use App\Models\Polres;
 use App\Models\Publication;
+use App\Models\SocialPost;
 use App\Models\Task;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -142,7 +143,52 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
-        // 4. 7 DAYS SENTIMENT TREND (100% Dynamic Aggregation from DB)
+        // 4. RADAR MEDIA SOSIAL INTELLIGENCE (Dynamic from social_posts DB)
+        $socialPostsQuery = SocialPost::where('polda_id', $poldaId);
+        $totalSocialPosts = (clone $socialPostsQuery)->count();
+
+        $platformCounts = [
+            'x'         => (clone $socialPostsQuery)->where('platform', 'x')->count(),
+            'tiktok'    => (clone $socialPostsQuery)->where('platform', 'tiktok')->count(),
+            'instagram' => (clone $socialPostsQuery)->where('platform', 'instagram')->count(),
+            'youtube'   => (clone $socialPostsQuery)->where('platform', 'youtube')->count(),
+        ];
+
+        $socialPosCount = (clone $socialPostsQuery)->where('sentiment', 'positif')->count();
+        $socialNeuCount = (clone $socialPostsQuery)->where('sentiment', 'netral')->count();
+        $socialNegCount = (clone $socialPostsQuery)->where('sentiment', 'negatif')->count();
+
+        $socialKolsCount = (clone $socialPostsQuery)->where('is_kol', true)->count();
+        $totalSocialViews = (clone $socialPostsQuery)->sum('views_count');
+        $totalSocialLikes = (clone $socialPostsQuery)->sum('likes_count');
+
+        $socialStats = [
+            'total_posts'    => $totalSocialPosts,
+            'platforms'      => $platformCounts,
+            'kol_count'      => $socialKolsCount,
+            'views_count'    => $totalSocialViews,
+            'likes_count'    => $totalSocialLikes,
+            'sentiment'      => [
+                'positif' => $totalSocialPosts > 0 ? (int) round(($socialPosCount / $totalSocialPosts) * 100) : 0,
+                'netral'  => $totalSocialPosts > 0 ? (int) round(($socialNeuCount / $totalSocialPosts) * 100) : 0,
+                'negatif' => $totalSocialPosts > 0 ? (int) round(($socialNegCount / $totalSocialPosts) * 100) : 0,
+            ],
+        ];
+
+        // Top 5 Viral Social Media Posts
+        $topViralSocialPosts = SocialPost::where('polda_id', $poldaId)
+            ->orderByDesc('virality_score')
+            ->limit(5)
+            ->get();
+
+        // Latest 6 Real-time Social Posts Stream
+        $liveSocialPosts = SocialPost::where('polda_id', $poldaId)
+            ->latest('posted_at')
+            ->latest('id')
+            ->limit(6)
+            ->get();
+
+        // 5. 7 DAYS SENTIMENT TREND (100% Dynamic Aggregation: Media Online + Medsos + Isu)
         $dayNames = [
             'Sun' => 'Min', 'Mon' => 'Sen', 'Tue' => 'Sel',
             'Wed' => 'Rab', 'Thu' => 'Kam', 'Fri' => 'Jum', 'Sat' => 'Sab',
@@ -160,15 +206,15 @@ class DashboardController extends Controller
 
             $articles = MediaArticle::where('polda_id', $poldaId)->whereDate('pub_date', $dateStr)->get();
             $issues = Issue::where('polda_id', $poldaId)->whereDate('created_at', $dateStr)->get();
+            $socials = SocialPost::where('polda_id', $poldaId)->whereDate('posted_at', $dateStr)->get();
 
-            $pos = $articles->where('sentiment', 'positif')->count() + $issues->where('sentiment', 'positif')->count();
-            $neg = $articles->where('sentiment', 'negatif')->count() + $issues->where('sentiment', 'negatif')->count();
-            $neu = $articles->where('sentiment', 'netral')->count() + $issues->where('sentiment', 'netral')->count();
+            $pos = $articles->where('sentiment', 'positif')->count() + $issues->where('sentiment', 'positif')->count() + $socials->where('sentiment', 'positif')->count();
+            $neg = $articles->where('sentiment', 'negatif')->count() + $issues->where('sentiment', 'negatif')->count() + $socials->where('sentiment', 'negatif')->count();
+            $neu = $articles->where('sentiment', 'netral')->count() + $issues->where('sentiment', 'netral')->count() + $socials->where('sentiment', 'netral')->count();
 
             $totalDay = $pos + $neg + $neu;
 
             if ($totalDay > 0) {
-                // In media analysis: compute positive ratio among polarized sentiments or against total
                 $posPct = (int) round(($pos / $totalDay) * 100);
                 $negPct = (int) round(($neg / $totalDay) * 100);
                 $neuPct = max(0, 100 - ($posPct + $negPct));
@@ -200,7 +246,7 @@ class DashboardController extends Controller
 
         $avgPositivePct = (int) round(collect($sentiment7Days)->avg('positif'));
 
-        // 5. LIVE RADAR ARTICLES (Latest 6 from DB)
+        // 6. LIVE RADAR ARTICLES (Latest 6 from DB)
         $liveRadarArticles = MediaArticle::where('polda_id', $poldaId)
             ->latest('pub_date')
             ->latest('id')
@@ -216,10 +262,10 @@ class DashboardController extends Controller
         ];
 
         return Inertia::render('Dashboard', [
-            'allPoldas'         => $allPoldas,
-            'selectedPolda'     => $selectedPolda,
-            'selectedCode'      => $selectedCode,
-            'kpi'               => [
+            'allPoldas'            => $allPoldas,
+            'selectedPolda'        => $selectedPolda,
+            'selectedCode'         => $selectedCode,
+            'kpi'                  => [
                 'total_articles'       => $totalArticles,
                 'active_feeds_count'   => $activeFeedsCount,
                 'priority_issues'      => $priorityIssuesCount,
@@ -229,19 +275,22 @@ class DashboardController extends Controller
                 'total_tasks'          => $totalTasksCount,
                 'task_completion_rate' => $taskCompletionRate,
             ],
-            'polresStatuses'    => $polresStatuses,
-            'overallSituation'  => $overallSituation,
-            'topIssues'         => $topIssues,
-            'sentiment7Days'    => $sentiment7Days,
-            'avgPositivePct'    => $avgPositivePct,
-            'liveRadarArticles' => $liveRadarArticles,
-            'publicIndex'       => [
+            'socialStats'          => $socialStats,
+            'topViralSocialPosts'  => $topViralSocialPosts,
+            'liveSocialPosts'      => $liveSocialPosts,
+            'polresStatuses'       => $polresStatuses,
+            'overallSituation'     => $overallSituation,
+            'topIssues'            => $topIssues,
+            'sentiment7Days'       => $sentiment7Days,
+            'avgPositivePct'       => $avgPositivePct,
+            'liveRadarArticles'    => $liveRadarArticles,
+            'publicIndex'          => [
                 'score'  => $publicIndexScore,
                 'status' => $publicIndexScore >= 70 ? 'Positif' : ($publicIndexScore >= 50 ? 'Netral' : 'Atensi'),
                 'change' => '+6%',
                 'trend'  => 'up',
             ],
-            'metrics'           => $metrics,
+            'metrics'              => $metrics,
         ]);
     }
 }
