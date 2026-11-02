@@ -8,7 +8,7 @@ Platform intelijen media, monitoring opini publik, dan manajemen operasional keh
 
 - **Multi-Tenant Architecture**: Pemisahan data dan konteks operasional antar Polda dan jajaran Satwil (Polres/Polresta) di seluruh Indonesia.
 - **Radar Media Online (29 Portal RSS Feeds)**: Agregasi paralel 29 portal media resmi Sulbar & nasional dengan Fair Quota, Mutex Lock, dan bypass Cloudflare Google News RSS.
-- **Radar Media Sosial (Cyber Patrol & Social Listening)**: Pemantauan opini publik di 𝕏 (Twitter), TikTok, Instagram, dan YouTube terintegrasi Apify Multi-API Token Pool dengan auto-failover, pelacakan akun target khusus, dan ekstraksi thumbnail HD video.
+- **Radar Media Sosial (Cyber Patrol & Social Listening)**: Pemantauan opini publik di 𝕏 (Twitter), TikTok, Instagram, Facebook, dan YouTube terintegrasi Apify Multi-API Token Pool dengan auto-failover, pelacakan akun target khusus, ekstraksi thumbnail HD video, serta arsitektur **Dual-Mode Tren** (*Lensa Kamtibmas Polri* & *Lensa Tren Publik Medsos Indonesia*) dengan **Deteksi Kerawanan Siber & 1-Click Escalation**.
 - **Early Warning System (EWS)**: Deteksi dini isu viral atau berpotensi krisis dengan klasifikasi urgensi (Tinggi, Sedang, Rendah).
 - **Issue & Crisis Management**: Siklus penanganan isu menyeluruh dari eskalasi hingga resolusi lengkap dengan Counter Narasi & Press Release resmi.
 - **Antrean Verifikasi (Verification Queue)**: Validasi dan kurasi link rilis, pemberitaan, dan media pendukung oleh operator Humas.

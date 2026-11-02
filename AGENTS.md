@@ -86,10 +86,15 @@ Seluruh 29 portal media dikonfigurasi melalui seeder [`SulbarRssFeedsSeeder.php`
 - **Auto-Capping Berimbang**: Jika kapasitas berita non-bookmark melebihi ambang batas (`max_retained_articles_per_polda`), pemangkasan dilakukan berimbang per-sumber (`autoCapArticles` di `RssSyncService`), bukan menghapus portal daerah yang terbit berkala.
 - **Bookmark Permanen**: Kolom `is_bookmarked` pada tabel `media_articles` bersifat kebal dari pemangkasan otomatis (*never pruned*).
 
-### 4.4. Radar Media Sosial & Social Listening (𝕏, TikTok, Instagram, YouTube)
+### 4.4. Radar Media Sosial & Social Listening (𝕏, TikTok, Instagram, YouTube, Facebook)
 - **Tabel Basis Data**: `social_posts` (data postingan, metrik views/likes/shares/comments, virality_score 0-100, is_kol, sentiment) dan `social_settings` (konfigurasi Apify token, kata kunci pantau, frekuensi sinkronisasi per Polda).
 - **Tab Navigasi**: Tab 01 (Radar Multi-Platform), Tab 02 (Tokoh Kritis & KOL Tracker), Tab 03 (Tren Tagar & Isu Viral), Tab 04 (Integrasi Apify & Pengaturan).
-- **Direct One-Click Escalation**: Tombol `🚨 Eskalasi Jadi Isu` pada setiap kartu postingan medsos otomatis mengarahkan ke formulir `/issues/create` dengan pra-isi judul, kategori (`📱 Isu Medsos & Opini Publik`), URL sumber, dan ringkasan.
+- **Dual-Mode Architecture (Tab 03)**:
+  - *Mode 01 — Lensa Kamtibmas & Humas Polri*: Monitoring tagar kedinasan dinamis dan kurva jam puncak aktivitas netizen siang & malam (`peakHours`).
+  - *Mode 02 — Lensa Tren Publik Medsos Indonesia*: Agregasi tren publik lintas 5 platform (𝕏, YouTube, Instagram, TikTok, Facebook) dengan deteksi kerawanan siber (`is_security_relevant: true`) dan filter cepat isu beresiko tinggi.
+- **Katalog Apify Actor (Tab 04)**: Katalog pemetaan format tren unik dan rekomendasi Actor resmi Apify (`easyapi/twitter-trending-topics-scraper`, `streamers/youtube-scraper`, `yugenox/instagram-trends-scraper`, `apify/facebook-posts-scraper`, `clockworks/free-tiktok-scraper`).
+- **Direct One-Click Escalation**: Tombol `🚨 Eskalasi Jadi Isu` pada setiap kartu postingan medsos dan kartu tren publik otomatis mengarahkan ke formulir `/issues/create` dengan pra-isi judul, kategori (`📱 Isu Medsos & Opini Publik`), URL sumber, tingkat prioritas, dan ringkasan.
+- **API Endpoint Sinkronisasi Tren**: `POST /social-intelligence/sync-trends` memicu refresh tren multi-platform dan mencatat log audit ke tabel `audit_logs`.
 
 ### 4.5. Radar Media Online Divhumas Polri (22 Feed Nasional Terverifikasi 100% Gambar)
 - **Tenant Scope**: Kode `DIVHUMAS` (ID `10`) atau query parameter `?polda=ALL`.

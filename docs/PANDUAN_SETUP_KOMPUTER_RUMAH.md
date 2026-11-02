@@ -147,15 +147,18 @@ Buka browser dan akses: `http://simod-enterprise.test/login`
 ## 🎯 4. Fitur Pembaruan Terakhir yang Langsung Aktif
 
 Setelah Anda menjalankan langkah di atas di laptop rumah, seluruh fitur mutakhir sudah siap digunakan:
-1. **Radar Media Sosial Dinamis (Tab 03)**:
-   - Tombol tab khusus **Instagram**, **TikTok**, **𝕏 (Twitter)**, dan **YouTube**.
-   - Menampilkan ranking tagar yang berbeda dan relevan untuk setiap platform.
-   - Mengklik tagar langsung memfilter radar postingan (Tab 01).
-2. **Jam Puncak Obrolan Netizen (*Peak Hours Intelligence*)**:
+1. **Arsitektur Dual-Mode Radar Tren Medsos (Tab 03)**:
+   - **Mode 1 — Lensa Kamtibmas & Humas Polri**: Pemantauan tagar kedinasan, penegakan hukum, citra Polri, dan filter platform (Instagram, TikTok, 𝕏, YouTube).
+   - **Mode 2 — Lensa Tren Publik Medsos Indonesia**: Menangkap tren warganet Indonesia secara holistik lintas 5 platform (𝕏, YouTube, Instagram, TikTok, Facebook). Termasuk 15 topik teratas 𝕏 Indonesia (`#TOKEN50RBCUMA40RB`, `Kompak Kunci Keberhasilan`, `PLN 50rb`, dll).
+   - **Deteksi Kerawanan Siber & Kamtibmas**: Algoritma otomatis menyaring topik yang berindikasi phishing token listrik, kerumunan malam Halloween, dan kerawanan lalu lintas.
+   - **Aksi Terpadu 1-Klik**: Tombol `🚨 Eskalasi Jadi Isu` untuk membuat laporan ke `/issues/create` dengan data terisi otomatis, tombol `🔍 Pantau di Radar`, dan `⚡ Refresh Tren Publik (Apify)`.
+2. **Katalog Format Tren & Rekomendasi Actor Apify per Platform (Tab 04)**:
+   - Tabel panduan format tren dan rekomendasi Actor resmi Apify (`easyapi/twitter-trending-topics-scraper`, `streamers/youtube-scraper`, `yugenox/instagram-trends-scraper`, `apify/facebook-posts-scraper`, `clockworks/free-tiktok-scraper`).
+3. **Jam Puncak Obrolan Netizen (*Peak Hours Intelligence*)**:
    - Deteksi jam puncak warganet siang & malam dengan rekomendasi jam rilis konter narasi sesuai zona waktu aktif (`WIB` atau `WITA`).
-3. **Direktori Key Opinion Leader (Tab 02)**:
+4. **Direktori Key Opinion Leader (Tab 02)**:
    - Dilengkapi jumlah postingan dan total jangkauan views warganet.
-4. **Multi-Token Apify Scraper Pool**:
+5. **Multi-Token Apify Scraper Pool**:
    - Fitur uji koneksi token Apify bekerja mulus tanpa error CSRF Token Mismatch berkat sinkronisasi token otomatis.
    - Fallback otomatis ke konfigurasi `.env` jika input di web kosong.
 

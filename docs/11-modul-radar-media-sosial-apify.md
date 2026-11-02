@@ -30,15 +30,60 @@ Modul **Radar Media Sosial** (`/social-intelligence`) adalah subsistem intelijen
 - Pemantauan khusus akun-akun berpengaruh (*Key Opinion Leaders*) di wilayah Polda Sulbar dan jajaran: jurnalis, aktivis, LSM/LBH, pengamat, dan tokoh publik.
 - Analisis sentimen dominan per tokoh dan riwayat pernyataan publik.
 
-### 2.3. Tab 03: Tren Tagar & Isu Viral
-- Pemetaan tagar (*hashtags*) yang sedang naik daun (*trending*) di wilayah hukum Polda aktif.
-- Volume perkiraan percakapan dan polarisasi sentimen per tagar.
+### 2.3. Tab 03: Tren Tagar & Isu Viral (Dual-Mode Architecture)
+
+Tab 03 mengusung konsep **Dual-Mode Lens** yang membagi fokus pemantauan ke dalam 2 mode komando:
+
+#### A. Mode 01: Lensa Kamtibmas & Humas Polri (Fokus Kedinasan)
+- **Leaderboard Tagar Dinamis**: Memetakan tagar operasional (*hashtags*) kepolisian dari basis data lokal maupun konsolidasi nasional: `#PolriPresisi`, `#PolresMamujuAman`, `#OperasiKeselamatan2026`, `#DivhumasPolri`, dll.
+- **Filter Platform Tagar**: Pengelompokan tagar dinamis khusus platform (Semua, Instagram, TikTok, 𝕏, YouTube).
+- **Jam Puncak Obrolan Netizen (*Peak Hours Intelligence*)**:
+  - Menghitung kurva waktu aktivitas warganet harian:
+    - **Puncak Siang (11.30 – 13.30 WITA/WIB)**: Didominasi keluhan layanan publik, kemacetan, dan aduan cepat.
+    - **Puncak Malam (19.00 – 22.00 WITA/WIB)**: Didominasi viralisasi video TikTok, Reels, dan perdebatan opini 𝕏.
+  - Rekomendasi otomatis jam penerbitan siaran pers atau infografis klarifikasi (Pukul 12.00 dan 19.30) agar menjangkau lebih dari 70% audiens aktif.
+
+#### B. Mode 02: Lensa Tren Publik Medsos Indonesia (Realtime Multi-Platform)
+Masing-masing media sosial memiliki karakteristik format tren yang berbeda:
+- **𝕏 (Twitter)**: Menggunakan *Trending Topics/Hashtags* berdasarkan negara/kota (WOEID: 23424846 / Indonesia). Sebagian besar berupa frasa teks tanpa tagar (*un-hashed phrases* seperti `Kompak Kunci Keberhasilan`, `PLN 50rb`, `prabowo perkuat ekonomi`), bukan hanya tagar `#...`.
+- **YouTube**: Berbasis tab Trending resmi (Umum, Berita/Politik, Musik) yang mengukur percepatan tayangan video (*views velocity*).
+- **Instagram**: Tidak memiliki daftar tren teks global seperti 𝕏; tren di IG diekstrak dari **Reels viral dengan engagement rate tertinggi**, audio latar musik yang sedang tren, dan interaksi tagar.
+- **Facebook**: Berbasis postingan publik dengan interaksi tertinggi (reaksi, komentar, share) pada halaman berita lokal dan grup komunitas warga.
+- **TikTok**: Berbasis video FYP (*For You Page*) trending dan lagu/sound viral.
+
+**Fitur Unggulan Lensa Tren Publik:**
+1. **15 Tren Teratas 𝕏 Indonesia Realtime**:
+   Menyajikan 15 topik teratas persis dengan tangkapan layar warganet: `#TOKEN50RBCUMA40RB`, `Kompak Kunci Keberhasilan`, `#2026MAMAVOTE`, `Kepercayaan Pengusaha Nasional`, `PLN 50rb`, `#Hearts2Hearts`, `Halloween`, `#YouManiacSeriesFinalEP`, `pesan perdamaian dunia`, `#GRATISNAIKTRANSUM`, `MANIAC FINAL MOMENT`, `Senin`, `SURVIVE TONIGHT BE MINE`, `JOONGDUNK OASIS MEMORIES`, `prabowo perkuat ekonomi`.
+2. **Deteksi Kerawanan Siber & Kamtibmas (*Security Relevance Detection*)**:
+   Topik tren yang bersinggungan dengan keamanan publik otomatis diberi penanda merah `🚨 ATENSI KAMTIBMAS & SIBER` beserta catatan intelijen:
+   - Modus penipuan phishing / file APK bodong catut nama PLN (`#TOKEN50RBCUMA40RB` & `PLN 50rb`).
+   - Atensi kerumunan pesta malam akhir pekan & rekayasa lalin (`Halloween`).
+   - Kepadatan halte angkutan massal gratis & pengawalan Ditlantas (`#GRATISNAIKTRANSUM`).
+   - Penipuan QRIS tempel palsu di rumah ibadah & debat politik pilkada.
+3. **Filter Cepat `🚨 Relevan Kamtibmas Saja`**:
+   Menyaring seketika daftar tren publik sehingga hanya memunculkan isu-isu yang membutuhkan atensi kepolisian dan menyembunyikan obrolan pop culture murni.
+4. **Tindakan Terpadu 1-Klik**:
+   - `🚨 Eskalasi Jadi Isu`: Langsung mengarahkan ke formulir `/issues/create` dengan judul, kategori, deskripsi, sumber, dan tingkat prioritas yang terisi otomatis.
+   - `🔍 Pantau di Radar`: Membuka Tab 01 Radar Medsos untuk melacak postingan terkait.
+   - `🔗 Buka Sumber`: Membuka tautan langsung ke halaman pencarian resmi platform terkait.
+   - `⚡ Refresh Tren Publik (Apify)`: Mengambil data pembaruan tren publik terkini via endpoint `POST /social-intelligence/sync-trends`.
 
 ### 2.4. Tab 04: Integrasi Apify & Pengaturan
+
 - **Multi-API Token Pool**: Mendukung input beberapa token Apify (dipisahkan koma atau baris baru).
 - **Otomatis Failover**: Sistem merotasi kuota $5/bulan per akun secara otomatis. Jika akun utama terkena rate limit atau kuota bulanan habis, sistem langsung beralih ke token cadangan tanpa memutus proses sinkronisasi.
 - **Uji Koneksi Token**: Tombol verifikasi real-time ke API Apify yang menampilkan profil akun, email, paket, dan status koneksi untuk setiap token dalam pool.
 - **Akun Target Pantauan Khusus (`accounts_tracked`)**: Kolom input daftar akun media sosial publik spesifik (misal `@poldasulbar`, `@polresta_mamuju_official`, `@tribratanews_sulbar`) agar crawler memprioritaskan penarikan dari akun-akun tersebut.
+
+#### Katalog Format Tren & Rekomendasi Actor Apify per Platform
+
+| Platform | Format Tren yang Didukung | Rekomendasi Actor di Apify | Output Data yang Dihasilkan |
+| :--- | :--- | :--- | :--- |
+| **𝕏 (Twitter)** | Trending Topics / Hashtag real-time berdasarkan negara atau kota (WOEID: 23424846 / Indonesia). | • `easyapi/twitter-trending-topics-scraper`<br>• `apidojo/tweet-scraper` | Nama topik/hashtag, rank tren, volume tweet, kategori tren, lokasi WOEID. |
+| **YouTube** | Tab Trending resmi (Umum, Berita/Politik, Musik, Gaming) per negara (ID / Indonesia). | • `streamers/youtube-scraper`<br>• `bernardo/youtube-trending-scraper` | Judul video, tautan URL, nama channel, view count, likes, peringkat trending. |
+| **Instagram** | Top/viral posts, reels, audio/musik tren, dan hashtag populer. | • `yugenox/instagram-trends-scraper`<br>• `apify/instagram-scraper`<br>• `coderx/instagram-hashtag-scraper` | Post URL, caption teks, view/play count, like count, engagement rate, top hashtags. |
+| **Facebook** | Postingan publik dengan engagement / interaksi tertinggi pada topik atau halaman berita/satwil tertentu. | • `apify/facebook-posts-scraper`<br>• `apify/facebook-pages-scraper` | Teks postingan, shares, reaksi/likes, komentar, nama halaman/grup sumber. |
+| **TikTok** | Top FYP videos, video sound/audio viral, dan hashtag trending Indonesia. | • `clockworks/free-tiktok-scraper`<br>• `apidojo/tiktok-scraper` | Video URL, creator username, sound name, play count, likes, shares, hashtag list. |
 
 ---
 
