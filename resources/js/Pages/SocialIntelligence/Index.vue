@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
+import axios from 'axios';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
 import {
   Shield,
@@ -43,6 +44,8 @@ const props = defineProps({
   metrics: Object,
   kolProfiles: Array,
   trendingHashtags: Array,
+  trendingByPlatform: Object,
+  peakHours: Object,
   settings: Object,
   filters: Object,
 });
@@ -97,13 +100,39 @@ const isSavingSettings = ref(false);
 const saveFeedback = ref(null);
 
 const settingsForm = ref({
-  polda_id: props.selectedPolda?.id || props.settings?.polda_id || 5,
+  polda_id: props.selectedPolda?.id || props.settings?.polda_id || props.allPoldas?.[0]?.id || 1,
   apify_api_token: props.settings?.apify_api_token || '',
-  keywords_tracked: props.settings?.keywords_tracked || 'Polda Sulbar, Polresta Mamuju, Polisi Sulbar, Polres Majene, Polres Polman',
-  accounts_tracked: props.settings?.accounts_tracked || '@poldasulbar, @polresta_mamuju_official, @tribratanews_sulbar, @sulbar_update',
+  keywords_tracked: props.settings?.keywords_tracked || 'Polri, Humas Polri, Polisi Presisi, Dumas Presisi',
+  accounts_tracked: props.settings?.accounts_tracked || '@divisihumaspri, @humaspolri, @polripresisi, @halo_polisi',
   sync_frequency: props.settings?.sync_frequency || 'every_3_hours',
   auto_sync_enabled: Boolean(props.settings?.auto_sync_enabled ?? true),
 });
+
+// Keep settings form continuously in sync with active tenant props across reloads & domain switches
+watch(
+  () => [props.settings, props.selectedPolda],
+  ([newSettings, newPolda]) => {
+    if (newSettings || newPolda) {
+      settingsForm.value.polda_id = newPolda?.id || newSettings?.polda_id || props.allPoldas?.[0]?.id || 1;
+      if (newSettings?.apify_api_token !== undefined) {
+        settingsForm.value.apify_api_token = newSettings.apify_api_token || '';
+      }
+      if (newSettings?.keywords_tracked !== undefined) {
+        settingsForm.value.keywords_tracked = newSettings.keywords_tracked || '';
+      }
+      if (newSettings?.accounts_tracked !== undefined) {
+        settingsForm.value.accounts_tracked = newSettings.accounts_tracked || '';
+      }
+      if (newSettings?.sync_frequency !== undefined) {
+        settingsForm.value.sync_frequency = newSettings.sync_frequency || 'every_3_hours';
+      }
+      if (newSettings?.auto_sync_enabled !== undefined) {
+        settingsForm.value.auto_sync_enabled = Boolean(newSettings.auto_sync_enabled);
+      }
+    }
+  },
+  { deep: true }
+);
 
 const saveSettings = () => {
   isSavingSettings.value = true;
@@ -151,23 +180,14 @@ const testConnection = async () => {
   testConnectionResult.value = null;
 
   try {
-    const res = await fetch('/social-intelligence/test-connection', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({
-        apify_api_token: settingsForm.value.apify_api_token,
-      }),
+    const res = await axios.post('/social-intelligence/test-connection', {
+      apify_api_token: settingsForm.value.apify_api_token,
     });
-    const data = await res.json();
-    testConnectionResult.value = data;
+    testConnectionResult.value = res.data;
   } catch (err) {
     testConnectionResult.value = {
       success: false,
-      message: 'Terjadi kegagalan jaringan saat menghubungi server backend atau Apify.',
+      message: err.response?.data?.message || 'Terjadi kegagalan jaringan saat menghubungi server backend atau Apify.',
     };
   } finally {
     isTestingConnection.value = false;
@@ -222,6 +242,52 @@ const formatNumber = (num) => {
   if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
   if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
   return num.toLocaleString('id-ID');
+};
+
+const selectedTrendPlatform = ref(
+  props.filters?.platform && props.filters.platform !== 'all' ? props.filters.platform : 'all'
+);
+
+const trendPlatformTabs = [
+  { id: 'all', label: 'Semua Platform' },
+  { id: 'instagram', label: 'Instagram' },
+  { id: 'tiktok', label: 'TikTok' },
+  { id: 'x', label: '𝕏 (Twitter)' },
+  { id: 'youtube', label: 'YouTube' },
+];
+
+const currentTrendingList = computed(() => {
+  if (selectedTrendPlatform.value !== 'all' && props.trendingByPlatform && props.trendingByPlatform[selectedTrendPlatform.value]) {
+    return props.trendingByPlatform[selectedTrendPlatform.value];
+  }
+  return props.trendingHashtags || (props.trendingByPlatform ? props.trendingByPlatform.all : []) || [];
+});
+
+const trendingTitle = computed(() => {
+  if (selectedTrendPlatform.value === 'all') {
+    return props.isNational ? 'Top Tagar & Isu Nasional Paling Banyak Dibicarakan' : 'Top Tagar & Isu Paling Banyak Dibicarakan';
+  }
+  return `Top Tagar & Isu ${getPlatformBadge(selectedTrendPlatform.value).label} Paling Banyak Dibicarakan`;
+});
+
+const trendingSubtitle = computed(() => {
+  if (selectedTrendPlatform.value === 'all') {
+    return props.isNational
+      ? 'Daftar kata kunci dan tagar nasional seputar kepolisian dengan volume percakapan tertinggi sepekan terakhir.'
+      : `Daftar kata kunci dan tagar dengan volume percakapan tertinggi sepekan terakhir di ${props.selectedPolda?.name || 'wilayah jajaran'}.`;
+  }
+  return `Daftar kata kunci dan tagar terpopuler khusus ${getPlatformBadge(selectedTrendPlatform.value).label} seputar kepolisian berdasarkan volume dan jangkauan interaksi.`;
+});
+
+const filterByTrend = (trend) => {
+  searchQuery.value = trend.tag;
+  if (selectedTrendPlatform.value !== 'all') {
+    selectedPlatform.value = selectedTrendPlatform.value;
+  } else if (trend.platform) {
+    selectedPlatform.value = trend.platform;
+  }
+  activeTab.value = 'radar';
+  handleFilter();
 };
 </script>
 
@@ -754,11 +820,19 @@ const formatNumber = (num) => {
               <p class="text-xs font-mono text-slate-500 dark:text-slate-400">
                 {{ kol.author_handle }}
               </p>
+              <div v-if="kol.posts_count || kol.total_views" class="flex items-center gap-2 mt-1.5 text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                <span v-if="kol.posts_count" class="font-bold text-amber-600 dark:text-amber-400">
+                  {{ kol.posts_count }} Postingan
+                </span>
+                <span v-if="kol.total_views">
+                  &bull; {{ formatNumber(kol.total_views) }} Jangkauan
+                </span>
+              </div>
             </div>
 
             <div class="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <button
-                @click="searchQuery = kol.author_handle; activeTab = 'radar'; handleFilter()"
+                @click="searchQuery = kol.author_handle; selectedPlatform = (kol.platform || 'all'); activeTab = 'radar'; handleFilter()"
                 type="button"
                 class="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
               >
@@ -777,34 +851,62 @@ const formatNumber = (num) => {
         <!-- Leaderboard Tagar Viral -->
         <div class="lg:col-span-2 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4">
           <div class="border-b border-slate-200 dark:border-slate-800 pb-3">
-            <h2 class="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
-              <Hash class="w-5 h-5 text-amber-500" />
-              <span>{{ isNational ? 'Top Tagar & Isu Nasional Paling Banyak Dibicarakan' : 'Top Tagar & Isu Paling Banyak Dibicarakan' }}</span>
-            </h2>
-            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              {{ isNational
-                ? 'Daftar kata kunci dan tagar nasional seputar kepolisian dengan volume percakapan tertinggi sepekan terakhir.'
-                : `Daftar kata kunci dan tagar dengan volume percakapan tertinggi sepekan terakhir di ${selectedPolda?.name || 'wilayah jajaran'}.`
-              }}
-            </p>
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h2 class="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                  <Hash class="w-5 h-5 text-amber-500" />
+                  <span>{{ trendingTitle }}</span>
+                </h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  {{ trendingSubtitle }}
+                </p>
+              </div>
+
+              <!-- Platform Filter Pills for Trending Tab -->
+              <div class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar shrink-0">
+                <button
+                  v-for="pTab in trendPlatformTabs"
+                  :key="pTab.id"
+                  type="button"
+                  @click="selectedTrendPlatform = pTab.id"
+                  class="px-2.5 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1 whitespace-nowrap cursor-pointer select-none"
+                  :class="selectedTrendPlatform === pTab.id
+                    ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'"
+                >
+                  <span>{{ pTab.label }}</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           <div class="space-y-2.5">
             <div
-              v-for="(trend, idx) in trendingHashtags"
+              v-for="(trend, idx) in currentTrendingList"
               :key="idx"
               class="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 hover:border-amber-400 transition"
             >
               <div class="flex items-center gap-3">
-                <span class="w-6 h-6 rounded-lg bg-amber-400/20 text-amber-600 dark:text-amber-400 flex items-center justify-center font-black text-xs">
+                <span class="w-6 h-6 rounded-lg bg-amber-400/20 text-amber-600 dark:text-amber-400 flex items-center justify-center font-black text-xs shrink-0">
                   {{ idx + 1 }}
                 </span>
                 <div>
-                  <h4 class="font-black text-slate-900 dark:text-white text-xs">
+                  <h4
+                    @click="filterByTrend(trend)"
+                    class="font-black text-slate-900 dark:text-white text-xs hover:text-amber-500 cursor-pointer transition"
+                  >
                     {{ trend.tag }}
                   </h4>
-                  <p class="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-                    {{ formatNumber(trend.count) }} Percakapan &bull; Platform: {{ trend.platform.toUpperCase() }}
+                  <p class="text-[10px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span>{{ formatNumber(trend.count) }} Volume/Jangkauan</span>
+                    <span v-if="trend.posts_count" class="text-amber-600 dark:text-amber-400 font-bold">&bull; {{ trend.posts_count }} Postingan</span>
+                    <span>&bull;</span>
+                    <span
+                      class="px-1.5 py-0.2 rounded text-[9px] font-bold"
+                      :class="getPlatformBadge(trend.platform).class"
+                    >
+                      {{ getPlatformBadge(trend.platform).label }}
+                    </span>
                   </p>
                 </div>
               </div>
@@ -817,14 +919,23 @@ const formatNumber = (num) => {
                   {{ trend.sentiment }}
                 </span>
                 <button
-                  @click="searchQuery = trend.tag; activeTab = 'radar'; handleFilter()"
+                  @click="filterByTrend(trend)"
                   type="button"
-                  class="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
-                  title="Filter postingan dengan tagar ini"
+                  class="p-1.5 rounded-lg bg-slate-100 hover:bg-amber-400 hover:text-slate-950 dark:bg-slate-800 dark:hover:bg-amber-400 dark:hover:text-slate-950 text-slate-700 dark:text-slate-300 transition cursor-pointer"
+                  title="Filter postingan dengan tagar ini di Radar"
                 >
                   <Search class="w-3.5 h-3.5" />
                 </button>
               </div>
+            </div>
+
+            <!-- Empty State for current trending list -->
+            <div
+              v-if="!currentTrendingList || currentTrendingList.length === 0"
+              class="p-8 text-center text-xs text-slate-500 dark:text-slate-400 space-y-2"
+            >
+              <Hash class="w-6 h-6 mx-auto text-slate-400 opacity-50" />
+              <p>Belum ada aktivitas tagar khusus platform ini pada periode aktif.</p>
             </div>
           </div>
         </div>
@@ -837,27 +948,33 @@ const formatNumber = (num) => {
               <span>Jam Puncak Obrolan Netizen</span>
             </h3>
             <p class="text-[11px] text-slate-500 dark:text-slate-400">
-              {{ isNational ? 'Waktu WIB paling aktif warganet nasional' : 'Waktu WITA paling aktif warganet Sulbar' }}
+              Waktu {{ peakHours?.timezone || (isNational ? 'WIB' : 'WITA') }} paling aktif warganet {{ isNational ? 'nasional' : (selectedPolda?.name || 'wilayah') }}
             </p>
           </div>
 
           <div class="space-y-3 text-xs">
             <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-              <span class="text-[10px] text-slate-500 font-bold block">Puncak Siang:</span>
-              <p class="font-black text-slate-900 dark:text-white text-sm">{{ isNational ? '11.30 – 13.30 WIB' : '11.30 – 13.30 WITA' }}</p>
-              <p class="text-[10px] text-slate-500">Isu keluhan pelayanan & lalin siang hari</p>
+              <div class="flex items-center justify-between mb-0.5">
+                <span class="text-[10px] text-slate-500 font-bold block">Puncak Siang:</span>
+                <span class="text-[10px] font-mono text-amber-600 dark:text-amber-400 font-bold">{{ peakHours?.afternoon_pct || 34 }}% Trafik</span>
+              </div>
+              <p class="font-black text-slate-900 dark:text-white text-sm">{{ peakHours?.afternoon_window || (isNational ? '11.30 – 13.30 WIB' : '11.30 – 13.30 WITA') }}</p>
+              <p class="text-[10px] text-slate-500">{{ peakHours?.afternoon_desc || 'Isu keluhan pelayanan & lalin siang hari' }}</p>
             </div>
 
             <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-              <span class="text-[10px] text-slate-500 font-bold block">Puncak Malam:</span>
-              <p class="font-black text-amber-500 text-sm">{{ isNational ? '19.00 – 22.00 WIB' : '19.00 – 22.00 WITA' }}</p>
-              <p class="text-[10px] text-slate-500">Puncak viralisasi video TikTok & opini medsos X</p>
+              <div class="flex items-center justify-between mb-0.5">
+                <span class="text-[10px] text-slate-500 font-bold block">Puncak Malam:</span>
+                <span class="text-[10px] font-mono text-amber-600 dark:text-amber-400 font-bold">{{ peakHours?.evening_pct || 48 }}% Trafik</span>
+              </div>
+              <p class="font-black text-amber-500 text-sm">{{ peakHours?.evening_window || (isNational ? '19.00 – 22.00 WIB' : '19.00 – 22.00 WITA') }}</p>
+              <p class="text-[10px] text-slate-500">{{ peakHours?.evening_desc || 'Puncak viralisasi video TikTok & opini medsos X' }}</p>
             </div>
 
             <div class="p-4 rounded-2xl bg-amber-50 dark:bg-amber-400/10 border border-amber-300 dark:border-amber-400/30 text-[11px] text-amber-900 dark:text-amber-200 space-y-1">
               <p class="font-bold">💡 Rekomendasi Jam Rilis Konter Narasi:</p>
               <p class="leading-relaxed">
-                Rilis siaran pers atau infografis klarifikasi paling efektif didistribusikan pada pukul <strong>{{ isNational ? '12.00 WIB' : '12.00 WITA' }}</strong> atau <strong>{{ isNational ? '19.30 WIB' : '19.30 WITA' }}</strong> agar menjangkau 70% pengguna aktif.
+                Rilis siaran pers atau infografis klarifikasi paling efektif didistribusikan pada pukul <strong>{{ peakHours?.recommended_release_siang || (isNational ? '12.00 WIB' : '12.00 WITA') }}</strong> atau <strong>{{ peakHours?.recommended_release_malam || (isNational ? '19.30 WIB' : '19.30 WITA') }}</strong> agar menjangkau {{ peakHours?.active_audience_pct || 70 }}% pengguna aktif.
               </p>
             </div>
           </div>

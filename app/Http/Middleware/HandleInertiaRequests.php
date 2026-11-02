@@ -98,6 +98,7 @@ class HandleInertiaRequests extends Middleware
 
         return [
             ...parent::share($request),
+            'csrf_token'     => csrf_token(),
             'allPoldas'      => $allPoldas,
             'selectedPolda'  => $selectedPolda,
             'selectedCode'   => $selectedCode,

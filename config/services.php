@@ -40,4 +40,8 @@ return [
         'model'   => env('GEMINI_MODEL', 'gemini-2.5-pro'),
     ],
 
+    'apify' => [
+        'token' => env('APIFY_API_TOKEN'),
+    ],
+
 ];

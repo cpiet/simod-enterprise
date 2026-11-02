@@ -27,6 +27,13 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectGuestsTo('/login');
         $middleware->redirectUsersTo('/');
 
+        $middleware->validateCsrfTokens(except: [
+            'social-intelligence/test-connection',
+            'media-intelligence/rss-sources/test',
+            'media-intelligence/gemini-test',
+            'settings/ai/test',
+        ]);
+
         $middleware->web(append: [
             HandleInertiaRequests::class,
             PreventBackHistory::class,

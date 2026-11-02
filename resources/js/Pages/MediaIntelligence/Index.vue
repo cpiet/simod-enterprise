@@ -834,18 +834,10 @@ const testFeedUrl = async (url) => {
   testResult.value = null;
 
   try {
-    const res = await fetch('/media-intelligence/rss-sources/test', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-      },
-      body: JSON.stringify({ url }),
-    });
-    const data = await res.json();
-    testResult.value = data;
+    const res = await axios.post('/media-intelligence/rss-sources/test', { url });
+    testResult.value = res.data;
   } catch (e) {
-    testResult.value = { valid: false, message: 'Koneksi gagal atau CORS error: ' + e.message };
+    testResult.value = { valid: false, message: e.response?.data?.message || ('Koneksi gagal: ' + e.message) };
   } finally {
     isTestingUrl.value = false;
   }

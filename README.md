@@ -58,21 +58,34 @@ DB_USERNAME=root
 DB_PASSWORD=
 ```
 
-### 4. Migrasi & Seeding Database
+### 4. Migrasi & Seeding Database (Arsitektur Modern Laravel)
+> [!TIP]
+> **Tidak membutuhkan file `.sql` mentah!** Seluruh 24 tabel, 51 feed RSS, 103 postingan patroli siber aktual, akun pimpinan, menu navigasi, dan peran RBAC dibangun secara otomatis & instan melalui migrasi dan seeder resmi Laravel:
+
 ```bash
-php artisan migrate --seed
-# Atau seeder enterprise lengkap:
-php artisan db:seed --class=EnterpriseDatabaseSeeder
+php artisan migrate:fresh --seed
 ```
 
 ### 5. Jalankan Server Pengembangan
 ```bash
-# Terminal 1: Vite Dev Server
-npm run dev
+# Terminal 1: Kompilasi aset Vite
+npm run build
+# (atau 'npm run dev' untuk live reload saat pengembangan)
 
-# Terminal 2: Laravel Server
+# Terminal 2: Laravel Server (jika tidak menggunakan vhost Laragon)
 php artisan serve
 ```
+
+---
+
+## 🔑 Kredensial Akun Login Bawaan
+
+| Peran | Username / Email | Password Dinas | Cakupan Otoritas |
+|:---|:---|:---|:---|
+| **Super Admin Mabes** | `superadmin` / `superadmin@polri.go.id` | `MabesPolri#2026` | Akses penuh 34 Polda, Keamanan, Backup, AI & Audit Log |
+| **Kadivhumas Polri** | `kadivhumas` / `kadivhumas@polri.go.id` | `DivhumasPolri#2026` | Pucuk Pimpinan Tertinggi, Command Center Nasional |
+| **Akun Developer (Tech)** | `cpiet` / `alumnidarus@gmail.com` | `T0p1s@y@bund@r` | Superadmin Mabes & Pengembang Sistem |
+| **Pimpinan Polda Sulbar** | `kabid_sulbar` / `kabid.sulbar@polri.go.id` | `SulbarHumas#2026` | Komando Kehumasan Wilayah Sulawesi Barat |
 
 ---
 
@@ -80,6 +93,7 @@ php artisan serve
 
 Dokumentasi lengkap sistem SIMOD Enterprise terpusat pada direktori [`docs/`](./docs/README.md) dan panduan arsitektur khusus untuk AI Agents:
 
+- **[🏠 PANDUAN LENGKAP SETUP DI LAPTOP / KOMPUTER RUMAH](./docs/PANDUAN_SETUP_KOMPUTER_RUMAH.md)**: Panduan langkah demi langkah menjalankan proyek di komputer rumah/laptop lain tanpa file `.sql` mentah, lengkap dengan panduan VirtualHost Laragon & troubleshooting.
 - **[AGENTS.md](./AGENTS.md)**: Panduan instruksi, arsitektur 4 pilar, dual-theme engine, aturan kuota RSS 29 portal, dan protokol pengembangan untuk AI Coding Agents (Codex, Claude, Gemini, Antigravity).
 - **[Katalog Lengkap Modul](./docs/09-katalog-lengkap-19-modul-simod-enterprise.md)**: Daftar seluruh modul operasional, hak akses, dan rute navigasi.
 - **[Modul Media Intelligence & RSS](./docs/03-modul-media-intelligence-dan-rss.md)**: Panduan agregasi berita, executive briefing AI, dan naskah WhatsApp pimpinan.

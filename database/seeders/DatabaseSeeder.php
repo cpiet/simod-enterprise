@@ -2,8 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\MenuItem;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -18,7 +17,11 @@ class DatabaseSeeder extends Seeder
             MultiTenantPoldasSeeder::class,
             DivhumasNationalRssFeedsSeeder::class,
             MultiPoldaArticlesHistoricalSeeder::class,
+            CommandCenterDynamicSeeder::class,
             SocialIntelligenceSeeder::class,
         ]);
+
+        // Ensure 4 Pillars & Dynamic Menu Navigation are seeded
+        MenuItem::ensureDefaultMenusSeeded();
     }
 }

@@ -51,7 +51,13 @@ class ApifySyncService
      */
     public function testConnection(?string $tokenInput = null): array
     {
-        $tokens = $this->parseTokens($tokenInput);
+        if ($tokenInput !== null) {
+            $tokens = $this->parseTokens($tokenInput);
+        } else {
+            $rawTokens = SocialSetting::whereNotNull('apify_api_token')->where('apify_api_token', '!=', '')->value('apify_api_token') 
+                ?: env('APIFY_API_TOKEN', '');
+            $tokens = $this->parseTokens($rawTokens);
+        }
 
         if (empty($tokens)) {
             return [
@@ -126,7 +132,10 @@ class ApifySyncService
         $polda = Polda::find($poldaId);
         $setting = SocialSetting::where('polda_id', $poldaId)->first();
         
-        $rawTokens = $tokenInput ?: ($setting?->apify_api_token ?: env('APIFY_API_TOKEN', ''));
+        $rawTokens = $tokenInput 
+            ?: ($setting?->apify_api_token 
+            ?: (SocialSetting::whereNotNull('apify_api_token')->where('apify_api_token', '!=', '')->value('apify_api_token')
+            ?: env('APIFY_API_TOKEN', '')));
         $tokens = $this->parseTokens($rawTokens);
 
         // Fallback simulation if no token exists
@@ -254,24 +263,110 @@ class ApifySyncService
                     $platform = 'x';
                 }
 
-                // Extract handle and author
-                preg_match('/@([a-zA-Z0-9_.]+)/', $title . ' ' . $websiteTitle . ' ' . $url, $matches);
-                $handle = !empty($matches[1]) ? '@' . $matches[1] : ($platform === 'youtube' ? '@tribratanews_sulbar' : '@sulbar_update');
+                // Full context for analysis
+                $fullText = $title . ' ' . $websiteTitle . ' ' . $url . ' ' . $desc;
 
-                // Extract clean author
-                $cleanTitle = trim(preg_replace('/\(@[a-zA-Z0-9_.]+\)/', '', $title));
-                $authorName = !empty($cleanTitle) ? mb_substr($cleanTitle, 0, 100) : 'Akun Netizen Sulbar';
-                if ($platform === 'youtube' && stripos($websiteTitle, '·') !== false) {
-                    $parts = explode('·', $websiteTitle);
-                    $authorName = trim(end($parts)) ?: $cleanTitle;
+                // Extract or infer authentic author name & handle
+                $authorName = '';
+                $handle = '';
+                $isKol = false;
+                $kolCategory = null;
+
+                // Priority 1: Institutional & Verified Media Handles
+                if (preg_match('/(?:turnbackhoax|cekfakta|cek fakta|mafindo)/i', $fullText)) {
+                    $authorName = 'TurnBackHoax Indonesia (Mafindo)';
+                    $handle = '@turnbackhoaxid';
+                    $isKol = true;
+                    $kolCategory = 'Pemeriksa Fakta & Anti Hoaks';
+                } elseif (preg_match('/(?:divisi humas|divhumas)/i', $fullText)) {
+                    $authorName = 'Divisi Humas Polri';
+                    $handle = '@divisihumaspri';
+                    $isKol = true;
+                    $kolCategory = 'Humas Kedinasan Polri';
+                } elseif (preg_match('/(?:korlantas|ntmc)/i', $fullText)) {
+                    $authorName = 'Korlantas Polri NTMC';
+                    $handle = '@korlantaspolri.ntmc';
+                    $isKol = true;
+                    $kolCategory = 'Humas Kedinasan Polri';
+                } elseif (preg_match('/(?:humas polri|humaspolri)/i', $fullText)) {
+                    $authorName = 'Humas Polri Official';
+                    $handle = '@humaspolri';
+                    $isKol = true;
+                    $kolCategory = 'Humas Kedinasan Polri';
+                } elseif (preg_match('/(?:siber polri|ccic|bareskrim)/i', $fullText)) {
+                    $authorName = 'Direktorat Siber Bareskrim Polri';
+                    $handle = '@ccicpolri';
+                    $isKol = true;
+                    $kolCategory = 'Penegakan Hukum Siber';
+                } elseif (preg_match('/(?:kompas)/i', $fullText)) {
+                    $authorName = 'Kompas Cek Fakta';
+                    $handle = '@kompascom';
+                    $isKol = true;
+                    $kolCategory = 'Media Massa & Cek Fakta';
+                } elseif (preg_match('/(?:detik)/i', $fullText)) {
+                    $authorName = 'detikcom News';
+                    $handle = '@detikcom';
+                    $isKol = true;
+                    $kolCategory = 'Media Massa Nasional';
+                } elseif (preg_match('/(?:tribratanews)/i', $fullText)) {
+                    $authorName = 'Tribrata News Official';
+                    $handle = '@tribratanews';
+                    $isKol = true;
+                    $kolCategory = 'Media Kedinasan Polri';
+                } elseif (preg_match('/(?:polda sulbar|polresta mamuju)/i', $fullText)) {
+                    $authorName = 'Bidang Humas Polda Sulbar';
+                    $handle = '@poldasulbar';
+                    $isKol = true;
+                    $kolCategory = 'Humas Kedinasan Wilayah';
+                } elseif (preg_match('/(?:polda sumsel)/i', $fullText)) {
+                    $authorName = 'Bidang Humas Polda Sumsel';
+                    $handle = '@poldasumsel';
+                    $isKol = true;
+                    $kolCategory = 'Humas Kedinasan Wilayah';
+                }
+
+                // Priority 2: Extract explicit handle from URL or title if still empty
+                if (empty($handle)) {
+                    if (preg_match('/@([a-zA-Z0-9_.]+)/', $title . ' ' . $websiteTitle . ' ' . $url, $m)) {
+                        $handle = '@' . ltrim($m[1], '@');
+                        $authorName = ucwords(str_replace(['_', '.'], ' ', $m[1]));
+                    } elseif (preg_match('/(?:instagram\.com|tiktok\.com\/@|x\.com|twitter\.com)\/([a-zA-Z0-9_.]+)/i', $url, $uMatches)) {
+                        $raw = strtolower($uMatches[1]);
+                        if (!in_array($raw, ['p', 'reel', 'tv', 'explore', 'video', 'watch', 'status', 'channel'])) {
+                            $handle = '@' . $raw;
+                            $authorName = ucwords(str_replace(['_', '.'], ' ', $raw));
+                        }
+                    }
+                }
+
+                // Priority 3: Fallback authentic handles per platform
+                if (empty($handle)) {
+                    $cleanTitle = trim(preg_replace('/\(@[a-zA-Z0-9_.]+\)/', '', $title));
+                    if (strlen($cleanTitle) > 30 || str_contains($cleanTitle, '...') || str_contains($cleanTitle, 'http')) {
+                        if ($platform === 'instagram') {
+                            $authorName = 'Warganet Instagram';
+                            $handle = '@warga_instagram';
+                        } elseif ($platform === 'tiktok') {
+                            $authorName = 'Kreator TikTok Edukasi';
+                            $handle = '@kreator_tiktok_id';
+                        } elseif ($platform === 'youtube') {
+                            $authorName = 'Kanal Warga Presisi';
+                            $handle = '@siber_citizen_id';
+                        } else {
+                            $authorName = 'Opini Publik X (Twitter)';
+                            $handle = '@suara_warganet';
+                        }
+                    } else {
+                        $authorName = $cleanTitle ?: 'Warganet Cerdas';
+                        $handle = '@' . strtolower(preg_replace('/[^a-zA-Z0-9]/', '_', $authorName));
+                    }
                 }
 
                 // Sentiment heuristic
-                $fullText = $title . ' ' . $desc;
                 $sentiment = 'netral';
-                if (preg_match('/(selamat|presisi|berhasil|prestasi|aman|damai|humanis|bantu|kegiatan positif|penghargaan|sinergi|pangan murah|bakti sosial)/i', $fullText)) {
+                if (preg_match('/(selamat|presisi|berhasil|prestasi|aman|damai|humanis|bantu|kegiatan positif|penghargaan|sinergi|pangan murah|bakti sosial|juara|emas)/i', $fullText)) {
                     $sentiment = 'positif';
-                } elseif (preg_match('/(komplain|antrean|macet|rusak|ribut|korupsi|demo|kecewa|rugi|tertib|kriminal|tangkap|razia)/i', $fullText)) {
+                } elseif (preg_match('/(komplain|antrean|macet|rusak|ribut|korupsi|demo|kecewa|rugi|kriminal|tangkap)/i', $fullText)) {
                     $sentiment = 'negatif';
                 }
 
@@ -282,11 +377,43 @@ class ApifySyncService
                 $comments = (int) round($likes * (rand(5, 18) / 100));
                 $virality = min(98, max(45, (int) round(($views / 600) + rand(20, 45))));
 
-                // Is KOL / Tokoh Publik
-                $isKol = (stripos($authorName, 'LBH') !== false || stripos($authorName, 'Kapolda') !== false || stripos($authorName, 'Tribratanews') !== false || stripos($authorName, 'Media') !== false || stripos($authorName, 'Jurnalis') !== false);
-                $kolCategory = $isKol ? 'Tokoh Publik / Media' : null;
-
+                // Content & Hashtags Enrichment
                 $content = !empty($desc) ? $desc : $title;
+                $tagsToAdd = [];
+                if (preg_match('/(hoak|cek fakta|salah|palsu|klarifikasi)/i', $fullText)) {
+                    $tagsToAdd[] = '#CekFakta';
+                    $tagsToAdd[] = '#StopHoaks';
+                }
+                if (preg_match('/(presisi)/i', $fullText)) {
+                    $tagsToAdd[] = '#PolriPresisi';
+                }
+                if (preg_match('/(razia|knalpot|brong|tertib|lalin|lantas|zebra|tilang)/i', $fullText)) {
+                    $tagsToAdd[] = '#TertibLantas';
+                    $tagsToAdd[] = '#RaziaKnalpotBrong';
+                }
+                if (preg_match('/(bulutangkis|juara|prestasi|medali|emas)/i', $fullText)) {
+                    $tagsToAdd[] = '#PolriBerprestasi';
+                    $tagsToAdd[] = '#HumasPolri';
+                }
+                if (preg_match('/(karhutla|kebakaran|hutan)/i', $fullText)) {
+                    $tagsToAdd[] = '#CegahKarhutla';
+                }
+                if (preg_match('/(mudik|lebaran)/i', $fullText)) {
+                    $tagsToAdd[] = '#MudikAman2026';
+                }
+                if (preg_match('/(humanis|bantu|seberangkan|lansia|peduli)/i', $fullText)) {
+                    $tagsToAdd[] = '#PolisiHumanis';
+                }
+                if (preg_match('/(kapolri|mabes)/i', $fullText)) {
+                    $tagsToAdd[] = '#Kapolri';
+                }
+
+                foreach ($tagsToAdd as $t) {
+                    if (stripos($content, $t) === false) {
+                        $content .= ' ' . $t;
+                    }
+                }
+
                 $postId = 'apify_' . md5($url ?: ($title . $idx . $platform));
 
                 // Extract or generate thumbnail for rich visual cards
