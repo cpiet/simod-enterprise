@@ -33,6 +33,10 @@ import {
   ChevronRight,
   UserCheck,
   Hash,
+  Play,
+  Globe,
+  Layers,
+  ArrowUpRight,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -45,6 +49,8 @@ const props = defineProps({
   kolProfiles: Array,
   trendingHashtags: Array,
   trendingByPlatform: Object,
+  publicTrends: Object,
+  supportedActors: Array,
   peakHours: Object,
   settings: Object,
   filters: Object,
@@ -288,6 +294,98 @@ const filterByTrend = (trend) => {
   }
   activeTab.value = 'radar';
   handleFilter();
+};
+
+// Dual-Mode Lens for Trends Tab ('kamtibmas' vs 'public')
+const trendLensMode = ref('kamtibmas');
+const selectedPublicPlatform = ref('all');
+const securityOnly = ref(false);
+const searchTrendQuery = ref('');
+const isSyncingTrends = ref(false);
+
+const publicPlatformTabs = [
+  { id: 'all', label: 'Semua Platform' },
+  { id: 'x', label: '𝕏 (Twitter)' },
+  { id: 'youtube', label: 'YouTube' },
+  { id: 'instagram', label: 'Instagram' },
+  { id: 'tiktok', label: 'TikTok' },
+  { id: 'facebook', label: 'Facebook' },
+];
+
+const currentPublicTrendsList = computed(() => {
+  const platform = selectedPublicPlatform.value;
+  const list = props.publicTrends?.platforms?.[platform] || props.publicTrends?.platforms?.all || [];
+  
+  return list.filter((item) => {
+    if (securityOnly.value && !item.is_security_relevant) {
+      return false;
+    }
+    if (searchTrendQuery.value) {
+      const q = searchTrendQuery.value.toLowerCase();
+      const matchName = item.name?.toLowerCase().includes(q);
+      const matchCat = item.category?.toLowerCase().includes(q);
+      const matchType = item.relevance_type?.toLowerCase().includes(q);
+      const matchNote = item.relevance_note?.toLowerCase().includes(q);
+      return matchName || matchCat || matchType || matchNote;
+    }
+    return true;
+  });
+});
+
+const securityRelevantPublicCount = computed(() => {
+  const platform = selectedPublicPlatform.value;
+  const list = props.publicTrends?.platforms?.[platform] || props.publicTrends?.platforms?.all || [];
+  return list.filter(item => item.is_security_relevant).length;
+});
+
+const triggerSyncTrends = () => {
+  isSyncingTrends.value = true;
+  router.post('/social-intelligence/sync-trends', {
+    apify_api_token: settingsForm.value.apify_api_token,
+  }, {
+    preserveScroll: true,
+    onFinish: () => {
+      isSyncingTrends.value = false;
+    },
+  });
+};
+
+const filterByPublicTrend = (item) => {
+  searchQuery.value = item.name.replace(/^#/, '');
+  if (item.platform && item.platform !== 'all') {
+    selectedPlatform.value = item.platform;
+  }
+  activeTab.value = 'radar';
+  handleFilter();
+};
+
+const getEscalationUrl = (item) => {
+  const params = new URLSearchParams({
+    title: item.escalation?.title || `Atensi Isu Tren: ${item.name}`,
+    category: item.escalation?.category || '📱 Isu Medsos & Opini Publik',
+    summary: item.escalation?.description || `${item.relevance_note || ''} (Volume: ${item.volume})`,
+    source_media: item.platform_label || item.platform?.toUpperCase(),
+    source_url: item.sample_url || '',
+    priority: item.is_security_relevant ? 'high' : 'medium',
+  });
+  return `/issues/create?${params.toString()}`;
+};
+
+const getPublicPlatformBadge = (platform) => {
+  switch (platform) {
+    case 'x':
+      return { label: '𝕏', class: 'bg-black text-white border border-slate-700' };
+    case 'youtube':
+      return { label: 'YouTube', class: 'bg-red-600 text-white' };
+    case 'instagram':
+      return { label: 'Instagram', class: 'bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 text-white' };
+    case 'tiktok':
+      return { label: 'TikTok', class: 'bg-slate-900 text-white border border-rose-500/30' };
+    case 'facebook':
+      return { label: 'Facebook', class: 'bg-blue-600 text-white' };
+    default:
+      return { label: (platform || 'SEMUA').toUpperCase(), class: 'bg-slate-800 text-slate-300' };
+  }
 };
 </script>
 
@@ -845,8 +943,65 @@ const filterByTrend = (trend) => {
       </div>
     </div>
 
-    <!-- TAB 03: TREN TAGAR & ISU VIRAL -->
-    <div v-if="activeTab === 'trends'" class="space-y-4">
+    <!-- TAB 03: TREN TAGAR & ISU VIRAL (DUAL-MODE ARCHITECTURE) -->
+    <div v-if="activeTab === 'trends'" class="space-y-5">
+      <!-- DUAL-MODE LENS SWITCHER -->
+      <div class="p-2 rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-2 shadow-sm">
+        <!-- MODE 1: LENSA KAMTIBMAS POLRI -->
+        <button
+          type="button"
+          @click="trendLensMode = 'kamtibmas'"
+          class="flex items-start gap-3.5 p-3.5 rounded-xl transition text-left cursor-pointer border-2"
+          :class="trendLensMode === 'kamtibmas'
+            ? 'bg-amber-400/10 dark:bg-amber-400/10 border-amber-400 text-slate-900 dark:text-white shadow-sm'
+            : 'hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-600 dark:text-slate-400 border-transparent'"
+        >
+          <div
+            class="p-2 rounded-xl shrink-0 mt-0.5"
+            :class="trendLensMode === 'kamtibmas' ? 'bg-amber-400 text-slate-950 font-black shadow' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'"
+          >
+            <Shield class="w-5 h-5" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-xs font-black tracking-wider uppercase">01. Lensa Kamtibmas & Humas Polri</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-400 text-slate-950">Fokus Dinas</span>
+            </div>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+              Monitoring tagar kepolisian, cyber patrol, penegakan hukum, citra Polri, dan isu viral kewilayahan/nasional.
+            </p>
+          </div>
+        </button>
+
+        <!-- MODE 2: LENSA TREN PUBLIK MEDIA SOSIAL INDONESIA -->
+        <button
+          type="button"
+          @click="trendLensMode = 'public'"
+          class="flex items-start gap-3.5 p-3.5 rounded-xl transition text-left cursor-pointer border-2"
+          :class="trendLensMode === 'public'
+            ? 'bg-rose-500/10 dark:bg-rose-500/10 border-rose-500 text-slate-900 dark:text-white shadow-sm'
+            : 'hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-600 dark:text-slate-400 border-transparent'"
+        >
+          <div
+            class="p-2 rounded-xl shrink-0 mt-0.5"
+            :class="trendLensMode === 'public' ? 'bg-rose-500 text-white font-black shadow' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'"
+          >
+            <Flame class="w-5 h-5" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-xs font-black tracking-wider uppercase">02. Lensa Tren Publik Medsos Indonesia</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500 text-white animate-pulse">Live Multi-Platform</span>
+            </div>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+              Tren warganet Indonesia (𝕏, YouTube, Instagram, TikTok, Facebook) dengan deteksi kerawanan siber & EWS.
+            </p>
+          </div>
+        </button>
+      </div>
+
+      <!-- VIEW 1: LENSA KAMTIBMAS & HUMAS POLRI -->
+      <div v-if="trendLensMode === 'kamtibmas'" class="space-y-4">
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Leaderboard Tagar Viral -->
         <div class="lg:col-span-2 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4">
@@ -978,6 +1133,230 @@ const filterByTrend = (trend) => {
               </p>
             </div>
           </div>
+        </div>
+      </div>
+      </div>
+
+      <!-- VIEW 2: LENSA TREN PUBLIK MEDSOS INDONESIA (MULTI-PLATFORM) -->
+      <div v-else-if="trendLensMode === 'public'" class="space-y-4">
+        <!-- Header Tren Publik -->
+        <div class="p-6 rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white border border-slate-700/60 shadow-lg relative overflow-hidden">
+          <div class="absolute -right-12 -top-12 w-48 h-48 bg-rose-500/10 rounded-full blur-2xl pointer-events-none"></div>
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10">
+            <div>
+              <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white">
+                  🇮🇩 WOEID: 23424846 (Indonesia)
+                </span>
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-slate-300">
+                  Lintas 5 Platform (𝕏, YouTube, Instagram, TikTok, Facebook)
+                </span>
+                <span class="text-[11px] text-slate-400">
+                  Update: <strong class="text-amber-400">{{ publicTrends?.meta?.last_updated || 'Realtime' }}</strong>
+                </span>
+              </div>
+              <h2 class="text-xl md:text-2xl font-black tracking-tight text-white flex items-center gap-2">
+                <span>Tren Publik Media Sosial Indonesia</span>
+                <Flame class="w-6 h-6 text-rose-500 shrink-0" />
+              </h2>
+              <p class="text-xs text-slate-300 mt-1 max-w-3xl leading-relaxed">
+                Pemantauan tren warganet Indonesia secara holistik. Menangkap fenomena percakapan viral di ruang publik sekaligus menyaring potensi kejahatan siber, phishing, disinformasi, dan kerawanan kamtibmas sebelum meluas.
+              </p>
+            </div>
+
+            <div class="flex items-center gap-2.5 shrink-0">
+              <button
+                type="button"
+                @click="triggerSyncTrends"
+                :disabled="isSyncingTrends"
+                class="px-4 py-2.5 rounded-xl text-xs font-bold bg-amber-400 hover:bg-amber-300 text-slate-950 transition shadow flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+              >
+                <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': isSyncingTrends }" />
+                <span>{{ isSyncingTrends ? 'Memperbarui Tren...' : '⚡ Refresh Tren Publik (Apify)' }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter & Search Toolbar -->
+        <div class="p-4 rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 shadow-sm">
+          <!-- Platform Tabs -->
+          <div class="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
+            <button
+              v-for="p in publicPlatformTabs"
+              :key="p.id"
+              @click="selectedPublicPlatform = p.id"
+              type="button"
+              class="px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer select-none whitespace-nowrap"
+              :class="selectedPublicPlatform === p.id
+                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-950 font-black shadow'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'"
+            >
+              {{ p.label }}
+              <span class="ml-1 opacity-70 text-[10px]">
+                ({{ (publicTrends?.platforms?.[p.id] || []).length }})
+              </span>
+            </button>
+          </div>
+
+          <!-- Right Controls: Search & Security Only Toggle -->
+          <div class="flex flex-wrap items-center gap-2">
+            <!-- Search -->
+            <div class="relative min-w-[220px] flex-1 sm:flex-initial">
+              <Search class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
+              <input
+                v-model="searchTrendQuery"
+                type="text"
+                placeholder="Cari topik / isu / catatan..."
+                class="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-400"
+              />
+            </div>
+
+            <!-- Security Filter Toggle -->
+            <button
+              type="button"
+              @click="securityOnly = !securityOnly"
+              class="px-3 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer select-none flex items-center gap-1.5"
+              :class="securityOnly
+                ? 'bg-rose-500 text-white font-black border-rose-500 shadow-sm'
+                : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-100'"
+            >
+              <AlertTriangle class="w-3.5 h-3.5" :class="securityOnly ? 'text-white' : 'text-rose-500'" />
+              <span>🚨 Relevan Kamtibmas Saja</span>
+              <span class="px-1.5 py-0.2 rounded-full text-[10px]" :class="securityOnly ? 'bg-white/20 text-white' : 'bg-rose-500/20 text-rose-500 font-bold'">
+                {{ securityRelevantPublicCount }}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Trends Grid List -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div
+            v-for="(item, idx) in currentPublicTrendsList"
+            :key="idx"
+            class="rounded-3xl bg-white dark:bg-[#0b1426] border transition p-5 shadow-sm space-y-3 relative flex flex-col justify-between"
+            :class="item.is_security_relevant
+              ? 'border-rose-400/80 dark:border-rose-900/80 ring-1 ring-rose-400/20'
+              : 'border-slate-200 dark:border-slate-800 hover:border-amber-400/70'"
+          >
+            <div>
+              <!-- Top Row: Rank, Platform Badge, Category, Velocity -->
+              <div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                <div class="flex items-center gap-2">
+                  <!-- Rank Badge -->
+                  <span
+                    class="w-6 h-6 rounded-lg flex items-center justify-center font-black text-xs shrink-0"
+                    :class="item.rank === 1
+                      ? 'bg-amber-400 text-slate-950 shadow-sm'
+                      : item.rank === 2
+                      ? 'bg-slate-300 text-slate-900'
+                      : item.rank === 3
+                      ? 'bg-amber-700 text-white'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'"
+                  >
+                    #{{ item.rank }}
+                  </span>
+
+                  <!-- Platform Pill -->
+                  <span class="px-2 py-0.5 rounded text-[10px] font-black" :class="getPublicPlatformBadge(item.platform).class">
+                    {{ getPublicPlatformBadge(item.platform).label }}
+                  </span>
+
+                  <!-- Category -->
+                  <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                    {{ item.category }}
+                  </span>
+                </div>
+
+                <!-- Velocity / Speed -->
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                  {{ item.velocity }}
+                </span>
+              </div>
+
+              <!-- Trend Name / Title -->
+              <div class="space-y-1">
+                <h3
+                  @click="filterByPublicTrend(item)"
+                  class="font-black text-slate-900 dark:text-white text-sm hover:text-amber-500 cursor-pointer transition leading-snug"
+                >
+                  {{ item.name }}
+                </h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                  Volume / Penayangan: <strong class="text-slate-900 dark:text-slate-200">{{ item.volume }}</strong>
+                </p>
+              </div>
+
+              <!-- Security Relevance Banner (Atensi Intelijen Siber / Kamtibmas) -->
+              <div
+                v-if="item.is_security_relevant"
+                class="mt-3 p-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-900 dark:text-rose-200 space-y-1 text-xs"
+              >
+                <div class="flex items-center gap-1.5 font-black text-rose-600 dark:text-rose-400 text-[11px]">
+                  <AlertTriangle class="w-3.5 h-3.5 shrink-0" />
+                  <span>ATENSI KAMTIBMAS & SIBER: {{ item.relevance_type }}</span>
+                </div>
+                <p class="text-[11px] leading-relaxed text-slate-700 dark:text-slate-300">
+                  {{ item.relevance_note }}
+                </p>
+              </div>
+              <div
+                v-else
+                class="mt-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 text-[11px] leading-relaxed"
+              >
+                <span class="font-bold text-slate-800 dark:text-slate-200">Konteks Isu:</span> {{ item.relevance_note }}
+              </div>
+            </div>
+
+            <!-- Action Buttons Footer -->
+            <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 mt-2">
+              <div class="flex items-center gap-1.5">
+                <!-- Direct 1-Click Escalation -->
+                <Link
+                  :href="getEscalationUrl(item)"
+                  class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-black bg-rose-500 hover:bg-rose-600 text-white transition shadow-sm"
+                  title="Eskalasi langsung topik tren ini ke formulir Laporan Isu Baru"
+                >
+                  <AlertTriangle class="w-3 h-3" />
+                  <span>🚨 Eskalasi Jadi Isu</span>
+                </Link>
+
+                <!-- Filter in Radar Tab -->
+                <button
+                  type="button"
+                  @click="filterByPublicTrend(item)"
+                  class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition"
+                  title="Filter postingan dengan kata kunci ini di Tab 01 Radar"
+                >
+                  <Search class="w-3 h-3 text-slate-500" />
+                  <span>Pantau di Radar</span>
+                </button>
+              </div>
+
+              <!-- Open Source URL -->
+              <a
+                v-if="item.sample_url"
+                :href="item.sample_url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="p-1.5 rounded-lg bg-slate-100 hover:bg-amber-400 hover:text-slate-950 dark:bg-slate-800 dark:hover:bg-amber-400 dark:hover:text-slate-950 text-slate-500 transition"
+                title="Buka topik di platform aslinya"
+              >
+                <ExternalLink class="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Empty State -->
+        <div
+          v-if="!currentPublicTrendsList || currentPublicTrendsList.length === 0"
+          class="p-12 text-center text-xs text-slate-500 dark:text-slate-400 space-y-2 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800"
+        >
+          <Flame class="w-8 h-8 mx-auto text-slate-400 opacity-50" />
+          <p class="font-bold text-slate-700 dark:text-slate-300">Tidak ada tren publik yang sesuai dengan filter.</p>
+          <p class="text-[11px]">Coba ubah kata kunci pencarian atau matikan filter "Relevan Kamtibmas Saja".</p>
         </div>
       </div>
     </div>
@@ -1155,6 +1534,88 @@ const filterByTrend = (trend) => {
             </button>
           </div>
         </form>
+      </div>
+
+      <!-- KATALOG FORMAT TREN & REKOMENDASI ACTOR APIFY PER PLATFORM -->
+      <div class="max-w-4xl rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-6 md:p-8 shadow-sm space-y-6">
+        <div class="border-b border-slate-200 dark:border-slate-800 pb-4">
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-indigo-500 text-white">
+              Arsitektur Multi-Platform
+            </span>
+            <h2 class="text-base font-black text-slate-900 dark:text-white">
+              Format Tren yang Didukung & Rekomendasi Actor Apify per Platform
+            </h2>
+          </div>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Masing-masing media sosial memiliki format tren dan struktur data yang berbeda. Gunakan panduan resmi ini untuk memahami cara scraper Apify mengekstrak data tren dari masing-masing platform secara legal dan efisien.
+          </p>
+        </div>
+
+        <div class="space-y-4">
+          <div
+            v-for="(actor, aIdx) in (supportedActors || [])"
+            :key="aIdx"
+            class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-3"
+          >
+            <!-- Platform Header -->
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <div class="flex items-center gap-2.5">
+                <span class="px-2.5 py-1 rounded-xl text-xs font-black" :class="actor.badge_class">
+                  {{ actor.platform_label }}
+                </span>
+                <span class="text-xs font-black text-slate-900 dark:text-white">
+                  {{ actor.trend_format }}
+                </span>
+              </div>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                ✓ {{ actor.status_label }}
+              </span>
+            </div>
+
+            <!-- Actors Recommendations -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+              <div
+                v-for="(rec, rIdx) in actor.recommended_actors"
+                :key="rIdx"
+                class="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col justify-between"
+              >
+                <div>
+                  <div class="flex items-center justify-between gap-1 mb-1">
+                    <span class="font-mono font-bold text-xs text-amber-600 dark:text-amber-400">
+                      {{ rec.id }}
+                    </span>
+                    <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                      {{ rec.badge }}
+                    </span>
+                  </div>
+                  <p class="font-bold text-slate-900 dark:text-white text-xs">{{ rec.name }}</p>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                    {{ rec.description }}
+                  </p>
+                </div>
+                <div class="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  <span class="text-[10px] text-slate-400">Creator: @{{ rec.author }}</span>
+                  <a
+                    :href="rec.apify_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-[10px] font-bold text-sky-600 hover:text-sky-500 dark:text-sky-400 inline-flex items-center gap-1"
+                  >
+                    <span>Apify Store</span>
+                    <ExternalLink class="w-3 h-3" />
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <!-- Output Data Schema -->
+            <div class="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/60 text-[11px] text-slate-600 dark:text-slate-300 font-mono flex items-start gap-2">
+              <span class="font-bold text-slate-900 dark:text-white shrink-0">Output Data:</span>
+              <span class="break-words">{{ actor.output_data }}</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </EnterpriseLayout>

@@ -16,7 +16,7 @@ class SocialIntelligenceController extends Controller
     /**
      * Display the Social Intelligence Dashboard (Multi-Platform Radar).
      */
-    public function index(Request $request): Response
+    public function index(Request $request, ApifySyncService $service): Response
     {
         $allPoldas = Polda::withCount('polres')->where('is_active', true)->get();
         [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
@@ -156,6 +156,8 @@ class SocialIntelligenceController extends Controller
             'kolProfiles'         => $kolProfiles,
             'trendingHashtags'    => $trendingData['trendingHashtags'],
             'trendingByPlatform'  => $trendingData['trendingByPlatform'],
+            'publicTrends'        => $service->getPublicTrendsData(),
+            'supportedActors'     => $service->getSupportedTrendActors(),
             'peakHours'           => $peakHours,
             'settings'            => $settings,
             'filters'             => [
@@ -266,6 +268,17 @@ class SocialIntelligenceController extends Controller
         if (!$result['success']) {
             return redirect()->back()->with('error', $result['message']);
         }
+
+        return redirect()->back()->with('success', '✓ ' . $result['message']);
+    }
+
+    /**
+     * Refresh multi-platform public trends.
+     */
+    public function syncTrends(Request $request, ApifySyncService $service)
+    {
+        $token = $request->input('apify_api_token');
+        $result = $service->syncPublicTrends($token);
 
         return redirect()->back()->with('success', '✓ ' . $result['message']);
     }

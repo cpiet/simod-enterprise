@@ -71,6 +71,8 @@ class SocialIntelligenceTest extends TestCase
             ->has('posts.data', 1)
             ->has('metrics')
             ->where('metrics.total_posts', 1)
+            ->has('publicTrends')
+            ->has('supportedActors')
         );
     }
 
@@ -196,6 +198,15 @@ class SocialIntelligenceTest extends TestCase
             'user'    => [
                 'username' => 'humas_sulbar',
             ],
+        ]);
+    }
+
+    public function test_sync_public_trends_endpoint(): void
+    {
+        $response = $this->actingAs($this->user)->post('/social-intelligence/sync-trends');
+        $response->assertRedirect();
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'apify.trends_sync',
         ]);
     }
 }

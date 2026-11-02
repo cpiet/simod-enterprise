@@ -52,6 +52,7 @@ Route::post('/media-intelligence/topics/{id}/analyze-ai', [MediaIntelligenceCont
 Route::get('/social-intelligence', [SocialIntelligenceController::class, 'index'])->name('social-intelligence.index');
 Route::post('/social-intelligence/{id}/bookmark', [SocialIntelligenceController::class, 'toggleBookmark'])->name('social-intelligence.bookmark');
 Route::post('/social-intelligence/sync', [SocialIntelligenceController::class, 'sync'])->name('social-intelligence.sync');
+Route::post('/social-intelligence/sync-trends', [SocialIntelligenceController::class, 'syncTrends'])->name('social-intelligence.sync-trends');
 Route::post('/social-intelligence/settings', [SocialIntelligenceController::class, 'updateSettings'])->name('social-intelligence.settings');
 Route::post('/social-intelligence/test-connection', [SocialIntelligenceController::class, 'testConnection'])->name('social-intelligence.test-connection');
 
