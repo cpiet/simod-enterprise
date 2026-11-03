@@ -26,6 +26,7 @@ Dokumentasi ini memandu arsitektur, seluruh perintah CLI, modul operasional, int
 | **14** | [14. Katalog RSS Media Online Nasional](14-katalog-rss-media-online-nasional.md) | Registri feed media online nasional, endpoints valid, dan protokol polling ingestion pipeline. |
 | **15** | [15. Manajemen Menu Dinamis & Portabilitas Multi-Domain](15-manajemen-menu-dinamis-dan-portabilitas-multi-domain.md) | Navigasi berbasis basis data (`/settings/menus`), portabilitas multi-hosting, dan keamanan sesi (`PreventBackHistory`). |
 | **16** | [16. Peta Situasi Kamtibmas Nusantara & Integritas KPI](16-peta-nusantara-dan-integritas-kpi-command-center.md) | Peta Indonesia interaktif berbasis berita database (11 sentra), dual-scope map toggle, dan eliminasi KPI *gimmick*. |
+| **17** | [17. Perbaikan Navigasi Tab, Kontras Keamanan, & Otomasi Sinkron Topik Atensi](17-perbaikan-kontras-keamanan-dan-penarikan-otomatis-topik-atensi.md) | Redesain tab 2 baris 5 kolom anti-truncate, pembersihan gambar stok Unsplash, default placeholder teks berita, dan otomasi sinkron Google News saat adopsi Topik Atensi. |
 
 ---
 

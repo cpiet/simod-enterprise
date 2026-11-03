@@ -123,6 +123,16 @@ Ketika topik baru dibuat (misalnya *Peringatan HUT ke-75 Humas Polri*) dan belum
 4. **Klasifikasi Kategori & Portal**: Otomatis dipetakan ke kategori kepolisian (Harkamtibmas, Gakkum, Humas Polri) dan dikelompokkan pada opsi filter portal **`🌐 SEBARAN INTERNET (GOOGLE NEWS)`**.
 5. **Otomasi Pembuatan Topik**: Kotak centang *“Tarik berita internet sekarang (Google News Live)”* pada modal buat topik memungkinkan ingesti 25–100 berita pertama secara simultan.
 
-### 6.2. Standar Visual Grid Simetris & Kurasi Gambar Editorial
+### 6.2. Standar Visual Grid Simetris & Default Placeholder Resmi
 - **Kerapian Grid**: Setiap kartu berita dikunci pada ketinggian presisi `h-[435px]` dengan *two-line text clamp* untuk judul (`h-10 md:h-11`) dan ringkasan (`h-9`), memastikan tampilan dashboard tidak berantakan (*ragged cards*).
-- **Kurasi Gambar Editorial**: Berita internet yang tidak menyertakan foto thumbnail otomatis disematkan gambar editorial kepolisian beresolusi tinggi (*police fallback photos*) yang relevan, menjamin estetika profesional berstandar Command Center.
+- **Default Placeholder Elegan (Tanpa Gambar Stok Palsu)**: Menghilangkan pemaksaan gambar stok foto berulang (*unsplash*) yang tidak relevan dengan berita. Jika artikel tidak memiliki foto asli atau gambar gagal dimuat, sistem menampilkan banner placeholder default resmi yang elegan:
+  - Ikon `ImageOff` dalam bingkai rounded modern.
+  - Teks tegas: **`TIDAK ADA GAMBAR DITAMPILKAN`**.
+  - Subtitle: `Dokumentasi Berita Teks • [Nama Portal]`.
+  Sehingga tampilan tetap simetris, berwibawa, dan tidak membingungkan pimpinan dengan gambar yang tidak nyambung dengan isu berita.
+
+### 6.3. Sugesti Tren Potensial AI & Penarikan Berita Otomatis (1-Klik `✓ Pantau`)
+- Tombol `✓ Pantau` pada baris *Sugesti Isu Potensial & Tren Media Online (Google News AI)* seketika mengadopsi isu menjadi Topik Atensi aktif.
+- Sistem secara instan mengeksekusi penarikan berita langsung dari Google News menggunakan kata kunci bersih (tanpa `#` atau tanda baca).
+- Mengaitkan artikel portal lokal dan nasional yang relevan di basis data.
+- Seluruh berita terkait seketika disisipkan di baris teratas feed artikel, filter portal di-reset, dan fokus otomatis diarahkan ke topik tersebut tanpa jeda.
