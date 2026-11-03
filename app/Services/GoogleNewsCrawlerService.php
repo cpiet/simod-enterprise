@@ -47,7 +47,7 @@ class GoogleNewsCrawlerService
             ];
         }
 
-        $poldaId = $topic->polda_id;
+        $poldaId = $topic->polda_id ?: (\App\Models\Polda::first()?->id ?? 1);
         $ingestedArticles = [];
 
         foreach ($parsed as $item) {
@@ -111,6 +111,7 @@ class GoogleNewsCrawlerService
             ];
         }
 
+        libxml_clear_errors();
         return [
             'success'  => true,
             'message'  => "Berhasil menarik " . count($ingestedArticles) . " sebaran berita internet untuk kata kunci \"{$query}\".",
@@ -129,16 +130,30 @@ class GoogleNewsCrawlerService
             return trim($customQuery);
         }
 
-        // Jika ada kata kunci di topik, ambil kombinasi yang tajam
+        // Jika ada kata kunci di topik, bersihkan tanda pagar (#) dan karakter baca
         $keywords = $topic->getKeywordsArray();
-        if (!empty($keywords)) {
-            // Ambil 1-2 kata kunci pertama yang paling representatif
-            return implode(' ', array_slice($keywords, 0, 2));
+        $cleanedKeywords = [];
+        foreach ($keywords as $kw) {
+            $clean = preg_replace('/[#]/', '', $kw);
+            $clean = trim($clean, " \t\n\r\0\x0B.#,;");
+            if (mb_strlen($clean) >= 3) {
+                $cleanedKeywords[] = $clean;
+            }
+        }
+
+        if (!empty($cleanedKeywords)) {
+            // Ambil 1-3 kata kunci pertama yang paling representatif
+            return implode(' ', array_slice($cleanedKeywords, 0, 3));
         }
 
         // Fallback ke judul topik, bersihkan tanda baca berlebih
         $cleanedTitle = preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $topic->title);
         $cleanedTitle = preg_replace('/\s+/', ' ', trim($cleanedTitle));
+
+        $words = explode(' ', $cleanedTitle);
+        if (count($words) > 5) {
+            return implode(' ', array_slice($words, 0, 5));
+        }
 
         return $cleanedTitle;
     }
@@ -218,10 +233,10 @@ class GoogleNewsCrawlerService
             // Kategori dinamis
             $category = $this->detectCategory($cleanTitle . ' ' . $cleanSummary);
 
-            // Thumbnail / gambar artikel (ekstrak asli atau berikan cover editorial berwibawa)
+            // Thumbnail / gambar artikel asli dari Google News jika ada. Jangan paksakan gambar stok yang tidak relevan.
             $imageUrl = $this->extractImageFromHtml($rawDesc);
-            if (empty($imageUrl)) {
-                $imageUrl = $this->getEditorialFallbackImage($category, $cleanTitle, $count);
+            if (!empty($imageUrl) && str_contains($imageUrl, 'unsplash.com')) {
+                $imageUrl = null;
             }
 
             $results[] = [
@@ -243,48 +258,6 @@ class GoogleNewsCrawlerService
 
         libxml_clear_errors();
         return $results;
-    }
-
-    /**
-     * Berikan gambar cover editorial kepolisian & pers beresolusi tinggi yang sesuai tema.
-     */
-    protected function getEditorialFallbackImage(string $category, string $title, int $seed): string
-    {
-        $harkamtibmasImages = [
-            'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800&auto=format&fit=crop&q=80', // Konferensi Pers & Rilis Kehumasan
-            'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&auto=format&fit=crop&q=80', // Sinergi Media & Rapat Pimpinan
-            'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=800&auto=format&fit=crop&q=80', // Apel & Personel Kedinasan Polri
-            'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&auto=format&fit=crop&q=80', // Ruang Redaksi Berita & Pers
-        ];
-
-        $hukumImages = [
-            'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&auto=format&fit=crop&q=80', // Gedung Penegakan Hukum
-            'https://images.unsplash.com/photo-1505664194779-8beaceb93744?w=800&auto=format&fit=crop&q=80', // Arsip Berkas Perkara & Regulasi
-        ];
-
-        $siberImages = [
-            'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&auto=format&fit=crop&q=80', // Monitoring Ruang Siber
-            'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&auto=format&fit=crop&q=80', // Infrastruktur Jaringan & Server
-        ];
-
-        $laluLintasImages = [
-            'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=800&auto=format&fit=crop&q=80', // Patroli Jalan Raya
-        ];
-
-        $lower = mb_strtolower($title);
-        if (str_contains($lower, 'siber') || str_contains($lower, 'digital') || str_contains($lower, 'online') || str_contains($lower, 'medsos')) {
-            return $siberImages[$seed % count($siberImages)];
-        }
-
-        if ($category === 'Hukum & Kriminal') {
-            return $hukumImages[$seed % count($hukumImages)];
-        }
-
-        if ($category === 'Lalu Lintas') {
-            return $laluLintasImages[$seed % count($laluLintasImages)];
-        }
-
-        return $harkamtibmasImages[$seed % count($harkamtibmasImages)];
     }
 
     /**

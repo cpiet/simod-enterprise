@@ -52,6 +52,7 @@ import {
   Pin,
   Tag,
   Edit3,
+  ImageOff,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -152,39 +153,20 @@ const handleSearch = () => {
   currentPage.value = 1;
 };
 
-// Curated High-Resolution Editorial & Police Imagery Palette
-const defaultPoliceImages = [
-  'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800&auto=format&fit=crop&q=80', // Konferensi Pers & Rilis Kehumasan
-  'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&auto=format&fit=crop&q=80', // Sinergi Media & Rapat Pimpinan
-  'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=800&auto=format&fit=crop&q=80', // Apel & Personel Kedinasan Polri
-  'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&auto=format&fit=crop&q=80', // Ruang Redaksi Berita & Pers
-  'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&auto=format&fit=crop&q=80', // Gedung Penegakan Hukum
-  'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&auto=format&fit=crop&q=80', // Monitoring Ruang Siber
-];
-
+// Image Validation & Placeholder Logic (Tidak Memaksakan Gambar Stok)
 const brokenImages = ref(new Set());
 
-const getArticleImage = (article) => {
-  if (article?.image_url && !brokenImages.value.has(article.id)) {
-    return article.image_url;
-  }
-  const numId = parseInt(String(article?.id || '0').replace(/\D/g, '') || '0', 10);
-  const idx = Math.abs(numId) % defaultPoliceImages.length;
-  return defaultPoliceImages[idx];
+const hasValidImage = (article) => {
+  if (!article || !article.image_url) return false;
+  if (brokenImages.value.has(article.id)) return false;
+  const url = String(article.image_url).trim();
+  if (url === '' || url.includes('unsplash.com')) return false;
+  return true;
 };
 
-const handleImageError = (e, article) => {
-  if (!article) return;
-  if (!brokenImages.value.has(article.id)) {
+const handleImageError = (article) => {
+  if (article?.id) {
     brokenImages.value.add(article.id);
-    const fallback = getArticleImage(article);
-    if (e?.target && e.target.src !== fallback) {
-      e.target.src = fallback;
-      return;
-    }
-  }
-  if (e?.target) {
-    e.target.src = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='450' viewBox='0 0 800 450'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23070d1d'/%3E%3Cstop offset='50%25' stop-color='%230d1b38'/%3E%3Cstop offset='100%25' stop-color='%23081024'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='800' height='450' fill='url(%23g)'/%3E%3Ccircle cx='400' cy='200' r='60' fill='%23f59e0b' fill-opacity='0.15' stroke='%23f59e0b' stroke-width='2' stroke-opacity='0.4'/%3E%3Cpath d='M380 180h40v40h-40z' fill='none' stroke='%23f59e0b' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M370 200h60M400 170v60' stroke='%23f59e0b' stroke-width='2' stroke-opacity='0.6' stroke-linecap='round'/%3E%3Ctext x='400' y='290' font-family='sans-serif' font-size='15' font-weight='bold' fill='%2394a3b8' text-anchor='middle' letter-spacing='2'%3EWARTA INTELIJEN HUMAS POLRI%3C/text%3E%3Ctext x='400' y='315' font-family='sans-serif' font-size='11' fill='%2364748b' text-anchor='middle'%3EDokumentasi Siaran Pers Resmi%3C/text%3E%3C/svg%3E";
   }
 };
 
@@ -334,15 +316,39 @@ const adoptSuggestion = async (item) => {
       crawl_live: true,
     });
     if (res.data?.success) {
-      showToastNotification(res.data.message || 'Topik Atensi berhasil diadopsi!');
+      showToastNotification(res.data.message || 'Topik Atensi berhasil diadopsi & berita disinkronkan!');
       if (res.data.topic) {
         const exists = (props.topics || []).some(t => t.id === res.data.topic.id);
         if (!exists) {
           props.topics.push(res.data.topic);
+        } else {
+          const idx = props.topics.findIndex(t => t.id === res.data.topic.id);
+          if (idx !== -1) props.topics[idx] = res.data.topic;
         }
         selectedTopicId.value = res.data.topic.id;
       }
+
+      // Masukkan artikel hasil crawling Google News & hasil pencocokan langsung ke feed teratas
+      if (res.data.articles && res.data.articles.length > 0) {
+        const existingUrls = new Set((props.sampleArticles || []).map((a) => a.link));
+        const newArticles = res.data.articles.filter((a) => !existingUrls.has(a.link));
+        if (newArticles.length > 0) {
+          props.sampleArticles.unshift(...newArticles);
+        }
+      }
+
+      // Reset filter agar seluruh berita hasil topik atensi langsung tampil utuh
+      selectedPortal.value = 'Semua Portal';
+      selectedCategory.value = 'all';
+      showBookmarksOnly.value = false;
+      selectedSentiment.value = 'all';
+      searchQuery.value = '';
+      currentPage.value = 1;
+
       localSuggestedTopics.value = localSuggestedTopics.value.filter(s => s.title !== item.title);
+
+      // Sinkronkan state Inertia di latar belakang secara halus
+      router.reload({ preserveScroll: true, only: ['sampleArticles', 'topics'] });
     }
   } catch (err) {
     showToastNotification(err.response?.data?.message || 'Gagal mengadopsi topik, coba lagi.');
@@ -1164,7 +1170,20 @@ const filteredArticles = computed(() => {
 
   // Filter Topik Atensi Pimpinan (Smart Dossier)
   if (selectedTopicId.value) {
-    list = list.filter((a) => (a.matched_topic_ids || []).includes(selectedTopicId.value));
+    const curTopic = (props.topics || []).find((t) => t.id === selectedTopicId.value);
+    const kws = (curTopic?.keywords_array || [])
+      .map((k) => k.replace(/^[#]/, '').trim().toLowerCase())
+      .filter((k) => k.length >= 3);
+
+    list = list.filter((a) => {
+      if ((a.matched_topic_ids || []).includes(selectedTopicId.value)) return true;
+      if ((a.manual_topic_ids || []).includes(selectedTopicId.value)) return true;
+      if (kws.length > 0) {
+        const text = ((a.title || '') + ' ' + (a.summary || '')).toLowerCase();
+        return kws.some((k) => text.includes(k));
+      }
+      return false;
+    });
   }
 
   return list;
@@ -2116,18 +2135,35 @@ const submitIssue = () => {
                 </span>
               </div>
 
-              <!-- Real Cover Image with Smart Thematic Fallback -->
+              <!-- Real Cover Image (Hanya jika ada foto berita asli) -->
               <img
-                :src="getArticleImage(article)"
+                v-if="hasValidImage(article)"
+                :src="article.image_url"
                 :alt="article.title"
                 loading="lazy"
                 referrerpolicy="no-referrer"
                 class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                @error="(e) => handleImageError(e, article)"
+                @error="handleImageError(article)"
               />
 
-              <!-- Dark Gradient Overlay -->
-              <div class="absolute inset-0 bg-gradient-to-t from-[#0b1426] via-transparent to-black/40 pointer-events-none"></div>
+              <!-- Default Placeholder: Tulisan Default Tidak Ada Gambar Ditampilkan -->
+              <div
+                v-else
+                class="w-full h-full flex flex-col items-center justify-center p-4 bg-gradient-to-b from-slate-100 via-slate-50 to-white dark:from-[#091122] dark:via-[#070d1a] dark:to-[#050914] text-center select-none"
+              >
+                <div class="w-10 h-10 rounded-2xl bg-slate-200/70 dark:bg-slate-800/60 border border-slate-300 dark:border-slate-700/60 flex items-center justify-center mb-1.5 shadow-inner">
+                  <ImageOff class="w-5 h-5 text-slate-400 dark:text-slate-500" />
+                </div>
+                <span class="text-[11px] font-black tracking-wider text-slate-700 dark:text-slate-300 uppercase">
+                  Tidak Ada Gambar Ditampilkan
+                </span>
+                <span class="text-[10px] text-slate-500 dark:text-slate-500 mt-0.5">
+                  Dokumentasi Berita Teks &bull; {{ article.source_name }}
+                </span>
+              </div>
+
+              <!-- Dark Gradient Overlay (Hanya jika ada gambar asli) -->
+              <div v-if="hasValidImage(article)" class="absolute inset-0 bg-gradient-to-t from-[#0b1426] via-transparent to-black/40 pointer-events-none"></div>
             </div>
 
             <!-- Card Body Content -->

@@ -1514,13 +1514,87 @@ PROMPT;
 
         // 2. Tarik Google News secara instan jika crawl_live diaktifkan
         $crawledCount = 0;
+        $crawledArticles = [];
         if ($request->boolean('crawl_live', true)) {
             $crawler = new \App\Services\GoogleNewsCrawlerService();
             $crawlResult = $crawler->crawlAndIngestForTopic($topic, null, 40);
             $crawledCount = $crawlResult['count'] ?? 0;
+            $crawledArticles = $crawlResult['articles'] ?? [];
         }
 
-        // 3. Hapus topik ini dari daftar sugesti laporan aktif
+        // 3. Hubungkan juga artikel lokal di basis data yang sesuai dengan kata kunci topik
+        $keywords = $topic->getKeywordsArray();
+        $cleanedKeywords = [];
+        foreach ($keywords as $kw) {
+            $clean = preg_replace('/[#]/', '', $kw);
+            $clean = trim($clean, " \t\n\r\0\x0B.#,;");
+            if (mb_strlen($clean) >= 3) {
+                $cleanedKeywords[] = $clean;
+            }
+        }
+
+        if (!empty($cleanedKeywords)) {
+            $existingMatches = MediaArticle::where('polda_id', $selectedPolda->id)
+                ->where(function ($q) use ($cleanedKeywords, $topic) {
+                    foreach ($cleanedKeywords as $kw) {
+                        $q->orWhere('title', 'like', "%{$kw}%")
+                          ->orWhere('summary', 'like', "%{$kw}%");
+                    }
+                    $q->orWhere('title', 'like', "%{$topic->title}%");
+                })
+                ->latest('pub_date')
+                ->take(40)
+                ->get();
+
+            foreach ($existingMatches as $em) {
+                DB::table('media_article_topic')->updateOrInsert(
+                    [
+                        'media_article_id' => $em->id,
+                        'media_topic_id'   => $topic->id,
+                    ],
+                    [
+                        'is_manual'        => true,
+                        'created_at'       => now(),
+                        'updated_at'       => now(),
+                    ]
+                );
+
+                $already = false;
+                foreach ($crawledArticles as $ca) {
+                    if ((string) $ca['id'] === (string) $em->id || $ca['link'] === $em->url) {
+                        $already = true;
+                        break;
+                    }
+                }
+                if (!$already) {
+                    $crawledArticles[] = [
+                        'id'                => (string) $em->id,
+                        'title'             => $em->title,
+                        'source_name'       => strtoupper($em->source_name),
+                        'category'          => $em->category,
+                        'category_badge'    => strtoupper($em->category),
+                        'time_ago'          => $em->created_at ? $em->created_at->diffForHumans() : 'Baru saja',
+                        'pub_date'          => $em->pub_date ? $em->pub_date->format('d M Y, H.i') . ' WITA' : now()->format('d M Y, H.i') . ' WITA',
+                        'summary'           => $em->summary ?: 'Cuplikan berita pantauan intelijen media siber.',
+                        'image_url'         => (empty($em->image_url) || str_contains($em->image_url, 'unsplash.com')) ? null : $em->image_url,
+                        'link'              => $em->url,
+                        'sentiment'         => $em->sentiment ?: 'netral',
+                        'is_bookmarked'     => (bool) $em->is_bookmarked,
+                        'matched_topic_ids' => [$topic->id],
+                        'matched_topics'    => [
+                            [
+                                'id'       => $topic->id,
+                                'title'    => $topic->title,
+                                'priority' => $topic->priority,
+                            ]
+                        ],
+                        'manual_topic_ids'  => [$topic->id],
+                    ];
+                }
+            }
+        }
+
+        // 4. Hapus topik ini dari daftar sugesti laporan aktif
         $latestReport = MediaIntelligenceReport::where('polda_id', $selectedPolda->id)->latest()->first();
         $remainingSuggestions = [];
         if ($latestReport && is_array($latestReport->suggested_topics)) {
@@ -1530,27 +1604,17 @@ PROMPT;
             $latestReport->update(['suggested_topics' => $remainingSuggestions]);
         }
 
-        // Hitung total artikel terhubung
-        $keywords = $topic->getKeywordsArray();
-        $articlesQuery = MediaArticle::where('polda_id', $selectedPolda->id);
-        if (!empty($keywords)) {
-            $articlesQuery->where(function ($q) use ($keywords) {
-                foreach ($keywords as $kw) {
-                    $q->orWhere('title', 'like', "%{$kw}%")
-                      ->orWhere('summary', 'like', "%{$kw}%");
-                }
-            });
-        }
-        $topicArticlesCount = $articlesQuery->count();
+        $totalConnectedCount = max(count($crawledArticles), 1);
 
         return response()->json([
             'success'              => true,
-            'message'              => "✓ Topik '{$topic->title}' berhasil diadopsi sebagai Topik Atensi! {$crawledCount} berita Google News ditarik.",
+            'message'              => "✓ Topik '{$topic->title}' berhasil diadopsi sebagai Topik Atensi! {$totalConnectedCount} berita berhasil disinkronkan.",
             'topic'                => array_merge($topic->toArray(), [
-                'articles_count' => $topicArticlesCount,
+                'articles_count' => $totalConnectedCount,
                 'keywords_array' => $topic->getKeywordsArray(),
             ]),
-            'crawled_count'        => $crawledCount,
+            'crawled_count'        => $totalConnectedCount,
+            'articles'             => $crawledArticles,
             'remaining_suggestions'=> $remainingSuggestions,
         ]);
     }

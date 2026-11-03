@@ -56,11 +56,11 @@ class MediaTopic extends Model
             return [];
         }
 
-        $parts = preg_split('/[\r\n,]+/', (string) $this->keywords);
+        $parts = preg_split('/[\r\n,;]+/', (string) $this->keywords);
         $clean = [];
 
         foreach ($parts as $p) {
-            $trimmed = mb_strtolower(trim($p));
+            $trimmed = mb_strtolower(trim($p, " \t\n\r\0\x0B.#,;"));
             if ($trimmed !== '') {
                 $clean[] = $trimmed;
             }
