@@ -270,6 +270,24 @@ const deleteTopic = (topic) => {
   });
 };
 
+const removeKeywordFromTopic = (topic, keywordToRemove) => {
+  if (!confirm(`Hapus kata kunci "${keywordToRemove}" dari topik ini?`)) return;
+  const currentKeywords = (topic.keywords_array || []).filter(kw => kw.toLowerCase() !== keywordToRemove.toLowerCase());
+  const updatedKeywords = currentKeywords.join(', ');
+  router.post(`/media-intelligence/topics/${topic.id}/update`, {
+    id: topic.id,
+    title: topic.title,
+    keywords: updatedKeywords,
+    description: topic.description || '',
+    priority: topic.priority || 'high',
+  }, {
+    preserveScroll: true,
+    onSuccess: () => {
+      showToastNotification(`Kata kunci "${keywordToRemove}" berhasil dihapus.`);
+    },
+  });
+};
+
 const openTagModal = (article) => {
   targetArticleForTag.value = article;
   showTagModal.value = true;
@@ -1330,24 +1348,28 @@ const submitIssue = () => {
           <div
             v-for="t in topics"
             :key="t.id"
-            class="flex items-center shrink-0"
+            class="inline-flex items-center rounded-xl p-0.5 transition shrink-0 border"
+            :class="selectedTopicId === t.id
+              ? 'bg-amber-400 border-amber-400 shadow-md ring-2 ring-amber-400/30'
+              : t.priority === 'urgent'
+                ? 'bg-rose-950/40 border-rose-500/40 hover:border-rose-400'
+                : 'bg-slate-900 border-slate-800 hover:border-slate-700'"
           >
             <button
               @click="selectedTopicId = (selectedTopicId === t.id ? null : t.id); showBookmarksOnly = false; currentPage = 1"
-              class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap cursor-pointer border"
+              type="button"
+              class="px-2.5 py-1 text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer select-none"
               :class="selectedTopicId === t.id
-                ? 'bg-amber-400 text-slate-950 font-black border-amber-400 shadow-md'
-                : t.priority === 'urgent'
-                  ? 'bg-rose-950/40 text-rose-200 border-rose-500/40 hover:border-rose-400'
-                  : 'bg-slate-900 text-slate-200 border-slate-800 hover:border-slate-700'"
+                ? 'text-slate-950 font-black'
+                : t.priority === 'urgent' ? 'text-rose-200' : 'text-slate-200'"
             >
               <span
-                class="w-2 h-2 rounded-full"
+                class="w-2 h-2 rounded-full shrink-0"
                 :class="selectedTopicId === t.id
                   ? 'bg-slate-950'
                   : t.priority === 'urgent' ? 'bg-rose-500 animate-pulse' : 'bg-amber-400'"
               ></span>
-              <span class="truncate max-w-[190px]">{{ t.title }}</span>
+              <span class="truncate max-w-[170px]">{{ t.title }}</span>
               <span
                 class="text-[10px] px-1.5 py-0.2 rounded-full font-mono font-extrabold"
                 :class="selectedTopicId === t.id
@@ -1356,6 +1378,16 @@ const submitIssue = () => {
               >
                 {{ t.articles_count || 0 }}
               </span>
+            </button>
+
+            <!-- Quick Delete Button on the Pill -->
+            <button
+              @click.stop="deleteTopic(t)"
+              type="button"
+              class="p-1 rounded-lg hover:bg-black/20 text-slate-400 hover:text-rose-500 transition cursor-pointer"
+              title="Hapus Topik Atensi Ini"
+            >
+              <X class="w-3.5 h-3.5" />
             </button>
           </div>
 
@@ -1388,15 +1420,23 @@ const submitIssue = () => {
               <p v-if="currentSelectedTopic.description" class="text-xs text-slate-300 italic leading-relaxed">
                 "{{ currentSelectedTopic.description }}"
               </p>
-              <!-- Keywords Tags -->
+              <!-- Keywords Tags with Quick Remove 'X' -->
               <div class="flex items-center gap-1.5 flex-wrap pt-1">
                 <span class="text-[10px] text-slate-400 font-bold">Kata Kunci Pantau:</span>
                 <span
                   v-for="kw in (currentSelectedTopic.keywords_array || [])"
                   :key="kw"
-                  class="px-2 py-0.5 rounded-md text-[9px] font-mono bg-slate-800 text-slate-300 border border-slate-700"
+                  class="px-2 py-0.5 rounded-md text-[9px] font-mono bg-slate-800 text-slate-200 border border-slate-700 flex items-center gap-1.5"
                 >
-                  #{{ kw }}
+                  <span>#{{ kw }}</span>
+                  <button
+                    @click.stop="removeKeywordFromTopic(currentSelectedTopic, kw)"
+                    type="button"
+                    class="p-0.5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 rounded transition cursor-pointer"
+                    title="Hapus kata kunci ini dari pantauan"
+                  >
+                    <X class="w-2.5 h-2.5" />
+                  </button>
                 </span>
               </div>
             </div>
@@ -1423,22 +1463,24 @@ const submitIssue = () => {
                 <span>📱 Salin Naskah WA</span>
               </button>
 
-              <!-- Edit Topic -->
+              <!-- Edit Topic & Keywords -->
               <button
                 @click="openEditTopicModal(currentSelectedTopic)"
-                class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
-                title="Edit Topik & Kata Kunci"
+                class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-bold transition cursor-pointer"
+                title="Edit Judul & Kata Kunci"
               >
-                <Edit3 class="w-3.5 h-3.5" />
+                <Edit3 class="w-3.5 h-3.5 text-amber-400" />
+                <span>Edit Kata Kunci</span>
               </button>
 
               <!-- Delete Topic -->
               <button
                 @click="deleteTopic(currentSelectedTopic)"
-                class="p-2 rounded-xl bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-500/50 transition cursor-pointer"
-                title="Hapus Topik"
+                class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-400 border border-slate-700 hover:border-rose-500/50 text-xs font-bold transition cursor-pointer"
+                title="Hapus Topik Atensi Ini"
               >
-                <Trash2 class="w-3.5 h-3.5" />
+                <Trash2 class="w-3.5 h-3.5 text-rose-500" />
+                <span>Hapus Topik</span>
               </button>
 
               <!-- Close Topic Filter -->
