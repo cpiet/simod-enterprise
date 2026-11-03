@@ -43,6 +43,7 @@ import {
   RotateCw,
   Target,
   FolderOpen,
+  PlusCircle,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -51,6 +52,8 @@ const props = defineProps({
   selectedCode: String,
   isNational: Boolean,
   posts: Object, // Paginated
+  totalPostsCount: Number,
+  bookmarkedCount: Number,
   investigationCases: { type: Array, default: () => [] },
   selectedCase: { type: Object, default: null },
   casePosts: { type: Object, default: null },
@@ -75,10 +78,27 @@ const selectedSort = ref(props.filters?.sort || 'latest');
 const searchQuery = ref(props.filters?.q || '');
 const selectedSatwil = ref(props.filters?.satwil || 'all');
 
+// Smart Dossier & Topik Atensi Selection States
+const selectedCaseId = ref(props.filters?.case_id ? Number(props.filters.case_id) : (props.selectedCase?.id || null));
+const showBookmarksOnly = ref(Boolean(props.filters?.bookmarked));
+
+watch(() => [props.filters, props.selectedCase], () => {
+  if (props.filters?.case_id !== undefined) {
+    selectedCaseId.value = props.filters.case_id ? Number(props.filters.case_id) : null;
+  } else if (props.selectedCase?.id) {
+    selectedCaseId.value = props.selectedCase.id;
+  } else {
+    selectedCaseId.value = null;
+  }
+  showBookmarksOnly.value = Boolean(props.filters?.bookmarked);
+});
+
 const handleFilter = () => {
   router.get('/social-intelligence', {
     polda: props.selectedCode,
     tab: activeTab.value,
+    case_id: selectedCaseId.value || undefined,
+    bookmarked: showBookmarksOnly.value ? 1 : undefined,
     platform: selectedPlatform.value,
     sentiment: selectedSentiment.value,
     kol: kolOnly.value ? 1 : 0,
@@ -95,22 +115,40 @@ const switchTab = (tab) => {
 
 const isRefreshingCase = ref(false);
 
-const selectCaseTab = (caseId) => {
-  activeTab.value = 'case_' + caseId;
-  router.get('/social-intelligence', {
-    polda: props.selectedCode,
-    tab: 'case_' + caseId,
-    case_id: caseId,
-    platform: selectedPlatform.value,
-    sentiment: selectedSentiment.value,
-  }, { preserveState: true, preserveScroll: true });
+const selectAllPosts = () => {
+  selectedCaseId.value = null;
+  showBookmarksOnly.value = false;
+  handleFilter();
+};
+
+const selectBookmarked = () => {
+  selectedCaseId.value = null;
+  showBookmarksOnly.value = true;
+  handleFilter();
+};
+
+const selectCasePill = (caseId) => {
+  if (selectedCaseId.value === caseId) {
+    selectedCaseId.value = null;
+  } else {
+    selectedCaseId.value = caseId;
+    showBookmarksOnly.value = false;
+  }
+  handleFilter();
 };
 
 const closeCaseTab = (caseId) => {
-  if (confirm('Tutup tab berkas kasus ini dan simpan ke arsip?')) {
+  if (confirm('Tutup topik atensi pimpinan ini dan simpan ke arsip?')) {
     router.post(`/social-intelligence/cases/${caseId}/close`, {
       polda: props.selectedCode,
-    }, { preserveScroll: true });
+    }, {
+      preserveScroll: true,
+      onSuccess: () => {
+        if (selectedCaseId.value === caseId) {
+          selectedCaseId.value = null;
+        }
+      },
+    });
   }
 };
 
@@ -795,83 +833,246 @@ const getPublicPlatformBadge = (platform) => {
         <span>04. Integrasi Apify & Pengaturan</span>
       </button>
 
-      <!-- Vertical Divider if Active Investigation Cases Exist -->
-      <div v-if="investigationCases && investigationCases.length > 0" class="h-6 w-px bg-slate-300 dark:bg-slate-700 mx-1 shrink-0"></div>
-
-      <!-- DYNAMIC INVESTIGATION TABS (PERSISTENT ACTIVE CASES) -->
-      <div
-        v-for="c in investigationCases"
-        :key="c.id"
-        class="inline-flex items-center rounded-xl p-0.5 transition shrink-0 shadow-xs border"
-        :class="activeTab === 'case_' + c.id
-          ? 'bg-amber-400 border-amber-500 shadow-md ring-2 ring-amber-400/40'
-          : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-amber-400'"
-      >
-        <button
-          @click="selectCaseTab(c.id)"
-          type="button"
-          class="px-3 py-1.5 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap"
-          :class="activeTab === 'case_' + c.id
-            ? 'text-slate-950 font-black'
-            : 'text-slate-600 dark:text-slate-300'"
-          :title="c.title"
-        >
-          <Target class="w-3.5 h-3.5 text-rose-500 animate-pulse" v-if="activeTab === 'case_' + c.id" />
-          <FolderOpen class="w-3.5 h-3.5 text-amber-500" v-else />
-          <span class="max-w-[150px] md:max-w-[190px] truncate">{{ c.short_title }}</span>
-          <span
-            class="px-1.5 py-0.2 rounded-full text-[10px] font-black"
-            :class="activeTab === 'case_' + c.id ? 'bg-slate-950 text-amber-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'"
-          >
-            {{ c.posts_count }}
-          </span>
-        </button>
-
-        <!-- Close / Archive Tab Button -->
-        <button
-          @click.stop="closeCaseTab(c.id)"
-          type="button"
-          class="p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 text-slate-500 hover:text-rose-600 transition cursor-pointer"
-          title="Tutup & Arsipkan Tab Kasus Ini"
-        >
-          <X class="w-3.5 h-3.5" />
-        </button>
-      </div>
     </div>
 
     <!-- TAB 01: RADAR MULTI-PLATFORM (LIVE FEEDS) -->
-    <div v-if="activeTab === 'radar'" class="space-y-4">
-      <!-- BANNER BERKAS KASUS AKTIF (KEMUDAHAN KEMBALI DARI MENU UTAMA) -->
-      <div
-        v-if="investigationCases && investigationCases.length > 0"
-        class="p-4 rounded-3xl bg-gradient-to-r from-amber-500/15 via-indigo-500/10 to-transparent border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm"
-      >
-        <div class="flex items-center gap-3">
-          <span class="p-2.5 rounded-2xl bg-amber-400 text-slate-950 shadow-sm shrink-0">
-            <Target class="w-5 h-5" />
-          </span>
-          <div>
-            <p class="text-xs font-black text-slate-900 dark:text-white flex items-center gap-2">
-              <span>Berkas Kasus Penyelidikan Aktif ({{ investigationCases.length }})</span>
-              <span class="px-2 py-0.5 rounded-full text-[9px] bg-rose-500 text-white font-black uppercase tracking-wider">Prioritas</span>
-            </p>
-            <p class="text-[11px] text-slate-600 dark:text-slate-300">
-              Kasus atensi khusus tersimpan otomatis. Klik nama kasus di samping untuk membuka ruang kerja investigasi:
+    <div v-if="activeTab === 'radar'" class="space-y-5">
+      <!-- SMART DOSSIER: TOPIK ATENSI & REQUEST PIMPINAN (IDENTIK DENGAN MEDIA INTELLIGENCE) -->
+      <div class="rounded-3xl bg-[#0b1426] border border-amber-500/30 p-5 shadow-2xl space-y-4">
+        <!-- Top Bar: Title & Action -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+          <div class="space-y-0.5">
+            <div class="flex items-center gap-2">
+              <span class="flex h-2.5 w-2.5 relative">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+              </span>
+              <h3 class="text-sm md:text-base font-extrabold text-white flex items-center gap-1.5">
+                <span>Topik Atensi &amp; Request Pimpinan</span>
+                <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                  Smart Dossier
+                </span>
+              </h3>
+            </div>
+            <p class="text-[11px] text-slate-400">
+              Penyaringan kasus viral / atensi khusus Kapolda &amp; Kadiv Humas lintas 5 platform medsos (𝕏, TikTok, Instagram, YouTube, Facebook).
             </p>
           </div>
+
+          <div class="flex items-center gap-2">
+            <button
+              @click="openTrackKeywordModal"
+              type="button"
+              class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:brightness-110 text-slate-950 text-xs font-black shadow-md shadow-amber-500/20 transition cursor-pointer select-none"
+            >
+              <PlusCircle class="w-3.5 h-3.5" />
+              <span>+ Lacak Topik Atensi</span>
+            </button>
+          </div>
         </div>
-        <div class="flex items-center gap-2 flex-wrap">
+
+        <!-- Filter Pills Bar (Semua Percakapan, Disimpan, Kasus 1, Kasus 2...) -->
+        <div class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          <!-- All Posts Pill -->
           <button
+            @click="selectAllPosts"
+            type="button"
+            class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer select-none"
+            :class="selectedCaseId === null && !showBookmarksOnly
+              ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
+              : 'bg-slate-900 text-slate-300 hover:text-white border border-slate-800'"
+          >
+            <Globe class="w-3.5 h-3.5" />
+            <span>Semua Percakapan</span>
+            <span class="text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold" :class="selectedCaseId === null && !showBookmarksOnly ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-slate-400'">
+              {{ totalPostsCount || metrics?.total_posts || posts?.total || 0 }}
+            </span>
+          </button>
+
+          <!-- Bookmarked Pill -->
+          <button
+            @click="selectBookmarked"
+            type="button"
+            class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer select-none"
+            :class="showBookmarksOnly && selectedCaseId === null
+              ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
+              : 'bg-slate-900 text-slate-300 hover:text-white border border-slate-800'"
+          >
+            <Bookmark class="w-3.5 h-3.5" :class="showBookmarksOnly && selectedCaseId === null ? 'text-slate-950' : 'text-amber-400'" />
+            <span>Disimpan</span>
+            <span class="text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold" :class="showBookmarksOnly && selectedCaseId === null ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-slate-400'">
+              {{ bookmarkedCount || 0 }}
+            </span>
+          </button>
+
+          <div class="h-5 border-r border-slate-800 mx-1"></div>
+
+          <!-- Dynamic Investigation Case Pills -->
+          <div
             v-for="c in investigationCases"
             :key="c.id"
-            @click="selectCaseTab(c.id)"
-            type="button"
-            class="px-3 py-1.5 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-amber-400 hover:text-slate-950 border border-slate-200 dark:border-slate-700 transition flex items-center gap-1.5 cursor-pointer shadow-xs select-none"
+            class="inline-flex items-center rounded-xl p-0.5 transition shrink-0 border"
+            :class="selectedCaseId === c.id
+              ? 'bg-amber-400 border-amber-400 shadow-md ring-2 ring-amber-400/30'
+              : c.priority === 'urgent'
+                ? 'bg-rose-950/40 border-rose-500/40 hover:border-rose-400'
+                : 'bg-slate-900 border-slate-800 hover:border-slate-700'"
           >
-            <FolderOpen class="w-3.5 h-3.5 text-amber-500" />
-            <span class="max-w-[170px] truncate">{{ c.short_title }}</span>
-            <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 dark:bg-slate-700 font-mono">{{ c.posts_count }}</span>
-          </button>
+            <button
+              @click="selectCasePill(c.id)"
+              type="button"
+              class="px-2.5 py-1 text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer select-none"
+              :class="selectedCaseId === c.id
+                ? 'text-slate-950 font-black'
+                : c.priority === 'urgent' ? 'text-rose-200' : 'text-slate-200'"
+            >
+              <span
+                class="w-2 h-2 rounded-full shrink-0"
+                :class="selectedCaseId === c.id
+                  ? 'bg-slate-950'
+                  : c.priority === 'urgent' ? 'bg-rose-500 animate-pulse' : 'bg-amber-400'"
+              ></span>
+              <span class="truncate max-w-[170px]">{{ c.short_title }}</span>
+              <span
+                class="text-[10px] px-1.5 py-0.2 rounded-full font-mono font-extrabold"
+                :class="selectedCaseId === c.id
+                  ? 'bg-slate-950 text-amber-400'
+                  : c.priority === 'urgent' ? 'bg-rose-500/30 text-rose-300' : 'bg-slate-800 text-slate-300'"
+              >
+                {{ c.posts_count || 0 }}
+              </span>
+            </button>
+
+            <!-- Quick Close / Archive Button on the Pill -->
+            <button
+              @click.stop="closeCaseTab(c.id)"
+              type="button"
+              class="p-1 rounded-lg hover:bg-black/20 text-slate-400 hover:text-rose-500 transition cursor-pointer"
+              title="Tutup & Arsipkan Topik Atensi Ini"
+            >
+              <X class="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <span v-if="investigationCases.length === 0" class="text-xs text-slate-500 italic px-2">
+            Belum ada topik atensi aktif. Klik "+ Lacak Topik Atensi" untuk memantau kasus request pimpinan.
+          </span>
+        </div>
+
+        <!-- Dossier Detail Bar (Muncul saat Kasus Dipilih) -->
+        <div
+          v-if="selectedCase"
+          class="p-4 md:p-5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-900/95 to-slate-900 border border-amber-500/40 space-y-4"
+        >
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span
+                  class="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider"
+                  :class="selectedCase.priority === 'urgent' ? 'bg-rose-500 text-white' : 'bg-amber-400 text-slate-950'"
+                >
+                  {{ selectedCase.priority === 'urgent' ? '🚨 SANGAT MENDESAK' : '⭐ PRIORITAS TINGGI' }}
+                </span>
+                <h4 class="text-sm md:text-base font-black text-white flex items-center gap-2">
+                  <FolderOpen class="w-4 h-4 text-amber-400" />
+                  <span>{{ selectedCase.title }}</span>
+                </h4>
+                <span class="text-[11px] text-amber-400 font-mono font-bold">
+                  ({{ selectedCase.posts_count || 0 }} Percakapan Terkait)
+                </span>
+                <span class="text-[11px] text-slate-400">
+                  • Diperbarui: {{ selectedCase.last_crawled_at }}
+                </span>
+              </div>
+
+              <!-- Keywords Tags with Hash -->
+              <div class="flex items-center gap-1.5 flex-wrap pt-1">
+                <span class="text-[10px] text-slate-400 font-bold">Kata Kunci Pantau:</span>
+                <span
+                  v-for="kw in (selectedCase.keywords_array || [])"
+                  :key="kw"
+                  class="px-2 py-0.5 rounded-md text-[9px] font-mono bg-slate-800 text-slate-200 border border-slate-700"
+                >
+                  #{{ kw }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Action Buttons for Selected Case -->
+            <div class="flex items-center gap-2 shrink-0 flex-wrap">
+              <button
+                @click="refreshCaseTab(selectedCase.id)"
+                :disabled="isRefreshingCase"
+                type="button"
+                class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                title="Tarik data postingan terbaru seputar kasus ini"
+              >
+                <RotateCw class="w-3.5 h-3.5" :class="{ 'animate-spin': isRefreshingCase }" />
+                <span>{{ isRefreshingCase ? 'Menyinkronkan...' : 'Tarik Update Postingan' }}</span>
+              </button>
+
+              <a
+                :href="getCaseEscalationUrl(selectedCase)"
+                class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black shadow-md transition cursor-pointer select-none"
+                title="Eskalasi temuan medsos ke laporan isu kepolisian"
+              >
+                <AlertTriangle class="w-3.5 h-3.5" />
+                <span>🚨 Eskalasi Jadi Isu Kamtibmas</span>
+              </a>
+
+              <button
+                @click="selectAllPosts"
+                type="button"
+                class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 text-xs transition cursor-pointer"
+                title="Tutup Tampilan Kasus (Kembali ke Semua Percakapan)"
+              >
+                <X class="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <!-- 4 Mini KPIs -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+              <span class="text-[10px] font-bold text-slate-400">Total Percakapan Kasus</span>
+              <p class="text-xl font-black text-white mt-0.5">{{ selectedCase.posts_count || 0 }} <span class="text-[10px] font-normal text-slate-400">Post</span></p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+              <span class="text-[10px] font-bold text-slate-400">Estimasi Jangkauan (Views)</span>
+              <p class="text-xl font-black text-indigo-400 mt-0.5">{{ formatNumber(selectedCase.total_views || 0) }}</p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+              <span class="text-[10px] font-bold text-slate-400">Total Interaksi Warganet</span>
+              <p class="text-xl font-black text-emerald-400 mt-0.5">{{ formatNumber(selectedCase.total_engagements || 0) }}</p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+              <span class="text-[10px] font-bold text-slate-400">Polarisasi Negatif</span>
+              <p class="text-xl font-black text-rose-400 mt-0.5">{{ selectedCase.sentiment_breakdown?.neg_pct || 0 }}%</p>
+            </div>
+          </div>
+
+          <!-- Sentiment Bar & Humas Note -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between text-[11px] font-bold flex-wrap gap-2 text-slate-300">
+              <span>Polarisasi Sentimen Warganet:</span>
+              <div class="flex items-center gap-3">
+                <span class="text-emerald-400">🟢 Positif: {{ selectedCase.sentiment_breakdown?.pos_pct || 0 }}% ({{ selectedCase.sentiment_breakdown?.positif || 0 }})</span>
+                <span class="text-slate-400">⚪ Netral: {{ selectedCase.sentiment_breakdown?.netral || 0 }}</span>
+                <span class="text-rose-400">🔴 Negatif: {{ selectedCase.sentiment_breakdown?.neg_pct || 0 }}% ({{ selectedCase.sentiment_breakdown?.negatif || 0 }})</span>
+              </div>
+            </div>
+            <div class="h-2 w-full bg-slate-800 rounded-full overflow-hidden flex">
+              <div class="bg-emerald-500 transition-all duration-500" :style="{ width: (selectedCase.sentiment_breakdown?.pos_pct || 0) + '%' }"></div>
+              <div class="bg-slate-500 transition-all duration-500" :style="{ width: Math.max(0, 100 - (selectedCase.sentiment_breakdown?.pos_pct || 0) - (selectedCase.sentiment_breakdown?.neg_pct || 0)) + '%' }"></div>
+              <div class="bg-rose-500 transition-all duration-500" :style="{ width: (selectedCase.sentiment_breakdown?.neg_pct || 0) + '%' }"></div>
+            </div>
+            <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 flex items-start gap-2">
+              <Info class="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <p class="leading-relaxed text-[11px]">
+                <strong>Rekomendasi Komunikasi Humas:</strong> {{ selectedCase.intelligence_notes }}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1331,18 +1532,33 @@ const getPublicPlatformBadge = (platform) => {
         v-else
         class="rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-12 text-center shadow-sm space-y-3"
       >
-        <Radio class="w-10 h-10 text-slate-400 mx-auto" />
-        <h3 class="text-base font-black text-slate-900 dark:text-white">Tidak ada percakapan media sosial ditemukan</h3>
+        <FolderOpen v-if="selectedCase" class="w-10 h-10 text-amber-500 mx-auto" />
+        <Radio v-else class="w-10 h-10 text-slate-400 mx-auto" />
+        <h3 class="text-base font-black text-slate-900 dark:text-white">
+          {{ selectedCase ? `Belum ada postingan tersimpan untuk topik "${selectedCase.title}"` : 'Tidak ada percakapan media sosial ditemukan' }}
+        </h3>
         <p class="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-          Coba sesuaikan kata kunci pencarian, filter platform, atau tekan tombol Sinkronisasi Radar.
+          {{ selectedCase ? 'Klik "Tarik Update Postingan" di atas untuk mencari dan mengunduh postingan terbaru seputar kasus ini.' : 'Coba sesuaikan kata kunci pencarian, filter platform, atau tekan tombol Sinkronisasi Radar.' }}
         </p>
-        <button
-          @click="selectedPlatform = 'all'; selectedSentiment = 'all'; kolOnly = false; searchQuery = ''; handleFilter()"
-          type="button"
-          class="px-4 py-2 rounded-xl bg-amber-400 text-slate-950 font-black text-xs hover:bg-amber-300 transition"
-        >
-          Reset Filter
-        </button>
+        <div class="flex items-center justify-center gap-2 pt-2">
+          <button
+            v-if="selectedCase"
+            @click="refreshCaseTab(selectedCase.id)"
+            :disabled="isRefreshingCase"
+            type="button"
+            class="px-4 py-2 rounded-xl bg-amber-400 text-slate-950 font-black text-xs hover:bg-amber-300 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+          >
+            <RotateCw class="w-3.5 h-3.5" :class="{ 'animate-spin': isRefreshingCase }" />
+            <span>{{ isRefreshingCase ? 'Menyinkronkan...' : 'Tarik Update Postingan' }}</span>
+          </button>
+          <button
+            @click="selectAllPosts"
+            type="button"
+            class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold transition cursor-pointer"
+          >
+            Lihat Semua Percakapan
+          </button>
+        </div>
       </div>
 
       <!-- Pagination -->
@@ -1369,312 +1585,6 @@ const getPublicPlatformBadge = (platform) => {
             />
           </template>
         </div>
-      </div>
-    </div>
-
-    <!-- TAB KHUSUS: BERKAS INVESTIGASI KASUS (SMART INVESTIGATION WORKSPACE) -->
-    <div v-if="activeTab.startsWith('case_')" class="space-y-6">
-      <div v-if="selectedCase" class="space-y-6">
-        <!-- HEADER KASUS PRIORITAS -->
-        <div class="rounded-3xl bg-white dark:bg-[#0b1426] border border-amber-500/30 p-6 md:p-8 shadow-sm space-y-6 relative overflow-hidden">
-          <div class="absolute -right-16 -top-16 w-64 h-64 rounded-full bg-amber-500/10 blur-3xl pointer-events-none"></div>
-
-          <!-- Header Title & Badges -->
-          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
-            <div class="space-y-2">
-              <div class="flex items-center gap-2 flex-wrap">
-                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 flex items-center gap-1.5">
-                  <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
-                  <span>Berkas Kasus Prioritas</span>
-                </span>
-                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1">
-                  <Target class="w-3 h-3 text-amber-500" />
-                  <span>Smart Investigation Tab</span>
-                </span>
-                <span class="text-xs text-slate-500 dark:text-slate-400">
-                  Diperbarui: {{ selectedCase.last_crawled_at }}
-                </span>
-              </div>
-              <h1 class="text-xl md:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2.5">
-                <FolderOpen class="w-6 h-6 text-amber-500 shrink-0" />
-                <span>{{ selectedCase.title }}</span>
-              </h1>
-              <p class="text-xs text-slate-500 dark:text-slate-400 max-w-3xl">
-                Ruang kerja investigasi opini publik digital POLRI. Memantau percakapan warganet, sentimen polarisasi, dan agregasi postingan lintas 5 platform seputar kasus ini.
-              </p>
-            </div>
-
-            <!-- Action Buttons -->
-            <div class="flex items-center gap-2 flex-wrap">
-              <button
-                @click="refreshCaseTab(selectedCase.id)"
-                :disabled="isRefreshingCase"
-                type="button"
-                class="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              >
-                <RotateCw class="w-3.5 h-3.5" :class="{ 'animate-spin': isRefreshingCase }" />
-                <span>{{ isRefreshingCase ? 'Menyinkronkan...' : 'Tarik Update Kasus' }}</span>
-              </button>
-
-              <a
-                :href="getCaseEscalationUrl(selectedCase)"
-                class="px-4 py-2 rounded-xl text-xs font-black bg-rose-600 hover:bg-rose-700 text-white shadow-md hover:shadow-lg transition flex items-center gap-1.5 cursor-pointer select-none"
-              >
-                <AlertTriangle class="w-4 h-4" />
-                <span>🚨 Eskalasi Jadi Isu Kamtibmas</span>
-              </a>
-
-              <button
-                @click="closeCaseTab(selectedCase.id)"
-                type="button"
-                class="px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition flex items-center gap-1 cursor-pointer"
-                title="Tutup tab dan simpan ke arsip"
-              >
-                <X class="w-4 h-4" />
-                <span>Tutup Tab</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- 4 KPI Metrics -->
-          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
-              <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">Total Percakapan Kasus</span>
-              <p class="text-2xl font-black text-slate-900 dark:text-white mt-1">{{ selectedCase.posts_count || 0 }} <span class="text-xs font-normal text-slate-400">Post</span></p>
-              <span class="text-[10px] text-amber-500 font-medium">Himpunan warganet</span>
-            </div>
-            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
-              <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">Estimasi Jangkauan (Views)</span>
-              <p class="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">{{ formatNumber(selectedCase.total_views || 0) }}</p>
-              <span class="text-[10px] text-slate-400">Total penayangan konten</span>
-            </div>
-            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
-              <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">Total Interaksi Warganet</span>
-              <p class="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{{ formatNumber(selectedCase.total_engagements || 0) }}</p>
-              <span class="text-[10px] text-slate-400">Likes, shares & komentar</span>
-            </div>
-            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
-              <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">Polarisasi Negatif</span>
-              <p class="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">{{ selectedCase.sentiment_breakdown?.neg_pct || 0 }}%</p>
-              <span class="text-[10px] text-slate-400">{{ selectedCase.sentiment_breakdown?.negatif || 0 }} aduan / keluhan</span>
-            </div>
-          </div>
-
-          <!-- Polarisasi Sentimen & Catatan Analis -->
-          <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 space-y-3">
-            <div class="flex items-center justify-between text-xs font-bold flex-wrap gap-2">
-              <span class="text-slate-700 dark:text-slate-300">Rasio Polarisasi Sentimen Netizen Seputar Kasus Ini:</span>
-              <div class="flex items-center gap-3">
-                <span class="text-emerald-600 dark:text-emerald-400">🟢 Positif: {{ selectedCase.sentiment_breakdown?.pos_pct || 0 }}% ({{ selectedCase.sentiment_breakdown?.positif || 0 }})</span>
-                <span class="text-slate-500">⚪ Netral: {{ selectedCase.sentiment_breakdown?.netral || 0 }}</span>
-                <span class="text-rose-600 dark:text-rose-400">🔴 Negatif: {{ selectedCase.sentiment_breakdown?.neg_pct || 0 }}% ({{ selectedCase.sentiment_breakdown?.negatif || 0 }})</span>
-              </div>
-            </div>
-            <div class="h-3 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden flex">
-              <div class="bg-emerald-500 transition-all duration-500" :style="{ width: (selectedCase.sentiment_breakdown?.pos_pct || 0) + '%' }"></div>
-              <div class="bg-slate-400 transition-all duration-500" :style="{ width: Math.max(0, 100 - (selectedCase.sentiment_breakdown?.pos_pct || 0) - (selectedCase.sentiment_breakdown?.neg_pct || 0)) + '%' }"></div>
-              <div class="bg-rose-500 transition-all duration-500" :style="{ width: (selectedCase.sentiment_breakdown?.neg_pct || 0) + '%' }"></div>
-            </div>
-            <div class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
-              <Info class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-              <p class="leading-relaxed">
-                <strong>Rekomendasi Komunikasi Humas:</strong> {{ selectedCase.intelligence_notes }}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Postingan Khusus Kasus Ini -->
-        <div class="space-y-4">
-          <div class="flex items-center justify-between">
-            <h2 class="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
-              <Radio class="w-4 h-4 text-amber-500" />
-              <span>Himpunan Postingan Terlacak Khusus Kasus Ini ({{ (casePosts && casePosts.total) || selectedCase.posts_count || 0 }})</span>
-            </h2>
-            <button
-              @click="switchTab('radar')"
-              type="button"
-              class="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              <span>Lihat Semua Percakapan di Radar Utama</span>
-              <ChevronRight class="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <!-- Grid Postingan Kasus -->
-          <div v-if="casePosts && casePosts.data && casePosts.data.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div
-              v-for="post in casePosts.data"
-              :key="post.id"
-              class="rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-5 shadow-sm hover:border-amber-400 transition flex flex-col justify-between gap-4"
-            >
-              <div class="space-y-3">
-                <!-- Header Author & Platform -->
-                <div class="flex items-start justify-between gap-2">
-                  <div class="flex items-center gap-2.5">
-                    <div
-                      class="w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm shrink-0"
-                      :class="getPlatformBadge(post.platform).avatarBg"
-                    >
-                      {{ (post.author_name || 'N').charAt(0).toUpperCase() }}
-                    </div>
-                    <div class="min-w-0">
-                      <p class="text-xs font-black text-slate-900 dark:text-white truncate">
-                        {{ post.author_name }}
-                      </p>
-                      <p class="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate">
-                        {{ post.author_handle }}
-                      </p>
-                    </div>
-                  </div>
-
-                  <span
-                    class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0"
-                    :class="getPlatformBadge(post.platform).badgeClass"
-                  >
-                    {{ getPlatformBadge(post.platform).label }}
-                  </span>
-                </div>
-
-                <!-- Video Thumbnail with Play Overlay -->
-                <div v-if="post.thumbnail_url" class="relative rounded-2xl overflow-hidden aspect-video bg-slate-900 border border-slate-200 dark:border-slate-800 group">
-                  <img
-                    :src="post.thumbnail_url"
-                    :alt="post.content"
-                    class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                    loading="lazy"
-                  />
-                  <a
-                    :href="post.post_url"
-                    target="_blank"
-                    class="absolute inset-0 bg-black/30 flex items-center justify-center hover:bg-black/40 transition"
-                  >
-                    <div class="w-10 h-10 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition">
-                      <Play class="w-5 h-5 fill-current ml-0.5" />
-                    </div>
-                  </a>
-                </div>
-
-                <!-- Content Text -->
-                <p class="text-xs text-slate-700 dark:text-slate-200 leading-relaxed line-clamp-4">
-                  {{ post.content }}
-                </p>
-
-                <!-- Sentiment Badge -->
-                <div class="flex items-center gap-2">
-                  <span
-                    class="px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1"
-                    :class="getSentimentBadge(post.sentiment).class"
-                  >
-                    <span class="w-1.5 h-1.5 rounded-full" :class="getSentimentBadge(post.sentiment).dot"></span>
-                    <span>{{ getSentimentBadge(post.sentiment).label }}</span>
-                  </span>
-                  <span class="text-[10px] text-slate-400 font-mono">
-                    {{ post.posted_at ? new Date(post.posted_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Baru saja' }}
-                  </span>
-                </div>
-              </div>
-
-              <!-- Footer Metrik & Actions -->
-              <div class="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-                <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-mono">
-                  <span class="flex items-center gap-1" title="Views">
-                    <Eye class="w-3.5 h-3.5 text-slate-400" />
-                    <span>{{ formatNumber(post.views_count) }}</span>
-                  </span>
-                  <span class="flex items-center gap-1" title="Likes">
-                    <Heart class="w-3.5 h-3.5 text-rose-500" />
-                    <span>{{ formatNumber(post.likes_count) }}</span>
-                  </span>
-                  <span class="flex items-center gap-1" title="Shares">
-                    <Repeat class="w-3.5 h-3.5 text-sky-500" />
-                    <span>{{ formatNumber(post.shares_count) }}</span>
-                  </span>
-                  <span class="flex items-center gap-1" title="Comments">
-                    <MessageSquare class="w-3.5 h-3.5 text-amber-500" />
-                    <span>{{ formatNumber(post.comments_count) }}</span>
-                  </span>
-                </div>
-
-                <div class="flex items-center justify-between gap-2 pt-1">
-                  <button
-                    @click="toggleBookmark(post.id)"
-                    type="button"
-                    class="p-2 rounded-xl border text-xs transition cursor-pointer"
-                    :class="post.is_bookmarked
-                      ? 'bg-amber-50 dark:bg-amber-400/10 text-amber-600 dark:text-amber-400 border-amber-400'
-                      : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700'"
-                    :title="post.is_bookmarked ? 'Tersimpan di Arsip' : 'Tandai Bukti Arsip'"
-                  >
-                    <Bookmark class="w-3.5 h-3.5" :class="{ 'fill-current': post.is_bookmarked }" />
-                  </button>
-
-                  <div class="flex items-center gap-1.5">
-                    <a
-                      :href="post.post_url"
-                      target="_blank"
-                      class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 text-xs transition flex items-center justify-center"
-                      title="Buka Postingan Asli"
-                    >
-                      <ExternalLink class="w-3.5 h-3.5" />
-                    </a>
-
-                    <Link
-                      :href="`/issues/create?polda=${selectedCode}&title=${encodeURIComponent(`[PATROLI KASUS] ${post.author_handle || ''}: ${(post.content || '').slice(0, 60)}...`)}&category=📱 Isu Medsos & Opini Publik (Cyber Patrol)&source_media=${encodeURIComponent(getPlatformBadge(post.platform).label)}&source_url=${encodeURIComponent(post.post_url || '')}&summary=${encodeURIComponent(post.content || '')}`"
-                      class="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition flex items-center gap-1 shadow-sm cursor-pointer select-none"
-                      title="Jadikan Laporan Isu di Polres/Polda"
-                    >
-                      <span>🚨 Eskalasi Jadi Isu</span>
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Empty Case Posts State -->
-          <div
-            v-else
-            class="rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-10 text-center shadow-sm space-y-3"
-          >
-            <FolderOpen class="w-12 h-12 text-slate-300 dark:text-slate-700 mx-auto" />
-            <p class="text-sm font-bold text-slate-700 dark:text-slate-300">Belum Ada Postingan Tersimpan untuk Kasus Ini</p>
-            <p class="text-xs text-slate-500">Klik "Tarik Update Kasus" di atas untuk mengambil postingan terbaru dari internet.</p>
-          </div>
-
-          <!-- Pagination -->
-          <div v-if="casePosts && casePosts.links && casePosts.links.length > 3" class="flex justify-center items-center gap-1 pt-4">
-            <template v-for="(link, i) in casePosts.links" :key="i">
-              <Link
-                v-if="link.url"
-                :href="link.url"
-                class="px-3 py-1.5 rounded-xl text-xs font-bold transition"
-                :class="link.active
-                  ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
-                  : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'"
-                v-html="link.label"
-              />
-              <span
-                v-else
-                class="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-400 dark:text-slate-600 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-900 select-none"
-                v-html="link.label"
-              />
-            </template>
-          </div>
-        </div>
-      </div>
-
-      <!-- Fallback if case not loaded -->
-      <div v-else class="rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-12 text-center shadow-sm space-y-3">
-        <FolderOpen class="w-12 h-12 text-slate-300 dark:text-slate-700 mx-auto" />
-        <p class="text-sm font-bold text-slate-700 dark:text-slate-300">Berkas Kasus Sedang Dimuat...</p>
-        <button
-          @click="switchTab('radar')"
-          type="button"
-          class="px-4 py-2 rounded-xl text-xs font-bold bg-amber-400 text-slate-950 shadow-sm hover:bg-amber-300 cursor-pointer"
-        >
-          Kembali ke Radar Utama
-        </button>
       </div>
     </div>
 

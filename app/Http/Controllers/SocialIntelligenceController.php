@@ -30,6 +30,16 @@ class SocialIntelligenceController extends Controller
         $search = $request->query('q', '');
         $activeTab = $request->query('tab', 'radar');
         $satwil = $request->query('satwil', 'all');
+        $isBookmarkedOnly = $request->boolean('bookmarked', false);
+
+        // Check if an investigation case (Smart Dossier) is selected
+        $selectedCaseId = null;
+        if ($request->filled('case_id')) {
+            $selectedCaseId = (int) $request->query('case_id');
+        } elseif (str_starts_with($activeTab, 'case_')) {
+            $selectedCaseId = (int) str_replace('case_', '', $activeTab);
+            $activeTab = 'radar';
+        }
 
         // Base query
         $query = SocialPost::with(['polres', 'polda']);
@@ -38,6 +48,14 @@ class SocialIntelligenceController extends Controller
             $query->where('polda_id', $selectedPolda->id);
         } elseif ($isNational && $satwil !== 'all') {
             $query->where('polda_id', $satwil);
+        }
+
+        if ($selectedCaseId) {
+            $query->where('case_id', $selectedCaseId);
+        }
+
+        if ($isBookmarkedOnly) {
+            $query->where('is_bookmarked', true);
         }
 
         if ($platform !== 'all') {
@@ -85,6 +103,7 @@ class SocialIntelligenceController extends Controller
             ->when($isNational && $satwil !== 'all', fn($q) => $q->where('polda_id', $satwil));
 
         $totalCount = (clone $poldaScope)->count();
+        $bookmarkedCount = (clone $poldaScope)->where('is_bookmarked', true)->count();
         $totalLikes = (clone $poldaScope)->sum('likes_count');
         $totalShares = (clone $poldaScope)->sum('shares_count');
         $totalComments = (clone $poldaScope)->sum('comments_count');
@@ -183,28 +202,10 @@ class SocialIntelligenceController extends Controller
             ];
         })->values()->all();
 
-        // Check if an investigation case tab is selected
-        $selectedCaseId = null;
-        if ($request->has('case_id')) {
-            $selectedCaseId = (int) $request->query('case_id');
-        } elseif (str_starts_with($activeTab, 'case_')) {
-            $selectedCaseId = (int) str_replace('case_', '', $activeTab);
-        }
-
         $selectedCase = null;
-        $casePosts = null;
-
         if ($selectedCaseId) {
             $foundCase = $dbCases->firstWhere('id', $selectedCaseId) ?: SocialInvestigationCase::find($selectedCaseId);
             if ($foundCase) {
-                $activeTab = 'case_' . $foundCase->id;
-                $casePostsQuery = SocialPost::where('case_id', $foundCase->id)
-                    ->when($platform !== 'all', fn($q) => $q->where('platform', $platform))
-                    ->when($sentiment !== 'all', fn($q) => $q->where('sentiment', $sentiment))
-                    ->orderBy('posted_at', 'desc');
-
-                $casePosts = $casePostsQuery->paginate(12)->withQueryString();
-
                 $cPos = $foundCase->sentiment_breakdown['positif'] ?? 0;
                 $cNet = $foundCase->sentiment_breakdown['netral'] ?? 0;
                 $cNeg = $foundCase->sentiment_breakdown['negatif'] ?? 0;
@@ -215,6 +216,8 @@ class SocialIntelligenceController extends Controller
                     'title'               => $foundCase->title,
                     'short_title'         => $foundCase->short_title,
                     'keywords'            => $foundCase->keywords,
+                    'keywords_array'      => array_values(array_filter(array_map('trim', explode(',', (string) $foundCase->keywords)))),
+                    'description'         => $foundCase->description,
                     'priority'            => $foundCase->priority,
                     'status'              => $foundCase->status,
                     'platforms'           => $foundCase->platforms ?? ['x', 'tiktok', 'instagram', 'youtube', 'facebook'],
@@ -240,9 +243,11 @@ class SocialIntelligenceController extends Controller
             'selectedCode'        => $selectedCode,
             'isNational'          => $isNational,
             'posts'               => $posts,
+            'casePosts'           => $posts,
+            'totalPostsCount'     => $totalCount,
+            'bookmarkedCount'     => $bookmarkedCount,
             'investigationCases'  => $investigationCases,
             'selectedCase'        => $selectedCase,
-            'casePosts'           => $casePosts,
             'metrics'             => $metrics,
             'kolProfiles'         => $kolProfiles,
             'trendingHashtags'    => $trendingData['trendingHashtags'],
@@ -254,13 +259,15 @@ class SocialIntelligenceController extends Controller
             'peakHours'           => $peakHours,
             'settings'            => $settings,
             'filters'             => [
-                'platform'  => $platform,
-                'sentiment' => $sentiment,
-                'kol'       => $kolOnly,
-                'sort'      => $sort,
-                'q'         => $search,
-                'tab'       => $activeTab,
-                'satwil'    => $satwil,
+                'platform'   => $platform,
+                'sentiment'  => $sentiment,
+                'kol'        => $kolOnly,
+                'sort'       => $sort,
+                'q'          => $search,
+                'tab'        => $activeTab,
+                'satwil'     => $satwil,
+                'case_id'    => $selectedCaseId,
+                'bookmarked' => $isBookmarkedOnly,
             ],
         ]);
     }
@@ -743,13 +750,12 @@ class SocialIntelligenceController extends Controller
         $result = $service->crawlKeyword($validated['keyword'], $platforms, $poldaId, $maxItems);
 
         $caseId = $result['case_id'] ?? null;
-        $targetTab = $caseId ? ('case_' . $caseId) : 'radar';
 
         return redirect()->route('social-intelligence.index', array_filter([
             'polda'   => $selectedCode,
-            'tab'     => $targetTab,
+            'tab'     => 'radar',
             'case_id' => $caseId,
-        ]))->with('success', "Tab berkas kasus \"{$result['keyword']}\" berhasil dibuat dan dibuka!");
+        ]))->with('success', "Topik atensi pimpinan \"{$result['keyword']}\" berhasil dilacak dan dibuka!");
     }
 
     /**
@@ -777,7 +783,7 @@ class SocialIntelligenceController extends Controller
         return redirect()->route('social-intelligence.index', [
             'polda' => $selectedCode,
             'tab'   => 'radar',
-        ])->with('success', "Tab berkas kasus \"{$case->title}\" telah ditutup dan diarsipkan.");
+        ])->with('success', "Topik atensi \"{$case->title}\" telah ditutup dan diarsipkan.");
     }
 
     /**
@@ -794,9 +800,9 @@ class SocialIntelligenceController extends Controller
 
         return redirect()->route('social-intelligence.index', [
             'polda'   => $selectedCode,
-            'tab'     => 'case_' . $case->id,
+            'tab'     => 'radar',
             'case_id' => $case->id,
-        ])->with('success', "Pembaruan berkas kasus \"{$case->title}\" berhasil diambil ({$result['new_posts']} postingan baru)!");
+        ])->with('success', "Pembaruan topik atensi \"{$case->title}\" berhasil diambil ({$result['new_posts']} postingan baru)!");
     }
 
     /**

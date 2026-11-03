@@ -88,7 +88,12 @@ Seluruh 29 portal media dikonfigurasi melalui seeder [`SulbarRssFeedsSeeder.php`
 
 ### 4.4. Radar Media Sosial & Social Listening (𝕏, TikTok, Instagram, YouTube, Facebook)
 - **Tabel Basis Data**: `social_posts` (data postingan, metrik views/likes/shares/comments, virality_score 0-100, is_kol, sentiment, `case_id`), `social_investigation_cases` (berkas kasus atensi pimpinan, keywords, platforms, posts_count, sentiment_breakdown, status active/archived), dan `social_settings` (konfigurasi Apify token, kata kunci pantau, frekuensi sinkronisasi per Polda).
-- **Tab Navigasi**: Tab 01 (Radar Multi-Platform), Tab 02 (Tokoh Kritis & KOL Tracker), Tab 03 (Tren Tagar & Isu Viral), Tab 04 (Integrasi Apify & Pengaturan), serta **Tab Berkas Kasus Persisten Dinamis (`case_{id}`)**.
+- **Tab Navigasi Utama**: Tab 01 (Radar Multi-Platform), Tab 02 (Tokoh Kritis & KOL Tracker), Tab 03 (Tren Tagar & Isu Viral), Tab 04 (Integrasi Apify & Pengaturan).
+- **Smart Dossier Terpadu (Topik Atensi & Request Pimpinan)**: Terintegrasi langsung pada baris teratas Tab 01 dengan antarmuka yang identik dengan Media Intelligence:
+  - *Header Atensi*: Indikator radar pulsing amber, tombol aksi cepat `+ Lacak Topik Atensi` (membuka on-demand crawling drawer).
+  - *Pill Bar Navigasi*: `🌐 Semua Percakapan`, `🔖 Disimpan`, pembatas vertikal, serta pill dinamis seluruh kasus atensi aktif lengkap dengan indikator tingkat urgensi, hitungan postingan, dan tombol `✕` untuk menutup/mengarsipkan kasus dalam 1 klik.
+  - *Dossier Expansion Detail*: Menampilkan metadata kata kunci pantau (#tags), mini KPI (Total Postingan, Views, Interaksi, Polarisasi Negatif %), bar sentimen tri-warna, rekomendasi komunikasi Humas, tombol tarik update postingan, dan eskalasi 1-klik ke laporan isu.
+  - *Feed Sinkron*: Feed di bawahnya otomatis memfilter dan menampilkan postingan relevan sesuai kasus yang sedang aktif.
 - **Dual-Mode Architecture (Tab 03)**:
   - *Mode 01 — Lensa Kamtibmas & Humas Polri*: Monitoring tagar kedinasan dinamis dan kurva jam puncak aktivitas netizen siang & malam (`peakHours`).
   - *Mode 02 — Lensa Tren Publik Medsos Indonesia*: Agregasi tren publik lintas 5 platform (𝕏, YouTube, Instagram, TikTok, Facebook) dengan deteksi kerawanan siber (`is_security_relevant: true`) dan filter cepat isu beresiko tinggi.

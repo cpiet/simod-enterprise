@@ -18,8 +18,13 @@ Modul **Radar Media Sosial** (`/social-intelligence`) adalah subsistem intelijen
 
 ## 📡 2. Empat Pilar Tab Navigasi
 
-### 2.1. Tab 01: Radar Multi-Platform (Live Feeds)
-- Feed kartu percakapan publik lintas platform (𝕏, TikTok, Instagram, YouTube).
+### 2.1. Tab 01: Radar Multi-Platform (Live Feeds) & Smart Dossier Atensi Pimpinan
+- **Smart Dossier Terpadu (Topik Atensi & Request Pimpinan)**:
+  - Wadah kartu eksekutif di bagian atas Tab 01 dengan styling identik modul Media Intelligence.
+  - Tombol **`+ Lacak Topik Atensi`** untuk memicu modal crawling *on-demand*.
+  - Baris Pill Status: `🌐 Semua Percakapan`, `🔖 Disimpan`, dan pill interaktif kasus atensi pimpinan aktif dengan hitungan data dan tombol cepat `✕` untuk menutup/mengarsipkan berkas kasus.
+  - Saat kasus dipilih: Panel *Dossier Detail* terbuka menampilkan kata kunci (#tags), mini KPI (Total Postingan, Views, Interaksi, Polarisasi Negatif %), bar sentimen warganet, catatan rekomendasi Humas, tombol sinkronisasi ulang, dan eskalasi langsung ke laporan isu kepolisian.
+- Feed kartu percakapan publik lintas platform (𝕏, TikTok, Instagram, YouTube, Facebook).
 - **Ekstraksi Media & Video**:
   - **YouTube**: Thumbnail HD resmi dari YouTube CDN (`https://img.youtube.com/vi/{VIDEO_ID}/hqdefault.jpg`) dengan tombol overlay Play merah.
   - **TikTok, Instagram, 𝕏**: Kartu multimedia beresolusi tinggi dengan identitas author dan link sumber langsung.
