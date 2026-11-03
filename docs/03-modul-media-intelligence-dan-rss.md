@@ -90,3 +90,36 @@ Modul ini bertugas memantau pemberitaan media massa daring secara real-time untu
    - **Tab 05 (Early Warning System)**: Mitigasi risiko dan peringatan dini.
    - **Tab 06 (Narasi & Rekomendasi)**: Framing narasi dan agenda setting.
    - **Tab 07 (Naskah WA Pimpinan)**: Format naskah WhatsApp resmi siap kirim ke Bapak Kapolda dan Pejabat Utama.
+
+---
+
+## 5. Smart Dossier & Manajemen Topik Atensi Khusus Pimpinan
+
+Smart Dossier adalah instrumen penyaringan kasus sensitif atau atensi pimpinan berbasis kata kunci multi-tag (`#keyword`) dan tagging manual. Terletak pada baris teratas Radar Media Online, fitur ini memungkinkan analis Humas mengelompokkan pemberitaan dalam 1 klik.
+
+### 5.1. Caching Analisis Intelijen AI (Irit Token & Performa Tinggi)
+- **Struktur Penyimpanan**: Hasil telaah Google Gemini Pro pada topik disimpan ke kolom `ai_analysis` (JSON terstruktur), `ai_analyzed_at`, dan `ai_articles_count` di tabel `media_topics`.
+- **Akses Instan Tanpa Delay**: Saat analis atau pimpinan mengklik tombol **`👁️ Lihat Hasil Analisis AI`**, modal analisis lengkap (Ringkasan Eksekutif, Potensi Risiko, Polarisasi Sentimen, Talking Points, Counter Narasi, dan Naskah WhatsApp) langsung dimuat dari database tanpa menunggu jeda pemanggilan AI eksternal dan tanpa mengonsumsi kuota token API Gemini.
+
+### 5.2. Detektor Kebaruan Dinamis (*Topic Freshness Detector*)
+- Sistem secara otomatis membandingkan jumlah artikel terkini yang cocok dengan kata kunci topik terhadap `ai_articles_count`.
+- **Indikator Dinamis**:
+  - Jika ada artikel baru masuk ke sistem sejak analisis terakhir: Menampilkan badge peringatan amber **`⚠️ Ada +X Berita Baru Sejak Analisis Terakhir`** serta tombol aksi **`🔄 Perbarui Analisis (+X Baru)`**.
+  - Jika seluruh data telah teranalisis: Menampilkan badge hijau **`✓ Data Terkini (Up-to-Date)`**.
+
+---
+
+## 6. Mesin Ingesti Berita Internet Live On-Demand (Google News Crawler)
+
+Ketika topik baru dibuat (misalnya *Peringatan HUT ke-75 Humas Polri*) dan belum ada dalam 22–29 feed lokal yang tersimpan, sistem menyediakan mesin penarikan liputan internet secara seketika (*on-demand crawler*).
+
+### 6.1. Alur Kerja `GoogleNewsCrawlerService`
+1. **Penarikan Live**: Memanggil Google News RSS endpoint (`https://news.google.com/rss/search?q=...&hl=id&gl=ID&ceid=ID:id`).
+2. **Ekstraksi Sumber Nyata**: Mengekstrak tag `<source>` resmi (contoh: *Tribratanews Polda Sumsel*, *Tribrata News Bengkulu*, *Antara News*) agar identitas portal akurat.
+3. **Penyimpanan Permanen**: Artikel disimpan permanen ke tabel `media_articles` dengan `polda_id`, waktu terbit, ringkasan bersih, sentimen otomatis, dan ditautkan ke topik terkait.
+4. **Klasifikasi Kategori & Portal**: Otomatis dipetakan ke kategori kepolisian (Harkamtibmas, Gakkum, Humas Polri) dan dikelompokkan pada opsi filter portal **`🌐 SEBARAN INTERNET (GOOGLE NEWS)`**.
+5. **Otomasi Pembuatan Topik**: Kotak centang *“Tarik berita internet sekarang (Google News Live)”* pada modal buat topik memungkinkan ingesti 25–100 berita pertama secara simultan.
+
+### 6.2. Standar Visual Grid Simetris & Kurasi Gambar Editorial
+- **Kerapian Grid**: Setiap kartu berita dikunci pada ketinggian presisi `h-[435px]` dengan *two-line text clamp* untuk judul (`h-10 md:h-11`) dan ringkasan (`h-9`), memastikan tampilan dashboard tidak berantakan (*ragged cards*).
+- **Kurasi Gambar Editorial**: Berita internet yang tidak menyertakan foto thumbnail otomatis disematkan gambar editorial kepolisian beresolusi tinggi (*police fallback photos*) yang relevan, menjamin estetika profesional berstandar Command Center.

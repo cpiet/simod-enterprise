@@ -133,6 +133,18 @@ Seluruh 29 portal media dikonfigurasi melalui seeder [`SulbarRssFeedsSeeder.php`
 - **Verifikasi Kualitas Gambar**: 100% artikel memiliki thumbnail/cover image resolusi tinggi dari CDN resmi media yang diekstrak melalui parser `RssFeedService` (`enclosure`, `media:content`, `media:thumbnail`, `img src`).
 - **Sinkronisasi CLI**: `php artisan rss:sync --polda=ALL` otomatis memetakan ke tenant Divhumas Polri.
 
+### 4.6. Smart Dossier Topik Atensi, Caching AI & Mesin Ingesti Live Google News
+- **Smart Dossier & Caching Analisis AI**:
+  - Kolom basis data `media_topics`: `ai_analysis` (JSON terstruktur hasil Gemini AI), `ai_analyzed_at` (timestamp analisis terakhir), dan `ai_articles_count` (jumlah total artikel saat analisis dijalankan).
+  - **Efisiensi Token & Akses Instan**: Hasil analisis tersimpan permanen. Pengguna dapat membuka kembali modal analisis (`👁️ Lihat Hasil Analisis AI`) kapan saja tanpa memanggil API Gemini ulang.
+  - **Detektor Kebaruan Dinamis (*Freshness Detector*)**: Membandingkan jumlah artikel terkini yang cocok dengan kata kunci topik terhadap `ai_articles_count`. Jika ada berita baru masuk, badge amber `⚠️ Ada +X Berita Baru Sejak Analisis Terakhir` muncul dengan tombol `🔄 Perbarui Analisis`. Jika data sinkron, tampil badge hijau `✓ Data Terkini (Up-to-Date)`.
+- **Mesin Ingesti Live On-Demand (`GoogleNewsCrawlerService`)**:
+  - **Endpoint Backend**: `POST /media-intelligence/topics/{id}/crawl-live` memanggil `GoogleNewsCrawlerService::crawlForTopic()`.
+  - **Penarikan Cepat Lintas Internet**: Mengunduh Google News RSS (`https://news.google.com/rss/search?q=...`) untuk topik baru atau saat pimpinan membutuhkan cakupan sebaran nasional yang lebih luas.
+  - **Ekstraksi & Penyimpanan Permanen**: Mengekstrak nama sumber asli dari tag `<source>` (contoh: *Tribratanews Polda Sumsel*, *Antara News*), mengklasifikasikan kategori kepolisian (*Harkamtibmas*, *Gakkum*, dll.), mendeteksi sentimen, dan menyimpannya secara permanen ke tabel `media_articles` terhubung ke topik.
+  - **Pengelompokan Portal**: Berita hasil crawling internet otomatis dikelompokkan dalam filter portal `🌐 SEBARAN INTERNET (GOOGLE NEWS)`.
+  - **Standar Visual Card Grid Simetris**: Grid kartu berita dikunci pada tinggi seragam `h-[435px]` dengan batas 2 baris untuk judul (`h-10 md:h-11`) dan ringkasan (`h-9`). Jika berita internet tidak membawa thumbnail, sistem secara otomatis menginjeksi palet gambar cover editorial kepolisian berkualitas tinggi (*editorial police fallback photos*).
+
 ---
 
 ## 🤖 5. Alur Analisis Intelijen AI (Otomatis Gemini Pro & Manual Prompt)
@@ -206,6 +218,8 @@ Saat Anda (Agent) diminta memodifikasi kode ini:
    - Akun master sistem (`id: 1`, `kadivhumas`, `superadmin`, `cpiet`) berstatus kebal dari penghapusan (`deleteUser`) dan deaktivasi (`toggleUserStatus`).
    - Sesi pengguna aktif dilarang menghapus akunnya sendiri (*anti-self deletion*) atau mencabut status aktifnya sendiri (*anti-self lockout*).
    - Otoritas personel terhubung erat ke matriks 17 modul pada 4 pilar di `/roles`.
-8. **Smart Dossier / Topik Atensi Pimpinan**:
+8. **Smart Dossier / Topik Atensi Pimpinan & Ingesti Live**:
    - Fitur atensi khusus kasus sensitif pimpinan di `/media-intelligence` untuk pemantauan instan dan konteks laporan khusus pada mesin Gemini AI.
+   - Dilengkapi sistem caching analisis AI permanen (`ai_analysis`, `ai_analyzed_at`, `ai_articles_count`) untuk menghemat kuota token AI dan akses modal tanpa jeda.
+   - Didukung mesin penarikan berita langsung `GoogleNewsCrawlerService` untuk menangkap liputan internet secara real-time dan disimpan permanen pada basis data.
 
