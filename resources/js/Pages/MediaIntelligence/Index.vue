@@ -180,7 +180,16 @@ const topicForm = ref({
   keywords: '',
   description: '',
   priority: 'high',
+  crawl_live: true,
 });
+
+// Google News Live Crawler States
+const showLiveCrawlModal = ref(false);
+const isCrawlingLive = ref(false);
+const crawlingTopic = ref(null);
+const liveCrawlQuery = ref('');
+const liveCrawlDepth = ref(50);
+const liveCrawlError = ref('');
 
 const showTagModal = ref(false);
 const targetArticleForTag = ref(null);
@@ -203,9 +212,66 @@ const openCreateTopicModal = () => {
     keywords: '',
     description: '',
     priority: 'high',
+    crawl_live: true,
   };
   isEditingTopic.value = false;
   showTopicModal.value = true;
+};
+
+const openLiveCrawlModal = (topic) => {
+  if (!topic) return;
+  crawlingTopic.value = topic;
+  const kw = topic.keywords_array || [];
+  liveCrawlQuery.value = kw.length > 0 ? kw.slice(0, 2).join(' ') : topic.title;
+  liveCrawlDepth.value = 50;
+  liveCrawlError.value = '';
+  showLiveCrawlModal.value = true;
+};
+
+const executeLiveCrawl = async () => {
+  if (!crawlingTopic.value) return;
+  if (!liveCrawlQuery.value.trim()) {
+    liveCrawlError.value = 'Kata kunci pencarian tidak boleh kosong!';
+    return;
+  }
+
+  isCrawlingLive.value = true;
+  liveCrawlError.value = '';
+
+  try {
+    const res = await axios.post(`/media-intelligence/topics/${crawlingTopic.value.id}/crawl-live`, {
+      query: liveCrawlQuery.value.trim(),
+      depth: liveCrawlDepth.value,
+    });
+
+    if (res.data?.success) {
+      const fetchedCount = res.data.count || 0;
+      const totalCount = res.data.total_topic_articles ?? (crawlingTopic.value.articles_count + fetchedCount);
+
+      crawlingTopic.value.articles_count = totalCount;
+      const pTopic = (props.topics || []).find((t) => t.id === crawlingTopic.value.id);
+      if (pTopic) {
+        pTopic.articles_count = totalCount;
+      }
+
+      if (res.data.articles && res.data.articles.length > 0) {
+        const existingUrls = new Set((props.sampleArticles || []).map((a) => a.link));
+        const newArticles = res.data.articles.filter((a) => !existingUrls.has(a.link));
+        if (newArticles.length > 0) {
+          props.sampleArticles.unshift(...newArticles);
+        }
+      }
+
+      showLiveCrawlModal.value = false;
+      showToastNotification(`Berhasil menarik ${fetchedCount} sebaran berita internet untuk kasus ini!`);
+    } else {
+      liveCrawlError.value = res.data?.message || 'Gagal menarik sebaran berita dari internet.';
+    }
+  } catch (err) {
+    liveCrawlError.value = err.response?.data?.message || 'Terjadi kendala jaringan saat menarik berita Google News.';
+  } finally {
+    isCrawlingLive.value = false;
+  }
 };
 
 const openEditTopicModal = (topic) => {
@@ -1541,6 +1607,18 @@ const submitIssue = () => {
                 </button>
               </template>
 
+              <!-- Live Crawl Internet (Google News) Button -->
+              <button
+                @click="openLiveCrawlModal(currentSelectedTopic)"
+                :disabled="isCrawlingLive"
+                type="button"
+                class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition cursor-pointer select-none disabled:opacity-50"
+                title="Tarik sebaran berita terbaru dari seluruh portal berita online Indonesia via Google News"
+              >
+                <Globe class="w-3.5 h-3.5" :class="{ 'animate-spin': isCrawlingLive && crawlingTopic?.id === currentSelectedTopic.id }" />
+                <span>{{ (isCrawlingLive && crawlingTopic?.id === currentSelectedTopic.id) ? 'Menarik...' : '🌐 Tarik Berita Internet' }}</span>
+              </button>
+
               <!-- WhatsApp Report Button -->
               <button
                 @click="copyTopicWaScript(currentSelectedTopic)"
@@ -1578,6 +1656,35 @@ const submitIssue = () => {
                 title="Tutup Filter Topik"
               >
                 ✕ Kembali
+              </button>
+            </div>
+          </div>
+
+          <!-- CALLOUT JIKA BELUM ADA BERITA TERKAIT DI RADAR LOKAL -->
+          <div
+            v-if="!currentSelectedTopic.articles_count || currentSelectedTopic.articles_count === 0"
+            class="pt-3 border-t border-slate-800/80"
+          >
+            <div class="p-4 rounded-2xl bg-gradient-to-r from-blue-950/40 via-slate-900 to-blue-950/40 border border-blue-500/30 flex items-center justify-between gap-4 flex-wrap">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-blue-500/20 text-cyan-400 border border-blue-500/30">
+                    Radar Lokal Belum Menangkap
+                  </span>
+                  <p class="text-xs font-bold text-white">Belum ada berita terkait di database radar lokal saat ini</p>
+                </div>
+                <p class="text-[11px] text-slate-300">
+                  Topik ini mungkin peristiwa khusus kedinasan atau terbit di luar 29 portal media umum. Tarik sebaran berita dari seluruh internet via Google News secara instan.
+                </p>
+              </div>
+              <button
+                @click="openLiveCrawlModal(currentSelectedTopic)"
+                :disabled="isCrawlingLive"
+                type="button"
+                class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:brightness-110 text-white text-xs font-black shadow-lg shadow-blue-500/20 transition cursor-pointer select-none disabled:opacity-50"
+              >
+                <Zap class="w-4 h-4 fill-white" />
+                <span>⚡ Tarik Sebaran Berita Internet Sekarang</span>
               </button>
             </div>
           </div>
@@ -3221,6 +3328,24 @@ const submitIssue = () => {
             ></textarea>
           </div>
 
+          <!-- Otomasi Tarik Berita Live dari Google News (Khusus Buat Baru) -->
+          <div v-if="!isEditingTopic" class="flex items-start gap-2.5 p-3.5 rounded-2xl bg-gradient-to-r from-blue-950/40 via-slate-900 to-blue-950/40 border border-blue-500/30">
+            <input
+              id="crawl_live_checkbox"
+              v-model="topicForm.crawl_live"
+              type="checkbox"
+              class="mt-0.5 rounded border-slate-700 text-blue-500 focus:ring-blue-400 bg-slate-950 w-4 h-4 cursor-pointer shrink-0"
+            />
+            <label for="crawl_live_checkbox" class="text-xs text-slate-200 cursor-pointer select-none">
+              <span class="font-bold text-cyan-300 flex items-center gap-1.5">
+                <span>⚡ Tarik Otomatis Sebaran Berita Internet (Google News)</span>
+              </span>
+              <span class="block text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                Langsung menarik 30–50 sebaran berita dari seluruh portal berita online Indonesia (termasuk Tribratanews &amp; portal daerah) begitu topik ini didaftarkan.
+              </span>
+            </label>
+          </div>
+
           <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
             <button
               type="button"
@@ -3239,6 +3364,121 @@ const submitIssue = () => {
             </button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- MODAL 5B: TARIK SEBARAN BERITA LIVE DARI GOOGLE NEWS (ON-DEMAND)         -->
+    <!-- ========================================================================= -->
+    <div
+      v-if="showLiveCrawlModal && crawlingTopic"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+    >
+      <div class="w-full max-w-xl rounded-3xl bg-[#0b1426] border border-blue-500/50 shadow-2xl p-6 md:p-7 space-y-5 max-h-[90vh] overflow-y-auto">
+        <!-- Header -->
+        <div class="flex items-start justify-between border-b border-slate-800 pb-4">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-600 text-white">
+                Google News Live Engine
+              </span>
+              <span class="text-xs font-mono text-cyan-400">Seluruh Portal Media Indonesia</span>
+            </div>
+            <h3 class="text-base md:text-lg font-black text-white">
+              Tarik Sebaran Berita Internet: {{ crawlingTopic.title }}
+            </h3>
+            <p class="text-xs text-slate-400">
+              Menghimpun sebaran pemberitaan dari seluruh portal berita nasional, daerah, dan Tribratanews secara live.
+            </p>
+          </div>
+          <button @click="showLiveCrawlModal = false" class="text-slate-400 hover:text-white cursor-pointer p-1">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+
+        <!-- Form / Controls -->
+        <div class="space-y-4 text-xs">
+          <!-- Keyword Input -->
+          <div class="space-y-1.5">
+            <label class="block font-bold text-slate-200">
+              Kata Kunci Pencarian di Internet *
+            </label>
+            <div class="relative">
+              <Search class="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+              <input
+                v-model="liveCrawlQuery"
+                type="text"
+                required
+                placeholder="Contoh: HUT Humas Polri atau Hari Ulang Tahun Humas"
+                class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-semibold focus:outline-none focus:border-cyan-400"
+              />
+            </div>
+            <p class="text-[11px] text-slate-400">
+              💡 Gunakan kata kunci yang ringkas dan representatif untuk memaksimalkan tangkapan berita di seluruh portal Indonesia.
+            </p>
+          </div>
+
+          <!-- Target Depth / Kedalaman Data -->
+          <div class="space-y-1.5">
+            <label class="block font-bold text-slate-200">Target Kedalaman Data</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                @click="liveCrawlDepth = 25"
+                :class="liveCrawlDepth === 25 ? 'bg-blue-600/30 border-blue-400 text-white font-black' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'"
+                class="p-2.5 rounded-xl border text-center transition cursor-pointer select-none"
+              >
+                <div class="text-xs font-bold">25 Berita</div>
+                <div class="text-[10px] text-slate-400">Kilat (&lt; 3 dtk)</div>
+              </button>
+              <button
+                type="button"
+                @click="liveCrawlDepth = 50"
+                :class="liveCrawlDepth === 50 ? 'bg-blue-600/30 border-blue-400 text-white font-black' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'"
+                class="p-2.5 rounded-xl border text-center transition cursor-pointer select-none"
+              >
+                <div class="text-xs font-bold">50 Berita</div>
+                <div class="text-[10px] text-cyan-400">Standar Optimal</div>
+              </button>
+              <button
+                type="button"
+                @click="liveCrawlDepth = 100"
+                :class="liveCrawlDepth === 100 ? 'bg-blue-600/30 border-blue-400 text-white font-black' : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'"
+                class="p-2.5 rounded-xl border text-center transition cursor-pointer select-none"
+              >
+                <div class="text-xs font-bold">100 Berita</div>
+                <div class="text-[10px] text-amber-400">Komprehensif</div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Error Alert -->
+          <div v-if="liveCrawlError" class="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
+            ⚠️ {{ liveCrawlError }}
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+          <button
+            type="button"
+            @click="showLiveCrawlModal = false"
+            :disabled="isCrawlingLive"
+            class="px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 hover:text-white cursor-pointer disabled:opacity-50"
+          >
+            Batal
+          </button>
+          <button
+            type="button"
+            @click="executeLiveCrawl"
+            :disabled="isCrawlingLive || !liveCrawlQuery.trim()"
+            class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold shadow-lg shadow-blue-500/25 transition cursor-pointer disabled:opacity-50 select-none"
+          >
+            <RotateCw v-if="isCrawlingLive" class="w-4 h-4 animate-spin text-white" />
+            <Zap v-else class="w-4 h-4 fill-white" />
+            <span>{{ isCrawlingLive ? 'Sedang Menarik Berita...' : '⚡ Mulai Tarik Sebaran Berita' }}</span>
+          </button>
+        </div>
       </div>
     </div>
 

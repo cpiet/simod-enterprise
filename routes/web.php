@@ -47,6 +47,7 @@ Route::post('/media-intelligence/topics/{id}/update', [MediaIntelligenceControll
 Route::delete('/media-intelligence/topics/{id}', [MediaIntelligenceController::class, 'deleteTopic'])->name('media-intelligence.topics.delete');
 Route::post('/media-intelligence/articles/{id}/toggle-topic', [MediaIntelligenceController::class, 'toggleArticleTopic'])->name('media-intelligence.articles.toggle-topic');
 Route::post('/media-intelligence/topics/{id}/analyze-ai', [MediaIntelligenceController::class, 'analyzeTopicAi'])->name('media-intelligence.topics.analyze-ai');
+Route::post('/media-intelligence/topics/{id}/crawl-live', [MediaIntelligenceController::class, 'crawlTopicLive'])->name('media-intelligence.topics.crawl-live');
 
 // Social Media Intelligence Radar
 Route::get('/social-intelligence', [SocialIntelligenceController::class, 'index'])->name('social-intelligence.index');

@@ -1231,7 +1231,7 @@ PROMPT;
         $searchCode = strtoupper($poldaCode) === 'ALL' ? 'DIVHUMAS' : strtoupper($poldaCode);
         $polda = Polda::where('code', $searchCode)->first() ?? Polda::where('is_active', true)->first();
 
-        MediaTopic::create([
+        $topic = MediaTopic::create([
             'polda_id'    => $polda->id,
             'title'       => $validated['title'],
             'keywords'    => $validated['keywords'],
@@ -1241,7 +1241,16 @@ PROMPT;
             'created_by'  => auth()->id(),
         ]);
 
-        return back()->with('success', "Topik Atensi Pimpinan \"{$validated['title']}\" berhasil dibuat.");
+        $crawlNotice = '';
+        if ($request->boolean('crawl_live', true)) {
+            $crawler = new \App\Services\GoogleNewsCrawlerService();
+            $result = $crawler->crawlAndIngestForTopic($topic, null, 40);
+            if (!empty($result['count'])) {
+                $crawlNotice = " dan {$result['count']} sebaran berita internet berhasil ditarik!";
+            }
+        }
+
+        return back()->with('success', "Topik Atensi Pimpinan \"{$validated['title']}\" berhasil dibuat{$crawlNotice}");
     }
 
     /**
@@ -1428,5 +1437,48 @@ PROMPT;
             'model_used'            => $result['model_used'] ?? $model,
             'latency_ms'            => $result['latency_ms'] ?? 0,
         ]);
+    }
+
+    /**
+     * Tarik sebaran berita secara on-demand dari internet (Google News) untuk Topik Atensi tertentu.
+     */
+    public function crawlTopicLive(Request $request, int $id): JsonResponse
+    {
+        $topic = MediaTopic::findOrFail($id);
+        $customQuery = $request->input('query');
+        $depth = (int) $request->input('depth', 50);
+
+        $crawler = new \App\Services\GoogleNewsCrawlerService();
+        $result = $crawler->crawlAndIngestForTopic($topic, $customQuery, $depth);
+
+        // Hitung ulang total berita topik di database
+        $keywords = $topic->getKeywordsArray();
+        $manualArticleIds = DB::table('media_article_topic')
+            ->where('media_topic_id', $topic->id)
+            ->pluck('media_article_id')
+            ->toArray();
+
+        $articlesQuery = MediaArticle::where('polda_id', $topic->polda_id);
+        if (!empty($manualArticleIds) || !empty($keywords)) {
+            $articlesQuery->where(function ($q) use ($manualArticleIds, $keywords) {
+                if (!empty($manualArticleIds)) {
+                    $q->whereIn('id', $manualArticleIds);
+                }
+                foreach ($keywords as $kw) {
+                    $q->orWhere('title', 'like', "%{$kw}%")
+                      ->orWhere('summary', 'like', "%{$kw}%");
+                }
+            });
+        }
+        $totalArticlesCount = $articlesQuery->count();
+
+        return response()->json([
+            'success'              => $result['success'],
+            'message'              => $result['message'],
+            'count'                => $result['count'],
+            'total_topic_articles' => $totalArticlesCount,
+            'query'                => $result['query'] ?? '',
+            'articles'             => $result['articles'] ?? [],
+        ], $result['success'] ? 200 : 500);
     }
 }

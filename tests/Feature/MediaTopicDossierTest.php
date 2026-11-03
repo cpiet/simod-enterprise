@@ -211,4 +211,41 @@ class MediaTopicDossierTest extends TestCase
         $this->assertEquals(1, $topic->ai_articles_count);
         $this->assertEquals('Pemusnahan ladang ganja berhasil dilaksanakan oleh tim gabungan.', $topic->ai_analysis['executive_summary']);
     }
+
+    public function test_crawl_topic_live_from_google_news_ingests_articles(): void
+    {
+        $polda = Polda::firstOrCreate(
+            ['code' => 'SULBAR'],
+            ['name' => 'Polda Sulawesi Barat', 'is_active' => true]
+        );
+
+        $user = User::factory()->create(['role' => 'superadmin', 'polda_id' => $polda->id]);
+
+        $topic = MediaTopic::create([
+            'polda_id' => $polda->id,
+            'title'    => 'HUT Humas Polri ke-75',
+            'keywords' => 'humas polri, hut humas',
+            'priority' => 'high',
+            'status'   => 'active',
+        ]);
+
+        $res = $this->actingAs($user)->postJson("/media-intelligence/topics/{$topic->id}/crawl-live", [
+            'query' => 'HUT Humas Polri',
+            'depth' => 5,
+        ]);
+
+        $res->assertOk();
+        $res->assertJson(['success' => true]);
+        $res->assertJsonStructure([
+            'success',
+            'count',
+            'total_topic_articles',
+            'articles',
+        ]);
+
+        // Verifikasi bahwa artikel berhasil di-ingest ke basis data dan dipivotkan
+        $this->assertDatabaseHas('media_article_topic', [
+            'media_topic_id' => $topic->id,
+        ]);
+    }
 }
