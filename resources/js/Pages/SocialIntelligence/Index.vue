@@ -259,31 +259,49 @@ const testConnection = async () => {
 
 // Format Helpers
 const getPlatformBadge = (platform) => {
-  switch (platform) {
+  const p = (platform || 'umum').toLowerCase();
+  switch (p) {
     case 'x':
       return {
         label: '𝕏 (Twitter)',
         class: 'bg-slate-900 text-white border-slate-700 dark:bg-slate-800',
+        badgeClass: 'bg-slate-900 text-white border border-slate-700 dark:bg-slate-800',
+        avatarBg: 'bg-slate-800 text-white border border-slate-700',
       };
     case 'tiktok':
       return {
         label: 'TikTok',
         class: 'bg-black text-white border-cyan-400 shadow-sm shadow-cyan-400/20',
+        badgeClass: 'bg-black text-white border border-cyan-400 shadow-sm shadow-cyan-400/20',
+        avatarBg: 'bg-black text-cyan-400 border border-cyan-400/40',
       };
     case 'instagram':
       return {
         label: 'Instagram',
         class: 'bg-gradient-to-r from-fuchsia-600 to-pink-500 text-white',
+        badgeClass: 'bg-gradient-to-r from-fuchsia-600 to-pink-500 text-white',
+        avatarBg: 'bg-gradient-to-br from-purple-600 to-pink-500 text-white',
       };
     case 'youtube':
       return {
         label: 'YouTube',
         class: 'bg-red-600 text-white',
+        badgeClass: 'bg-red-600 text-white',
+        avatarBg: 'bg-red-600 text-white',
+      };
+    case 'facebook':
+      return {
+        label: 'Facebook',
+        class: 'bg-blue-600 text-white',
+        badgeClass: 'bg-blue-600 text-white',
+        avatarBg: 'bg-blue-600 text-white',
       };
     default:
       return {
-        label: platform.toUpperCase(),
+        label: (platform || 'UMUM').toUpperCase(),
         class: 'bg-slate-800 text-slate-300',
+        badgeClass: 'bg-slate-800 text-slate-300 border border-slate-700',
+        avatarBg: 'bg-slate-800 text-slate-300 border border-slate-700',
       };
   }
 };
@@ -297,6 +315,31 @@ const getSentimentClass = (sentiment) => {
     case 'netral':
     default:
       return 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700';
+  }
+};
+
+const getSentimentBadge = (sentiment) => {
+  const s = (sentiment || 'netral').toLowerCase();
+  switch (s) {
+    case 'positif':
+      return {
+        label: 'Positif',
+        class: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40',
+        dot: 'bg-emerald-500',
+      };
+    case 'negatif':
+      return {
+        label: 'Negatif',
+        class: 'bg-rose-500/20 text-rose-400 border border-rose-500/40',
+        dot: 'bg-rose-500',
+      };
+    case 'netral':
+    default:
+      return {
+        label: 'Netral',
+        class: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700',
+        dot: 'bg-slate-400',
+      };
   }
 };
 
@@ -1271,7 +1314,7 @@ const getPublicPlatformBadge = (platform) => {
 
                 <!-- One-Click Escalation to Laporan Isu (/issues/create) -->
                 <Link
-                  :href="`/issues/create?polda=${selectedCode}&title=${encodeURIComponent(`[PATROLI MEDSOS] ${post.author_handle}: ${post.content.slice(0, 60)}...`)}&category=📱 Isu Medsos & Opini Publik (Cyber Patrol)&source_media=${encodeURIComponent(getPlatformBadge(post.platform).label)}&source_url=${encodeURIComponent(post.post_url)}&summary=${encodeURIComponent(post.content)}`"
+                  :href="`/issues/create?polda=${selectedCode}&title=${encodeURIComponent(`[PATROLI MEDSOS] ${post.author_handle || ''}: ${(post.content || '').slice(0, 60)}...`)}&category=📱 Isu Medsos & Opini Publik (Cyber Patrol)&source_media=${encodeURIComponent(getPlatformBadge(post.platform).label)}&source_url=${encodeURIComponent(post.post_url || '')}&summary=${encodeURIComponent(post.content || '')}`"
                   class="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition flex items-center gap-1 shadow-sm cursor-pointer select-none"
                   title="Jadikan Kasus / Laporan Isu di Polres/Polda"
                 >
@@ -1577,7 +1620,7 @@ const getPublicPlatformBadge = (platform) => {
                     </a>
 
                     <Link
-                      :href="`/issues/create?polda=${selectedCode}&title=${encodeURIComponent(`[PATROLI KASUS] ${post.author_handle}: ${post.content.slice(0, 60)}...`)}&category=📱 Isu Medsos & Opini Publik (Cyber Patrol)&source_media=${encodeURIComponent(getPlatformBadge(post.platform).label)}&source_url=${encodeURIComponent(post.post_url)}&summary=${encodeURIComponent(post.content)}`"
+                      :href="`/issues/create?polda=${selectedCode}&title=${encodeURIComponent(`[PATROLI KASUS] ${post.author_handle || ''}: ${(post.content || '').slice(0, 60)}...`)}&category=📱 Isu Medsos & Opini Publik (Cyber Patrol)&source_media=${encodeURIComponent(getPlatformBadge(post.platform).label)}&source_url=${encodeURIComponent(post.post_url || '')}&summary=${encodeURIComponent(post.content || '')}`"
                       class="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition flex items-center gap-1 shadow-sm cursor-pointer select-none"
                       title="Jadikan Laporan Isu di Polres/Polda"
                     >
