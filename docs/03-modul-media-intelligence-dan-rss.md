@@ -77,19 +77,22 @@ Modul ini bertugas memantau pemberitaan media massa daring secara real-time untu
 
 ---
 
-## 4. Alur Kerja Intelijen AI & Naskah WhatsApp Pimpinan
+## 4. Alur Kerja Intelijen AI (Pipeline Seamless 1-Klik) & Naskah WhatsApp Pimpinan
 
-1. **Salin Prompt AI**:
-   - Merangkum 29 feed berita menjadi formula prompt resmi analis intelijen media Polri.
-2. **Tempel Ringkasan AI**:
-   - Pengguna menempelkan hasil analisis ChatGPT / Claude / Gemini pada modal *"Tempel Ringkasan AI"*.
+1. **Pipeline 2-in-1 Seamless (`⚡ Sinkron & Analisis Otomatis`)**:
+   - Operator cukup mengklik 1 tombol utama pada top bar.
+   - Sistem secara otomatis menarik berita terbaru dari 22/29 portal media (`curl_multi`), menyimpannya ke database dengan fair quota, dan seketika mengumpankannya ke mesin Google Gemini AI tanpa perlu reload halaman berulang kali.
    - Data otomatis tersimpan permanen pada tabel **`media_intelligence_reports`**.
-3. **Penyajian Terpadu Lintas Tab**:
+2. **Penyajian Terpadu Lintas Tab**:
    - **Tab 02 (Executive Briefing)**: Ringkasan pimpinan 200 kata, Isu Strategis Nasional Polri, Isu Kewilayahan Sulbar, respon cepat 0–2 jam, 2–6 jam, 24 jam.
    - **Tab 03 (Sentimen Berita)**: Polarisasi opini publik Nasional dan Kewilayahan.
    - **Tab 05 (Early Warning System)**: Mitigasi risiko dan peringatan dini.
    - **Tab 06 (Narasi & Rekomendasi)**: Framing narasi dan agenda setting.
    - **Tab 07 (Naskah WA Pimpinan)**: Format naskah WhatsApp resmi siap kirim ke Bapak Kapolda dan Pejabat Utama.
+3. **Pemisahan Otoritas & Integrasi RBAC (`/roles`)**:
+   - Modul `media_intelligence_ai`: Memberikan hak eksekusi sinkronisasi dan analisis AI otomatis.
+   - Modul `media_intelligence_manage`: Khusus untuk administrator mengelola master URL feed RSS pada menu Keamanan & Pemeliharaan (`/maintenance/rss-sync`).
+   - Tombol manual prompt serta tombol kelola RSS telah dihilangkan dari antarmuka operasional radar berita demi menjaga kebersihan dashboard dan mencegah perubahan tidak berwenang.
 
 ---
 

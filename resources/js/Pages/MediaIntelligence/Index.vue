@@ -629,26 +629,41 @@ const copyAiPrompt = () => {
 };
 
 // =========================================================================
-// GOOGLE GEMINI PRO AUTOMATED MEDIA INTELLIGENCE
+// AUTOMATED MEDIA INTELLIGENCE & ALL-IN-ONE SYNC PIPELINE
 // =========================================================================
 const isAnalyzingGemini = ref(false);
+const syncStepText = ref('');
 
-const triggerGeminiAnalysis = async () => {
+const triggerGeminiAnalysis = async (withSync = true) => {
   if (!props.aiSetting?.has_api_key) {
-    showToastNotification('Kunci API Google Gemini belum dikonfigurasi. Hubungi Administrator di menu Keamanan & Pemeliharaan.');
+    showToastNotification('Kunci API Mesin AI belum dikonfigurasi. Hubungi Administrator di menu Keamanan & Pemeliharaan.');
     return;
   }
 
   isAnalyzingGemini.value = true;
+  syncStepText.value = withSync ? '1/2 Menarik berita...' : 'Menganalisis...';
+
+  let stepTimer = null;
+  if (withSync) {
+    stepTimer = setTimeout(() => {
+      if (isAnalyzingGemini.value) {
+        syncStepText.value = '2/2 Menganalisis dengan AI...';
+      }
+    }, 3800);
+  }
+
   try {
-    const res = await axios.post(`/media-intelligence/analyze-gemini?polda=${props.selectedCode}`);
-    showToastNotification(`✓ ${res.data.message || 'Analisis intelijen otomatis Gemini Pro selesai!'}`);
+    const syncParam = withSync ? '&sync=1' : '';
+    const res = await axios.post(`/media-intelligence/analyze-gemini?polda=${props.selectedCode}${syncParam}`);
+    showToastNotification(`✓ ${res.data.message || 'Sinkronisasi berita dan analisis intelijen otomatis selesai!'}`);
     router.reload({ preserveScroll: true });
   } catch (err) {
-    const msg = err.response?.data?.message || 'Analisis Gemini gagal. Periksa koneksi atau kuota API Gemini.';
+    const msg = err.response?.data?.message || 'Analisis intelijen gagal. Periksa koneksi atau kuota API.';
     showToastNotification(msg);
   } finally {
+    if (stepTimer) clearTimeout(stepTimer);
     isAnalyzingGemini.value = false;
+    syncStepText.value = '';
   }
 };
 
@@ -1254,55 +1269,25 @@ const submitIssue = () => {
         </p>
       </div>
 
-      <!-- Action Buttons: Gemini Pro Auto, Pengaturan AI, Salin Prompt AI, Lihat Prompt, Tempel Ringkasan AI, Format WA -->
-      <div class="flex flex-wrap items-center gap-2 relative z-10">
-        <!-- Button Utama: Analisis Otomatis AI (Gemini Pro) -->
+      <!-- Action Buttons: 1-Click All-in-One Sinkron & Analisis Otomatis + Format WA Pimpinan -->
+      <div class="flex flex-wrap items-center gap-2.5 relative z-10">
+        <!-- Button Utama: Sinkron & Analisis Otomatis (1-Click Seamless Pipeline) -->
         <button
-          @click="triggerGeminiAnalysis"
+          @click="triggerGeminiAnalysis(true)"
           :disabled="isAnalyzingGemini"
-          class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-black transition-all shadow-lg shadow-amber-400/25 border border-amber-300 hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed select-none"
-          title="Jalankan analisis intelijen media otomatis menggunakan Google Gemini Pro"
+          class="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-black transition-all shadow-lg shadow-amber-400/25 border border-amber-300 hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed select-none"
+          title="Tarik berita terkini dari seluruh portal media dan analisis intelijen secara otomatis dalam 1 klik"
         >
           <RotateCw v-if="isAnalyzingGemini" class="w-4 h-4 text-slate-950 animate-spin" />
           <Zap v-else class="w-4 h-4 text-slate-950 fill-slate-950" />
-          <span>{{ isAnalyzingGemini ? 'Menganalisis Berita...' : '⚡ Analisis Otomatis (Gemini Pro)' }}</span>
-          <span v-if="props.aiSetting?.has_api_key" class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse ml-0.5" title="Gemini API Aktif"></span>
+          <span>{{ isAnalyzingGemini ? (syncStepText || 'Memproses Sinkron & Analisis...') : '⚡ Sinkron & Analisis Otomatis' }}</span>
+          <span v-if="props.aiSetting?.has_api_key" class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse ml-0.5" title="Mesin Analisis AI Aktif"></span>
         </button>
 
-        <!-- Button 1: Salin Prompt AI -->
-        <button
-          @click="copyAiPrompt"
-          class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-400/40 hover:border-amber-400 text-amber-300 hover:text-amber-200 text-xs font-bold transition shadow-lg shadow-amber-400/10 cursor-pointer"
-          title="Salin formula prompt ChatGPT resmi Senior Media Analyst"
-        >
-          <Sparkles class="w-4 h-4 text-amber-400" />
-          <span>Salin Prompt AI</span>
-        </button>
-
-        <!-- Button 1b: Lihat Prompt AI (Preview Modal) -->
-        <button
-          @click="openPromptPreviewModal('Formula Prompt AI Presisi', props.aiPromptTemplate || 'Formula prompt intelijen media Polri...')"
-          class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 text-slate-300 hover:text-white text-xs font-bold transition cursor-pointer"
-          title="Lihat teks formula prompt ChatGPT secara lengkap"
-        >
-          <Eye class="w-4 h-4 text-slate-400" />
-          <span>Lihat Prompt</span>
-        </button>
-
-        <!-- Button 2: Tempel Ringkasan AI -->
-        <button
-          @click="showPasteAiModal = true"
-          class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-amber-400 text-slate-200 hover:text-white text-xs font-bold transition cursor-pointer"
-          title="Tempel teks/JSON hasil analisis dari AI secara manual"
-        >
-          <Clipboard class="w-4 h-4 text-amber-400" />
-          <span>Tempel Ringkasan AI</span>
-        </button>
-
-        <!-- Button 4: Format WA Pimpinan (Tab 07) -->
+        <!-- Button 2: Format WA Pimpinan (Tab 07) -->
         <button
           @click="activeTab = '07'"
-          class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white text-xs font-black transition shadow-lg shadow-emerald-600/25 border border-emerald-400/30 cursor-pointer"
+          class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white text-xs font-black transition shadow-lg shadow-emerald-600/25 border border-emerald-400/30 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
           title="Buka format naskah WhatsApp resmi siap kirim ke pimpinan"
         >
           <MessageCircle class="w-4 h-4" />
@@ -1418,17 +1403,11 @@ const submitIssue = () => {
           <button
             @click="refreshRssFeeds"
             :disabled="isRefreshingRss"
-            class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-white transition shadow-sm disabled:opacity-50"
+            class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-white transition shadow-sm disabled:opacity-50 cursor-pointer"
+            title="Tarik berita terbaru dari portal media (hanya pembaruan berita tanpa memanggil AI)"
           >
             <RotateCw class="w-4 h-4 text-amber-400" :class="{ 'animate-spin': isRefreshingRss }" />
             <span>{{ isRefreshingRss ? 'Menarik Berita...' : 'Sinkron Berita' }}</span>
-          </button>
-          <button
-            @click="showRssManagerModal = true"
-            class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border-2 border-amber-400/90 text-xs font-black text-amber-300 hover:text-amber-200 transition shadow-lg shadow-amber-400/10"
-          >
-            <SlidersHorizontal class="w-4 h-4 text-amber-400" />
-            <span>Kelola Sumber RSS</span>
           </button>
         </div>
       </div>
@@ -2140,18 +2119,18 @@ const submitIssue = () => {
             </h2>
             <span v-if="props.aiSetting?.has_api_key" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-300 text-[10px] font-black">
               <Bot class="w-3 h-3 text-amber-400" />
-              <span>{{ props.aiSetting?.gemini_model || 'Gemini Pro' }}</span>
+              <span>{{ props.aiSetting?.gemini_model ? 'AI: ' + props.aiSetting.gemini_model : 'Mesin AI' }}</span>
             </span>
           </div>
           <div class="flex items-center gap-2">
             <button
-              @click="triggerGeminiAnalysis"
+              @click="triggerGeminiAnalysis(true)"
               :disabled="isAnalyzingGemini"
               class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 text-[11px] font-bold transition shadow-sm cursor-pointer disabled:opacity-50"
-              title="Segarkan analisis dengan Google Gemini Pro"
+              title="Segarkan sinkronisasi berita dan analisis otomatis"
             >
               <RotateCw class="w-3.5 h-3.5" :class="{ 'animate-spin': isAnalyzingGemini }" />
-              <span>{{ isAnalyzingGemini ? 'Menganalisis...' : 'Analisis Ulang (Gemini)' }}</span>
+              <span>{{ isAnalyzingGemini ? (syncStepText || 'Menganalisis...') : 'Analisis Ulang' }}</span>
             </button>
             <button
               @click="copyWaReport"
@@ -2166,7 +2145,7 @@ const submitIssue = () => {
           </div>
         </div>
         <p class="text-xs md:text-sm text-slate-200 leading-relaxed">
-          {{ report?.executive_brief || 'Ringkasan briefing pimpinan belum diisi. Gunakan tombol "⚡ Analisis Otomatis (Gemini Pro)" di atas atau "Tempel Ringkasan AI" secara manual.' }}
+          {{ report?.executive_brief || 'Ringkasan briefing pimpinan belum diisi. Gunakan tombol "⚡ Sinkron & Analisis Otomatis" di atas.' }}
         </p>
       </div>
 

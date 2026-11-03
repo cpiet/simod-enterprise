@@ -492,10 +492,45 @@ class MediaIntelligenceController extends Controller
                 return response()->json([
                     'success' => false,
                     'status'  => 'missing_api_key',
-                    'message' => 'Google Gemini API Key belum diatur. Silakan masukkan API Key Anda pada pengaturan Gemini.',
+                    'message' => 'Kunci API Mesin AI belum diatur. Hubungi Administrator di menu Keamanan & Pemeliharaan.',
                 ], 422);
             }
-            return back()->with('error', 'Google Gemini API Key belum diatur. Silakan masukkan API Key Anda.');
+            return back()->with('error', 'Kunci API Mesin AI belum diatur. Hubungi Administrator di menu Keamanan & Pemeliharaan.');
+        }
+
+        // 1. Sinkronisasi Berita RSS jika diminta (Pipeline 2-in-1 Seamless)
+        $shouldSync = $request->boolean('sync', false) || $request->boolean('sync_first', false);
+        $syncedCount = 0;
+        if ($shouldSync) {
+            $mediaFeeds = MediaFeed::where('polda_id', $polda->id)->orderBy('name')->get();
+            if ($mediaFeeds->isNotEmpty()) {
+                $rssService = new RssFeedService();
+                $liveArticles = $rssService->fetchAggregatedFeeds($mediaFeeds->toArray(), true);
+                $bySource = [];
+                foreach ($liveArticles as $item) {
+                    $srcKey = strtoupper($item['source_name'] ?? 'MEDIA ONLINE');
+                    $bySource[$srcKey][] = $item;
+                }
+                foreach ($bySource as $srcKey => $items) {
+                    foreach (array_slice($items, 0, 25) as $item) {
+                        MediaArticle::updateOrCreate(
+                            ['url' => $item['link']],
+                            [
+                                'polda_id'    => $polda->id,
+                                'feed_id'     => $item['source_id'] ?: null,
+                                'title'       => $item['title'],
+                                'source_name' => strtoupper($item['source_name']),
+                                'category'    => $item['category'],
+                                'image_url'   => $item['image_url'] ?: null,
+                                'summary'     => $item['summary'],
+                                'pub_date'    => !empty($item['pub_date']) ? date('Y-m-d H:i:s', strtotime($item['pub_date'])) : now(),
+                                'sentiment'   => $item['sentiment'] ?? 'netral',
+                            ]
+                        );
+                        $syncedCount++;
+                    }
+                }
+            }
         }
 
         // Fetch latest articles for this Polda (up to 30)
@@ -613,17 +648,21 @@ class MediaIntelligenceController extends Controller
         ]);
 
         $modelUsed = $result['model_used'] ?? $model;
+        $successMsg = $shouldSync
+            ? "Sinkronisasi {$syncedCount} berita dan analisis intelijen otomatis berhasil diperbarui!"
+            : "Analisis intelijen otomatis berhasil diperbarui!";
 
         if ($request->wantsJson()) {
             return response()->json([
-                'success' => true,
-                'message' => "Analisis otomatis Google Gemini ({$modelUsed}) berhasil diperbarui!",
-                'report'  => $report,
-                'model'   => $modelUsed,
+                'success'      => true,
+                'message'      => $successMsg,
+                'synced_count' => $syncedCount,
+                'report'       => $report,
+                'model'        => $modelUsed,
             ]);
         }
 
-        return back()->with('success', "Analisis intelijen otomatis Gemini Pro ({$modelUsed}) berhasil diperbarui!");
+        return back()->with('success', $successMsg);
     }
 
     /**

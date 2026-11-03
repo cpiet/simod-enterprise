@@ -55,14 +55,14 @@ class RolePermission extends Model
             [
                 'pillar'      => '1. Komando & Intelijen',
                 'key'         => 'media_intelligence_ai',
-                'name'        => 'Analisis AI & Naskah WA Pimpinan',
-                'description' => 'Eksekusi prompt AI, input hasil ringkasan analis, dan generate naskah WhatsApp resmi pimpinan.',
+                'name'        => 'Sinkronisasi Berita & Analisis Otomatis AI',
+                'description' => 'Eksekusi sinkronisasi berita seketika dan analisis intelijen otomatis AI serta penerbitan naskah WhatsApp pimpinan.',
             ],
             [
                 'pillar'      => '1. Komando & Intelijen',
                 'key'         => 'media_intelligence_manage',
-                'name'        => 'Manajemen Sumber RSS & Uji URL',
-                'description' => 'Tambah, edit, uji validitas XML, dan aktifkan/nonaktifkan portal media RSS.',
+                'name'        => 'Manajemen Master Feed RSS (Admin Maintenance)',
+                'description' => 'Kelola portal RSS, uji validitas XML feed, dan konfigurasi auto-sync di menu Keamanan & Pemeliharaan.',
             ],
             [
                 'pillar'      => '1. Komando & Intelijen',

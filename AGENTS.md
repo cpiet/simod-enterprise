@@ -147,26 +147,20 @@ Seluruh 29 portal media dikonfigurasi melalui seeder [`SulbarRssFeedsSeeder.php`
 
 ---
 
-## 🤖 5. Alur Analisis Intelijen AI (Otomatis Gemini Pro & Manual Prompt)
+## 🤖 5. Alur Analisis Intelijen AI (Pipeline Seamless 1-Klik)
 
-### 5.1. Analisis Otomatis 1-Klik (Google Gemini Pro Engine - Default)
-1. **Tombol Utama `⚡ Analisis Otomatis (Gemini Pro)`**: Terletak pada top-command bar di Radar Media Online. Memanggil API backend `POST /media-intelligence/analyze-gemini`.
-2. **Mesin Cerdas `GeminiService`**:
-   - Menarik 30 berita terkini sesuai tenant aktif (Divhumas Polri / Polda).
-   - Menginjeksikan konteks berita ke dalam formula prompt Senior Media Analyst Mabes Polri.
-   - Memanggil endpoint Google Gemini (`gemini-2.5-pro` dengan fallback bertingkat ke `gemini-1.5-pro` dan `gemini-2.5-flash`).
-   - Menerima keluaran terstruktur JSON murni (`responseMimeType: application/json`).
-3. **Penyimpanan Permanen Basis Data**:
-   - Menyimpan hasil analisis ke tabel `media_intelligence_reports` dan memperbarui stempel `ai_settings`.
+### 5.1. Pipeline 2-in-1: Sinkron Berita & Analisis Otomatis
+1. **Tombol Utama `⚡ Sinkron & Analisis Otomatis`**: Terletak pada top-command bar di Radar Media Online. Memanggil API backend `POST /media-intelligence/analyze-gemini?sync=1`.
+2. **Eksekusi 2-in-1 Simultan**:
+   - **Tahap 1 (Penarikan Berita Terkini)**: Menarik feed RSS dari 22/29 portal media secara paralel (`curl_multi`) dan menyimpan artikel terbaru secara adil (*fair quota* 25 berita/portal).
+   - **Tahap 2 (Analisis Intelijen AI)**: 30 artikel paling segar seketika diumpankan ke mesin AI (`gemini-2.5-pro` dengan fallback otomatis ke `gemini-1.5-pro`).
+   - Menerima keluaran JSON terstruktur dan menyimpannya permanen ke tabel `media_intelligence_reports`.
+3. **Penyajian Cepat Tanpa Klik Ganda**:
    - Mengisi seketika seluruh tab: **Tab 02** (Executive Briefing), **Tab 03** (Polarisasi Sentimen), **Tab 05** (EWS), **Tab 06** (Counter Narasi & Rekomendasi), dan **Tab 07** (Naskah WhatsApp Siap Kirim).
-4. **Sentralisasi Admin di Keamanan & Pemeliharaan (`/settings/ai`)**:
-   - Master Google Gemini API Key dikonfigurasi tersentralisasi oleh Administrator di menu **Keamanan & Pemeliharaan -> Mesin Intelijen AI**.
-   - Halaman operasional **Radar Media Online (`/media-intelligence`)** tetap bersih, bebas dari input API key yang membingungkan staf.
-   - Menyediakan fitur *"Uji Koneksi API"* realtime beserta indikator latensi milidetik dan audit log.
-   - Pilihan model (`gemini-2.5-pro`, `gemini-1.5-pro`, `gemini-2.5-flash`, `gemini-1.5-flash`).
-
-### 5.2. Opsi Manual (Salin Formula & Tempel Ringkasan AI)
-- **Tetap Dipertahankan Berdampingan**: Tombol *"Salin Prompt AI"*, *"Lihat Prompt"*, dan *"Tempel Ringkasan AI"* tetap aktif dan dapat digunakan kapan saja jika pengguna ingin menganalisis menggunakan antarmuka eksternal ChatGPT Plus (GPT-4o), Claude 3.5 Sonnet, atau akun web Gemini secara manual.
+4. **Sentralisasi Admin & Kebijakan Hak Akses (/roles)**:
+   - Pengaturan sumber RSS XML dikunci khusus di menu Admin **Keamanan & Pemeliharaan -> Otomasi Sinkron RSS** (`/maintenance/rss-sync`) dan dilindungi izin `media_intelligence_manage`.
+   - Tombol manual kuno (*Salin Prompt*, *Lihat Prompt*, *Tempel Ringkasan AI*) serta tombol *Kelola Sumber RSS* telah dibersihkan dari antarmuka operasional radar.
+   - Hak akses operasional `media_intelligence_ai` di `/roles` terdefinisi sebagai *Sinkronisasi Berita & Analisis Otomatis AI*.
 
 ---
 
