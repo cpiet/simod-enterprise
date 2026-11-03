@@ -151,14 +151,48 @@ const handleSearch = () => {
   currentPage.value = 1;
 };
 
-// Image fallback tracker
+// Curated High-Resolution Editorial & Police Imagery Palette
+const defaultPoliceImages = [
+  'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800&auto=format&fit=crop&q=80', // Konferensi Pers & Rilis Kehumasan
+  'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&auto=format&fit=crop&q=80', // Sinergi Media & Rapat Pimpinan
+  'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=800&auto=format&fit=crop&q=80', // Apel & Personel Kedinasan Polri
+  'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&auto=format&fit=crop&q=80', // Ruang Redaksi Berita & Pers
+  'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&auto=format&fit=crop&q=80', // Gedung Penegakan Hukum
+  'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&auto=format&fit=crop&q=80', // Monitoring Ruang Siber
+];
+
 const brokenImages = ref(new Set());
-const handleImageError = (e, article) => {
-  brokenImages.value.add(article.id);
-  e.target.style.display = 'none';
-  if (e.target.nextElementSibling) {
-    e.target.nextElementSibling.classList.remove('hidden');
+
+const getArticleImage = (article) => {
+  if (article?.image_url && !brokenImages.value.has(article.id)) {
+    return article.image_url;
   }
+  const numId = parseInt(String(article?.id || '0').replace(/\D/g, '') || '0', 10);
+  const idx = Math.abs(numId) % defaultPoliceImages.length;
+  return defaultPoliceImages[idx];
+};
+
+const handleImageError = (e, article) => {
+  if (article && !brokenImages.value.has(article.id)) {
+    brokenImages.value.add(article.id);
+    const fallback = getArticleImage(article);
+    if (e?.target) {
+      e.target.src = fallback;
+    }
+  }
+};
+
+const getCleanSummary = (article) => {
+  let s = article.summary || '';
+  s = s.replace(/[\u00a0\s]+/g, ' ').trim();
+  if (article.source_name) {
+    const srcRegex = new RegExp('\\s*' + article.source_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$', 'i');
+    s = s.replace(srcRegex, '').trim();
+  }
+  if (!s || s.length < 25 || s.toLowerCase() === (article.title || '').toLowerCase()) {
+    return `Informasi siaran pers media dari portal ${article.source_name || 'media online'} terkait dinamika pemantauan "${article.title}".`;
+  }
+  return s;
 };
 
 // Filter States
@@ -1035,7 +1069,11 @@ const filteredArticles = computed(() => {
 
   // Filter Portal
   if (selectedPortal.value !== 'Semua Portal') {
-    list = list.filter((a) => a.source_name.toLowerCase() === selectedPortal.value.toLowerCase());
+    if (selectedPortal.value.includes('SEBARAN INTERNET')) {
+      list = list.filter((a) => !a.feed_id || a.source_id === 0 || (a.link && a.link.includes('news.google.com')));
+    } else {
+      list = list.filter((a) => a.source_name.toLowerCase() === selectedPortal.value.toLowerCase());
+    }
   }
 
   // Filter Kategori
@@ -1864,7 +1902,7 @@ const submitIssue = () => {
           <div
             v-for="article in paginatedArticles"
             :key="article.id"
-            class="rounded-3xl bg-[#0b1426] border border-slate-800/90 hover:border-amber-400/50 transition-all duration-300 flex flex-col justify-between overflow-hidden shadow-xl group hover:shadow-2xl hover:shadow-amber-400/5"
+            class="rounded-3xl bg-[#0b1426] border border-slate-800/90 hover:border-amber-400/50 transition-all duration-300 flex flex-col justify-between overflow-hidden shadow-xl group hover:shadow-2xl hover:shadow-amber-400/5 h-[435px]"
           >
             <!-- Top Cover Image Area (h-48) -->
             <div class="h-48 w-full bg-slate-950 relative overflow-hidden shrink-0 border-b border-slate-800/80">
@@ -1882,10 +1920,9 @@ const submitIssue = () => {
                 </span>
               </div>
 
-              <!-- Real Cover Image -->
+              <!-- Real Cover Image with Smart Thematic Fallback -->
               <img
-                v-if="article.image_url && !brokenImages.has(article.id)"
-                :src="article.image_url"
+                :src="getArticleImage(article)"
                 :alt="article.title"
                 loading="lazy"
                 referrerpolicy="no-referrer"
@@ -1893,24 +1930,15 @@ const submitIssue = () => {
                 @error="(e) => handleImageError(e, article)"
               />
 
-              <!-- Fallback Placeholder Persis SIMOD ("Gambar tidak disediakan oleh website") -->
-              <div
-                v-else
-                class="w-full h-full flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-slate-900 via-[#0d1830] to-slate-950 text-slate-600 p-4 text-center select-none"
-              >
-                <Newspaper class="w-12 h-12 text-slate-700 stroke-[1.5]" />
-                <span class="text-[10px] text-slate-500 font-medium">Gambar tidak disediakan oleh website</span>
-              </div>
-
               <!-- Dark Gradient Overlay -->
               <div class="absolute inset-0 bg-gradient-to-t from-[#0b1426] via-transparent to-black/40 pointer-events-none"></div>
             </div>
 
             <!-- Card Body Content -->
-            <div class="p-5 flex-1 flex flex-col justify-between space-y-3">
+            <div class="p-5 flex-1 flex flex-col justify-between space-y-2">
               <div class="space-y-2">
                 <!-- Category Badge & Topic Atensi Badges -->
-                <div class="flex flex-wrap items-center gap-1.5 pt-1">
+                <div class="flex flex-wrap items-center gap-1.5 pt-0.5">
                   <span class="px-2.5 py-0.5 rounded-md text-[9px] font-extrabold uppercase bg-slate-900/90 text-slate-300 border border-slate-700/80 tracking-wider">
                     {{ article.category_badge || article.category || (isDivhumas ? 'NASIONAL & MABES' : 'REGIONAL') }}
                   </span>
@@ -1935,20 +1963,20 @@ const submitIssue = () => {
                   <span class="truncate">{{ article.pub_date }}</span>
                 </div>
 
-                <!-- Title -->
+                <!-- Title (Uniform Height 2-line clamp) -->
                 <a
                   :href="article.link"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="block font-black text-sm md:text-[15px] text-white group-hover:text-amber-400 transition leading-snug line-clamp-2"
+                  class="block font-black text-sm md:text-[14px] text-white group-hover:text-amber-400 transition leading-snug line-clamp-2 h-10 md:h-11 overflow-hidden"
                   :title="article.title"
                 >
                   {{ article.title }}
                 </a>
 
-                <!-- Summary Excerpt -->
-                <p class="text-xs text-slate-300 line-clamp-3 leading-relaxed">
-                  {{ article.summary }}
+                <!-- Summary Excerpt (Cleaned and Uniform Height 2-line clamp) -->
+                <p class="text-xs text-slate-300 line-clamp-2 h-9 overflow-hidden leading-relaxed">
+                  {{ getCleanSummary(article) }}
                 </p>
               </div>
 

@@ -186,6 +186,16 @@ class MediaIntelligenceController extends Controller
         $portalsList = [
             ['name' => 'Semua Portal', 'count' => count($articles)],
         ];
+
+        // Tambahkan opsi Sebaran Internet (Google News) jika terdapat artikel live crawling
+        $liveCrawlCount = MediaArticle::where('polda_id', $poldaId)->whereNull('feed_id')->count();
+        if ($liveCrawlCount > 0) {
+            $portalsList[] = [
+                'name'  => '🌐 SEBARAN INTERNET (GOOGLE NEWS)',
+                'count' => $liveCrawlCount,
+            ];
+        }
+
         foreach ($mergedPortalCounts as $name => $count) {
             $portalsList[] = ['name' => $name, 'count' => $count];
         }

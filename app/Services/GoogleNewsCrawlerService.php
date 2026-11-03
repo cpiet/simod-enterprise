@@ -207,10 +207,7 @@ class GoogleNewsCrawlerService
             }
 
             $rawDesc = (string) ($item->description ?? '');
-            $cleanSummary = $this->cleanHtmlSummary($rawDesc);
-            if (empty($cleanSummary)) {
-                $cleanSummary = "Pemberitaan mengenai \"{$cleanTitle}\" dihimpun dari portal {$sourceName}.";
-            }
+            $cleanSummary = $this->cleanHtmlSummary($rawDesc, $cleanTitle, $sourceName);
 
             $pubDateStr = (string) ($item->pubDate ?? '');
             $pubDate = !empty($pubDateStr) ? date('Y-m-d H:i:s', strtotime($pubDateStr)) : now()->format('Y-m-d H:i:s');
@@ -221,8 +218,11 @@ class GoogleNewsCrawlerService
             // Kategori dinamis
             $category = $this->detectCategory($cleanTitle . ' ' . $cleanSummary);
 
-            // Thumbnail / gambar artikel
+            // Thumbnail / gambar artikel (ekstrak asli atau berikan cover editorial berwibawa)
             $imageUrl = $this->extractImageFromHtml($rawDesc);
+            if (empty($imageUrl)) {
+                $imageUrl = $this->getEditorialFallbackImage($category, $cleanTitle, $count);
+            }
 
             $results[] = [
                 'title'       => html_entity_decode($cleanTitle, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
@@ -246,13 +246,65 @@ class GoogleNewsCrawlerService
     }
 
     /**
+     * Berikan gambar cover editorial kepolisian & pers beresolusi tinggi yang sesuai tema.
+     */
+    protected function getEditorialFallbackImage(string $category, string $title, int $seed): string
+    {
+        $harkamtibmasImages = [
+            'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=800&auto=format&fit=crop&q=80', // Konferensi Pers & Rilis Kehumasan
+            'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&auto=format&fit=crop&q=80', // Sinergi Media & Rapat Pimpinan
+            'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=800&auto=format&fit=crop&q=80', // Apel & Personel Kedinasan Polri
+            'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&auto=format&fit=crop&q=80', // Ruang Redaksi Berita & Pers
+        ];
+
+        $hukumImages = [
+            'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&auto=format&fit=crop&q=80', // Gedung Penegakan Hukum
+            'https://images.unsplash.com/photo-1505664194779-8beaceb93744?w=800&auto=format&fit=crop&q=80', // Arsip Berkas Perkara & Regulasi
+        ];
+
+        $siberImages = [
+            'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&auto=format&fit=crop&q=80', // Monitoring Ruang Siber
+            'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&auto=format&fit=crop&q=80', // Infrastruktur Jaringan & Server
+        ];
+
+        $laluLintasImages = [
+            'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=800&auto=format&fit=crop&q=80', // Patroli Jalan Raya
+        ];
+
+        $lower = mb_strtolower($title);
+        if (str_contains($lower, 'siber') || str_contains($lower, 'digital') || str_contains($lower, 'online') || str_contains($lower, 'medsos')) {
+            return $siberImages[$seed % count($siberImages)];
+        }
+
+        if ($category === 'Hukum & Kriminal') {
+            return $hukumImages[$seed % count($hukumImages)];
+        }
+
+        if ($category === 'Lalu Lintas') {
+            return $laluLintasImages[$seed % count($laluLintasImages)];
+        }
+
+        return $harkamtibmasImages[$seed % count($harkamtibmasImages)];
+    }
+
+    /**
      * Bersihkan HTML tags dari deskripsi RSS.
      */
-    protected function cleanHtmlSummary(string $html): string
+    protected function cleanHtmlSummary(string $html, string $cleanTitle = '', string $sourceName = ''): string
     {
         $text = strip_tags($html);
         $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $text = preg_replace('/\s+/', ' ', trim($text));
+        $text = preg_replace('/[\x{00a0}\s]+/u', ' ', trim($text));
+
+        // Bersihkan nama media di ujung jika menempel
+        if (!empty($sourceName)) {
+            $text = preg_replace('/\s*' . preg_quote($sourceName, '/') . '\s*$/i', '', $text);
+        }
+
+        // Jika ringkasan terlalu pendek atau sama persis dengan judul
+        if (empty($text) || mb_strlen($text) < 25 || mb_strtolower($text) === mb_strtolower($cleanTitle)) {
+            return "Informasi publikasi pers dari portal {$sourceName} terkait pemantauan agenda \"{$cleanTitle}\".";
+        }
 
         return mb_substr($text, 0, 500);
     }
