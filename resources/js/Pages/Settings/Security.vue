@@ -146,21 +146,21 @@ const resetToStandards = () => {
     <SecurityMaintenanceTabs :selected-code="selectedCode" />
 
     <!-- Header Section -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-3xl bg-gradient-to-r from-[#0d182e] via-[#0b1426] to-[#070d1d] border border-slate-800 shadow-xl">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-3xl bg-white dark:bg-gradient-to-r dark:from-[#0d182e] dark:via-[#0b1426] dark:to-[#070d1d] border border-slate-200 dark:border-slate-800 shadow-xl">
       <div class="space-y-1">
         <div class="flex items-center gap-2">
-          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/40">
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500/15 dark:bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/30 dark:border-rose-500/40">
             Pertahanan Siber &amp; Enkripsi
           </span>
-          <span class="text-xs font-bold text-slate-400">
+          <span class="text-xs font-bold text-slate-500 dark:text-slate-400">
             {{ selectedCode === 'ALL' ? 'Mabes Polri (Konsolidasi)' : selectedPolda?.name }}
           </span>
         </div>
-        <h1 class="text-2xl md:text-3xl font-black text-white tracking-tight flex items-center gap-2">
-          <ShieldAlert class="w-6 h-6 text-amber-400" />
+        <h1 class="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+          <ShieldAlert class="w-6 h-6 text-amber-500 dark:text-amber-400" />
           <span>Pusat Keamanan Sistem (Security Center)</span>
         </h1>
-        <p class="text-xs md:text-sm text-slate-300 max-w-2xl leading-relaxed">
+        <p class="text-xs md:text-sm text-slate-600 dark:text-slate-300 max-w-2xl leading-relaxed">
           Parameter mitigasi brute force, perlindungan bot Turnstile, isolasi media private, dan kepatuhan standar BSSN / Mabes Polri. Data tersimpan permanen di database.
         </p>
       </div>
@@ -169,7 +169,7 @@ const resetToStandards = () => {
         <button
           type="button"
           @click="resetToStandards"
-          class="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition"
+          class="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white text-xs font-bold transition"
           title="Kembalikan ke standar acuan BSSN"
         >
           <RotateCcw class="w-3.5 h-3.5" />
@@ -180,7 +180,7 @@ const resetToStandards = () => {
           type="button"
           @click="submitSecurity"
           :disabled="form.processing"
-          class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition shadow-lg shadow-amber-400/20 disabled:opacity-50"
+          class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition shadow-lg shadow-amber-400/20 disabled:opacity-50 cursor-pointer"
         >
           <Save class="w-4 h-4" />
           <span>{{ form.processing ? 'Menyimpan...' : 'Simpan Parameter' }}</span>
@@ -190,51 +190,51 @@ const resetToStandards = () => {
 
     <!-- 4 Security KPI Cards (Real-time dynamic from form state) -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="p-5 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-2">
-        <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
+      <div class="p-5 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-xl space-y-2">
+        <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold">
           <span class="text-[11px] font-black uppercase">Indeks Keamanan</span>
-          <ShieldCheck class="w-4 h-4 text-emerald-400" />
+          <ShieldCheck class="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
         </div>
         <div class="text-3xl font-black" :class="dynamicScore.badgeColor">
           {{ dynamicScore.score }} <span class="text-xs text-slate-400 font-normal">/ 100</span>
         </div>
-        <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+        <div class="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
           <div :class="dynamicScore.progressBg" class="h-full transition-all duration-300" :style="{ width: dynamicScore.score + '%' }"></div>
         </div>
         <p class="text-[11px] font-bold" :class="dynamicScore.badgeColor">{{ dynamicScore.category }}</p>
       </div>
 
-      <div class="p-5 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
-        <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
+      <div class="p-5 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-xl space-y-1">
+        <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold">
           <span class="text-[11px] font-black uppercase">Turnstile Anti-Bot</span>
-          <Globe class="w-4 h-4 text-amber-400" />
+          <Globe class="w-4 h-4 text-amber-500 dark:text-amber-400" />
         </div>
-        <div class="text-3xl font-black" :class="form.enable_turnstile ? 'text-white' : 'text-slate-500'">
+        <div class="text-3xl font-black" :class="form.enable_turnstile ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500'">
           {{ form.enable_turnstile ? 'Aktif' : 'Nonaktif' }}
         </div>
-        <p class="text-[11px] text-slate-400">Cloudflare Managed Challenge</p>
+        <p class="text-[11px] text-slate-500 dark:text-slate-400">Cloudflare Managed Challenge</p>
       </div>
 
-      <div class="p-5 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
-        <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
+      <div class="p-5 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-xl space-y-1">
+        <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold">
           <span class="text-[11px] font-black uppercase">Brute Force Limit</span>
-          <Lock class="w-4 h-4 text-amber-400" />
+          <Lock class="w-4 h-4 text-amber-500 dark:text-amber-400" />
         </div>
-        <div class="text-3xl font-black text-amber-400">
+        <div class="text-3xl font-black text-amber-500 dark:text-amber-400">
           {{ form.max_login_attempts }}x Limit
         </div>
-        <p class="text-[11px] text-slate-400">Cooldown {{ form.lockout_minutes }} Menit Otomatis</p>
+        <p class="text-[11px] text-slate-500 dark:text-slate-400">Cooldown {{ form.lockout_minutes }} Menit Otomatis</p>
       </div>
 
-      <div class="p-5 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
-        <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
+      <div class="p-5 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-xl space-y-1">
+        <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-bold">
           <span class="text-[11px] font-black uppercase">Isolasi Media Privat</span>
-          <FileCheck2 class="w-4 h-4 text-sky-400" />
+          <FileCheck2 class="w-4 h-4 text-sky-500 dark:text-sky-400" />
         </div>
-        <div class="text-3xl font-black" :class="form.private_media_storage ? 'text-emerald-400' : 'text-slate-500'">
+        <div class="text-3xl font-black" :class="form.private_media_storage ? 'text-emerald-500 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'">
           {{ form.private_media_storage ? 'Terenkripsi' : 'Terbuka' }}
         </div>
-        <p class="text-[11px] text-slate-400">
+        <p class="text-[11px] text-slate-500 dark:text-slate-400">
           {{ form.private_media_storage ? 'Akses via URL Bertanda Tangan' : 'Dapat Diakses Publik' }}
         </p>
       </div>
@@ -243,11 +243,11 @@ const resetToStandards = () => {
     <!-- Security Form Cards -->
     <form @submit.prevent="submitSecurity" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <!-- Turnstile Cloudflare -->
-      <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
-        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+      <div class="rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-6 shadow-xl space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
           <div class="flex items-center gap-2">
-            <Globe class="w-4 h-4 text-amber-400" />
-            <h3 class="text-sm font-black text-white uppercase tracking-wider">Cloudflare Turnstile Anti-Bot</h3>
+            <Globe class="w-4 h-4 text-amber-500 dark:text-amber-400" />
+            <h3 class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">Cloudflare Turnstile Anti-Bot</h3>
           </div>
           <label class="relative inline-flex items-center cursor-pointer">
             <input
@@ -255,43 +255,43 @@ const resetToStandards = () => {
               type="checkbox"
               class="sr-only peer"
             />
-            <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-400"></div>
+            <div class="w-9 h-5 bg-slate-200 dark:bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-400"></div>
           </label>
         </div>
 
         <div class="space-y-3 text-xs">
           <div>
-            <label class="block font-bold text-slate-300 mb-1">Turnstile Site Key</label>
+            <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Turnstile Site Key</label>
             <input
               v-model="form.turnstile_site_key"
               type="text"
-              class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+              class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-mono"
               placeholder="0x4AAAAAAAiH8s-xxxxxxxx"
             />
-            <p v-if="form.errors.turnstile_site_key" class="text-rose-400 text-[10px] mt-1">{{ form.errors.turnstile_site_key }}</p>
+            <p v-if="form.errors.turnstile_site_key" class="text-rose-500 dark:text-rose-400 text-[10px] mt-1">{{ form.errors.turnstile_site_key }}</p>
           </div>
           <div>
-            <label class="block font-bold text-slate-300 mb-1">Turnstile Secret Key</label>
+            <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Turnstile Secret Key</label>
             <input
               v-model="form.turnstile_secret_key"
               type="password"
-              class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono"
+              class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-mono"
               placeholder="0x4AAAAAAAiH8s-yyyyyyyyyyyyyyyyyyyyyyyy"
             />
-            <p v-if="form.errors.turnstile_secret_key" class="text-rose-400 text-[10px] mt-1">{{ form.errors.turnstile_secret_key }}</p>
+            <p v-if="form.errors.turnstile_secret_key" class="text-rose-500 dark:text-rose-400 text-[10px] mt-1">{{ form.errors.turnstile_secret_key }}</p>
           </div>
-          <p class="text-[11px] text-slate-400 leading-relaxed">
+          <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
             Melindungi endpoint login dari serangan brute force otomatis dan bot tanpa mengganggu pengguna dengan captcha rumit.
           </p>
         </div>
       </div>
 
       <!-- Brute Force, Session, & PIN -->
-      <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
-        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+      <div class="rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-6 shadow-xl space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
           <div class="flex items-center gap-2">
-            <Lock class="w-4 h-4 text-amber-400" />
-            <h3 class="text-sm font-black text-white uppercase tracking-wider">Batas Percobaan Login &amp; Sesi</h3>
+            <Lock class="w-4 h-4 text-amber-500 dark:text-amber-400" />
+            <h3 class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">Batas Percobaan Login &amp; Sesi</h3>
           </div>
           <label class="relative inline-flex items-center cursor-pointer">
             <input
@@ -299,78 +299,78 @@ const resetToStandards = () => {
               type="checkbox"
               class="sr-only peer"
             />
-            <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-400"></div>
+            <div class="w-9 h-5 bg-slate-200 dark:bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-400"></div>
           </label>
         </div>
 
         <div class="space-y-3 text-xs">
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block font-bold text-slate-300 mb-1">Max Percobaan Gagal</label>
+              <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Max Percobaan Gagal</label>
               <input
                 v-model.number="form.max_login_attempts"
                 type="number"
                 min="1"
                 max="20"
-                class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-bold"
+                class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold"
               />
-              <p v-if="form.errors.max_login_attempts" class="text-rose-400 text-[10px] mt-1">{{ form.errors.max_login_attempts }}</p>
+              <p v-if="form.errors.max_login_attempts" class="text-rose-500 dark:text-rose-400 text-[10px] mt-1">{{ form.errors.max_login_attempts }}</p>
             </div>
             <div>
-              <label class="block font-bold text-slate-300 mb-1">Cooldown (Menit)</label>
+              <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Cooldown (Menit)</label>
               <input
                 v-model.number="form.lockout_minutes"
                 type="number"
                 min="1"
                 max="1440"
-                class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-bold"
+                class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold"
               />
-              <p v-if="form.errors.lockout_minutes" class="text-rose-400 text-[10px] mt-1">{{ form.errors.lockout_minutes }}</p>
+              <p v-if="form.errors.lockout_minutes" class="text-rose-500 dark:text-rose-400 text-[10px] mt-1">{{ form.errors.lockout_minutes }}</p>
             </div>
           </div>
 
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block font-bold text-slate-300 mb-1">Timeout Sesi (Menit)</label>
+              <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Timeout Sesi (Menit)</label>
               <input
                 v-model.number="form.session_timeout_minutes"
                 type="number"
                 min="5"
                 max="480"
-                class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-bold"
+                class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold"
               />
-              <p v-if="form.errors.session_timeout_minutes" class="text-rose-400 text-[10px] mt-1">{{ form.errors.session_timeout_minutes }}</p>
+              <p v-if="form.errors.session_timeout_minutes" class="text-rose-500 dark:text-rose-400 text-[10px] mt-1">{{ form.errors.session_timeout_minutes }}</p>
             </div>
             <div>
-              <label class="block font-bold text-slate-300 mb-1">Masa Aktif PIN (Hari)</label>
+              <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Masa Aktif PIN (Hari)</label>
               <input
                 v-model.number="form.pin_expiry_days"
                 type="number"
                 min="1"
                 max="365"
-                class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-bold"
+                class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold"
               />
-              <p v-if="form.errors.pin_expiry_days" class="text-rose-400 text-[10px] mt-1">{{ form.errors.pin_expiry_days }}</p>
+              <p v-if="form.errors.pin_expiry_days" class="text-rose-500 dark:text-rose-400 text-[10px] mt-1">{{ form.errors.pin_expiry_days }}</p>
             </div>
           </div>
 
           <!-- IP Whitelist -->
           <div>
-            <label class="block font-bold text-slate-300 mb-1">IP Whitelist Terminal Komando (opsional)</label>
+            <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">IP Whitelist Terminal Komando (opsional)</label>
             <textarea
               v-model="form.ip_whitelist"
               rows="2"
-              class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-[11px]"
+              class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-mono text-[11px]"
               placeholder="127.0.0.1&#10;192.168.1.100"
             ></textarea>
           </div>
 
           <div class="flex items-center justify-between pt-1">
-            <span class="text-[11px] text-slate-400">Isolasi Folder Storage Bukti / Dokumen Terenkripsi</span>
+            <span class="text-[11px] text-slate-600 dark:text-slate-400">Isolasi Folder Storage Bukti / Dokumen Terenkripsi</span>
             <input
               v-model="form.private_media_storage"
               type="checkbox"
-              class="w-4 h-4 rounded text-amber-400 focus:ring-0 bg-slate-900 border-slate-700 cursor-pointer"
+              class="w-4 h-4 rounded text-amber-400 focus:ring-0 bg-slate-100 dark:bg-slate-900 border-slate-300 dark:border-slate-700 cursor-pointer"
             />
           </div>
         </div>
@@ -378,21 +378,21 @@ const resetToStandards = () => {
     </form>
 
     <!-- Real Security Audit Trail Log (Verified from Database) -->
-    <div class="rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl overflow-hidden space-y-0">
-      <div class="p-5 bg-gradient-to-r from-slate-900 via-[#0b1426] to-[#080f20] border-b border-slate-800 flex items-center justify-between">
+    <div class="rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden space-y-0">
+      <div class="p-5 bg-slate-50 dark:bg-gradient-to-r dark:from-slate-900 dark:via-[#0b1426] dark:to-[#080f20] border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <History class="w-4 h-4 text-amber-400" />
-          <h3 class="text-sm font-black text-white uppercase tracking-wider">
+          <History class="w-4 h-4 text-amber-500 dark:text-amber-400" />
+          <h3 class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">
             Jejak Audit Keamanan Terakhir (Database Logs)
           </h3>
         </div>
-        <span class="text-xs text-slate-400 font-mono">Tersinkron Realtime</span>
+        <span class="text-xs text-slate-500 dark:text-slate-400 font-mono">Tersinkron Realtime</span>
       </div>
 
       <div class="overflow-x-auto">
         <table class="w-full text-xs">
           <thead>
-            <tr class="text-left text-slate-400 border-b border-slate-800/80 bg-slate-900/40">
+            <tr class="text-left text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800/80 bg-slate-100/60 dark:bg-slate-900/40">
               <th class="px-5 py-3 font-bold">Aktivitas / Event</th>
               <th class="px-5 py-3 font-bold">Pelaksana</th>
               <th class="px-5 py-3 font-bold">Alamat IP</th>
@@ -400,26 +400,26 @@ const resetToStandards = () => {
               <th class="px-5 py-3 font-bold">Detail Parameter</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-800/60">
+          <tbody class="divide-y divide-slate-200 dark:divide-slate-800/60">
             <tr
               v-for="log in securityLogs"
               :key="log.id"
-              class="hover:bg-slate-900/40 transition"
+              class="hover:bg-slate-50 dark:hover:bg-slate-900/40 transition"
             >
-              <td class="px-5 py-3 font-mono font-bold text-amber-300">
-                <span class="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-200 border border-slate-700">
+              <td class="px-5 py-3 font-mono font-bold text-amber-600 dark:text-amber-300">
+                <span class="px-2 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
                   {{ log.action }}
                 </span>
               </td>
-              <td class="px-5 py-3 font-semibold text-white">{{ log.user }}</td>
-              <td class="px-5 py-3 font-mono text-slate-400">{{ log.ip }}</td>
-              <td class="px-5 py-3 text-slate-400">{{ log.time_ago }} ({{ log.created_at }})</td>
-              <td class="px-5 py-3 font-mono text-[11px] text-slate-400 truncate max-w-xs">
+              <td class="px-5 py-3 font-semibold text-slate-900 dark:text-white">{{ log.user }}</td>
+              <td class="px-5 py-3 font-mono text-slate-500 dark:text-slate-400">{{ log.ip }}</td>
+              <td class="px-5 py-3 text-slate-500 dark:text-slate-400">{{ log.time_ago }} ({{ log.created_at }})</td>
+              <td class="px-5 py-3 font-mono text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-xs">
                 {{ log.metadata ? JSON.stringify(log.metadata) : '-' }}
               </td>
             </tr>
             <tr v-if="!securityLogs || securityLogs.length === 0">
-              <td colspan="5" class="px-5 py-6 text-center text-slate-500 italic">
+              <td colspan="5" class="px-5 py-6 text-center text-slate-400 dark:text-slate-500 italic">
                 Belum ada rekaman audit log keamanan. Simpan parameter di atas untuk mencatat log pertama.
               </td>
             </tr>

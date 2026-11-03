@@ -67,6 +67,34 @@ html:not(.dark) .bg-\[\#080f20\] {
     background-color: #ffffff !important;
 }
 
+/* Dark Gradients on Header Cards & Surface Containers in Light Mode */
+html.light .from-\[\#0d182e\],
+html:not(.dark) .from-\[\#0d182e\],
+html.light .from-\[\#0d1b33\],
+html:not(.dark) .from-\[\#0d1b33\],
+html.light .via-\[\#0b1426\],
+html:not(.dark) .via-\[\#0b1426\],
+html.light .via-\[\#0c182b\],
+html:not(.dark) .via-\[\#0c182b\],
+html.light .to-\[\#070d1d\],
+html:not(.dark) .to-\[\#070d1d\],
+html.light .to-\[\#0a1424\],
+html:not(.dark) .to-\[\#0a1424\],
+html.light .to-\[\#080f20\],
+html:not(.dark) .to-\[\#080f20\] {
+    --tw-gradient-from: #ffffff !important;
+    --tw-gradient-via: #ffffff !important;
+    --tw-gradient-to: #ffffff !important;
+}
+
+html.light div.rounded-3xl.bg-gradient-to-r,
+html:not(.dark) div.rounded-3xl.bg-gradient-to-r,
+html.light div.rounded-2xl.bg-gradient-to-r,
+html:not(.dark) div.rounded-2xl.bg-gradient-to-r {
+    background-image: none !important;
+    background-color: #ffffff !important;
+}
+
 /* Sidebars & Top Navigation Headers */
 html.light .bg-\[\#091122\],
 html:not(.dark) .bg-\[\#091122\],

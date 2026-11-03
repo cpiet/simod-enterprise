@@ -76,26 +76,31 @@ const visibleTabs = computed(() => {
 <template>
   <div class="space-y-2">
     <div class="flex items-center justify-between gap-2">
-      <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/40">
+      <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500/15 dark:bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/30 dark:border-rose-500/40">
         Keamanan, Navigasi &amp; Pemeliharaan Terpadu
       </span>
-      <span class="text-[10px] font-mono text-slate-400 hidden sm:inline">
+      <span class="text-[10px] font-mono text-slate-500 dark:text-slate-400 hidden sm:inline">
         {{ visibleTabs.length }} Sub-Modul Aktif
       </span>
     </div>
-    <div class="p-2 rounded-2xl bg-[#08101e] border border-slate-800 shadow-xl">
-      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10 gap-2">
+    <div class="p-2.5 rounded-2xl bg-white dark:bg-[#08101e] border border-slate-200 dark:border-slate-800 shadow-xl">
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
         <Link
           v-for="t in visibleTabs"
           :key="t.href"
           :href="t.href"
-          class="flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl text-[11px] font-extrabold text-center leading-tight transition"
+          :title="t.name"
+          class="group flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold text-center leading-tight transition"
           :class="isActive(t.href)
-            ? 'bg-amber-500/20 text-amber-400 border-2 border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.25)]'
-            : 'bg-slate-900/90 text-slate-200 hover:text-white hover:bg-slate-800 border border-slate-700/80'"
+            ? 'bg-amber-400/15 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 border-2 border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.25)]'
+            : 'bg-slate-50 dark:bg-slate-900/90 text-slate-700 dark:text-slate-200 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700/80'"
         >
-          <component :is="resolveIcon(t.icon)" class="w-3.5 h-3.5 shrink-0" :class="isActive(t.href) ? 'text-amber-400' : 'text-slate-400'" />
-          <span class="truncate">{{ t.name }}</span>
+          <component
+            :is="resolveIcon(t.icon)"
+            class="w-4 h-4 shrink-0 transition"
+            :class="isActive(t.href) ? 'text-amber-500 dark:text-amber-400' : 'text-slate-400 dark:text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'"
+          />
+          <span class="text-xs font-bold sm:whitespace-nowrap leading-tight text-center">{{ t.name }}</span>
         </Link>
       </div>
     </div>
