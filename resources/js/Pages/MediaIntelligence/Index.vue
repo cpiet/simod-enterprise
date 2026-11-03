@@ -364,14 +364,25 @@ const runTopicAiAnalysis = async (topic, forceRefresh = false) => {
   showTopicAiModal.value = true;
 
   try {
-    const res = await axios.post(`/media-intelligence/topics/${topic.id}/analyze-ai`);
+    const payload = {
+      current_articles_count: topic.articles_count || 0,
+    };
+    const res = await axios.post(`/media-intelligence/topics/${topic.id}/analyze-ai`, payload);
     if (res.data?.success) {
       topicAiResult.value = res.data.analysis;
       // Perbarui state lokal topik seketika agar langsung reaktif
+      const newAnalyzedCount = res.data.articles_count ?? topic.articles_count ?? 0;
       topic.ai_analysis = res.data.analysis;
       topic.ai_analyzed_at = res.data.topic?.ai_analyzed_at || new Date().toISOString();
       topic.ai_analyzed_at_humans = res.data.topic?.ai_analyzed_at_humans || 'Baru saja';
-      topic.ai_articles_count = res.data.articles_count || 0;
+      topic.ai_articles_count = newAnalyzedCount;
+
+      if (activeAnalyzingTopic.value && activeAnalyzingTopic.value.id === topic.id) {
+        activeAnalyzingTopic.value.ai_analysis = res.data.analysis;
+        activeAnalyzingTopic.value.ai_analyzed_at = topic.ai_analyzed_at;
+        activeAnalyzingTopic.value.ai_analyzed_at_humans = topic.ai_analyzed_at_humans;
+        activeAnalyzingTopic.value.ai_articles_count = newAnalyzedCount;
+      }
 
       // Sinkronkan juga pada daftar props.topics
       const pTopic = (props.topics || []).find(t => t.id === topic.id);
@@ -379,7 +390,7 @@ const runTopicAiAnalysis = async (topic, forceRefresh = false) => {
         pTopic.ai_analysis = res.data.analysis;
         pTopic.ai_analyzed_at = topic.ai_analyzed_at;
         pTopic.ai_analyzed_at_humans = topic.ai_analyzed_at_humans;
-        pTopic.ai_articles_count = topic.ai_articles_count;
+        pTopic.ai_articles_count = newAnalyzedCount;
       }
 
       showToastNotification('Analisis AI kasus berhasil diperbarui dan disimpan!');
@@ -1591,6 +1602,12 @@ const submitIssue = () => {
                   class="px-2 py-0.5 rounded-full text-[9px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40"
                 >
                   ⚠️ Ada {{ getTopicNewArticlesCount(currentSelectedTopic) }} Berita Baru Sejak Analisis Terakhir
+                </span>
+                <span
+                  v-else
+                  class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1"
+                >
+                  ✓ Data Terkini (Up-to-Date)
                 </span>
               </div>
               <button

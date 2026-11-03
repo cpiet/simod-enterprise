@@ -1358,7 +1358,11 @@ PROMPT;
             });
         }
 
-        $matchingArticles = $articlesQuery->latest('pub_date')->limit(25)->get();
+        // Total seluruh berita yang cocok di database & hitungan saat ini
+        $totalMatchingCount = (clone $articlesQuery)->count();
+        $clientCurrentCount = (int) $request->input('current_articles_count', 0);
+
+        $matchingArticles = $articlesQuery->latest('pub_date')->limit(30)->get();
 
         if ($matchingArticles->isEmpty()) {
             return response()->json([
@@ -1366,6 +1370,8 @@ PROMPT;
                 'message' => "Belum ada berita yang sesuai dengan kata kunci Topik \"{$topic->title}\". Tambahkan kata kunci yang lebih luas atau kaitkan berita secara manual.",
             ], 422);
         }
+
+        $effectiveAnalyzedCount = max($totalMatchingCount, $clientCurrentCount, count($matchingArticles));
 
         $formattedArticles = $matchingArticles->map(function ($a) {
             return [
@@ -1400,7 +1406,7 @@ PROMPT;
         $topic->update([
             'ai_analysis'       => $result['data'],
             'ai_analyzed_at'    => now(),
-            'ai_articles_count' => count($formattedArticles),
+            'ai_articles_count' => $effectiveAnalyzedCount,
         ]);
 
         return response()->json([
@@ -1414,10 +1420,11 @@ PROMPT;
                 'ai_analysis'           => $result['data'],
                 'ai_analyzed_at'        => now()->toISOString(),
                 'ai_analyzed_at_humans' => now()->diffForHumans(),
-                'ai_articles_count'     => count($formattedArticles),
+                'ai_articles_count'     => $effectiveAnalyzedCount,
             ],
             'analysis'              => $result['data'],
-            'articles_count'        => count($formattedArticles),
+            'articles_count'        => $effectiveAnalyzedCount,
+            'sample_count'          => count($formattedArticles),
             'model_used'            => $result['model_used'] ?? $model,
             'latency_ms'            => $result['latency_ms'] ?? 0,
         ]);
