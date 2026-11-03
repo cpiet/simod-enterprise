@@ -87,8 +87,8 @@ Seluruh 29 portal media dikonfigurasi melalui seeder [`SulbarRssFeedsSeeder.php`
 - **Bookmark Permanen**: Kolom `is_bookmarked` pada tabel `media_articles` bersifat kebal dari pemangkasan otomatis (*never pruned*).
 
 ### 4.4. Radar Media Sosial & Social Listening (𝕏, TikTok, Instagram, YouTube, Facebook)
-- **Tabel Basis Data**: `social_posts` (data postingan, metrik views/likes/shares/comments, virality_score 0-100, is_kol, sentiment) dan `social_settings` (konfigurasi Apify token, kata kunci pantau, frekuensi sinkronisasi per Polda).
-- **Tab Navigasi**: Tab 01 (Radar Multi-Platform), Tab 02 (Tokoh Kritis & KOL Tracker), Tab 03 (Tren Tagar & Isu Viral), Tab 04 (Integrasi Apify & Pengaturan).
+- **Tabel Basis Data**: `social_posts` (data postingan, metrik views/likes/shares/comments, virality_score 0-100, is_kol, sentiment, `case_id`), `social_investigation_cases` (berkas kasus atensi pimpinan, keywords, platforms, posts_count, sentiment_breakdown, status active/archived), dan `social_settings` (konfigurasi Apify token, kata kunci pantau, frekuensi sinkronisasi per Polda).
+- **Tab Navigasi**: Tab 01 (Radar Multi-Platform), Tab 02 (Tokoh Kritis & KOL Tracker), Tab 03 (Tren Tagar & Isu Viral), Tab 04 (Integrasi Apify & Pengaturan), serta **Tab Berkas Kasus Persisten Dinamis (`case_{id}`)**.
 - **Dual-Mode Architecture (Tab 03)**:
   - *Mode 01 — Lensa Kamtibmas & Humas Polri*: Monitoring tagar kedinasan dinamis dan kurva jam puncak aktivitas netizen siang & malam (`peakHours`).
   - *Mode 02 — Lensa Tren Publik Medsos Indonesia*: Agregasi tren publik lintas 5 platform (𝕏, YouTube, Instagram, TikTok, Facebook) dengan deteksi kerawanan siber (`is_security_relevant: true`) dan filter cepat isu beresiko tinggi.

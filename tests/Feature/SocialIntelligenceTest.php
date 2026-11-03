@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Polda;
 use App\Models\Polres;
+use App\Models\SocialInvestigationCase;
 use App\Models\SocialPost;
 use App\Models\SocialSetting;
 use App\Models\User;
@@ -215,18 +216,49 @@ class SocialIntelligenceTest extends TestCase
     public function test_track_keyword_on_demand_endpoint(): void
     {
         $response = $this->actingAs($this->user)->post('/social-intelligence/track-keyword', [
-            'keyword'   => 'razia knalpot brong',
-            'platforms' => ['x', 'tiktok'],
+            'keyword'   => 'Kasus Ponpes Hamalatul Quran',
+            'platforms' => ['x', 'tiktok', 'instagram'],
             'polda_id'  => $this->polda->id,
             'max_items' => 10,
         ]);
 
         $response->assertRedirect();
+        $this->assertDatabaseHas('social_investigation_cases', [
+            'polda_id' => $this->polda->id,
+            'title'    => 'Kasus Ponpes Hamalatul Quran',
+            'status'   => 'active',
+        ]);
         $this->assertDatabaseHas('social_posts', [
             'polda_id' => $this->polda->id,
         ]);
         $this->assertDatabaseHas('audit_logs', [
             'action' => 'apify.keyword_crawl',
+        ]);
+    }
+
+    public function test_close_and_refresh_investigation_case(): void
+    {
+        $case = SocialInvestigationCase::create([
+            'polda_id'    => $this->polda->id,
+            'title'       => 'Penyelidikan Sengketa Lahan',
+            'keywords'    => 'sengketa lahan',
+            'status'      => 'active',
+            'priority'    => 'high',
+            'platforms'   => ['x', 'tiktok'],
+            'posts_count' => 5,
+        ]);
+
+        // Refresh Case
+        $refreshRes = $this->actingAs($this->user)->post("/social-intelligence/cases/{$case->id}/refresh");
+        $refreshRes->assertRedirect();
+
+        // Close Case
+        $closeRes = $this->actingAs($this->user)->post("/social-intelligence/cases/{$case->id}/close");
+        $closeRes->assertRedirect();
+
+        $this->assertEquals('archived', $case->fresh()->status);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'social_case.archive',
         ]);
     }
 }

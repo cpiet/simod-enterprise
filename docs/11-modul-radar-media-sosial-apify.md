@@ -208,6 +208,23 @@ Pada pembaruan v2.2+, modul Radar Media Sosial dilengkapi dengan 3 pilar instrum
   - **Smart Synthetic Fallback Ingestion (Garansi Tanpa Gagal)**: Jika token Apify pengguna habis kuota ($0), sistem tidak akan crash/error, melainkan secara cerdas memproduksi postingan ingestion realistis bertopik kata kunci tersebut lengkap dengan sentimen terklasifikasi, metrik views/likes/virality akurat, dan tag wilayah yang sesuai.
   - **Audit Logging**: Setiap aktivitas pelacakan on-demand dicatat otomatis ke tabel `audit_logs` dengan kategori `apify.keyword_crawl`.
 
+### 7.4. Smart Investigation Tab (Berkas Kasus Persisten & Workspace Khusus)
+- **Kebutuhan Investigasi Siber**: Menjawab kebutuhan operator dan pimpinan saat memantau kasus sensitif (contoh: *Kasus penggeledahan di Pondok Pesantren Hamalatul Quran*), di mana pemantauan tidak boleh hilang saat pengguna keluar ke **Menu Utama (Command Center)**, membuat laporan Dumas, atau me-refresh browser.
+- **Arsitektur Tab Dinamis & Persisten**:
+  - Tabel Basis Data: `social_investigation_cases` dan relasi `case_id` pada `social_posts`.
+  - Ketika kata kunci dilacak pada modal on-demand, sistem secara otomatis mendaftarkan kasus tersebut sebagai **Berkas Kasus Aktif** dan langsung memunculkan **Tab Kasus Khusus** di bar navigasi atas berdampingan dengan Tab 01–04:
+    `🎯 [Nama Kasus] ([Jumlah Post]) [✕]`.
+  - **Banner Berkas Kasus Aktif di Tab 01**: Jika pengguna berada di Tab 01 (Radar Utama), sistem menampilkan kartu banner di bagian atas yang mengingatkan adanya berkas kasus aktif lengkap dengan tombol 1-klik untuk langsung beralih ke berkas tersebut.
+- **Fitur Workspace Berkas Kasus**:
+  1. **Header Berkas Perkara**: Menampilkan judul lengkap, badge `🚨 Berkas Kasus Prioritas`, badge `🎯 Smart Investigation Tab`, dan status waktu sinkronisasi.
+  2. **4 KPI Kasus Khusus**: Menghitung secara terisolasi total percakapan, estimasi jangkauan tayangan warganet (*views*), total interaksi (*engagements*), dan persentase polarisasi sentimen negatif.
+  3. **Bar Polarisasi Sentimen Kasus**: Visualisasi dinamis 3 warna (🟢 Positif, ⚪ Netral, 🔴 Negatif) dan box rekomendasi narasi komunikasi kehumasan (*counter narrative strategy*).
+  4. **Tindakan Komando Terpadu**:
+     - 🚨 **`Eskalasi Jadi Isu Kamtibmas`**: Otomatis mengarahkan ke formulir `/issues/create` dengan judul, ringkasan intelijen, polarisasi sentimen, dan media sumber yang telah terisi lengkap.
+     - 🔄 **`Tarik Update Kasus`**: Endpoint `POST /social-intelligence/cases/{id}/refresh` untuk mengambil postingan terbaru seputar kasus ini secara langsung.
+     - ✕ **`Tutup & Arsipkan Tab`**: Endpoint `POST /social-intelligence/cases/{id}/close` untuk menutup tab secara elegan dan memindahkan berkas ke arsip jika pemantauan kasus telah selesai.
+  5. **Grid Postingan Terisolasi Kasus**: Feed khusus yang hanya memuat konten-konten relevan seputar kasus tersebut lengkap dengan pemutar video, metrik, sentimen, dan tombol eskalasi per postingan.
+
 ---
 
 

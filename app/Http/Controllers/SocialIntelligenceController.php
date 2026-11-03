@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\Polda;
+use App\Models\SocialInvestigationCase;
 use App\Models\SocialPost;
 use App\Models\SocialSetting;
 use App\Services\ApifySyncService;
@@ -146,12 +147,102 @@ class SocialIntelligenceController extends Controller
             }
         }
 
+        // Active Investigation Cases (Smart Dossiers)
+        $dbCases = SocialInvestigationCase::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))
+            ->where('status', 'active')
+            ->latest()
+            ->get();
+
+        $investigationCases = $dbCases->map(function ($c) {
+            $pos = $c->sentiment_breakdown['positif'] ?? 0;
+            $net = $c->sentiment_breakdown['netral'] ?? 0;
+            $neg = $c->sentiment_breakdown['negatif'] ?? 0;
+            $tot = max(1, $pos + $net + $neg);
+
+            return [
+                'id'                  => $c->id,
+                'title'               => $c->title,
+                'short_title'         => $c->short_title,
+                'keywords'            => $c->keywords,
+                'description'         => $c->description,
+                'priority'            => $c->priority,
+                'status'              => $c->status,
+                'platforms'           => $c->platforms ?? ['x', 'tiktok', 'instagram', 'youtube', 'facebook'],
+                'posts_count'         => $c->posts_count,
+                'total_views'         => $c->total_views,
+                'total_engagements'   => $c->total_engagements,
+                'sentiment_breakdown' => [
+                    'positif' => $pos,
+                    'netral'  => $net,
+                    'negatif' => $neg,
+                    'pos_pct' => round(($pos / $tot) * 100),
+                    'neg_pct' => round(($neg / $tot) * 100),
+                ],
+                'intelligence_notes'  => $c->intelligence_notes ?: "Isu atensi \"{$c->title}\" menghimpun {$c->posts_count} percakapan warganet dengan " . round(($neg / $tot) * 100) . "% sentimen negatif dan " . round(($pos / $tot) * 100) . "% apresiasi positif. Disarankan pemantauan cyber patrol aktif dan koordinasi rilis Humas.",
+                'last_crawled_at'     => $c->last_crawled_at ? $c->last_crawled_at->diffForHumans() : 'Baru saja',
+            ];
+        })->values()->all();
+
+        // Check if an investigation case tab is selected
+        $selectedCaseId = null;
+        if ($request->has('case_id')) {
+            $selectedCaseId = (int) $request->query('case_id');
+        } elseif (str_starts_with($activeTab, 'case_')) {
+            $selectedCaseId = (int) str_replace('case_', '', $activeTab);
+        }
+
+        $selectedCase = null;
+        $casePosts = null;
+
+        if ($selectedCaseId) {
+            $foundCase = $dbCases->firstWhere('id', $selectedCaseId) ?: SocialInvestigationCase::find($selectedCaseId);
+            if ($foundCase) {
+                $activeTab = 'case_' . $foundCase->id;
+                $casePostsQuery = SocialPost::where('case_id', $foundCase->id)
+                    ->when($platform !== 'all', fn($q) => $q->where('platform', $platform))
+                    ->when($sentiment !== 'all', fn($q) => $q->where('sentiment', $sentiment))
+                    ->orderBy('posted_at', 'desc');
+
+                $casePosts = $casePostsQuery->paginate(12)->withQueryString();
+
+                $cPos = $foundCase->sentiment_breakdown['positif'] ?? 0;
+                $cNet = $foundCase->sentiment_breakdown['netral'] ?? 0;
+                $cNeg = $foundCase->sentiment_breakdown['negatif'] ?? 0;
+                $cTot = max(1, $cPos + $cNet + $cNeg);
+
+                $selectedCase = [
+                    'id'                  => $foundCase->id,
+                    'title'               => $foundCase->title,
+                    'short_title'         => $foundCase->short_title,
+                    'keywords'            => $foundCase->keywords,
+                    'priority'            => $foundCase->priority,
+                    'status'              => $foundCase->status,
+                    'platforms'           => $foundCase->platforms ?? ['x', 'tiktok', 'instagram', 'youtube', 'facebook'],
+                    'posts_count'         => $foundCase->posts_count,
+                    'total_views'         => $foundCase->total_views,
+                    'total_engagements'   => $foundCase->total_engagements,
+                    'sentiment_breakdown' => [
+                        'positif' => $cPos,
+                        'netral'  => $cNet,
+                        'negatif' => $cNeg,
+                        'pos_pct' => round(($cPos / $cTot) * 100),
+                        'neg_pct' => round(($cNeg / $cTot) * 100),
+                    ],
+                    'intelligence_notes'  => $foundCase->intelligence_notes ?: "Isu atensi \"{$foundCase->title}\" menghimpun {$foundCase->posts_count} percakapan warganet dengan " . round(($cNeg / $cTot) * 100) . "% sentimen negatif dan " . round(($cPos / $cTot) * 100) . "% apresiasi positif. Disarankan pemantauan berkala dan penyiapan siaran pers klarifikasi resmi Divhumas/Bidhumas.",
+                    'last_crawled_at'     => $foundCase->last_crawled_at ? $foundCase->last_crawled_at->diffForHumans() : 'Baru saja',
+                ];
+            }
+        }
+
         return Inertia::render('SocialIntelligence/Index', [
             'allPoldas'           => $allPoldas,
             'selectedPolda'       => $selectedPolda,
             'selectedCode'        => $selectedCode,
             'isNational'          => $isNational,
             'posts'               => $posts,
+            'investigationCases'  => $investigationCases,
+            'selectedCase'        => $selectedCase,
+            'casePosts'           => $casePosts,
             'metrics'             => $metrics,
             'kolProfiles'         => $kolProfiles,
             'trendingHashtags'    => $trendingData['trendingHashtags'],
@@ -651,11 +742,61 @@ class SocialIntelligenceController extends Controller
 
         $result = $service->crawlKeyword($validated['keyword'], $platforms, $poldaId, $maxItems);
 
+        $caseId = $result['case_id'] ?? null;
+        $targetTab = $caseId ? ('case_' . $caseId) : 'radar';
+
+        return redirect()->route('social-intelligence.index', array_filter([
+            'polda'   => $selectedCode,
+            'tab'     => $targetTab,
+            'case_id' => $caseId,
+        ]))->with('success', "Tab berkas kasus \"{$result['keyword']}\" berhasil dibuat dan dibuka!");
+    }
+
+    /**
+     * Close / Archive an active investigation case tab.
+     */
+    public function closeCase(Request $request, $id)
+    {
+        $case = SocialInvestigationCase::findOrFail($id);
+        $case->update(['status' => 'archived']);
+
+        AuditLog::create([
+            'polda_id'     => $case->polda_id,
+            'user_id'      => auth()->id(),
+            'action'       => 'social_case.archive',
+            'subject_type' => 'social_investigation_case',
+            'subject_id'   => (string) $case->id,
+            'ip_address'   => request()->ip() ?? '127.0.0.1',
+            'user_agent'   => request()->userAgent() ?? 'System',
+            'metadata'     => ['title' => $case->title],
+            'created_at'   => now(),
+        ]);
+
+        [$selectedCode] = $this->resolveActiveTenant($request);
+
         return redirect()->route('social-intelligence.index', [
             'polda' => $selectedCode,
             'tab'   => 'radar',
-            'q'     => $validated['keyword'],
-        ])->with('success', $result['message']);
+        ])->with('success', "Tab berkas kasus \"{$case->title}\" telah ditutup dan diarsipkan.");
+    }
+
+    /**
+     * Refresh / Re-crawl an active investigation case.
+     */
+    public function refreshCase(Request $request, $id, ApifySyncService $service)
+    {
+        $case = SocialInvestigationCase::findOrFail($id);
+        $platforms = $case->platforms ?? ['x', 'tiktok', 'instagram', 'youtube', 'facebook'];
+        
+        $result = $service->crawlKeyword($case->keywords, $platforms, $case->polda_id, 20, $case->id);
+
+        [$selectedCode] = $this->resolveActiveTenant($request);
+
+        return redirect()->route('social-intelligence.index', [
+            'polda'   => $selectedCode,
+            'tab'     => 'case_' . $case->id,
+            'case_id' => $case->id,
+        ])->with('success', "Pembaruan berkas kasus \"{$case->title}\" berhasil diambil ({$result['new_posts']} postingan baru)!");
     }
 
     /**

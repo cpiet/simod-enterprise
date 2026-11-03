@@ -15,6 +15,7 @@ class SocialPost extends Model
     protected $fillable = [
         'polda_id',
         'polres_id',
+        'case_id',
         'platform',
         'author_name',
         'author_handle',
@@ -54,6 +55,11 @@ class SocialPost extends Model
     public function polres(): BelongsTo
     {
         return $this->belongsTo(Polres::class);
+    }
+
+    public function investigationCase(): BelongsTo
+    {
+        return $this->belongsTo(SocialInvestigationCase::class, 'case_id');
     }
 }
 

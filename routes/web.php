@@ -54,6 +54,8 @@ Route::post('/social-intelligence/{id}/bookmark', [SocialIntelligenceController:
 Route::post('/social-intelligence/sync', [SocialIntelligenceController::class, 'sync'])->name('social-intelligence.sync');
 Route::post('/social-intelligence/sync-trends', [SocialIntelligenceController::class, 'syncTrends'])->name('social-intelligence.sync-trends');
 Route::post('/social-intelligence/track-keyword', [SocialIntelligenceController::class, 'trackKeyword'])->name('social-intelligence.track-keyword');
+Route::post('/social-intelligence/cases/{id}/close', [SocialIntelligenceController::class, 'closeCase'])->name('social-intelligence.cases.close');
+Route::post('/social-intelligence/cases/{id}/refresh', [SocialIntelligenceController::class, 'refreshCase'])->name('social-intelligence.cases.refresh');
 Route::post('/social-intelligence/settings', [SocialIntelligenceController::class, 'updateSettings'])->name('social-intelligence.settings');
 Route::post('/social-intelligence/test-connection', [SocialIntelligenceController::class, 'testConnection'])->name('social-intelligence.test-connection');
 

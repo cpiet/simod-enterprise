@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\AuditLog;
 use App\Models\Polda;
+use App\Models\SocialInvestigationCase;
 use App\Models\SocialPost;
 use App\Models\SocialSetting;
 use Carbon\Carbon;
@@ -499,7 +500,7 @@ class ApifySyncService
     /**
      * Crawl specific on-demand keyword across designated platforms using Apify token pool or smart ingestion.
      */
-    public function crawlKeyword(string $keyword, array $platforms, int $poldaId, int $maxItems = 20): array
+    public function crawlKeyword(string $keyword, array $platforms, int $poldaId, int $maxItems = 20, ?int $caseId = null): array
     {
         $cleanKeyword = trim($keyword);
         if (empty($cleanKeyword)) {
@@ -510,10 +511,38 @@ class ApifySyncService
         }
 
         if (empty($platforms)) {
-            $platforms = ['x', 'tiktok', 'instagram', 'youtube'];
+            $platforms = ['x', 'tiktok', 'instagram', 'youtube', 'facebook'];
         }
 
         $polda = Polda::find($poldaId) ?: Polda::first();
+        $poldaId = $polda ? $polda->id : 1;
+
+        // Ensure persistent Investigation Case exists
+        $case = null;
+        if ($caseId) {
+            $case = SocialInvestigationCase::find($caseId);
+        }
+        if (!$case) {
+            $case = SocialInvestigationCase::firstOrCreate(
+                [
+                    'polda_id' => $poldaId,
+                    'title'    => $cleanKeyword,
+                ],
+                [
+                    'keywords'    => $cleanKeyword,
+                    'platforms'   => $platforms,
+                    'status'      => 'active',
+                    'priority'    => 'high',
+                    'created_by'  => auth()->id(),
+                ]
+            );
+        }
+
+        if ($case && $case->status !== 'active') {
+            $case->update(['status' => 'active']);
+        }
+        $caseId = $case ? $case->id : null;
+
         $setting = SocialSetting::where('polda_id', $poldaId)->first();
         
         $rawTokens = $setting?->apify_api_token 
@@ -588,6 +617,7 @@ class ApifySyncService
                                     'post_id'  => $postId,
                                 ],
                                 [
+                                    'case_id'        => $caseId,
                                     'platform'       => $platform,
                                     'author_name'    => 'Netizen Indonesia',
                                     'author_handle'  => '@warga_' . substr(md5($url), 0, 7),
@@ -669,6 +699,7 @@ class ApifySyncService
                         'post_id'  => $postId,
                     ],
                     [
+                        'case_id'        => $caseId,
                         'platform'       => $t['platform'],
                         'author_name'    => $t['author'],
                         'author_handle'  => $t['handle'],
@@ -691,6 +722,10 @@ class ApifySyncService
             }
         }
 
+        if ($case) {
+            $case->refreshMetrics();
+        }
+
         AuditLog::create([
             'polda_id'     => $poldaId,
             'user_id'      => auth()->id(),
@@ -701,6 +736,7 @@ class ApifySyncService
             'user_agent'   => request()->userAgent() ?? 'System',
             'metadata'     => [
                 'keyword'         => $cleanKeyword,
+                'case_id'         => $caseId,
                 'platforms'       => $platforms,
                 'pulled_count'    => $pulledCount,
                 'platform_counts' => $platformCounts,
@@ -713,9 +749,11 @@ class ApifySyncService
         return [
             'success'         => true,
             'keyword'         => $cleanKeyword,
+            'case_id'         => $case?->id,
+            'case_title'      => $case?->title,
             'new_posts'       => $pulledCount,
             'platform_counts' => $platformCounts,
-            'message'         => "Pelacakan topik \"{$cleanKeyword}\" sukses ({$modeLabel})! {$pulledCount} postingan baru dihimpun ke dalam radar.",
+            'message'         => "Pelacakan topik \"{$cleanKeyword}\" sukses ({$modeLabel})! {$pulledCount} postingan baru dihimpun ke dalam berkas kasus.",
         ];
     }
 
