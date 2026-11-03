@@ -30,13 +30,8 @@ Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard
 Route::get('/command-center', [DashboardController::class, 'index'])->name('command-center');
 Route::get('/media-intelligence', [MediaIntelligenceController::class, 'index'])->name('media-intelligence');
 Route::get('/monitoring-media-online', [MediaIntelligenceController::class, 'index'])->name('monitoring-media-online');
-Route::post('/media-intelligence/ai-briefing', [MediaIntelligenceController::class, 'storeAiBriefing'])->name('media-intelligence.briefing');
-Route::post('/media-intelligence/rss-sources', [MediaIntelligenceController::class, 'storeRssSource'])->name('media-intelligence.rss.store');
-Route::post('/media-intelligence/rss-sources/{id}/toggle', [MediaIntelligenceController::class, 'toggleRssSource'])->name('media-intelligence.rss.toggle');
-Route::delete('/media-intelligence/rss-sources/{id}', [MediaIntelligenceController::class, 'deleteRssSource'])->name('media-intelligence.rss.delete');
 Route::post('/media-intelligence/articles/{id}/bookmark', [MediaIntelligenceController::class, 'toggleBookmark'])->name('media-intelligence.bookmark');
 Route::post('/media-intelligence/articles/bookmarks/import', [MediaIntelligenceController::class, 'importBookmarks'])->name('media-intelligence.bookmark.import');
-Route::post('/media-intelligence/rss-sources/test', [MediaIntelligenceController::class, 'testRssSource'])->name('media-intelligence.rss.test');
 Route::post('/media-intelligence/analyze-gemini', [MediaIntelligenceController::class, 'analyzeGemini'])->name('media-intelligence.analyze.gemini');
 Route::post('/media-intelligence/gemini-settings', [MediaIntelligenceController::class, 'updateGeminiSettings'])->name('media-intelligence.gemini.settings');
 Route::post('/media-intelligence/gemini-test', [MediaIntelligenceController::class, 'testGeminiConnection'])->name('media-intelligence.gemini.test');
