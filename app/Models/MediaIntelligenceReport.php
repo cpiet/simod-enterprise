@@ -31,6 +31,7 @@ class MediaIntelligenceReport extends Model
         'strategic_contents',
         'agenda_setting',
         'recommendations',
+        'suggested_topics',
         'raw_input',
     ];
 
@@ -45,6 +46,7 @@ class MediaIntelligenceReport extends Model
         'strategic_contents' => 'array',
         'agenda_setting'     => 'array',
         'recommendations'    => 'array',
+        'suggested_topics'   => 'array',
     ];
 
     protected $appends = [

@@ -248,4 +248,93 @@ class MediaTopicDossierTest extends TestCase
             'media_topic_id' => $topic->id,
         ]);
     }
+
+    public function test_adopt_suggested_topic_creates_topic_and_removes_from_suggestions(): void
+    {
+        $polda = Polda::firstOrCreate(
+            ['code' => 'SULBAR'],
+            ['name' => 'Polda Sulawesi Barat', 'is_active' => true]
+        );
+
+        $user = User::factory()->create(['role' => 'superadmin', 'polda_id' => $polda->id]);
+
+        $report = \App\Models\MediaIntelligenceReport::create([
+            'polda_id'         => $polda->id,
+            'report_date'      => now()->format('Y-m-d'),
+            'report_time'      => '14.00 WITA',
+            'suggested_topics' => [
+                [
+                    'title'    => 'Modus Penipuan Jastip Tiket Konser',
+                    'priority' => 'high',
+                    'velocity' => '+15 Berita',
+                    'keywords' => 'penipuan tiket, jastip konser',
+                    'rationale'=> 'Mulai marak di media sosial.',
+                ],
+                [
+                    'title'    => 'Penertiban Knalpot Brong',
+                    'priority' => 'urgent',
+                    'velocity' => '+10 Berita',
+                    'keywords' => 'knalpot brong, razia lantas',
+                    'rationale'=> 'Sentimen netizen terbelah.',
+                ],
+            ],
+        ]);
+
+        $res = $this->actingAs($user)->postJson('/media-intelligence/topics/adopt-suggestion', [
+            'polda_id'   => $polda->id,
+            'title'      => 'Modus Penipuan Jastip Tiket Konser',
+            'keywords'   => 'penipuan tiket, jastip konser, siber',
+            'priority'   => 'high',
+            'crawl_live' => false,
+        ]);
+
+        $res->assertOk();
+        $res->assertJson(['success' => true]);
+        $res->assertJsonStructure(['success', 'message', 'topic', 'remaining_suggestions']);
+
+        // Check MediaTopic is created
+        $this->assertDatabaseHas('media_topics', [
+            'polda_id' => $polda->id,
+            'title'    => 'Modus Penipuan Jastip Tiket Konser',
+        ]);
+
+        // Check it was removed from suggestions
+        $report->refresh();
+        $this->assertCount(1, $report->suggested_topics);
+        $this->assertEquals('Penertiban Knalpot Brong', $report->suggested_topics[0]['title']);
+    }
+
+    public function test_dismiss_suggested_topic_removes_from_suggestions(): void
+    {
+        $polda = Polda::firstOrCreate(
+            ['code' => 'SULBAR'],
+            ['name' => 'Polda Sulawesi Barat', 'is_active' => true]
+        );
+
+        $user = User::factory()->create(['role' => 'superadmin', 'polda_id' => $polda->id]);
+
+        $report = \App\Models\MediaIntelligenceReport::create([
+            'polda_id'         => $polda->id,
+            'report_date'      => now()->format('Y-m-d'),
+            'report_time'      => '14.00 WITA',
+            'suggested_topics' => [
+                [
+                    'title'    => 'Isu Tidak Relevan Sepak Bola Asing',
+                    'priority' => 'high',
+                    'keywords' => 'bola, liga asing',
+                ],
+            ],
+        ]);
+
+        $res = $this->actingAs($user)->postJson('/media-intelligence/topics/dismiss-suggestion', [
+            'polda_id' => $polda->id,
+            'title'    => 'Isu Tidak Relevan Sepak Bola Asing',
+        ]);
+
+        $res->assertOk();
+        $res->assertJson(['success' => true]);
+
+        $report->refresh();
+        $this->assertCount(0, $report->suggested_topics);
+    }
 }

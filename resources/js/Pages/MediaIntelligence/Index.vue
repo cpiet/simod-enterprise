@@ -69,6 +69,7 @@ const props = defineProps({
   aiSetting: Object,
   issues: Array,
   pressReleases: Array,
+  suggestedTopics: { type: Array, default: () => [] },
   metrics: Object,
 });
 
@@ -238,6 +239,55 @@ const isAnalyzingTopic = ref(false);
 const topicAiResult = ref(null);
 const activeAnalyzingTopic = ref(null);
 const topicAiError = ref('');
+
+// Suggested Emerging Topics State (AI & Google News Trend Ingestion)
+const localSuggestedTopics = ref([
+  ...(props.suggestedTopics?.length ? props.suggestedTopics : (props.report?.suggested_topics || []))
+]);
+const isAdoptingSuggestion = ref(false);
+const adoptingTitle = ref('');
+
+const adoptSuggestion = async (item) => {
+  if (!item || !item.title) return;
+  isAdoptingSuggestion.value = true;
+  adoptingTitle.value = item.title;
+  try {
+    const res = await axios.post('/media-intelligence/topics/adopt-suggestion', {
+      title: item.title,
+      keywords: item.keywords || item.title,
+      description: item.rationale || 'Topik potensial terdeteksi otomatis oleh AI dari tren Google News.',
+      priority: item.priority || 'high',
+      crawl_live: true,
+    });
+    if (res.data?.success) {
+      showToastNotification(res.data.message || 'Topik Atensi berhasil diadopsi!');
+      if (res.data.topic) {
+        const exists = (props.topics || []).some(t => t.id === res.data.topic.id);
+        if (!exists) {
+          props.topics.push(res.data.topic);
+        }
+        selectedTopicId.value = res.data.topic.id;
+      }
+      localSuggestedTopics.value = localSuggestedTopics.value.filter(s => s.title !== item.title);
+    }
+  } catch (err) {
+    showToastNotification(err.response?.data?.message || 'Gagal mengadopsi topik, coba lagi.');
+  } finally {
+    isAdoptingSuggestion.value = false;
+    adoptingTitle.value = '';
+  }
+};
+
+const dismissSuggestion = async (item) => {
+  if (!item || !item.title) return;
+  localSuggestedTopics.value = localSuggestedTopics.value.filter(s => s.title !== item.title);
+  try {
+    await axios.post('/media-intelligence/topics/dismiss-suggestion', { title: item.title });
+    showToastNotification('Sugesti topik disembunyikan.');
+  } catch (err) {
+    // Silent fail
+  }
+};
 
 const currentSelectedTopic = computed(() => {
   if (!selectedTopicId.value) return null;
@@ -1457,6 +1507,87 @@ const submitIssue = () => {
           <span v-if="topics.length === 0" class="text-xs text-slate-500 italic px-2">
             Belum ada topik atensi aktif. Klik "+ Buat Topik Atensi" untuk memantau kasus request pimpinan.
           </span>
+        </div>
+
+        <!-- BARIS SUGESTI TOPIK POTENSIAL / TREN GOOGLE NEWS (JIKA ADA SUGESTI AKTIF) -->
+        <div
+          v-if="localSuggestedTopics.length > 0"
+          class="p-3.5 rounded-2xl bg-gradient-to-r from-violet-950/40 via-[#0a1122] to-cyan-950/30 border border-violet-500/40 space-y-2.5 shadow-lg relative overflow-hidden"
+        >
+          <!-- Header Bar Sugesti -->
+          <div class="flex items-center justify-between text-xs gap-2 flex-wrap">
+            <div class="flex items-center gap-2">
+              <span class="flex h-2 w-2 relative">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-cyan-400"></span>
+              </span>
+              <span class="font-extrabold text-cyan-300 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                <Sparkles class="w-3.5 h-3.5 text-cyan-400" />
+                <span>Sugesti Isu Potensial &amp; Tren Media Online (Google News AI)</span>
+              </span>
+              <span class="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-violet-500/20 text-violet-300 border border-violet-500/40">
+                {{ localSuggestedTopics.length }} Rekomendasi
+              </span>
+            </div>
+            <span class="text-[10px] text-slate-400 hidden sm:inline">
+              Klik <strong>"✓ Pantau"</strong> untuk otomatis menjadikannya Topik Atensi &amp; menarik sebaran Google News.
+            </span>
+          </div>
+
+          <!-- Sugesti Pills List -->
+          <div class="flex items-center gap-2.5 overflow-x-auto pb-1 scrollbar-thin">
+            <div
+              v-for="st in localSuggestedTopics"
+              :key="st.title"
+              class="p-2.5 rounded-xl bg-slate-900/95 border border-violet-500/30 hover:border-cyan-400/60 transition-all shadow-md shrink-0 flex items-center gap-3 group max-w-md"
+            >
+              <div class="space-y-0.5 min-w-[200px] max-w-[260px]">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span
+                    class="px-1.5 py-0.2 rounded text-[8px] font-black uppercase tracking-wider"
+                    :class="st.priority === 'urgent' ? 'bg-rose-500 text-white' : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'"
+                  >
+                    {{ st.priority === 'urgent' ? '🚨 MENDESAK' : '⚡ TREN BARU' }}
+                  </span>
+                  <span v-if="st.velocity" class="text-[9px] font-mono text-emerald-400 font-bold">
+                    {{ st.velocity }}
+                  </span>
+                </div>
+                <h5 class="text-xs font-black text-white truncate" :title="st.title">
+                  {{ st.title }}
+                </h5>
+                <p v-if="st.rationale" class="text-[10px] text-slate-300 line-clamp-1 italic" :title="st.rationale">
+                  {{ st.rationale }}
+                </p>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="flex items-center gap-1.5 shrink-0">
+                <!-- 1-Click Adopt Button -->
+                <button
+                  @click="adoptSuggestion(st)"
+                  :disabled="isAdoptingSuggestion && adoptingTitle === st.title"
+                  type="button"
+                  class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:brightness-110 text-white text-[10px] font-black shadow-sm transition cursor-pointer select-none disabled:opacity-50"
+                  title="Jadikan Topik Atensi Baru & Tarik Berita Internet Sekarang"
+                >
+                  <RotateCw v-if="isAdoptingSuggestion && adoptingTitle === st.title" class="w-3 h-3 animate-spin text-white" />
+                  <Check v-else class="w-3 h-3 text-white" />
+                  <span>{{ isAdoptingSuggestion && adoptingTitle === st.title ? 'Menarik...' : 'Pantau' }}</span>
+                </button>
+
+                <!-- Dismiss Button -->
+                <button
+                  @click="dismissSuggestion(st)"
+                  type="button"
+                  class="p-1 rounded-lg hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition cursor-pointer"
+                  title="Abaikan sugesti ini"
+                >
+                  <X class="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Dossier Detail Bar (Muncul saat Topik Dipilih) -->

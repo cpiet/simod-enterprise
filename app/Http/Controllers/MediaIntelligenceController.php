@@ -273,6 +273,7 @@ class MediaIntelligenceController extends Controller
             'aiSetting'        => $aiSetting,
             'issues'           => $issues,
             'pressReleases'    => $pressReleases,
+            'suggestedTopics'  => is_array($report?->suggested_topics) ? $report->suggested_topics : [],
             'metrics'          => $metrics,
         ]);
     }
@@ -440,6 +441,7 @@ class MediaIntelligenceController extends Controller
             'strategic_contents'       => $parsed['strategic_contents'] ?? [],
             'agenda_setting'           => $parsed['agenda_setting'] ?? [],
             'recommendations'          => $parsed['recommendations'] ?? [],
+            'suggested_topics'         => $parsed['suggested_topics'] ?? [],
             'raw_input'                => $rawText,
         ]);
 
@@ -692,6 +694,15 @@ Sajikan laporan HANYA dalam blok JSON murni terstruktur (di dalam blok ```json .
       "pic": "Kadivhumas / Karo Penmas / Kabid Humas Jajaran",
       "indicator": "Sentimen positif >80%, spekulasi hoaks teredam tuntas, situasi kamtibmas tetap kondusif"
     }
+  ],
+  "suggested_topics": [
+    {
+      "title": "Judul Isu Potensial / Topik Tren Media Baru 1",
+      "priority": "high",
+      "velocity": "+15 Berita / Tren Cepat",
+      "keywords": "kata_kunci_1, kata_kunci_2, kata_kunci_3",
+      "rationale": "Uraian 1-2 kalimat mengapa isu ini berpotensi menjadi tren nasional dan perlu dipantau sebelum eskalasi meluas..."
+    }
   ]
 }
 
@@ -830,6 +841,15 @@ Sajikan laporan HANYA dalam blok JSON murni terstruktur (di dalam blok ```json .
       "pic": "PIC yang Disarankan",
       "indicator": "Indikator Keberhasilan (Kamtibmas Kondusif & Public Trust Terjaga)"
     }
+  ],
+  "suggested_topics": [
+    {
+      "title": "Judul Isu Potensial / Topik Tren Media Baru Kewilayahan",
+      "priority": "high",
+      "velocity": "+10 Berita / Tren Cepat",
+      "keywords": "kata_kunci_1, kata_kunci_2, kata_kunci_3",
+      "rationale": "Uraian 1-2 kalimat mengapa isu ini berpotensi menjadi perhatian publik di daerah dan perlu dipantau..."
+    }
   ]
 }
 
@@ -954,6 +974,22 @@ PROMPT;
                         'indicator' => 'Sentimen positif >80%, spekulasi publik teredam, dan kamtibmas kewilayahan kondusif.',
                     ],
                 ],
+                'suggested_topics'         => [
+                    [
+                        'title'     => 'Modus Penipuan Jastip Tiket Konser & QRIS Palsu',
+                        'priority'  => 'high',
+                        'velocity'  => '+18 Berita Media Siber',
+                        'keywords'  => 'penipuan tiket, jastip konser, qris palsu, siber bareskrim',
+                        'rationale' => 'Mulai diberitakan 5 portal media nasional dalam 6 jam terakhir. Potensi kerugian masyarakat dan aduan ke ranah siber meluas.',
+                    ],
+                    [
+                        'title'     => 'Penertiban Balap Liar & Tilang Knalpot Brong',
+                        'priority'  => 'urgent',
+                        'velocity'  => '+24 Berita Kewilayahan',
+                        'keywords'  => 'knalpot brong, balap liar, razia gabungan, lantas presisi',
+                        'rationale' => 'Muncul video viral adu argumen penertiban di Jawa Tengah dan Jawa Timur dengan sentimen warganet terbelah.',
+                    ],
+                ],
                 'raw_input'                => 'Laporan Intelijen Media Divisi Humas Polri (Mabes Polri) Berstandar Humanis, Transparan & Berbasis Fakta',
             ]);
         }
@@ -1065,6 +1101,22 @@ PROMPT;
                     'action'    => 'Publikasikan ikrar netralitas seluruh personel Polda Sulbar secara serentak.',
                     'pic'       => 'Bidpropam & Bidhumas',
                     'indicator' => 'Indeks kepercayaan publik bertahan di atas 80%',
+                ],
+            ],
+            'suggested_topics'         => [
+                [
+                    'title'     => 'Kesiapsiagaan Jalur Rawan Longsor Pesisir Majene-Mamuju',
+                    'priority'  => 'high',
+                    'velocity'  => '+9 Berita Daerah',
+                    'keywords'  => 'longsor majene, jalan trans sulawesi, polres majene, cuaca ekstrem',
+                    'rationale' => 'Peningkatan curah hujan tinggi memicu kekhawatiran antrean logistik sembako antarkabupaten.',
+                ],
+                [
+                    'title'     => 'Patroli Dialogis Pasca-Pilkada & Deklarasi Damai Mamuju',
+                    'priority'  => 'urgent',
+                    'velocity'  => '+14 Berita Media Lokal',
+                    'keywords'  => 'pilkada damai, polresta mamuju, patroli dialogis, cooling system',
+                    'rationale' => 'Pemberitaan media lokal menyoroti langkah cooling system kepolisian menjaga kondusifitas pascapenetapan suara.',
                 ],
             ],
             'raw_input'                => null,
@@ -1359,5 +1411,119 @@ PROMPT;
             'query'                => $result['query'] ?? '',
             'articles'             => $result['articles'] ?? [],
         ], $result['success'] ? 200 : 500);
+    }
+
+    /**
+     * Adopsi sugesti topik potensial dari AI Google News menjadi Topik Atensi aktif (1-Klik).
+     */
+    public function adoptSuggestedTopic(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'title'       => 'required|string|max:255',
+            'keywords'    => 'required|string|max:500',
+            'description' => 'nullable|string|max:1000',
+            'priority'    => 'nullable|string|in:urgent,high',
+            'crawl_live'  => 'nullable|boolean',
+            'polda_id'    => 'nullable|integer',
+            'polda_code'  => 'nullable|string',
+        ]);
+
+        [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
+        if ($request->filled('polda_id')) {
+            $selectedPolda = Polda::find($request->input('polda_id')) ?? $selectedPolda;
+        } elseif ($request->filled('polda_code')) {
+            $selectedPolda = Polda::where('code', strtoupper($request->input('polda_code')))->first() ?? $selectedPolda;
+        }
+        $selectedPolda = $selectedPolda ?? Polda::first();
+
+        // 1. Buat Topik Atensi Baru
+        $topic = MediaTopic::create([
+            'polda_id'    => $selectedPolda->id,
+            'title'       => trim($validated['title']),
+            'keywords'    => trim($validated['keywords']),
+            'description' => $validated['description'] ?? 'Isu tren media online terdeteksi otomatis oleh AI Google News.',
+            'priority'    => $validated['priority'] ?? 'high',
+            'status'      => 'active',
+            'created_by'  => auth()->id(),
+        ]);
+
+        // 2. Tarik Google News secara instan jika crawl_live diaktifkan
+        $crawledCount = 0;
+        if ($request->boolean('crawl_live', true)) {
+            $crawler = new \App\Services\GoogleNewsCrawlerService();
+            $crawlResult = $crawler->crawlAndIngestForTopic($topic, null, 40);
+            $crawledCount = $crawlResult['count'] ?? 0;
+        }
+
+        // 3. Hapus topik ini dari daftar sugesti laporan aktif
+        $latestReport = MediaIntelligenceReport::where('polda_id', $selectedPolda->id)->latest()->first();
+        $remainingSuggestions = [];
+        if ($latestReport && is_array($latestReport->suggested_topics)) {
+            $remainingSuggestions = array_values(array_filter($latestReport->suggested_topics, function ($st) use ($topic) {
+                return strtolower(trim($st['title'] ?? '')) !== strtolower(trim($topic->title));
+            }));
+            $latestReport->update(['suggested_topics' => $remainingSuggestions]);
+        }
+
+        // Hitung total artikel terhubung
+        $keywords = $topic->getKeywordsArray();
+        $articlesQuery = MediaArticle::where('polda_id', $selectedPolda->id);
+        if (!empty($keywords)) {
+            $articlesQuery->where(function ($q) use ($keywords) {
+                foreach ($keywords as $kw) {
+                    $q->orWhere('title', 'like', "%{$kw}%")
+                      ->orWhere('summary', 'like', "%{$kw}%");
+                }
+            });
+        }
+        $topicArticlesCount = $articlesQuery->count();
+
+        return response()->json([
+            'success'              => true,
+            'message'              => "✓ Topik '{$topic->title}' berhasil diadopsi sebagai Topik Atensi! {$crawledCount} berita Google News ditarik.",
+            'topic'                => array_merge($topic->toArray(), [
+                'articles_count' => $topicArticlesCount,
+                'keywords_array' => $topic->getKeywordsArray(),
+            ]),
+            'crawled_count'        => $crawledCount,
+            'remaining_suggestions'=> $remainingSuggestions,
+        ]);
+    }
+
+    /**
+     * Abaikan (dismiss) sugesti topik potensial.
+     */
+    public function dismissSuggestedTopic(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'title'      => 'required|string',
+            'polda_id'   => 'nullable|integer',
+            'polda_code' => 'nullable|string',
+        ]);
+
+        $title = trim($validated['title']);
+
+        [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
+        if ($request->filled('polda_id')) {
+            $selectedPolda = Polda::find($request->input('polda_id')) ?? $selectedPolda;
+        } elseif ($request->filled('polda_code')) {
+            $selectedPolda = Polda::where('code', strtoupper($request->input('polda_code')))->first() ?? $selectedPolda;
+        }
+        $selectedPolda = $selectedPolda ?? Polda::first();
+
+        $latestReport = MediaIntelligenceReport::where('polda_id', $selectedPolda->id)->latest()->first();
+        $remainingSuggestions = [];
+        if ($latestReport && is_array($latestReport->suggested_topics)) {
+            $remainingSuggestions = array_values(array_filter($latestReport->suggested_topics, function ($st) use ($title) {
+                return strtolower(trim($st['title'] ?? '')) !== strtolower(trim($title));
+            }));
+            $latestReport->update(['suggested_topics' => $remainingSuggestions]);
+        }
+
+        return response()->json([
+            'success'              => true,
+            'message'              => 'Sugesti topik berhasil diabaikan.',
+            'remaining_suggestions'=> $remainingSuggestions,
+        ]);
     }
 }

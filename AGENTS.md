@@ -219,8 +219,9 @@ Saat Anda (Agent) diminta memodifikasi kode ini:
    - Akun master sistem (`id: 1`, `kadivhumas`, `superadmin`, `cpiet`) berstatus kebal dari penghapusan (`deleteUser`) dan deaktivasi (`toggleUserStatus`).
    - Sesi pengguna aktif dilarang menghapus akunnya sendiri (*anti-self deletion*) atau mencabut status aktifnya sendiri (*anti-self lockout*).
    - Otoritas personel terhubung erat ke matriks 17 modul pada 4 pilar di `/roles`.
-8. **Smart Dossier / Topik Atensi Pimpinan & Ingesti Live**:
+8. **Smart Dossier / Topik Atensi Pimpinan, Ingesti Live & Sugesti Tren Cerdas**:
    - Fitur atensi khusus kasus sensitif pimpinan di `/media-intelligence` untuk pemantauan instan dan konteks laporan khusus pada mesin Gemini AI.
    - Dilengkapi sistem caching analisis AI permanen (`ai_analysis`, `ai_analyzed_at`, `ai_articles_count`) untuk menghemat kuota token AI dan akses modal tanpa jeda.
    - Didukung mesin penarikan berita langsung `GoogleNewsCrawlerService` untuk menangkap liputan internet secara real-time dan disimpan permanen pada basis data.
+   - **Sugesti Tren Potensial AI (Google News)**: Mesin AI mendeteksi dan mengembalikan array `suggested_topics` (title, priority, velocity, keywords, rationale) dari pemberitaan terkini. Ditampilkan pada baris interaktif tepat di dalam kotak Smart Dossier dengan tombol 1-klik `✓ Pantau` (`POST /media-intelligence/topics/adopt-suggestion`) yang otomatis mengadopsinya menjadi Topik Atensi, menarik sebaran berita Google News instan, serta tombol `✕` (`POST /media-intelligence/topics/dismiss-suggestion`) untuk mengabaikan.
 
