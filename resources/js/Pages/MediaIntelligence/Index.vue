@@ -330,18 +330,59 @@ const toggleArticleTopic = async (topicId) => {
   }
 };
 
-const runTopicAiAnalysis = async (topic) => {
+const getTopicNewArticlesCount = (topic) => {
+  if (!topic || !topic.ai_analyzed_at) return 0;
+  const currentCount = topic.articles_count || 0;
+  const analyzedCount = topic.ai_articles_count || 0;
+  return Math.max(0, currentCount - analyzedCount);
+};
+
+const openCachedTopicAi = (topic) => {
+  if (!topic || !topic.ai_analysis) return;
+  activeAnalyzingTopic.value = topic;
+  topicAiResult.value = topic.ai_analysis;
+  topicAiError.value = '';
+  isAnalyzingTopic.value = false;
+  showTopicAiModal.value = true;
+};
+
+const runTopicAiAnalysis = async (topic, forceRefresh = false) => {
   if (!topic) return;
+
+  // Jika sudah pernah dianalisis dan bukan permintaan pembaruan paksa, buka langsung (0 token)
+  if (topic.ai_analysis && !forceRefresh) {
+    openCachedTopicAi(topic);
+    return;
+  }
+
   activeAnalyzingTopic.value = topic;
   isAnalyzingTopic.value = true;
   topicAiError.value = '';
-  topicAiResult.value = null;
+  if (!forceRefresh) {
+    topicAiResult.value = null;
+  }
   showTopicAiModal.value = true;
 
   try {
     const res = await axios.post(`/media-intelligence/topics/${topic.id}/analyze-ai`);
     if (res.data?.success) {
       topicAiResult.value = res.data.analysis;
+      // Perbarui state lokal topik seketika agar langsung reaktif
+      topic.ai_analysis = res.data.analysis;
+      topic.ai_analyzed_at = res.data.topic?.ai_analyzed_at || new Date().toISOString();
+      topic.ai_analyzed_at_humans = res.data.topic?.ai_analyzed_at_humans || 'Baru saja';
+      topic.ai_articles_count = res.data.articles_count || 0;
+
+      // Sinkronkan juga pada daftar props.topics
+      const pTopic = (props.topics || []).find(t => t.id === topic.id);
+      if (pTopic) {
+        pTopic.ai_analysis = res.data.analysis;
+        pTopic.ai_analyzed_at = topic.ai_analyzed_at;
+        pTopic.ai_analyzed_at_humans = topic.ai_analyzed_at_humans;
+        pTopic.ai_articles_count = topic.ai_articles_count;
+      }
+
+      showToastNotification('Analisis AI kasus berhasil diperbarui dan disimpan!');
     } else {
       topicAiError.value = res.data?.message || 'Gagal memproses analisis AI kasus ini.';
     }
@@ -1443,15 +1484,51 @@ const submitIssue = () => {
 
             <!-- Action Buttons for Selected Topic -->
             <div class="flex items-center gap-2 shrink-0 flex-wrap">
-              <!-- AI Analysis Button -->
-              <button
-                @click="runTopicAiAnalysis(currentSelectedTopic)"
-                class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-md transition cursor-pointer"
-                title="Jalankan analisis AI khusus untuk seluruh berita dalam kasus ini"
-              >
-                <Zap class="w-3.5 h-3.5 fill-slate-950" />
-                <span>⚡ Analisis Kasus Ini</span>
-              </button>
+              <!-- Kasus 1: Sudah ada analisis tersimpan -->
+              <template v-if="currentSelectedTopic.ai_analysis">
+                <!-- Tombol Buka Hasil (Instan, 0 Token) -->
+                <button
+                  @click="openCachedTopicAi(currentSelectedTopic)"
+                  type="button"
+                  class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:brightness-110 text-slate-950 text-xs font-black shadow-md shadow-amber-500/20 transition cursor-pointer select-none"
+                  title="Buka hasil analisis intelijen yang tersimpan (instan, 0 kuota token)"
+                >
+                  <Eye class="w-3.5 h-3.5 text-slate-950" />
+                  <span>👁️ Lihat Hasil Analisis AI</span>
+                </button>
+
+                <!-- Tombol Perbarui Analisis (Re-Analyze) -->
+                <button
+                  @click="runTopicAiAnalysis(currentSelectedTopic, true)"
+                  :disabled="isAnalyzingTopic"
+                  type="button"
+                  class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-bold transition cursor-pointer disabled:opacity-50 select-none"
+                  :title="getTopicNewArticlesCount(currentSelectedTopic) > 0 ? `Ada ${getTopicNewArticlesCount(currentSelectedTopic)} berita baru sejak analisis terakhir. Klik untuk memperbarui!` : 'Panggil ulang Gemini AI untuk menyerap berita terkini'"
+                >
+                  <RotateCw class="w-3.5 h-3.5 text-amber-400" :class="{ 'animate-spin': isAnalyzingTopic && activeAnalyzingTopic?.id === currentSelectedTopic.id }" />
+                  <span>{{ (isAnalyzingTopic && activeAnalyzingTopic?.id === currentSelectedTopic.id) ? 'Menganalisis...' : 'Perbarui Analisis' }}</span>
+                  <span
+                    v-if="getTopicNewArticlesCount(currentSelectedTopic) > 0"
+                    class="px-1.5 py-0.2 rounded-full text-[9px] bg-rose-500 text-white font-mono font-bold animate-pulse"
+                  >
+                    +{{ getTopicNewArticlesCount(currentSelectedTopic) }} Baru
+                  </span>
+                </button>
+              </template>
+
+              <!-- Kasus 2: Belum pernah dianalisis -->
+              <template v-else>
+                <button
+                  @click="runTopicAiAnalysis(currentSelectedTopic, false)"
+                  :disabled="isAnalyzingTopic"
+                  type="button"
+                  class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-md transition cursor-pointer disabled:opacity-50 select-none"
+                  title="Jalankan analisis AI khusus untuk seluruh berita dalam kasus ini"
+                >
+                  <Zap class="w-3.5 h-3.5 fill-slate-950" :class="{ 'animate-pulse': isAnalyzingTopic && activeAnalyzingTopic?.id === currentSelectedTopic.id }" />
+                  <span>{{ (isAnalyzingTopic && activeAnalyzingTopic?.id === currentSelectedTopic.id) ? 'Sedang Menganalisis...' : '⚡ Analisis Kasus Ini' }}</span>
+                </button>
+              </template>
 
               <!-- WhatsApp Report Button -->
               <button
@@ -1491,6 +1568,51 @@ const submitIssue = () => {
               >
                 ✕ Kembali
               </button>
+            </div>
+          </div>
+
+          <!-- MINI PREVIEW SUMMARY BOX (JIKA SUDAH ADA ANALISIS TERSIMPAN) -->
+          <div
+            v-if="currentSelectedTopic.ai_analysis"
+            class="pt-3 border-t border-slate-800/80 space-y-2.5"
+          >
+            <div class="flex items-center justify-between text-[11px] text-slate-400 flex-wrap gap-2">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                  <CheckCircle2 class="w-3 h-3 text-emerald-400" />
+                  <span>Analisis AI Tersimpan</span>
+                </span>
+                <span>
+                  Dianalisis: <strong class="text-slate-200">{{ currentSelectedTopic.ai_analyzed_at_humans || 'Baru saja' }}</strong>
+                  ({{ currentSelectedTopic.ai_articles_count || 0 }} berita)
+                </span>
+                <span
+                  v-if="getTopicNewArticlesCount(currentSelectedTopic) > 0"
+                  class="px-2 py-0.5 rounded-full text-[9px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                >
+                  ⚠️ Ada {{ getTopicNewArticlesCount(currentSelectedTopic) }} Berita Baru Sejak Analisis Terakhir
+                </span>
+              </div>
+              <button
+                @click="openCachedTopicAi(currentSelectedTopic)"
+                type="button"
+                class="text-amber-400 hover:text-amber-300 font-bold hover:underline flex items-center gap-1 cursor-pointer select-none"
+              >
+                <span>Buka Analisis Lengkap (Talking Points &amp; Risiko) &rarr;</span>
+              </button>
+            </div>
+
+            <!-- Snippet Ringkasan Eksekutif -->
+            <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300 leading-relaxed space-y-1.5">
+              <p class="line-clamp-2">
+                <strong class="text-amber-400">Ringkasan Intelijen:</strong> {{ currentSelectedTopic.ai_analysis.executive_summary }}
+              </p>
+              <div class="flex items-center gap-3 text-[11px] pt-1 text-slate-400 font-mono flex-wrap">
+                <span class="text-slate-300">Sentimen Media: <strong class="text-amber-300 uppercase">{{ currentSelectedTopic.ai_analysis.dominant_sentiment || 'Netral' }}</strong></span>
+                <span class="text-emerald-400">🟢 {{ currentSelectedTopic.ai_analysis.sentiment_breakdown?.positif || 0 }}% Positif</span>
+                <span class="text-slate-400">⚪ {{ currentSelectedTopic.ai_analysis.sentiment_breakdown?.netral || 0 }}% Netral</span>
+                <span class="text-rose-400">🔴 {{ currentSelectedTopic.ai_analysis.sentiment_breakdown?.negatif || 0 }}% Negatif</span>
+              </div>
             </div>
           </div>
         </div>
@@ -3193,9 +3315,9 @@ const submitIssue = () => {
     >
       <div class="w-full max-w-4xl rounded-3xl bg-[#0b1426] border border-amber-400/50 shadow-2xl p-6 md:p-8 space-y-6 max-h-[90vh] overflow-y-auto">
         <!-- Modal Header -->
-        <div class="flex items-start justify-between border-b border-slate-800 pb-4">
+        <div class="flex items-start justify-between border-b border-slate-800 pb-4 gap-3">
           <div class="space-y-1">
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
               <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950">
                 Google Gemini Pro
               </span>
@@ -3205,6 +3327,12 @@ const submitIssue = () => {
               >
                 {{ activeAnalyzingTopic.priority === 'urgent' ? '🚨 Kasus Sangat Mendesak' : '⭐ Prioritas Tinggi' }}
               </span>
+              <span
+                v-if="activeAnalyzingTopic.ai_analyzed_at"
+                class="text-[11px] text-slate-400 font-mono"
+              >
+                • Terakhir dianalisis: <strong class="text-slate-200">{{ activeAnalyzingTopic.ai_analyzed_at_humans || 'Baru saja' }}</strong> (basis {{ activeAnalyzingTopic.ai_articles_count || 0 }} berita)
+              </span>
             </div>
             <h2 class="text-lg md:text-xl font-black text-white">
               Hasil Analisis Intelijen Kasus: {{ activeAnalyzingTopic.title }}
@@ -3213,9 +3341,30 @@ const submitIssue = () => {
               Analisis mendalam pemberitaan siber, asesmen risiko kamtibmas, talking points, dan naskah WhatsApp pimpinan.
             </p>
           </div>
-          <button @click="showTopicAiModal = false" class="text-slate-400 hover:text-white cursor-pointer">
-            <X class="w-6 h-6" />
-          </button>
+
+          <div class="flex items-center gap-2 shrink-0">
+            <!-- Re-analyze button inside modal -->
+            <button
+              @click="runTopicAiAnalysis(activeAnalyzingTopic, true)"
+              :disabled="isAnalyzingTopic"
+              type="button"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-bold transition cursor-pointer disabled:opacity-50 select-none"
+              title="Analisis ulang kasus dengan berita terkini menggunakan Gemini AI"
+            >
+              <RotateCw class="w-3.5 h-3.5 text-amber-400" :class="{ 'animate-spin': isAnalyzingTopic }" />
+              <span>{{ isAnalyzingTopic ? 'Menganalisis...' : 'Perbarui Analisis' }}</span>
+              <span
+                v-if="getTopicNewArticlesCount(activeAnalyzingTopic) > 0"
+                class="px-1.5 py-0.2 rounded-full text-[9px] bg-rose-500 text-white font-mono font-bold"
+              >
+                +{{ getTopicNewArticlesCount(activeAnalyzingTopic) }} Baru
+              </span>
+            </button>
+
+            <button @click="showTopicAiModal = false" class="text-slate-400 hover:text-white cursor-pointer p-1">
+              <X class="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         <!-- Loading State -->

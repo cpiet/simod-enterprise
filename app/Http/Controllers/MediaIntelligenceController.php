@@ -97,15 +97,19 @@ class MediaIntelligenceController extends Controller
         $topicsMap = [];
         foreach ($dbTopics as $t) {
             $topicsMap[$t->id] = [
-                'id'             => $t->id,
-                'title'          => $t->title,
-                'keywords'       => $t->keywords,
-                'keywords_array' => $t->getKeywordsArray(),
-                'description'    => $t->description,
-                'priority'       => $t->priority,
-                'status'         => $t->status,
-                'created_at'     => $t->created_at?->format('d M Y, H:i'),
-                'articles_count' => 0,
+                'id'                    => $t->id,
+                'title'                 => $t->title,
+                'keywords'              => $t->keywords,
+                'keywords_array'        => $t->getKeywordsArray(),
+                'description'           => $t->description,
+                'priority'              => $t->priority,
+                'status'                => $t->status,
+                'ai_analysis'           => $t->ai_analysis,
+                'ai_analyzed_at'        => $t->ai_analyzed_at?->toISOString(),
+                'ai_analyzed_at_humans' => $t->ai_analyzed_at ? $t->ai_analyzed_at->diffForHumans() : null,
+                'ai_articles_count'     => (int) ($t->ai_articles_count ?? 0),
+                'created_at'            => $t->created_at?->format('d M Y, H:i'),
+                'articles_count'        => 0,
             ];
         }
 
@@ -1392,19 +1396,30 @@ PROMPT;
             return response()->json($result, 500);
         }
 
+        // Simpan hasil analisis AI secara permanen ke basis data (Smart Caching)
+        $topic->update([
+            'ai_analysis'       => $result['data'],
+            'ai_analyzed_at'    => now(),
+            'ai_articles_count' => count($formattedArticles),
+        ]);
+
         return response()->json([
-            'success'        => true,
-            'topic'          => [
-                'id'          => $topic->id,
-                'title'       => $topic->title,
-                'priority'    => $topic->priority,
-                'keywords'    => $topic->keywords,
-                'description' => $topic->description,
+            'success'               => true,
+            'topic'                 => [
+                'id'                    => $topic->id,
+                'title'                 => $topic->title,
+                'priority'              => $topic->priority,
+                'keywords'              => $topic->keywords,
+                'description'           => $topic->description,
+                'ai_analysis'           => $result['data'],
+                'ai_analyzed_at'        => now()->toISOString(),
+                'ai_analyzed_at_humans' => now()->diffForHumans(),
+                'ai_articles_count'     => count($formattedArticles),
             ],
-            'analysis'       => $result['data'],
-            'articles_count' => count($formattedArticles),
-            'model_used'     => $result['model_used'] ?? $model,
-            'latency_ms'     => $result['latency_ms'] ?? 0,
+            'analysis'              => $result['data'],
+            'articles_count'        => count($formattedArticles),
+            'model_used'            => $result['model_used'] ?? $model,
+            'latency_ms'            => $result['latency_ms'] ?? 0,
         ]);
     }
 }

@@ -13,14 +13,20 @@ class MediaTopic extends Model
         'title',
         'keywords',
         'description',
+        'ai_analysis',
+        'ai_analyzed_at',
+        'ai_articles_count',
         'priority',
         'status',
         'created_by',
     ];
 
     protected $casts = [
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
+        'ai_analysis'       => 'array',
+        'ai_analyzed_at'    => 'datetime',
+        'ai_articles_count' => 'integer',
+        'created_at'        => 'datetime',
+        'updated_at'        => 'datetime',
     ];
 
     public function polda(): BelongsTo

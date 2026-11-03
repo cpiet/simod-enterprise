@@ -204,5 +204,11 @@ class MediaTopicDossierTest extends TestCase
                 'whatsapp_script',
             ],
         ]);
+
+        $topic->refresh();
+        $this->assertNotNull($topic->ai_analysis);
+        $this->assertNotNull($topic->ai_analyzed_at);
+        $this->assertEquals(1, $topic->ai_articles_count);
+        $this->assertEquals('Pemusnahan ladang ganja berhasil dilaksanakan oleh tim gabungan.', $topic->ai_analysis['executive_summary']);
     }
 }
