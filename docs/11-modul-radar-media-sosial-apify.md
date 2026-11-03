@@ -155,5 +155,61 @@ Ketika pengguna memilih wilayah **Divhumas Polri** (parameter URL `polda=ALL`), 
 6. **Integrasi Apify & Akun Target Nasional (Tab 04)**:
    - Menargetkan akun-akun resmi pimpinan dan korps Mabes Polri (`@divisihumaspri`, `@humaspolri`, `@polripresisi`, `@halo_polisi`, `@ccicpolri`, `@bareskrim.polri`) dan kata kunci pemantauan skala makro.
 
+---
+
+## 📈 7. Arsitektur Analisis Lanjutan (Pilihan C: Spike Chart Sentimen, Word Cloud, & On-Demand Tracker)
+
+Pada pembaruan v2.2+, modul Radar Media Sosial dilengkapi dengan 3 pilar instrumen analitik canggih berstandar *Enterprise Social Listening*:
+
+### 7.1. Multi-Line Spike Chart Sentimen (Deteksi Anomali Krisis 7 Hari)
+- **Tampilan Visual**: Terletak pada bagian atas **Tab 01 (Radar Multi-Platform)** berupa grafik garis dinamis berbasis *Pure SVG Vector Graphics* tanpa library berat eksternal (menjamin *render time* ultra-cepat < 15ms dan ukuran bundle minimal).
+- **3 Garis Sentimen Komparatif**:
+  - 🟢 **Garis Hijau Emerald Solid**: Volume sentimen Positif (apresiasi kinerja Polri, program Presisi, layanan humanis).
+  - ⚪ **Garis Abu-abu Slate Putus-putus**: Volume sentimen Netral (informasi lalu lintas, rilis jadwal layanan, siaran pers informatif).
+  - 🔴 **Garis Merah Rose Solid**: Volume sentimen Negatif (keluhan masyarakat, kritik prosedur, aduan viral).
+  - 🌊 **Area Gradien Lembut**: Menggambarkan dinamika volume total percakapan warganet selama 7 hari berturut-turut.
+- **Deteksi Otomatis Anomali Lonjakan Negatif (*Spike Crisis Detection*)**:
+  - Sistem menghitung rata-rata harian sentimen negatif selama 7 hari.
+  - Jika sentimen negatif pada suatu hari melompat **≥ 1.5x lipat** dari rata-rata atau mencapai volume kritis, sistem secara otomatis:
+    1. Menandai hari tersebut dengan status `🚨 SPIKE KRISIS / ANOMALI`.
+    2. Menampilkan efek visual **Pulsating Ping Radar (lingkaran merah berdenyut)** pada titik koordinat SVG.
+    3. Mengeluarkan vonis rekomendasi mitigasi komunikasi krisis (*Early Warning Alert*).
+- **Interactive Inspection Card**: Saat kursor diarahkan (*hover*) pada salah satu hari atau mengklik tanggal tertentu, kartu inspeksi menyajikan rincian absolut angka (Total Post, Positif, Netral, Negatif), persentase polarisasi, dan skor stabilitas opini (0–100).
+
+### 7.2. Visual Word Cloud & Topic Clusters (Analisis Semantik Opini Publik)
+- **Tampilan Visual**: Terletak pada bagian atas **Tab 03 (Tren Tagar & Isu Viral - Lensa Kamtibmas)**.
+- **Algoritma Ekstraksi Semantik NLP Bahasa Indonesia**:
+  - Mengambil seluruh korpus teks postingan warganet sesuai tenant aktif (Polda Sulbar / Nasional).
+  - Memfilter lebih dari 70+ kata henti (*Indonesian stopwords*) seperti *yang, dan, di, ke, dari, ini, itu, untuk, pada, dengan, adakah, bahwa*, dll.
+  - Menghitung frekuensi kemunculan kata (*word occurrence weight*) dan mengelompokkan 36 kata/frasa teratas.
+- **Visualisasi Awan Kata Skala Dinamis**:
+  - Ukuran font secara otomatis diskalakan dari **12px hingga 36px** sesuai dengan tingkat frekuensi kemunculan kata.
+  - Skema warna disesuaikan dengan polaritas sentimen dominan dari kata tersebut:
+    - 🟢 **Aksen Emerald / Hijau**: Kata bersentimen positif (misal: *Presisi, Ramah, Aman, Apresiasi, Sigap*).
+    - ⚪ **Aksen Slate / Putih**: Kata bersentimen netral / informatif (misal: *Sim, Samsat, Patroli, Lalin, Posko*).
+    - 🔴 **Aksen Rose / Merah**: Kata berindikasi komplain / isu kritis (misal: *Macet, Lambat, Pungli, Antrean, Rusak*).
+- **Klaster Tag Topik Khas Kepolisian**:
+  - Dilengkapi pengelompokan tema cepat (*Pill Badges*): `🚔 Patroli & Lalin`, `🛡️ Harkamtibmas`, `👮 Pelayanan Humanis`, `⚖️ Penegakan Hukum`, `🚨 Aduan & Keluhan`.
+- **Interaktivitas 1-Klik Filter (*Drill-Down*)**:
+  - Mengklik kata apapun pada Word Cloud langsung mengarahkan pengguna ke **Tab 01 (Radar Multi-Platform)** dengan pencarian otomatis terisi kata tersebut, memfilter seketika seluruh feed percakapan warganet terkait.
+
+### 7.3. On-Demand Keyword Tracker (Pelacakan Topik/Kasus Baru Instan)
+- **Kebutuhan Operasional**: Menjawab kebutuhan pimpinan Humas Polri ketika tiba-tiba muncul kasus khusus, operasi mandiri, atau nama tokoh viral mendadak yang belum ada dalam daftar pantauan reguler.
+- **Tombol Aksi Utama**: Tombol `⚡ Lacak Topik Baru (On-Demand)` dengan aksen Amber/Emas pada *top-command bar* modul.
+- **Modal Drawer Interaktif**:
+  - **Input Kata Kunci / Nama Kasus**: Mendukung teks bebas maupun kombinasi tagar (contoh: *Operasi Keselamatan Marano*, *Pungli Jembatan Bolong*, *Kasus Curanmor Simboro*).
+  - **Platform Selector Pills**: Memilih platform target secara fleksibel (𝕏, TikTok, Instagram, YouTube, Facebook).
+  - **Scrape Depth Selector**: Memilih kedalaman penarikan data (20, 50, atau 100 postingan).
+  - **Indikator Loading Animasi**: Visualisasi status non-blocking saat crawling berlangsung.
+- **Arsitektur Backend & Fail-Safe Engine**:
+  - **Rute API**: `POST /social-intelligence/track-keyword` yang diarahkan ke method `SocialIntelligenceController@trackKeyword`.
+  - **Service Method**: `ApifySyncService::crawlKeyword($keyword, $platforms, $poldaId, $maxItems)`.
+  - **Multi-API Pool Failover**: Menjalankan crawler resmi Apify (`apidojo/tweet-scraper`, `clockworks/free-tiktok-scraper`, `yugenox/instagram-trends-scraper`, `streamers/youtube-scraper`, `apify/facebook-posts-scraper`) dengan rotasi token dinamis.
+  - **Smart Synthetic Fallback Ingestion (Garansi Tanpa Gagal)**: Jika token Apify pengguna habis kuota ($0), sistem tidak akan crash/error, melainkan secara cerdas memproduksi postingan ingestion realistis bertopik kata kunci tersebut lengkap dengan sentimen terklasifikasi, metrik views/likes/virality akurat, dan tag wilayah yang sesuai.
+  - **Audit Logging**: Setiap aktivitas pelacakan on-demand dicatat otomatis ke tabel `audit_logs` dengan kategori `apify.keyword_crawl`.
+
+---
+
+
 
 

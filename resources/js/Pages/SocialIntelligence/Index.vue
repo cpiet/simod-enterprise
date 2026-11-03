@@ -37,6 +37,9 @@ import {
   Globe,
   Layers,
   ArrowUpRight,
+  Activity,
+  Zap,
+  Cloud,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -51,6 +54,8 @@ const props = defineProps({
   trendingByPlatform: Object,
   publicTrends: Object,
   supportedActors: Array,
+  spikeTimeline: Object,
+  wordCloud: Object,
   peakHours: Object,
   settings: Object,
   filters: Object,
@@ -371,6 +376,121 @@ const getEscalationUrl = (item) => {
   return `/issues/create?${params.toString()}`;
 };
 
+// --- PILIHAN C: MULTI-LINE SPIKE CHART REACTIVE MATH ---
+const spikeTimelineDays = computed(() => props.spikeTimeline?.days || []);
+
+const spikeMaxVal = computed(() => {
+  let m = 1;
+  for (const d of spikeTimelineDays.value) {
+    if (d.positif > m) m = d.positif;
+    if (d.netral > m) m = d.netral;
+    if (d.negatif > m) m = d.negatif;
+    if (d.total > m) m = d.total;
+  }
+  return m;
+});
+
+const activeDayIndex = ref(null);
+const activeDayData = computed(() => {
+  if (activeDayIndex.value !== null && spikeTimelineDays.value[activeDayIndex.value]) {
+    return spikeTimelineDays.value[activeDayIndex.value];
+  }
+  const spikeIdx = spikeTimelineDays.value.findIndex(d => d.is_spike);
+  if (spikeIdx !== -1) return spikeTimelineDays.value[spikeIdx];
+  return spikeTimelineDays.value[spikeTimelineDays.value.length - 1] || null;
+});
+
+const getSvgX = (index) => {
+  const total = Math.max(1, spikeTimelineDays.value.length - 1);
+  return 45 + (index / total) * (650 - 90);
+};
+
+const getSvgY = (val) => {
+  const max = Math.max(1, spikeMaxVal.value);
+  return 150 - (val / max) * 115;
+};
+
+const posPolyline = computed(() => {
+  return spikeTimelineDays.value.map((d, i) => `${getSvgX(i)},${getSvgY(d.positif)}`).join(' ');
+});
+
+const netPolyline = computed(() => {
+  return spikeTimelineDays.value.map((d, i) => `${getSvgX(i)},${getSvgY(d.netral)}`).join(' ');
+});
+
+const negPolyline = computed(() => {
+  return spikeTimelineDays.value.map((d, i) => `${getSvgX(i)},${getSvgY(d.negatif)}`).join(' ');
+});
+
+const totalAreaPath = computed(() => {
+  if (spikeTimelineDays.value.length === 0) return '';
+  const firstX = getSvgX(0);
+  const lastX = getSvgX(spikeTimelineDays.value.length - 1);
+  const points = spikeTimelineDays.value.map((d, i) => `L ${getSvgX(i)} ${getSvgY(d.total)}`).join(' ');
+  return `M ${firstX} 150 ${points} L ${lastX} 150 Z`;
+});
+
+// --- PILIHAN C: WORD CLOUD FILTERING ---
+const filterByWord = (word) => {
+  searchQuery.value = word.text;
+  activeTab.value = 'radar';
+  handleFilter();
+};
+
+const getWordStyle = (word) => {
+  let colorClass = 'text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 hover:border-amber-400';
+  if (word.sentiment === 'positif') {
+    colorClass = 'text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20 hover:border-emerald-500';
+  } else if (word.sentiment === 'negatif') {
+    colorClass = 'text-rose-700 dark:text-rose-300 bg-rose-500/10 border-rose-500/30 hover:bg-rose-500/20 hover:border-rose-500';
+  } else if (word.sentiment === 'netral') {
+    colorClass = 'text-amber-700 dark:text-amber-300 bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-500';
+  }
+  return {
+    fontSize: `${Math.max(12, Math.min(34, word.weight))}px`,
+    classes: colorClass,
+  };
+};
+
+// --- PILIHAN C: ON-DEMAND KEYWORD TRACKER MODAL ---
+const showTrackModal = ref(false);
+const trackForm = ref({
+  keyword: '',
+  platforms: ['x', 'tiktok', 'instagram', 'youtube', 'facebook'],
+  max_items: 20,
+  polda_id: props.selectedPolda?.id || 1,
+});
+const isTrackingKeyword = ref(false);
+
+const openTrackKeywordModal = () => {
+  trackForm.value.keyword = searchQuery.value || '';
+  trackForm.value.polda_id = props.selectedPolda?.id || 1;
+  showTrackModal.value = true;
+};
+
+const toggleTrackPlatform = (platId) => {
+  const idx = trackForm.value.platforms.indexOf(platId);
+  if (idx > -1) {
+    if (trackForm.value.platforms.length > 1) {
+      trackForm.value.platforms.splice(idx, 1);
+    }
+  } else {
+    trackForm.value.platforms.push(platId);
+  }
+};
+
+const submitTrackKeyword = () => {
+  if (!trackForm.value.keyword.trim()) return;
+  isTrackingKeyword.value = true;
+  router.post('/social-intelligence/track-keyword', trackForm.value, {
+    preserveScroll: true,
+    onFinish: () => {
+      isTrackingKeyword.value = false;
+      showTrackModal.value = false;
+    },
+  });
+};
+
 const getPublicPlatformBadge = (platform) => {
   switch (platform) {
     case 'x':
@@ -436,6 +556,16 @@ const getPublicPlatformBadge = (platform) => {
         >
           <RefreshCw class="w-4 h-4 text-sky-500" :class="{ 'animate-spin': isSyncing }" />
           <span>{{ isSyncing ? 'Menyinkronkan...' : 'Sinkronisasi Radar' }}</span>
+        </button>
+
+        <!-- Lacak Topik Baru On-Demand -->
+        <button
+          @click="openTrackKeywordModal"
+          type="button"
+          class="px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white shadow-md shadow-sky-500/20 flex items-center gap-2 cursor-pointer transition select-none"
+        >
+          <Sparkles class="w-4 h-4 text-amber-300" />
+          <span>⚡ Lacak Topik Baru</span>
         </button>
 
         <!-- Buat Laporan Baru -->
@@ -573,6 +703,199 @@ const getPublicPlatformBadge = (platform) => {
 
     <!-- TAB 01: RADAR MULTI-PLATFORM (LIVE FEEDS) -->
     <div v-if="activeTab === 'radar'" class="space-y-4">
+      <!-- GRAFIK TREN SENTIMEN & DETEKSI LONJAKAN ISU (SPIKE DETECTION) -->
+      <div class="rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm space-y-4">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30">
+                Spike Anomaly Detection
+              </span>
+              <span
+                class="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                :class="spikeTimeline?.summary?.spike_detected ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 animate-pulse' : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'"
+              >
+                {{ spikeTimeline?.summary?.spike_detected ? '🚨 Terdeteksi Lonjakan Isu' : '🟢 Stabilitas Opini Terkendali' }}
+              </span>
+              <span class="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                Indeks Stabilitas: <strong class="text-slate-900 dark:text-white">{{ spikeTimeline?.summary?.stability_score || 85 }}/100</strong>
+              </span>
+            </div>
+            <h2 class="text-base font-black text-slate-900 dark:text-white flex items-center gap-2 mt-1">
+              <Activity class="w-5 h-5 text-indigo-500" />
+              <span>Grafik Fluktuasi Percakapan & Deteksi Lonjakan Isu (7 Hari)</span>
+            </h2>
+          </div>
+
+          <!-- Chart Legend -->
+          <div class="flex items-center gap-3 text-xs font-bold">
+            <span class="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+              <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
+              <span>Positif</span>
+            </span>
+            <span class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+              <span class="w-3 h-3 rounded-full bg-slate-400 inline-block"></span>
+              <span>Netral</span>
+            </span>
+            <span class="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+              <span class="w-3 h-3 rounded-full bg-rose-500 inline-block"></span>
+              <span>Negatif (Spike)</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Pure Reactive SVG Multi-Line Chart -->
+        <div class="relative w-full overflow-x-auto no-scrollbar">
+          <svg viewBox="0 0 650 175" class="w-full h-44 select-none">
+            <defs>
+              <linearGradient id="totalAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#6366f1" stop-opacity="0.18" />
+                <stop offset="100%" stop-color="#6366f1" stop-opacity="0.0" />
+              </linearGradient>
+            </defs>
+
+            <!-- Horizontal Gridlines -->
+            <line x1="45" y1="35" x2="605" y2="35" stroke="currentColor" class="text-slate-200 dark:text-slate-800" stroke-dasharray="3,3" />
+            <line x1="45" y1="75" x2="605" y2="75" stroke="currentColor" class="text-slate-200 dark:text-slate-800" stroke-dasharray="3,3" />
+            <line x1="45" y1="115" x2="605" y2="115" stroke="currentColor" class="text-slate-200 dark:text-slate-800" stroke-dasharray="3,3" />
+            <line x1="45" y1="150" x2="605" y2="150" stroke="currentColor" class="text-slate-300 dark:text-slate-700" stroke-width="1.5" />
+
+            <!-- Soft Total Area Path -->
+            <path :d="totalAreaPath" fill="url(#totalAreaGrad)" />
+
+            <!-- Line 1: Positif (Emerald) -->
+            <polyline
+              :points="posPolyline"
+              fill="none"
+              stroke="#10b981"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+
+            <!-- Line 2: Netral (Slate) -->
+            <polyline
+              :points="netPolyline"
+              fill="none"
+              stroke="#94a3b8"
+              stroke-width="2"
+              stroke-dasharray="4,2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+
+            <!-- Line 3: Negatif (Rose Spike) -->
+            <polyline
+              :points="negPolyline"
+              fill="none"
+              stroke="#f43f5e"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+
+            <!-- Data Circle Points & Interactive Hover Columns -->
+            <g v-for="(day, idx) in spikeTimelineDays" :key="idx">
+              <!-- Interactive Transparent Trigger Column -->
+              <rect
+                :x="getSvgX(idx) - 25"
+                y="10"
+                width="50"
+                height="150"
+                fill="transparent"
+                class="cursor-pointer"
+                @mouseenter="activeDayIndex = idx"
+              />
+
+              <!-- Highlight Vertical Line on Hover -->
+              <line
+                v-if="activeDayIndex === idx"
+                :x1="getSvgX(idx)"
+                y1="20"
+                :x2="getSvgX(idx)"
+                y2="150"
+                stroke="#6366f1"
+                stroke-width="1.5"
+                stroke-dasharray="2,2"
+              />
+
+              <!-- Positif Point -->
+              <circle
+                :cx="getSvgX(idx)"
+                :cy="getSvgY(day.positif)"
+                r="3.5"
+                fill="#10b981"
+                stroke="#ffffff"
+                stroke-width="1.5"
+              />
+
+              <!-- Negatif Point with Alert Pulsating Ring if Spike -->
+              <circle
+                v-if="day.is_spike"
+                :cx="getSvgX(idx)"
+                :cy="getSvgY(day.negatif)"
+                r="7"
+                fill="#f43f5e"
+                opacity="0.3"
+                class="animate-ping"
+              />
+              <circle
+                :cx="getSvgX(idx)"
+                :cy="getSvgY(day.negatif)"
+                r="4.5"
+                :fill="day.is_spike ? '#e11d48' : '#f43f5e'"
+                stroke="#ffffff"
+                stroke-width="1.5"
+              />
+
+              <!-- X-Axis Date Labels -->
+              <text
+                :x="getSvgX(idx)"
+                y="166"
+                text-anchor="middle"
+                class="text-[10px] font-mono font-bold"
+                :fill="activeDayIndex === idx ? '#6366f1' : (day.is_spike ? '#f43f5e' : '#64748b')"
+              >
+                {{ day.label }}
+              </text>
+            </g>
+          </svg>
+        </div>
+
+        <!-- Active Data Point Inspector & Early Warning Summary -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs">
+          <div>
+            <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Waktu Analisis:</span>
+            <span class="font-black text-slate-900 dark:text-white text-sm">{{ activeDayData?.label || '7 Hari Terakhir' }}</span>
+            <span v-if="activeDayData?.is_spike" class="ml-2 px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-500 text-white">Spike!</span>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <div>
+              <span class="text-[10px] text-slate-500 font-bold block">🟢 Positif:</span>
+              <span class="font-black text-emerald-600 dark:text-emerald-400 text-sm">{{ activeDayData?.positif || 0 }}</span>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-500 font-bold block">⚪ Netral:</span>
+              <span class="font-black text-slate-700 dark:text-slate-300 text-sm">{{ activeDayData?.netral || 0 }}</span>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-500 font-bold block">🔴 Negatif:</span>
+              <span class="font-black text-rose-600 dark:text-rose-400 text-sm">{{ activeDayData?.negatif || 0 }}</span>
+            </div>
+          </div>
+
+          <div class="md:col-span-2 flex items-center justify-between border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 pt-2 md:pt-0 md:pl-4">
+            <div>
+              <span class="text-[10px] text-slate-500 font-bold block">💡 Kesimpulan Intelijen:</span>
+              <p class="text-[11px] text-slate-700 dark:text-slate-300 font-medium leading-relaxed">
+                {{ activeDayData?.is_spike ? activeDayData.spike_note : (spikeTimeline?.summary?.verdict || 'Situasi percakapan publik terpantau kondusif.') }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Toolbar Filters -->
       <div class="p-4 rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 shadow-sm">
         <!-- Platform Selector Pills -->
@@ -1135,6 +1458,61 @@ const getPublicPlatformBadge = (platform) => {
           </div>
         </div>
       </div>
+
+      <!-- VISUAL WORD CLOUD & TOPIC CLUSTERS (SEMANTIC ANALYSIS) -->
+      <div class="rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950">
+                Semantic NLP Engine
+              </span>
+              <span class="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                {{ (wordCloud?.words || []).length }} Topik Turunan Teridentifikasi
+              </span>
+            </div>
+            <h3 class="text-base font-black text-slate-900 dark:text-white flex items-center gap-2 mt-1">
+              <Cloud class="w-5 h-5 text-sky-500" />
+              <span>Visual Word Cloud & Klaster Kata Terkait</span>
+            </h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Representasi visual kata/frasa yang paling sering muncul berdampingan dengan kata kunci kepolisian. Ukuran kata mencerminkan frekuensi penyebutan. <strong>Klik kata mana saja untuk memfilter percakapan di Radar secara instan.</strong>
+            </p>
+          </div>
+
+          <!-- Sentiment Color Legend -->
+          <div class="flex items-center gap-2 text-xs font-bold shrink-0">
+            <span class="px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-[10px]">
+              🟢 Citra Positif
+            </span>
+            <span class="px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-[10px]">
+              ⚪ Informasi Netral
+            </span>
+            <span class="px-2 py-0.5 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30 text-[10px]">
+              🔴 Keluhan / Isu Negatif
+            </span>
+          </div>
+        </div>
+
+        <!-- Word Cloud Floating Tag Cloud -->
+        <div class="p-6 rounded-2xl bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 min-h-[220px] flex flex-wrap items-center justify-center gap-3 select-none">
+          <button
+            v-for="(w, wIdx) in (wordCloud?.words || [])"
+            :key="wIdx"
+            @click="filterByWord(w)"
+            type="button"
+            class="px-3.5 py-1.5 rounded-2xl font-black transition cursor-pointer border transform hover:scale-110 shadow-sm flex items-center gap-1.5 active:scale-95"
+            :class="getWordStyle(w).classes"
+            :style="{ fontSize: getWordStyle(w).fontSize }"
+            :title="`Klik untuk memfilter: ${w.text} (${w.count} sebutan) — Sentimen Dominan: ${w.sentiment}`"
+          >
+            <span>{{ w.text }}</span>
+            <span class="text-[9px] opacity-75 font-mono px-1.5 py-0.2 rounded-full bg-white/40 dark:bg-black/40">
+              {{ w.count }}
+            </span>
+          </button>
+        </div>
+      </div>
       </div>
 
       <!-- VIEW 2: LENSA TREN PUBLIK MEDSOS INDONESIA (MULTI-PLATFORM) -->
@@ -1616,6 +1994,137 @@ const getPublicPlatformBadge = (platform) => {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+    <!-- MODAL ON-DEMAND KEYWORD TRACKER (CRAWL TOPIK BARU INSTAN) -->
+    <div
+      v-if="showTrackModal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in"
+    >
+      <div
+        class="w-full max-w-lg rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-6 md:p-8 shadow-2xl space-y-6 relative"
+      >
+        <!-- Modal Header -->
+        <div class="flex items-start justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-sky-500 to-indigo-600 text-white">
+                Apify On-Demand Engine
+              </span>
+              <span class="text-xs text-slate-500 dark:text-slate-400 font-bold">Non-Blocking</span>
+            </div>
+            <h2 class="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2 mt-1">
+              <Sparkles class="w-5 h-5 text-amber-400" />
+              <span>Lacak Kata Kunci / Topik Baru</span>
+            </h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+              Tarik percakapan warganet secara langsung dari internet berdasarkan topik atau nama kasus mendesak yang ingin Anda amati.
+            </p>
+          </div>
+          <button
+            @click="showTrackModal = false"
+            type="button"
+            class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition"
+          >
+            <X class="w-4 h-4" />
+          </button>
+        </div>
+
+        <form @submit.prevent="submitTrackKeyword" class="space-y-4 text-xs">
+          <!-- Input Kata Kunci -->
+          <div>
+            <label class="block font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[11px] mb-1.5">
+              KATA KUNCI / TOPIK / NAMA KASUS
+            </label>
+            <div class="relative">
+              <Search class="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
+              <input
+                v-model="trackForm.keyword"
+                type="text"
+                required
+                placeholder="Contoh: razia knalpot brong, kebijakan tarif, demo mahasiswa"
+                class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-bold placeholder-slate-400 focus:outline-none focus:border-amber-400 text-sm"
+              />
+            </div>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+              Crawler akan melacak percakapan publik, komentar, dan video seputar kata kunci ini.
+            </p>
+          </div>
+
+          <!-- Platform Checkbox Pills -->
+          <div>
+            <label class="block font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[11px] mb-1.5">
+              PILIH PLATFORM TARGET
+            </label>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="plat in [
+                  { id: 'x', label: '𝕏 (Twitter)' },
+                  { id: 'tiktok', label: 'TikTok' },
+                  { id: 'instagram', label: 'Instagram' },
+                  { id: 'youtube', label: 'YouTube' },
+                  { id: 'facebook', label: 'Facebook' },
+                ]"
+                :key="plat.id"
+                type="button"
+                @click="toggleTrackPlatform(plat.id)"
+                class="px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer text-xs"
+                :class="trackForm.platforms.includes(plat.id)
+                  ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-950 font-black shadow'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700'"
+              >
+                <span>{{ plat.label }}</span>
+                <Check v-if="trackForm.platforms.includes(plat.id)" class="w-3.5 h-3.5 text-amber-400 dark:text-amber-600" />
+              </button>
+            </div>
+          </div>
+
+          <!-- Target Kedalaman Scraping -->
+          <div>
+            <label class="block font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[11px] mb-1.5">
+              KEDALAMAN DATA TARGET
+            </label>
+            <div class="grid grid-cols-3 gap-2">
+              <button
+                v-for="opt in [
+                  { val: 20, label: '20 Postingan', desc: 'Kilat (< 10 detik)' },
+                  { val: 50, label: '50 Postingan', desc: 'Standar' },
+                  { val: 100, label: '100 Postingan', desc: 'Komprehensif' },
+                ]"
+                :key="opt.val"
+                type="button"
+                @click="trackForm.max_items = opt.val"
+                class="p-2.5 rounded-xl text-center transition border cursor-pointer"
+                :class="trackForm.max_items === opt.val
+                  ? 'bg-amber-400/15 border-amber-400 text-slate-950 dark:text-white font-black'
+                  : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'"
+              >
+                <p class="font-bold text-xs">{{ opt.label }}</p>
+                <p class="text-[10px] text-slate-400">{{ opt.desc }}</p>
+              </button>
+            </div>
+          </div>
+
+          <!-- Modal Action Buttons -->
+          <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <button
+              type="button"
+              @click="showTrackModal = false"
+              class="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              :disabled="isTrackingKeyword || !trackForm.keyword.trim()"
+              class="px-6 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white shadow-lg shadow-sky-500/25 flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+            >
+              <RefreshCw v-if="isTrackingKeyword" class="w-4 h-4 animate-spin text-amber-300" />
+              <Sparkles v-else class="w-4 h-4 text-amber-300" />
+              <span>{{ isTrackingKeyword ? 'Sedang Menghimpun Data...' : 'Mulai Lacak Topik Ini' }}</span>
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   </EnterpriseLayout>

@@ -73,6 +73,8 @@ class SocialIntelligenceTest extends TestCase
             ->where('metrics.total_posts', 1)
             ->has('publicTrends')
             ->has('supportedActors')
+            ->has('spikeTimeline')
+            ->has('wordCloud')
         );
     }
 
@@ -207,6 +209,24 @@ class SocialIntelligenceTest extends TestCase
         $response->assertRedirect();
         $this->assertDatabaseHas('audit_logs', [
             'action' => 'apify.trends_sync',
+        ]);
+    }
+
+    public function test_track_keyword_on_demand_endpoint(): void
+    {
+        $response = $this->actingAs($this->user)->post('/social-intelligence/track-keyword', [
+            'keyword'   => 'razia knalpot brong',
+            'platforms' => ['x', 'tiktok'],
+            'polda_id'  => $this->polda->id,
+            'max_items' => 10,
+        ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('social_posts', [
+            'polda_id' => $this->polda->id,
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'apify.keyword_crawl',
         ]);
     }
 }

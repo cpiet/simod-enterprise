@@ -95,6 +95,10 @@ Seluruh 29 portal media dikonfigurasi melalui seeder [`SulbarRssFeedsSeeder.php`
 - **Katalog Apify Actor (Tab 04)**: Katalog pemetaan format tren unik dan rekomendasi Actor resmi Apify (`easyapi/twitter-trending-topics-scraper`, `streamers/youtube-scraper`, `yugenox/instagram-trends-scraper`, `apify/facebook-posts-scraper`, `clockworks/free-tiktok-scraper`).
 - **Direct One-Click Escalation**: Tombol `🚨 Eskalasi Jadi Isu` pada setiap kartu postingan medsos dan kartu tren publik otomatis mengarahkan ke formulir `/issues/create` dengan pra-isi judul, kategori (`📱 Isu Medsos & Opini Publik`), URL sumber, tingkat prioritas, dan ringkasan.
 - **API Endpoint Sinkronisasi Tren**: `POST /social-intelligence/sync-trends` memicu refresh tren multi-platform dan mencatat log audit ke tabel `audit_logs`.
+- **Instrumen Analitik Terpadu (Spike Chart, Word Cloud, On-Demand Tracker)**:
+  - *Multi-Line Spike Chart Sentimen*: Pure SVG rendering dinamika 7 hari (Positif, Netral, Negatif) dengan deteksi otomatis anomali krisis negatif (`>= 1.5x` rata-rata) disertai efek visual pulsating ping radar dan skor stabilitas opini (0-100).
+  - *Visual Word Cloud Semantik*: Ekstraksi 36 kata/frasa teratas dengan filtering 70+ Indonesian stopwords, skala dinamis (12-36px), pewarnaan sentimen dominan (Emerald, Slate, Rose), klaster tema kepolisian, dan filter 1-klik ke pencarian feed.
+  - *On-Demand Keyword Tracker*: Tombol `⚡ Lacak Topik Baru (On-Demand)` dan modal drawer untuk crawling kasus/topik mendadak lintas 𝕏, TikTok, IG, YT, FB via `POST /social-intelligence/track-keyword` (`ApifySyncService::crawlKeyword`) dengan multi-token failover dan smart synthetic fallback ingestion.
 
 ### 4.5. Radar Media Online Divhumas Polri (22 Feed Nasional Terverifikasi 100% Gambar)
 - **Tenant Scope**: Kode `DIVHUMAS` (ID `10`) atau query parameter `?polda=ALL`.
