@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { useForm, router, Head, Link } from '@inertiajs/vue3';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
 import SecurityMaintenanceTabs from '@/Components/SecurityMaintenanceTabs.vue';
+import axios from 'axios';
 import {
   Radio,
   Clock,
@@ -25,6 +26,15 @@ import {
   Check,
   Plus,
   Trash2,
+  ExternalLink,
+  Search,
+  Filter,
+  Globe,
+  X,
+  RefreshCw,
+  SlidersHorizontal,
+  Rss,
+  CheckCircle,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -35,9 +45,15 @@ const props = defineProps({
   globalSetting: { type: Object, default: () => ({}) },
   telemetry: { type: Object, default: () => ({}) },
   recentLogs: { type: Array, default: () => [] },
+  feeds: { type: Array, default: () => [] },
+  feedCategories: { type: Array, default: () => [] },
+  feedsTelemetry: { type: Object, default: () => ({ total_feeds: 0, active_feeds: 0, inactive_feeds: 0 }) },
 });
 
-// Inertia Form Setup
+// Active Sub-Tab: 'feeds', 'scheduler', 'logs'
+const activeSubTab = ref('feeds');
+
+// Inertia Form Setup (Scheduler & Limits)
 const form = useForm({
   polda_id: props.selectedPolda?.id || null,
   sync_mode: props.setting?.sync_mode || 'interval',
@@ -100,10 +116,142 @@ const saveSettings = () => {
     preserveScroll: true,
   });
 };
+
+// ==========================================
+// FEED MANAGEMENT LOGIC & STATE
+// ==========================================
+const feedSearch = ref('');
+const selectedCategory = ref('ALL');
+const selectedFeedStatus = ref('ALL');
+
+const filteredFeeds = computed(() => {
+  return props.feeds.filter(f => {
+    // Search filter
+    if (feedSearch.value) {
+      const q = feedSearch.value.toLowerCase();
+      const matchName = f.name?.toLowerCase().includes(q);
+      const matchUrl = f.url?.toLowerCase().includes(q);
+      const matchCat = f.category?.toLowerCase().includes(q);
+      if (!matchName && !matchUrl && !matchCat) return false;
+    }
+    // Category filter
+    if (selectedCategory.value !== 'ALL' && f.category !== selectedCategory.value) {
+      return false;
+    }
+    // Status filter
+    if (selectedFeedStatus.value === 'active' && !f.is_active) return false;
+    if (selectedFeedStatus.value === 'inactive' && f.is_active) return false;
+
+    return true;
+  });
+});
+
+// Toggle Feed Status
+const isTogglingId = ref(null);
+const toggleFeed = (feed) => {
+  isTogglingId.value = feed.id;
+  router.post(`/maintenance/rss-sync/feeds/${feed.id}/toggle`, {}, {
+    preserveScroll: true,
+    onFinish: () => {
+      isTogglingId.value = null;
+    },
+  });
+};
+
+// Test Existing Feed XML
+const testingFeedId = ref(null);
+const feedTestResults = ref({});
+
+const testFeed = async (feed) => {
+  testingFeedId.value = feed.id;
+  try {
+    const res = await axios.post('/maintenance/rss-sync/feeds/test', { url: feed.url });
+    feedTestResults.value[feed.id] = {
+      valid: res.data.valid,
+      message: res.data.message,
+      latency: res.data.latency_ms,
+      items: res.data.items_count,
+    };
+  } catch (err) {
+    feedTestResults.value[feed.id] = {
+      valid: false,
+      message: err.response?.data?.message || 'Gagal menghubungi server feed.',
+      latency: err.response?.data?.latency_ms,
+      items: 0,
+    };
+  } finally {
+    testingFeedId.value = null;
+  }
+};
+
+// Delete Feed
+const deletingFeedId = ref(null);
+const deleteFeed = (feed) => {
+  if (!confirm(`Apakah Anda yakin ingin menghapus sumber feed [${feed.name}]?`)) {
+    return;
+  }
+  deletingFeedId.value = feed.id;
+  router.delete(`/maintenance/rss-sync/feeds/${feed.id}`, {
+    preserveScroll: true,
+    onFinish: () => {
+      deletingFeedId.value = null;
+    },
+  });
+};
+
+// Add Feed Modal & Form
+const showAddModal = ref(false);
+const newFeedForm = useForm({
+  polda_id: props.selectedPolda?.id || null,
+  name: '',
+  url: '',
+  category: 'Regional Sulselbar',
+});
+
+const isTestingNewFeed = ref(false);
+const newFeedTestResult = ref(null);
+
+const testNewFeedUrl = async () => {
+  if (!newFeedForm.url) return;
+  isTestingNewFeed.value = true;
+  newFeedTestResult.value = null;
+  try {
+    const res = await axios.post('/maintenance/rss-sync/feeds/test', { url: newFeedForm.url });
+    newFeedTestResult.value = res.data;
+  } catch (err) {
+    newFeedTestResult.value = {
+      valid: false,
+      message: err.response?.data?.message || 'URL Feed tidak dapat diakses atau bukan format XML RSS valid.',
+    };
+  } finally {
+    isTestingNewFeed.value = false;
+  }
+};
+
+const submitNewFeed = () => {
+  newFeedForm.polda_id = props.selectedPolda?.id || null;
+  newFeedForm.post('/maintenance/rss-sync/feeds', {
+    preserveScroll: true,
+    onSuccess: () => {
+      showAddModal.value = false;
+      newFeedForm.reset();
+      newFeedTestResult.value = null;
+    },
+  });
+};
+
+const categoryBadgeClass = (cat) => {
+  if (!cat) return 'bg-slate-700 text-slate-300';
+  if (cat.includes('Regional')) return 'bg-sky-500/15 text-sky-400 border border-sky-500/30';
+  if (cat.includes('Nasional')) return 'bg-amber-500/15 text-amber-400 border border-amber-500/30';
+  if (cat.includes('Hukum')) return 'bg-rose-500/15 text-rose-400 border border-rose-500/30';
+  if (cat.includes('Google')) return 'bg-purple-500/15 text-purple-400 border border-purple-500/30';
+  return 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
+};
 </script>
 
 <template>
-  <Head title="Otomasi Sinkron Berita RSS - Keamanan & Pemeliharaan" />
+  <Head title="Manajemen Sumber RSS & Otomasi - Keamanan & Pemeliharaan" />
 
   <EnterpriseLayout
     :all-poldas="allPoldas"
@@ -119,24 +267,24 @@ const saveSettings = () => {
         <div class="space-y-2 relative z-10">
           <div class="flex items-center gap-2 flex-wrap">
             <span class="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-400 text-slate-950 shadow-md">
-              Otomasi Latar Belakang
+              Pusat Kendali RSS
             </span>
             <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
               <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               MULTI-TENANT GUARD AKTIF
             </span>
             <span class="text-xs text-slate-400 font-mono">
-              Wilayah: <strong class="text-white">{{ selectedPolda?.name || selectedCode }}</strong>
+              Satwil: <strong class="text-white">{{ selectedPolda?.name || selectedCode }}</strong>
             </span>
           </div>
 
-          <h1 class="text-xl md:text-2xl font-black text-white tracking-tight flex items-center gap-2">
+          <h1 class="text-xl md:text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
             <Radio class="w-6 h-6 text-amber-400" />
-            <span>Otomasi Sinkron RSS &amp; Manajemen Kestabilan Sistem</span>
+            <span>Manajemen Sumber RSS Portal &amp; Otomasi Kestabilan Sistem</span>
           </h1>
 
           <p class="text-xs md:text-sm text-slate-300 max-w-3xl leading-relaxed">
-            Konfigurasi penjadwalan otomatis penarikan feed RSS untuk intelijen media. Dilengkapi perlindungan <strong>Mutex Lock</strong> anti-tumpang tindih, pembatasan memori, dan <strong>Auto-Capping Database</strong> agar performa server tetap cepat dan stabil untuk seluruh jajaran Polda.
+            Pusat konfigurasi sumber feed portal berita media online nasional dan kewilayahan. Mengelola daftar <strong>{{ feeds.length }} portal resmi</strong>, validasi XML realtime, penjadwalan otomatis di latar belakang, dan <strong>Auto-Capping Database</strong>.
           </p>
         </div>
 
@@ -164,23 +312,18 @@ const saveSettings = () => {
 
       <!-- Telemetry & Health Grid (4 Cards) -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <!-- Card 1: Mutex Lock Status -->
+        <!-- Card 1: Total Feeds Terdaftar -->
         <div class="p-5 rounded-2xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-2">
           <div class="flex items-center justify-between text-xs text-slate-400 font-bold">
-            <span>Status Antrean Server</span>
-            <ShieldCheck v-if="!telemetry.is_locked" class="w-4 h-4 text-emerald-400" />
-            <ShieldAlert v-else class="w-4 h-4 text-amber-400 animate-pulse" />
+            <span>Portal RSS Terdaftar</span>
+            <Rss class="w-4 h-4 text-amber-400" />
           </div>
           <div class="flex items-baseline gap-2">
-            <span
-              class="text-lg font-black tracking-tight"
-              :class="!telemetry.is_locked ? 'text-emerald-400' : 'text-amber-400'"
-            >
-              {{ !telemetry.is_locked ? 'SIAGA (AMAN)' : 'PROSES BERJALAN' }}
-            </span>
+            <span class="text-2xl font-black text-amber-400">{{ feedsTelemetry.total_feeds }}</span>
+            <span class="text-xs text-slate-400 font-semibold">Portal ({{ feedsTelemetry.active_feeds }} Aktif)</span>
           </div>
           <p class="text-[11px] text-slate-400 leading-snug">
-            {{ !telemetry.is_locked ? 'Mutex Lock aktif mencegah proses bertumpuk saat sinkronisasi.' : 'Sinkronisasi sedang aktif di latar belakang.' }}
+            {{ feedsTelemetry.inactive_feeds > 0 ? `${feedsTelemetry.inactive_feeds} portal dinonaktifkan sementara.` : '100% portal siap ditarik berkala.' }}
           </p>
         </div>
 
@@ -229,367 +372,710 @@ const saveSettings = () => {
         </div>
       </div>
 
-      <!-- Main Configuration Form -->
-      <form @submit.prevent="saveSettings" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Left: Scheduler Settings (2 cols) -->
-        <div class="lg:col-span-2 space-y-6">
-          <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-6">
-            <div class="border-b border-slate-800 pb-4 flex items-center justify-between">
-              <div class="flex items-center gap-2">
-                <Clock class="w-5 h-5 text-amber-400" />
-                <h3 class="text-base font-bold text-white">Mode &amp; Penjadwalan Sinkronisasi</h3>
-              </div>
-              <div class="flex items-center gap-2">
-                <label class="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" v-model="form.is_active" class="sr-only peer">
-                  <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                  <span class="ml-2 text-xs font-bold text-slate-300">
-                    {{ form.is_active ? 'Otomasi Aktif' : 'Otomasi Nonaktif' }}
-                  </span>
-                </label>
-              </div>
+      <!-- SUB-TABS SWITCHER (Daftar Portal RSS, Jadwal Otomasi, Log Telemetri) -->
+      <div class="p-1.5 rounded-2xl bg-[#08101e] border border-slate-800 flex flex-wrap gap-2 shadow-lg">
+        <button
+          type="button"
+          @click="activeSubTab = 'feeds'"
+          class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition cursor-pointer"
+          :class="activeSubTab === 'feeds'
+            ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
+            : 'text-slate-300 hover:text-white hover:bg-slate-800/60'"
+        >
+          <Rss class="w-4 h-4" />
+          <span>Daftar Sumber Feed RSS ({{ feeds.length }} Portal)</span>
+        </button>
+
+        <button
+          type="button"
+          @click="activeSubTab = 'scheduler'"
+          class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition cursor-pointer"
+          :class="activeSubTab === 'scheduler'
+            ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
+            : 'text-slate-300 hover:text-white hover:bg-slate-800/60'"
+        >
+          <Clock class="w-4 h-4" />
+          <span>Otomasi Penjadwalan &amp; Kestabilan Server</span>
+        </button>
+
+        <button
+          type="button"
+          @click="activeSubTab = 'logs'"
+          class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition cursor-pointer"
+          :class="activeSubTab === 'logs'
+            ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
+            : 'text-slate-300 hover:text-white hover:bg-slate-800/60'"
+        >
+          <History class="w-4 h-4" />
+          <span>Log Telemetri &amp; Mutex Antrean</span>
+        </button>
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- TAB 1: DAFTAR & MANAJEMEN SUMBER FEED RSS (PORTAL MEDIA)      -->
+      <!-- ============================================================== -->
+      <div v-if="activeSubTab === 'feeds'" class="space-y-4">
+        <!-- Control Bar: Search, Category Filter, Status Filter, Add Button -->
+        <div class="p-4 rounded-2xl bg-[#0b1426] border border-slate-800 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+          <div class="flex items-center gap-3 w-full md:w-auto flex-1 flex-wrap">
+            <!-- Search Input -->
+            <div class="relative w-full sm:w-72">
+              <Search class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                v-model="feedSearch"
+                placeholder="Cari nama portal atau URL..."
+                class="w-full pl-9 pr-4 py-2 rounded-xl text-xs bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+              />
             </div>
 
-            <!-- Radio 1: Manual Only -->
-            <label
-              class="flex items-start gap-3 p-4 rounded-2xl border transition cursor-pointer select-none"
-              :class="form.sync_mode === 'manual'
-                ? 'bg-amber-500/10 border-amber-400/80 shadow-sm'
-                : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'"
+            <!-- Category Filter -->
+            <select
+              v-model="selectedCategory"
+              class="px-3 py-2 rounded-xl text-xs bg-slate-900 border border-slate-700 text-slate-200 focus:outline-none focus:border-amber-400"
             >
-              <input
-                type="radio"
-                value="manual"
-                v-model="form.sync_mode"
-                class="mt-1 text-amber-400 focus:ring-amber-400"
-              />
-              <div class="space-y-1">
-                <div class="text-sm font-bold text-white flex items-center gap-2">
-                  <span>1. Mode Manual Murni (Sesuai Kebutuhan)</span>
-                  <span v-if="form.sync_mode === 'manual'" class="px-2 py-0.5 rounded text-[10px] bg-amber-400 text-slate-950 font-black">Dipilih</span>
-                </div>
-                <p class="text-xs text-slate-400 leading-relaxed">
-                  Sistem tidak akan menarik berita secara otomatis. Berita hanya diperbarui ketika operator mengklik tombol <em>"Sinkron Berita"</em> di halaman Monitoring Media Online. Sangat hemat bandwidth dan CPU.
-                </p>
+              <option value="ALL">Semua Kategori ({{ feeds.length }})</option>
+              <option v-for="cat in feedCategories" :key="cat" :value="cat">
+                {{ cat }}
+              </option>
+            </select>
+
+            <!-- Status Filter -->
+            <select
+              v-model="selectedFeedStatus"
+              class="px-3 py-2 rounded-xl text-xs bg-slate-900 border border-slate-700 text-slate-200 focus:outline-none focus:border-amber-400"
+            >
+              <option value="ALL">Semua Status</option>
+              <option value="active">Aktif Saja ({{ feedsTelemetry.active_feeds }})</option>
+              <option value="inactive">Nonaktif Saja ({{ feedsTelemetry.inactive_feeds }})</option>
+            </select>
+          </div>
+
+          <!-- Add Feed Button -->
+          <button
+            type="button"
+            @click="showAddModal = true"
+            class="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition shadow-lg shadow-amber-400/20 cursor-pointer shrink-0"
+          >
+            <Plus class="w-4 h-4" />
+            <span>Tambah Portal RSS Baru</span>
+          </button>
+        </div>
+
+        <!-- Feeds Table / Grid -->
+        <div class="rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl overflow-hidden">
+          <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <Rss class="w-4 h-4 text-amber-400" />
+              <h3 class="text-sm font-black text-white">
+                Daftar Sumber Feed Resmi Terdaftar ({{ filteredFeeds.length }} Ditampilkan)
+              </h3>
+            </div>
+            <span class="text-xs text-slate-400 font-mono">
+              Wilayah: <strong class="text-amber-400">{{ selectedPolda?.name || selectedCode }}</strong>
+            </span>
+          </div>
+
+          <div v-if="filteredFeeds.length > 0" class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-900/90 text-slate-400 text-[11px] font-black uppercase tracking-wider border-b border-slate-800">
+                <tr>
+                  <th class="py-3 px-4 w-12 text-center">Status</th>
+                  <th class="py-3 px-4">Nama Portal Media</th>
+                  <th class="py-3 px-4">Kategori Portal</th>
+                  <th class="py-3 px-4">Tautan Feed XML</th>
+                  <th class="py-3 px-4 text-center">Berita Terkumpul</th>
+                  <th class="py-3 px-4 text-center">Aksi Cepat</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/60 font-medium">
+                <tr
+                  v-for="feed in filteredFeeds"
+                  :key="feed.id"
+                  class="hover:bg-slate-900/40 transition"
+                  :class="{ 'opacity-60 bg-slate-950/40': !feed.is_active }"
+                >
+                  <!-- Status Toggle Switch -->
+                  <td class="py-3 px-4 text-center">
+                    <button
+                      type="button"
+                      @click="toggleFeed(feed)"
+                      :disabled="isTogglingId === feed.id"
+                      class="relative inline-flex items-center cursor-pointer disabled:opacity-50"
+                      :title="feed.is_active ? 'Klik untuk nonaktifkan feed ini' : 'Klik untuk mengaktifkan feed ini'"
+                    >
+                      <span
+                        class="w-8 h-4.5 rounded-full transition-colors flex items-center p-0.5"
+                        :class="feed.is_active ? 'bg-emerald-500' : 'bg-slate-700'"
+                      >
+                        <span
+                          class="w-3.5 h-3.5 rounded-full bg-white transition-transform"
+                          :class="feed.is_active ? 'translate-x-3.5' : 'translate-x-0'"
+                        ></span>
+                      </span>
+                    </button>
+                  </td>
+
+                  <!-- Nama Portal -->
+                  <td class="py-3 px-4 font-bold text-white">
+                    <div class="flex items-center gap-1.5">
+                      <span class="w-2 h-2 rounded-full" :class="feed.is_active ? 'bg-emerald-400' : 'bg-slate-600'"></span>
+                      <span>{{ feed.name }}</span>
+                    </div>
+                  </td>
+
+                  <!-- Kategori Badge -->
+                  <td class="py-3 px-4">
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold" :class="categoryBadgeClass(feed.category)">
+                      {{ feed.category }}
+                    </span>
+                  </td>
+
+                  <!-- URL Feed XML -->
+                  <td class="py-3 px-4 font-mono text-[11px] text-slate-400 max-w-xs">
+                    <div class="flex items-center gap-1.5 truncate">
+                      <a
+                        :href="feed.url"
+                        target="_blank"
+                        rel="noopener"
+                        class="text-sky-400 hover:text-sky-300 hover:underline truncate"
+                        :title="feed.url"
+                      >
+                        {{ feed.url }}
+                      </a>
+                      <ExternalLink class="w-3 h-3 text-slate-500 shrink-0" />
+                    </div>
+
+                    <!-- Inline Test Feedback Badge (if tested) -->
+                    <div v-if="feedTestResults[feed.id]" class="mt-1">
+                      <span
+                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold"
+                        :class="feedTestResults[feed.id].valid ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'"
+                      >
+                        <CheckCircle2 v-if="feedTestResults[feed.id].valid" class="w-3 h-3" />
+                        <AlertTriangle v-else class="w-3 h-3" />
+                        <span>{{ feedTestResults[feed.id].message }}</span>
+                      </span>
+                    </div>
+                  </td>
+
+                  <!-- Berita Terkumpul -->
+                  <td class="py-3 px-4 text-center font-bold text-slate-300">
+                    <span class="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-700 text-amber-400 font-mono">
+                      {{ feed.articles_count }}
+                    </span>
+                  </td>
+
+                  <!-- Action Buttons -->
+                  <td class="py-3 px-4 text-center">
+                    <div class="inline-flex items-center gap-1.5">
+                      <!-- Test Feed Button -->
+                      <button
+                        type="button"
+                        @click="testFeed(feed)"
+                        :disabled="testingFeedId === feed.id"
+                        class="px-2 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-400 font-bold text-[10px] transition cursor-pointer disabled:opacity-50 inline-flex items-center gap-1"
+                        title="Uji kelayakan feed XML sekarang"
+                      >
+                        <RotateCw class="w-3 h-3" :class="{ 'animate-spin': testingFeedId === feed.id }" />
+                        <span>{{ testingFeedId === feed.id ? 'Menguji...' : 'Uji XML' }}</span>
+                      </button>
+
+                      <!-- Delete Feed Button -->
+                      <button
+                        type="button"
+                        @click="deleteFeed(feed)"
+                        :disabled="deletingFeedId === feed.id"
+                        class="p-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 transition cursor-pointer disabled:opacity-50"
+                        title="Hapus feed portal ini"
+                      >
+                        <Trash2 class="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div v-else class="p-8 text-center text-slate-400 text-xs">
+            Tidak ada portal media yang cocok dengan filter pencarian. Klik tombol <strong>"Tambah Portal RSS Baru"</strong> untuk menambahkan sumber berita.
+          </div>
+        </div>
+
+        <!-- MODAL TAMBAH PORTAL RSS BARU -->
+        <div
+          v-if="showAddModal"
+          class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4"
+        >
+          <div class="w-full max-w-lg rounded-3xl bg-[#0b1426] border border-slate-800 shadow-2xl p-6 space-y-5">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div class="flex items-center gap-2">
+                <Rss class="w-5 h-5 text-amber-400" />
+                <h3 class="text-base font-bold text-white">Tambah Sumber Feed RSS Baru</h3>
               </div>
-            </label>
+              <button
+                type="button"
+                @click="showAddModal = false"
+                class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                <X class="w-5 h-5" />
+              </button>
+            </div>
 
-            <!-- Radio 2: Interval Mode -->
-            <label
-              class="flex items-start gap-3 p-4 rounded-2xl border transition cursor-pointer select-none"
-              :class="form.sync_mode === 'interval'
-                ? 'bg-amber-500/10 border-amber-400/80 shadow-sm'
-                : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'"
-            >
-              <input
-                type="radio"
-                value="interval"
-                v-model="form.sync_mode"
-                class="mt-1 text-amber-400 focus:ring-amber-400"
-              />
-              <div class="space-y-3 flex-1">
-                <div class="flex items-center justify-between flex-wrap gap-2">
-                  <div class="text-sm font-bold text-white flex items-center gap-2">
-                    <span>2. Mode Interval Berkala (Rekomendasi Operasional)</span>
-                    <span v-if="form.sync_mode === 'interval'" class="px-2 py-0.5 rounded text-[10px] bg-amber-400 text-slate-950 font-black">Dipilih</span>
-                  </div>
-                </div>
-                <p class="text-xs text-slate-400 leading-relaxed">
-                  Berita ditarik secara teratur setiap rentang waktu tertentu melalui Laravel Task Scheduler di latar belakang.
-                </p>
+            <form @submit.prevent="submitNewFeed" class="space-y-4">
+              <!-- Field: Nama Portal -->
+              <div class="space-y-1.5">
+                <label class="text-xs font-bold text-slate-200">
+                  Nama Portal Media <span class="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  v-model="newFeedForm.name"
+                  required
+                  placeholder="Contoh: Detik Sulsel, Kompas News, ANTARA News"
+                  class="w-full px-3 py-2.5 rounded-xl text-xs bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                />
+              </div>
 
-                <!-- Interval Options Pills -->
-                <div v-if="form.sync_mode === 'interval'" class="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2">
+              <!-- Field: Kategori -->
+              <div class="space-y-1.5">
+                <label class="text-xs font-bold text-slate-200">
+                  Kategori Liputan
+                </label>
+                <input
+                  type="text"
+                  v-model="newFeedForm.category"
+                  placeholder="Regional Sulselbar, Nasional & Umum, Hukum & Kriminal, dll."
+                  class="w-full px-3 py-2.5 rounded-xl text-xs bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                />
+              </div>
+
+              <!-- Field: URL Feed RSS (XML) -->
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <label class="text-xs font-bold text-slate-200">
+                    URL Feed RSS / XML <span class="text-rose-400">*</span>
+                  </label>
                   <button
-                    v-for="opt in [
-                      { label: 'Tiap 1 Jam', val: 60, desc: 'Breaking' },
-                      { label: 'Tiap 3 Jam', val: 180, desc: 'Ideal' },
-                      { label: 'Tiap 6 Jam', val: 360, desc: 'Shift' },
-                      { label: 'Tiap 12 Jam', val: 720, desc: 'Santai' },
-                      { label: 'Tiap 24 Jam', val: 1440, desc: 'Arsip' },
-                    ]"
-                    :key="opt.val"
                     type="button"
-                    @click="form.interval_minutes = opt.val"
-                    class="p-2.5 rounded-xl border text-center transition cursor-pointer"
-                    :class="form.interval_minutes === opt.val
-                      ? 'bg-amber-400 text-slate-950 border-amber-400 font-black shadow-md'
-                      : 'bg-slate-900 text-slate-300 border-slate-700 hover:bg-slate-800'"
+                    @click="testNewFeedUrl"
+                    :disabled="isTestingNewFeed || !newFeedForm.url"
+                    class="text-[11px] font-bold text-sky-400 hover:text-sky-300 disabled:opacity-40 inline-flex items-center gap-1 cursor-pointer"
                   >
-                    <div class="text-xs font-bold">{{ opt.label }}</div>
-                    <div class="text-[10px] opacity-80 font-medium">{{ opt.desc }}</div>
+                    <RotateCw class="w-3 h-3" :class="{ 'animate-spin': isTestingNewFeed }" />
+                    <span>{{ isTestingNewFeed ? 'Menguji...' : 'Uji Validasi XML' }}</span>
                   </button>
                 </div>
-              </div>
-            </label>
+                <input
+                  type="url"
+                  v-model="newFeedForm.url"
+                  required
+                  placeholder="https://domain.com/rss.xml"
+                  class="w-full px-3 py-2.5 rounded-xl text-xs bg-slate-900 border border-slate-700 text-white font-mono placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                />
 
-            <!-- Radio 3: Scheduled Times Mode (Jam Dinas Spesifik Polri) -->
-            <label
-              class="flex items-start gap-3 p-4 rounded-2xl border transition cursor-pointer select-none"
-              :class="form.sync_mode === 'scheduled_times'
-                ? 'bg-amber-500/10 border-amber-400/80 shadow-sm'
-                : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'"
-            >
-              <input
-                type="radio"
-                value="scheduled_times"
-                v-model="form.sync_mode"
-                class="mt-1 text-amber-400 focus:ring-amber-400"
-              />
-              <div class="space-y-3 flex-1">
-                <div class="text-sm font-bold text-white flex items-center gap-2">
-                  <span>3. Mode Jam Dinas Spesifik (Sesuai Jam Kerja Polri)</span>
-                  <span v-if="form.sync_mode === 'scheduled_times'" class="px-2 py-0.5 rounded text-[10px] bg-amber-400 text-slate-950 font-black">Dipilih</span>
+                <!-- Result of XML Test inside Modal -->
+                <div v-if="newFeedTestResult" class="p-3 rounded-xl border text-xs" :class="newFeedTestResult.valid ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-rose-500/10 border-rose-500/30 text-rose-300'">
+                  <div class="flex items-center gap-2">
+                    <CheckCircle2 v-if="newFeedTestResult.valid" class="w-4 h-4 shrink-0 text-emerald-400" />
+                    <AlertTriangle v-else class="w-4 h-4 shrink-0 text-rose-400" />
+                    <span class="font-bold">{{ newFeedTestResult.message }}</span>
+                  </div>
                 </div>
-                <p class="text-xs text-slate-400 leading-relaxed">
-                  Menarik berita tepat pada jam-jam pergantian dinas atau sebelum briefing pimpinan (WITA/WIB).
-                </p>
+              </div>
 
-                <div v-if="form.sync_mode === 'scheduled_times'" class="space-y-3 pt-2">
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <span class="text-xs font-bold text-slate-300">Preset Jam Dinas:</span>
+              <!-- Action Buttons -->
+              <div class="pt-3 border-t border-slate-800 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  @click="showAddModal = false"
+                  class="px-4 py-2 rounded-xl text-xs font-bold text-slate-300 hover:bg-slate-800 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  :disabled="newFeedForm.processing || !newFeedForm.name || !newFeedForm.url"
+                  class="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition shadow-lg shadow-amber-400/20 disabled:opacity-50 cursor-pointer"
+                >
+                  <Save class="w-4 h-4" />
+                  <span>{{ newFeedForm.processing ? 'Menyimpan...' : 'Simpan Sumber Feed' }}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================================== -->
+      <!-- TAB 2: OTOMASI PENJADWALAN & KESTABILAN SERVER                -->
+      <!-- ============================================================== -->
+      <div v-if="activeSubTab === 'scheduler'" class="space-y-6">
+        <form @submit.prevent="saveSettings" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Left: Scheduler Settings (2 cols) -->
+          <div class="lg:col-span-2 space-y-6">
+            <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-6">
+              <div class="border-b border-slate-800 pb-4 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <Clock class="w-5 h-5 text-amber-400" />
+                  <h3 class="text-base font-bold text-white">Mode &amp; Penjadwalan Sinkronisasi Otomatis</h3>
+                </div>
+                <div class="flex items-center gap-2">
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" v-model="form.is_active" class="sr-only peer">
+                    <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                    <span class="ml-2 text-xs font-bold text-slate-300">
+                      {{ form.is_active ? 'Otomasi Aktif' : 'Otomasi Nonaktif' }}
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Radio 1: Manual Only -->
+              <label
+                class="flex items-start gap-3 p-4 rounded-2xl border transition cursor-pointer select-none"
+                :class="form.sync_mode === 'manual'
+                  ? 'bg-amber-500/10 border-amber-400/80 shadow-sm'
+                  : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'"
+              >
+                <input
+                  type="radio"
+                  value="manual"
+                  v-model="form.sync_mode"
+                  class="mt-1 text-amber-400 focus:ring-amber-400"
+                />
+                <div class="space-y-1">
+                  <div class="text-sm font-bold text-white flex items-center gap-2">
+                    <span>1. Mode Manual Murni (Sesuai Kebutuhan)</span>
+                    <span v-if="form.sync_mode === 'manual'" class="px-2 py-0.5 rounded text-[10px] bg-amber-400 text-slate-950 font-black">Dipilih</span>
+                  </div>
+                  <p class="text-xs text-slate-400 leading-relaxed">
+                    Sistem tidak akan menarik berita secara otomatis. Berita hanya diperbarui ketika operator mengklik tombol <em>"Sinkron Berita"</em> di halaman Monitoring Media Online. Sangat hemat bandwidth dan CPU.
+                  </p>
+                </div>
+              </label>
+
+              <!-- Radio 2: Interval Mode -->
+              <label
+                class="flex items-start gap-3 p-4 rounded-2xl border transition cursor-pointer select-none"
+                :class="form.sync_mode === 'interval'
+                  ? 'bg-amber-500/10 border-amber-400/80 shadow-sm'
+                  : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'"
+              >
+                <input
+                  type="radio"
+                  value="interval"
+                  v-model="form.sync_mode"
+                  class="mt-1 text-amber-400 focus:ring-amber-400"
+                />
+                <div class="space-y-3 flex-1">
+                  <div class="flex items-center justify-between flex-wrap gap-2">
+                    <div class="text-sm font-bold text-white flex items-center gap-2">
+                      <span>2. Mode Interval Berkala (Rekomendasi Operasional)</span>
+                      <span v-if="form.sync_mode === 'interval'" class="px-2 py-0.5 rounded text-[10px] bg-amber-400 text-slate-950 font-black">Dipilih</span>
+                    </div>
+                  </div>
+                  <p class="text-xs text-slate-400 leading-relaxed">
+                    Berita ditarik secara teratur setiap rentang waktu tertentu melalui Laravel Task Scheduler di latar belakang.
+                  </p>
+
+                  <!-- Interval Options Pills -->
+                  <div v-if="form.sync_mode === 'interval'" class="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2">
                     <button
-                      v-for="timeStr in standardPresetTimes"
-                      :key="timeStr"
+                      v-for="opt in [
+                        { label: 'Tiap 1 Jam', val: 60, desc: 'Breaking' },
+                        { label: 'Tiap 3 Jam', val: 180, desc: 'Ideal' },
+                        { label: 'Tiap 6 Jam', val: 360, desc: 'Shift' },
+                        { label: 'Tiap 12 Jam', val: 720, desc: 'Santai' },
+                        { label: 'Tiap 24 Jam', val: 1440, desc: 'Arsip' },
+                      ]"
+                      :key="opt.val"
                       type="button"
-                      @click="togglePresetTime(timeStr)"
-                      class="px-3 py-1.5 rounded-lg text-xs font-bold border transition cursor-pointer flex items-center gap-1.5"
-                      :class="form.scheduled_times.includes(timeStr)
-                        ? 'bg-amber-400 text-slate-950 border-amber-400 font-black'
-                        : 'bg-slate-900 text-slate-300 border-slate-700 hover:text-white'"
+                      @click="form.interval_minutes = opt.val"
+                      class="p-2.5 rounded-xl border text-center transition cursor-pointer"
+                      :class="form.interval_minutes === opt.val
+                        ? 'bg-amber-400 text-slate-950 border-amber-400 font-black shadow-md'
+                        : 'bg-slate-900 text-slate-300 border-slate-700 hover:bg-slate-800'"
                     >
-                      <Check v-if="form.scheduled_times.includes(timeStr)" class="w-3.5 h-3.5" />
-                      <span>Pukul {{ timeStr }}</span>
+                      <div class="text-xs font-bold">{{ opt.label }}</div>
+                      <div class="text-[10px] opacity-80 font-medium">{{ opt.desc }}</div>
                     </button>
                   </div>
+                </div>
+              </label>
 
-                  <!-- Custom Selected Times Badges -->
-                  <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-                    <span class="text-[11px] font-bold text-slate-400">Jadwal Jam Aktif:</span>
+              <!-- Radio 3: Scheduled Times Mode (Jam Dinas Spesifik Polri) -->
+              <label
+                class="flex items-start gap-3 p-4 rounded-2xl border transition cursor-pointer select-none"
+                :class="form.sync_mode === 'scheduled_times'
+                  ? 'bg-amber-500/10 border-amber-400/80 shadow-sm'
+                  : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'"
+              >
+                <input
+                  type="radio"
+                  value="scheduled_times"
+                  v-model="form.sync_mode"
+                  class="mt-1 text-amber-400 focus:ring-amber-400"
+                />
+                <div class="space-y-3 flex-1">
+                  <div class="text-sm font-bold text-white flex items-center gap-2">
+                    <span>3. Mode Jam Dinas Spesifik (Sesuai Jam Kerja Polri)</span>
+                    <span v-if="form.sync_mode === 'scheduled_times'" class="px-2 py-0.5 rounded text-[10px] bg-amber-400 text-slate-950 font-black">Dipilih</span>
+                  </div>
+                  <p class="text-xs text-slate-400 leading-relaxed">
+                    Menarik berita tepat pada jam-jam pergantian dinas atau sebelum briefing pimpinan (WITA/WIB).
+                  </p>
+
+                  <div v-if="form.sync_mode === 'scheduled_times'" class="space-y-3 pt-2">
                     <div class="flex items-center gap-2 flex-wrap">
-                      <span
-                        v-for="t in form.scheduled_times"
-                        :key="t"
-                        class="px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-[#0b1426] border border-amber-400/40 text-amber-400 flex items-center gap-1.5 shadow-sm"
+                      <span class="text-xs font-bold text-slate-300">Preset Jam Dinas:</span>
+                      <button
+                        v-for="timeStr in standardPresetTimes"
+                        :key="timeStr"
+                        type="button"
+                        @click="togglePresetTime(timeStr)"
+                        class="px-3 py-1.5 rounded-lg text-xs font-bold border transition cursor-pointer flex items-center gap-1.5"
+                        :class="form.scheduled_times.includes(timeStr)
+                          ? 'bg-amber-400 text-slate-950 border-amber-400 font-black'
+                          : 'bg-slate-900 text-slate-300 border-slate-700 hover:text-white'"
                       >
-                        <Clock class="w-3 h-3 text-amber-400" />
-                        <span>{{ t }}</span>
-                        <button
-                          type="button"
-                          @click.stop="removeTime(t)"
-                          class="hover:text-rose-400 ml-1"
-                        >
-                          &times;
-                        </button>
-                      </span>
+                        <Check v-if="form.scheduled_times.includes(timeStr)" class="w-3.5 h-3.5" />
+                        <span>Pukul {{ timeStr }}</span>
+                      </button>
+                    </div>
 
-                      <!-- Add Custom Time Input -->
-                      <div class="flex items-center gap-1 ml-auto">
-                        <input
-                          type="time"
-                          v-model="newCustomTime"
-                          class="px-2 py-1 rounded-md text-xs bg-slate-800 border border-slate-700 text-white focus:outline-none"
-                        />
-                        <button
-                          type="button"
-                          @click="addCustomTime"
-                          class="px-2.5 py-1 rounded-md bg-amber-400 text-slate-950 font-black text-xs hover:bg-amber-300 cursor-pointer"
+                    <!-- Custom Selected Times Badges -->
+                    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+                      <span class="text-[11px] font-bold text-slate-400">Jadwal Jam Aktif:</span>
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <span
+                          v-for="t in form.scheduled_times"
+                          :key="t"
+                          class="px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-[#0b1426] border border-amber-400/40 text-amber-400 flex items-center gap-1.5 shadow-sm"
                         >
-                          + Tambah
-                        </button>
+                          <Clock class="w-3 h-3 text-amber-400" />
+                          <span>{{ t }}</span>
+                          <button
+                            type="button"
+                            @click.stop="removeTime(t)"
+                            class="hover:text-rose-400 ml-1"
+                          >
+                            &times;
+                          </button>
+                        </span>
+
+                        <!-- Add Custom Time Input -->
+                        <div class="flex items-center gap-1 ml-auto">
+                          <input
+                            type="time"
+                            v-model="newCustomTime"
+                            class="px-2 py-1 rounded-md text-xs bg-slate-800 border border-slate-700 text-white focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            @click="addCustomTime"
+                            class="px-2.5 py-1 rounded-md bg-amber-400 text-slate-950 font-black text-xs hover:bg-amber-300 cursor-pointer"
+                          >
+                            + Tambah
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Right: Stability & Resource Guards (1 col) -->
+          <div class="space-y-6">
+            <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-5">
+              <div class="border-b border-slate-800 pb-3 flex items-center gap-2">
+                <Shield class="w-5 h-5 text-emerald-400" />
+                <h3 class="text-base font-bold text-white">Keamanan &amp; Kestabilan Server</h3>
               </div>
-            </label>
-          </div>
-        </div>
 
-        <!-- Right: Stability & Resource Guards (1 col) -->
-        <div class="space-y-6">
-          <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-5">
-            <div class="border-b border-slate-800 pb-3 flex items-center gap-2">
-              <Shield class="w-5 h-5 text-emerald-400" />
-              <h3 class="text-base font-bold text-white">Keamanan &amp; Kestabilan Server</h3>
-            </div>
-
-            <!-- Field 1: Max Retained Articles Per Polda (Auto-Capping) -->
-            <div class="space-y-1.5">
-              <label class="text-xs font-bold text-slate-200 flex items-center justify-between">
-                <span>Batas Maksimum Berita / Polda</span>
-                <span class="text-amber-400 font-mono font-extrabold">{{ form.max_retained_articles_per_polda }} Berita</span>
-              </label>
-              <input
-                type="range"
-                v-model.number="form.max_retained_articles_per_polda"
-                min="300"
-                max="3000"
-                step="100"
-                class="w-full accent-amber-400 cursor-pointer"
-              />
-              <p class="text-[10px] text-slate-400 leading-tight">
-                Mencegah database penuh. Berita unbookmarked paling usang akan dipangkas otomatis jika melampaui angka ini.
-              </p>
-            </div>
-
-            <!-- Field 2: Max Articles Per Feed -->
-            <div class="space-y-1.5">
-              <label class="text-xs font-bold text-slate-200 flex items-center justify-between">
-                <span>Maks. Berita per Sumber Feed</span>
-                <span class="text-amber-400 font-mono font-extrabold">{{ form.max_articles_per_feed }} Item</span>
-              </label>
-              <input
-                type="number"
-                v-model.number="form.max_articles_per_feed"
-                min="5"
-                max="100"
-                class="w-full px-3 py-2 rounded-xl text-xs bg-slate-900 border border-slate-700 text-white font-bold"
-              />
-            </div>
-
-            <!-- Field 3: Auto-Prune Age (Days) -->
-            <div class="space-y-1.5">
-              <label class="text-xs font-bold text-slate-200 flex items-center justify-between">
-                <span>Masa Simpan Berita Lama</span>
-                <span class="text-amber-400 font-mono font-extrabold">{{ form.auto_prune_days }} Hari</span>
-              </label>
-              <input
-                type="number"
-                v-model.number="form.auto_prune_days"
-                min="7"
-                max="365"
-                class="w-full px-3 py-2 rounded-xl text-xs bg-slate-900 border border-slate-700 text-white font-bold"
-              />
-            </div>
-
-            <!-- Field 4: Timeout Per Feed -->
-            <div class="space-y-1.5">
-              <label class="text-xs font-bold text-slate-200 flex items-center justify-between">
-                <span>Batas Waktu Timeout Request</span>
-                <span class="text-amber-400 font-mono font-extrabold">{{ form.timeout_seconds }} Detik</span>
-              </label>
-              <input
-                type="number"
-                v-model.number="form.timeout_seconds"
-                min="3"
-                max="30"
-                class="w-full px-3 py-2 rounded-xl text-xs bg-slate-900 border border-slate-700 text-white font-bold"
-              />
-              <p class="text-[10px] text-slate-400 leading-tight">
-                Jika portal media mengalami gangguan/down, proses akan di-skip setelah batas detik ini tanpa menghambat portal lain.
-              </p>
-            </div>
-
-            <!-- Multi-Polda Global Checkbox -->
-            <div class="pt-3 border-t border-slate-800">
-              <label class="flex items-start gap-2 cursor-pointer select-none">
+              <!-- Field 1: Max Retained Articles Per Polda (Auto-Capping) -->
+              <div class="space-y-1.5">
+                <label class="text-xs font-bold text-slate-200 flex items-center justify-between">
+                  <span>Batas Maksimum Berita / Polda</span>
+                  <span class="text-amber-400 font-mono font-extrabold">{{ form.max_retained_articles_per_polda }} Berita</span>
+                </label>
                 <input
-                  type="checkbox"
-                  v-model="form.apply_to_all_poldas"
-                  class="mt-1 rounded text-amber-400 focus:ring-amber-400"
+                  type="range"
+                  v-model.number="form.max_retained_articles_per_polda"
+                  min="300"
+                  max="3000"
+                  step="100"
+                  class="w-full accent-amber-400 cursor-pointer"
                 />
-                <span class="text-xs text-slate-300 font-semibold leading-snug">
-                  Terapkan konfigurasi kestabilan ini ke <strong>seluruh jajaran Polda</strong> (Nasional).
-                </span>
-              </label>
-            </div>
+                <p class="text-[10px] text-slate-400 leading-tight">
+                  Mencegah database penuh. Berita unbookmarked paling usang akan dipangkas otomatis jika melampaui batas ini.
+                </p>
+              </div>
 
-            <!-- Save Button -->
-            <button
-              type="submit"
-              :disabled="form.processing"
-              class="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition shadow-lg shadow-amber-400/20 cursor-pointer disabled:opacity-50 select-none"
-            >
-              <Save class="w-4 h-4" />
-              <span>{{ form.processing ? 'Menyimpan Konfigurasi...' : 'Simpan Pengaturan Otomasi' }}</span>
-            </button>
-          </div>
-        </div>
-      </form>
+              <!-- Field 2: Max Articles Per Feed -->
+              <div class="space-y-1.5">
+                <label class="text-xs font-bold text-slate-200 flex items-center justify-between">
+                  <span>Maks. Berita per Sumber Feed</span>
+                  <span class="text-amber-400 font-mono font-extrabold">{{ form.max_articles_per_feed }} Item</span>
+                </label>
+                <input
+                  type="number"
+                  v-model.number="form.max_articles_per_feed"
+                  min="5"
+                  max="100"
+                  class="w-full px-3 py-2 rounded-xl text-xs bg-slate-900 border border-slate-700 text-white font-bold"
+                />
+              </div>
 
-      <!-- Section: Telemetry & Activity Audit Logs -->
-      <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
-        <div class="flex items-center justify-between flex-wrap gap-2 border-b border-slate-800 pb-3">
-          <div class="flex items-center gap-2">
-            <History class="w-5 h-5 text-amber-400" />
-            <h3 class="text-base font-bold text-white">Rekam Jejak Telemetri &amp; Log Sinkronisasi Terkini</h3>
-          </div>
-          <span class="text-xs text-slate-400 font-mono">
-            Memori PHP: {{ telemetry.memory_limit }} &bull; Max Execution: {{ telemetry.max_execution_time }}s
-          </span>
-        </div>
+              <!-- Field 3: Auto-Prune Age (Days) -->
+              <div class="space-y-1.5">
+                <label class="text-xs font-bold text-slate-200 flex items-center justify-between">
+                  <span>Masa Simpan Berita Lama</span>
+                  <span class="text-amber-400 font-mono font-extrabold">{{ form.auto_prune_days }} Hari</span>
+                </label>
+                <input
+                  type="number"
+                  v-model.number="form.auto_prune_days"
+                  min="7"
+                  max="365"
+                  class="w-full px-3 py-2 rounded-xl text-xs bg-slate-900 border border-slate-700 text-white font-bold"
+                />
+              </div>
 
-        <div v-if="recentLogs.length > 0" class="overflow-x-auto">
-          <table class="w-full text-left text-xs">
-            <thead class="bg-slate-900/80 text-slate-400 text-[11px] font-black uppercase tracking-wider border-b border-slate-800">
-              <tr>
-                <th class="py-3 px-4">Waktu Eksekusi</th>
-                <th class="py-3 px-4">Cakupan Wilayah</th>
-                <th class="py-3 px-4">Tipe Pemicu</th>
-                <th class="py-3 px-4">Status</th>
-                <th class="py-3 px-4 text-center">Feed Diproses</th>
-                <th class="py-3 px-4 text-center">Berita Disimpan</th>
-                <th class="py-3 px-4 text-center">Berita Dipangkas</th>
-                <th class="py-3 px-4 text-right">Durasi &amp; RAM</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-800/60 font-medium">
-              <tr
-                v-for="log in recentLogs"
-                :key="log.id"
-                class="hover:bg-slate-900/40 transition"
+              <!-- Field 4: Timeout Per Feed -->
+              <div class="space-y-1.5">
+                <label class="text-xs font-bold text-slate-200 flex items-center justify-between">
+                  <span>Batas Waktu Timeout Request</span>
+                  <span class="text-amber-400 font-mono font-extrabold">{{ form.timeout_seconds }} Detik</span>
+                </label>
+                <input
+                  type="number"
+                  v-model.number="form.timeout_seconds"
+                  min="3"
+                  max="30"
+                  class="w-full px-3 py-2 rounded-xl text-xs bg-slate-900 border border-slate-700 text-white font-bold"
+                />
+                <p class="text-[10px] text-slate-400 leading-tight">
+                  Jika portal media mengalami gangguan/down, proses akan di-skip setelah batas detik ini tanpa menghambat portal lain.
+                </p>
+              </div>
+
+              <!-- Multi-Polda Global Checkbox -->
+              <div class="pt-3 border-t border-slate-800">
+                <label class="flex items-start gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    v-model="form.apply_to_all_poldas"
+                    class="mt-1 rounded text-amber-400 focus:ring-amber-400"
+                  />
+                  <span class="text-xs text-slate-300 font-semibold leading-snug">
+                    Terapkan konfigurasi kestabilan ini ke <strong>seluruh jajaran Polda</strong> (Nasional).
+                  </span>
+                </label>
+              </div>
+
+              <!-- Save Button -->
+              <button
+                type="submit"
+                :disabled="form.processing"
+                class="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition shadow-lg shadow-amber-400/20 cursor-pointer disabled:opacity-50 select-none"
               >
-                <td class="py-3 px-4 font-mono text-slate-300">
-                  <div>{{ log.created_at }}</div>
-                  <div class="text-[10px] text-slate-300">{{ log.time_ago }}</div>
-                </td>
-                <td class="py-3 px-4 text-white font-bold">
-                  {{ log.polda_name }}
-                </td>
-                <td class="py-3 px-4">
-                  <span
-                    class="px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono"
-                    :class="log.sync_type === 'automatic' ? 'bg-sky-500/20 text-sky-300' : 'bg-purple-500/20 text-purple-300'"
-                  >
-                    {{ log.sync_type }}
-                  </span>
-                </td>
-                <td class="py-3 px-4">
-                  <span
-                    class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase inline-flex items-center gap-1"
-                    :class="log.status === 'success'
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                      : (log.status === 'skipped_locked' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30')"
-                  >
-                    <CheckCircle2 v-if="log.status === 'success'" class="w-3 h-3 text-emerald-400" />
-                    <AlertTriangle v-else class="w-3 h-3 text-amber-400" />
-                    <span>{{ log.status }}</span>
-                  </span>
-                </td>
-                <td class="py-3 px-4 text-center font-bold text-slate-300">
-                  {{ log.feeds_processed }}
-                </td>
-                <td class="py-3 px-4 text-center font-black text-amber-400">
-                  +{{ log.articles_stored }}
-                </td>
-                <td class="py-3 px-4 text-center font-bold text-rose-400">
-                  -{{ log.articles_pruned }}
-                </td>
-                <td class="py-3 px-4 text-right font-mono">
-                  <div class="text-white font-bold">{{ log.duration_ms }} ms</div>
-                  <div class="text-[10px] text-slate-300">{{ log.memory_usage_mb }} MB</div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                <Save class="w-4 h-4" />
+                <span>{{ form.processing ? 'Menyimpan Konfigurasi...' : 'Simpan Pengaturan Otomasi' }}</span>
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
 
-        <div v-else class="p-8 text-center text-slate-300 text-xs">
-          Belum ada riwayat aktivitas sinkronisasi. Klik tombol <strong>"Uji Sinkron Sekarang"</strong> di atas untuk menjalankan uji coba pertama.
+      <!-- ============================================================== -->
+      <!-- TAB 3: LOG & TELEMETRI SINKRONISASI                           -->
+      <!-- ============================================================== -->
+      <div v-if="activeSubTab === 'logs'" class="space-y-4">
+        <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
+          <div class="flex items-center justify-between flex-wrap gap-2 border-b border-slate-800 pb-3">
+            <div class="flex items-center gap-2">
+              <History class="w-5 h-5 text-amber-400" />
+              <h3 class="text-base font-bold text-white">Rekam Jejak Telemetri &amp; Log Sinkronisasi Terkini</h3>
+            </div>
+            <span class="text-xs text-slate-400 font-mono">
+              Memori PHP: {{ telemetry.memory_limit }} &bull; Max Execution: {{ telemetry.max_execution_time }}s
+            </span>
+          </div>
+
+          <div v-if="recentLogs.length > 0" class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-900/80 text-slate-400 text-[11px] font-black uppercase tracking-wider border-b border-slate-800">
+                <tr>
+                  <th class="py-3 px-4">Waktu Eksekusi</th>
+                  <th class="py-3 px-4">Cakupan Wilayah</th>
+                  <th class="py-3 px-4">Tipe Pemicu</th>
+                  <th class="py-3 px-4">Status</th>
+                  <th class="py-3 px-4 text-center">Feed Diproses</th>
+                  <th class="py-3 px-4 text-center">Berita Disimpan</th>
+                  <th class="py-3 px-4 text-center">Berita Dipangkas</th>
+                  <th class="py-3 px-4 text-right">Durasi &amp; RAM</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/60 font-medium">
+                <tr
+                  v-for="log in recentLogs"
+                  :key="log.id"
+                  class="hover:bg-slate-900/40 transition"
+                >
+                  <td class="py-3 px-4 font-mono text-slate-300">
+                    <div>{{ log.created_at }}</div>
+                    <div class="text-[10px] text-slate-300">{{ log.time_ago }}</div>
+                  </td>
+                  <td class="py-3 px-4 text-white font-bold">
+                    {{ log.polda_name }}
+                  </td>
+                  <td class="py-3 px-4">
+                    <span
+                      class="px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono"
+                      :class="log.sync_type === 'automatic' ? 'bg-sky-500/20 text-sky-300' : 'bg-purple-500/20 text-purple-300'"
+                    >
+                      {{ log.sync_type }}
+                    </span>
+                  </td>
+                  <td class="py-3 px-4">
+                    <span
+                      class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase inline-flex items-center gap-1"
+                      :class="log.status === 'success'
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                        : (log.status === 'skipped_locked' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30')"
+                    >
+                      <CheckCircle2 v-if="log.status === 'success'" class="w-3 h-3 text-emerald-400" />
+                      <AlertTriangle v-else class="w-3 h-3 text-amber-400" />
+                      <span>{{ log.status }}</span>
+                    </span>
+                  </td>
+                  <td class="py-3 px-4 text-center font-bold text-slate-300">
+                    {{ log.feeds_processed }}
+                  </td>
+                  <td class="py-3 px-4 text-center font-black text-amber-400">
+                    +{{ log.articles_stored }}
+                  </td>
+                  <td class="py-3 px-4 text-center font-bold text-rose-400">
+                    -{{ log.articles_pruned }}
+                  </td>
+                  <td class="py-3 px-4 text-right font-mono">
+                    <div class="text-white font-bold">{{ log.duration_ms }} ms</div>
+                    <div class="text-[10px] text-slate-300">{{ log.memory_usage_mb }} MB</div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div v-else class="p-8 text-center text-slate-300 text-xs">
+            Belum ada riwayat aktivitas sinkronisasi. Klik tombol <strong>"Uji Sinkron Sekarang"</strong> di atas untuk menjalankan uji coba pertama.
+          </div>
         </div>
       </div>
     </div>
   </EnterpriseLayout>
 </template>
-

@@ -52,7 +52,48 @@ class RssSyncTest extends TestCase
             ->has('setting')
             ->has('telemetry')
             ->has('recentLogs')
+            ->has('feeds')
+            ->has('feedCategories')
+            ->has('feedsTelemetry')
         );
+    }
+
+    public function test_admin_can_store_toggle_and_delete_rss_feed()
+    {
+        // 1. Store feed
+        $storeResponse = $this->actingAs($this->user)->post('/maintenance/rss-sync/feeds', [
+            'polda_id' => $this->polda->id,
+            'name'     => 'Portal Uji Sulbar',
+            'url'      => 'https://ujisulbar.polri.go.id/rss.xml',
+            'category' => 'Regional Sulselbar',
+        ]);
+
+        $storeResponse->assertRedirect();
+        $storeResponse->assertSessionHas('success');
+
+        $feed = MediaFeed::where('url', 'https://ujisulbar.polri.go.id/rss.xml')->first();
+        $this->assertNotNull($feed);
+        $this->assertEquals('Portal Uji Sulbar', $feed->name);
+        $this->assertTrue($feed->is_active);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'CREATE_RSS_FEED',
+        ]);
+
+        // 2. Toggle feed
+        $toggleResponse = $this->actingAs($this->user)->post("/maintenance/rss-sync/feeds/{$feed->id}/toggle");
+        $toggleResponse->assertRedirect();
+        $feed->refresh();
+        $this->assertFalse($feed->is_active);
+
+        // 3. Delete feed
+        $deleteResponse = $this->actingAs($this->user)->delete("/maintenance/rss-sync/feeds/{$feed->id}");
+        $deleteResponse->assertRedirect();
+        $this->assertDatabaseMissing('media_feeds', ['id' => $feed->id]);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'DELETE_RSS_FEED',
+        ]);
     }
 
     public function test_update_rss_sync_settings_persists_and_writes_audit_log()

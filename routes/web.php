@@ -119,11 +119,17 @@ Route::post('/maintenance/news-cleanup', [\App\Http\Controllers\NewsCleanupContr
 Route::get('/maintenance/rss-sync', [\App\Http\Controllers\RssSyncController::class, 'index'])->name('maintenance.rss-sync');
 Route::post('/maintenance/rss-sync', [\App\Http\Controllers\RssSyncController::class, 'update'])->name('maintenance.rss-sync.update');
 Route::post('/maintenance/rss-sync/trigger', [\App\Http\Controllers\RssSyncController::class, 'triggerSync'])->name('maintenance.rss-sync.trigger');
+Route::post('/maintenance/rss-sync/feeds', [\App\Http\Controllers\RssSyncController::class, 'storeFeed'])->name('maintenance.rss-sync.feeds.store');
+Route::post('/maintenance/rss-sync/feeds/{id}/toggle', [\App\Http\Controllers\RssSyncController::class, 'toggleFeed'])->name('maintenance.rss-sync.feeds.toggle');
+Route::delete('/maintenance/rss-sync/feeds/{id}', [\App\Http\Controllers\RssSyncController::class, 'deleteFeed'])->name('maintenance.rss-sync.feeds.delete');
+Route::post('/maintenance/rss-sync/feeds/test', [\App\Http\Controllers\RssSyncController::class, 'testFeed'])->name('maintenance.rss-sync.feeds.test');
 
 // Mesin Intelijen AI & LLM Administration Center
 Route::get('/settings/ai', [\App\Http\Controllers\AiSettingController::class, 'index'])->name('settings.ai');
 Route::post('/settings/ai', [\App\Http\Controllers\AiSettingController::class, 'update'])->name('settings.ai.update');
 Route::post('/settings/ai/test', [\App\Http\Controllers\AiSettingController::class, 'testConnection'])->name('settings.ai.test');
+Route::post('/settings/ai/apify', [\App\Http\Controllers\AiSettingController::class, 'updateApify'])->name('settings.ai.apify.update');
+Route::post('/settings/ai/test-apify', [\App\Http\Controllers\AiSettingController::class, 'testApify'])->name('settings.ai.apify.test');
 
 // Manajemen Menu & Navigasi Dinamis (Database-Driven Menu Architecture)
 Route::get('/settings/menus', [MenuManagementController::class, 'index'])->name('settings.menus');

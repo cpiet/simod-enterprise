@@ -7,6 +7,8 @@ use App\Models\AuditLog;
 use App\Models\MediaArticle;
 use App\Models\MediaIntelligenceReport;
 use App\Models\Polda;
+use App\Models\SocialSetting;
+use App\Services\ApifySyncService;
 use App\Services\GeminiService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -52,6 +54,27 @@ class AiSettingController extends Controller
             ];
         }
 
+        // Apify Social Media Scraper Settings
+        $socialSetting = SocialSetting::where('polda_id', $selectedPolda->id)->first()
+            ?: SocialSetting::whereNull('polda_id')->first()
+            ?: new SocialSetting();
+
+        $apifyRaw = $socialSetting->apify_api_token ?: config('services.apify.token', env('APIFY_API_TOKEN', ''));
+        $apifyService = new ApifySyncService();
+        $apifyTokens = $apifyService->parseTokens($apifyRaw);
+
+        $socialSettingData = [
+            'has_token'         => !empty($apifyTokens),
+            'apify_api_token'   => $apifyRaw,
+            'total_tokens'      => count($apifyTokens),
+            'masked_tokens'     => array_map(fn($t) => $apifyService->maskToken($t), $apifyTokens),
+            'keywords_tracked'  => $socialSetting->keywords_tracked ?: 'Polri, Humas Polri, Polisi Presisi, Dumas Presisi',
+            'accounts_tracked'  => $socialSetting->accounts_tracked ?: '@divisihumaspri, @humaspolri, @polripresisi, @halo_polisi',
+            'sync_frequency'    => $socialSetting->sync_frequency ?: 'every_3_hours',
+            'auto_sync_enabled' => (bool) ($socialSetting->auto_sync_enabled ?? true),
+            'last_synced_at'    => $socialSetting->last_synced_at ? $socialSetting->last_synced_at->diffForHumans() : 'Belum pernah sinkron',
+        ];
+
         // Stats & Telemetry
         $totalReports = MediaIntelligenceReport::where('polda_id', $selectedPolda->id)->count();
         $latestReport = MediaIntelligenceReport::where('polda_id', $selectedPolda->id)->latest()->first();
@@ -85,6 +108,7 @@ class AiSettingController extends Controller
                 'last_status'       => $aiSetting->last_status,
                 'last_error'        => $aiSetting->last_error,
             ],
+            'socialSetting'  => $socialSettingData,
             'globalSetting'  => [
                 'has_api_key'     => !empty($globalSetting?->gemini_api_key),
                 'masked_api_key'  => $geminiService->maskApiKey($globalSetting?->gemini_api_key),
@@ -232,6 +256,74 @@ class AiSettingController extends Controller
                 'is_primary'   => true,
             ]
         ];
+
+        return response()->json($result, $result['success'] ? 200 : 400);
+    }
+
+    /**
+     * Update Apify Scraper configuration & Social Listening parameters (Admin Only).
+     */
+    public function updateApify(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'apify_api_token'     => 'nullable|string',
+            'keywords_tracked'    => 'nullable|string',
+            'accounts_tracked'    => 'nullable|string',
+            'sync_frequency'      => 'nullable|string',
+            'auto_sync_enabled'   => 'nullable|boolean',
+            'apply_to_all_poldas' => 'nullable|boolean',
+        ]);
+
+        [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
+        $selectedPolda = $selectedPolda ?? Polda::first();
+
+        $updateData = [
+            'apify_api_token'   => $validated['apify_api_token'] ?? '',
+            'keywords_tracked'  => $validated['keywords_tracked'] ?? 'Polri, Humas Polri, Polisi Presisi, Dumas Presisi',
+            'accounts_tracked'  => $validated['accounts_tracked'] ?? '@divisihumaspri, @humaspolri, @polripresisi, @halo_polisi',
+            'sync_frequency'    => $validated['sync_frequency'] ?? 'every_3_hours',
+            'auto_sync_enabled' => (bool) ($validated['auto_sync_enabled'] ?? true),
+        ];
+
+        SocialSetting::updateOrCreate(
+            ['polda_id' => $selectedPolda->id],
+            $updateData
+        );
+
+        if ($request->boolean('apply_to_all_poldas')) {
+            SocialSetting::query()->update($updateData);
+            foreach (Polda::all() as $p) {
+                SocialSetting::updateOrCreate(['polda_id' => $p->id], $updateData);
+            }
+        }
+
+        $apifyService = new ApifySyncService();
+        $tokensCount = count($apifyService->parseTokens($updateData['apify_api_token']));
+
+        AuditLog::create([
+            'user_id'    => auth()->id(),
+            'action'     => 'UPDATE_APIFY_SETTINGS',
+            'ip_address' => $request->ip() ?: '127.0.0.1',
+            'details'    => json_encode([
+                'polda_id'            => $selectedPolda->id,
+                'polda_code'          => $selectedPolda->code,
+                'tokens_count'        => $tokensCount,
+                'sync_frequency'      => $updateData['sync_frequency'],
+                'auto_sync_enabled'   => $updateData['auto_sync_enabled'],
+                'apply_to_all_poldas' => (bool) ($validated['apply_to_all_poldas'] ?? false),
+            ]),
+        ]);
+
+        return back()->with('success', "✓ Konfigurasi Mesin Scraper Apify ({$tokensCount} Akun) & Parameter Patroli Medsos Berhasil Disimpan!");
+    }
+
+    /**
+     * Test connection to Apify Scraper API using single or multi-tokens pool.
+     */
+    public function testApify(Request $request, ApifySyncService $service): JsonResponse
+    {
+        $token = $request->input('apify_api_token');
+        $result = $service->testConnection($token);
 
         return response()->json($result, $result['success'] ? 200 : 400);
     }

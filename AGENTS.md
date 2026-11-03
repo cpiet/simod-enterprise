@@ -158,9 +158,10 @@ Seluruh 29 portal media dikonfigurasi melalui seeder [`SulbarRssFeedsSeeder.php`
 3. **Penyajian Cepat Tanpa Klik Ganda**:
    - Mengisi seketika seluruh tab: **Tab 02** (Executive Briefing), **Tab 03** (Polarisasi Sentimen), **Tab 05** (EWS), **Tab 06** (Counter Narasi & Rekomendasi), dan **Tab 07** (Naskah WhatsApp Siap Kirim).
 4. **Sentralisasi Admin & Kebijakan Hak Akses (/roles)**:
-   - Pengaturan sumber RSS XML dikunci khusus di menu Admin **Keamanan & Pemeliharaan -> Otomasi Sinkron RSS** (`/maintenance/rss-sync`) dan dilindungi izin `media_intelligence_manage`.
+   - Pengaturan sumber RSS XML dipusatkan di menu Admin **Keamanan & Pemeliharaan -> Otomasi Sinkron RSS** (`/maintenance/rss-sync`). Dilengkapi tab khusus **Daftar & Manajemen Sumber Feed RSS** (22 portal nasional / 29 portal daerah) dengan fitur penambahan feed baru, uji validasi XML realtime (latensi & artikel terdeteksi), toggle on/off, dan hapus portal.
    - Tombol manual kuno (*Salin Prompt*, *Lihat Prompt*, *Tempel Ringkasan AI*) serta tombol *Kelola Sumber RSS* telah dibersihkan dari antarmuka operasional radar.
    - Hak akses operasional `media_intelligence_ai` di `/roles` terdefinisi sebagai *Sinkronisasi Berita & Analisis Otomatis AI*.
+   - **Sentralisasi Kredensial Apify**: Pengaturan Personal API Token Apify dipindahkan dari tampilan operator `/social-intelligence` ke panel admin **Keamanan & Pemeliharaan -> Mesin Intelijen AI** (`/settings/ai`) di bawah tab *Mesin Scraper Patroli Siber (Apify Cloud)* dengan dukungan Multi-Token Failover Pool dan proteksi dari akses langsung operator.
 
 ---
 

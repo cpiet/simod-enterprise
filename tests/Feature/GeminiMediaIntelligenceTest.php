@@ -63,7 +63,35 @@ class GeminiMediaIntelligenceTest extends TestCase
             ->has('setting')
             ->has('globalSetting')
             ->has('telemetry')
+            ->has('socialSetting')
         );
+    }
+
+    public function test_admin_can_update_apify_settings_via_ai_controller(): void
+    {
+        $user = User::factory()->create();
+        $divhumas = Polda::where('code', 'DIVHUMAS')->first();
+
+        $response = $this->actingAs($user)->post('/settings/ai/apify?polda=ALL', [
+            'apify_api_token'     => 'apify_token_test_123',
+            'keywords_tracked'    => 'Polri, Kapolri, Humas Presisi',
+            'accounts_tracked'    => '@divisihumaspri, @humaspolri',
+            'sync_frequency'      => 'every_hour',
+            'auto_sync_enabled'   => true,
+            'apply_to_all_poldas' => true,
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseHas('social_settings', [
+            'apify_api_token'  => 'apify_token_test_123',
+            'sync_frequency'   => 'every_hour',
+        ]);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'UPDATE_APIFY_SETTINGS',
+        ]);
     }
 
     public function test_admin_can_update_ai_settings_and_audit_log_persists(): void

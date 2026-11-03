@@ -9,6 +9,7 @@ use App\Models\Polda;
 use App\Models\RssSyncLog;
 use App\Models\RssSyncSetting;
 use App\Services\RssSyncService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -27,19 +28,42 @@ class RssSyncController extends Controller
             $allPoldas = Polda::all();
         }
 
-        $selectedCode = strtoupper((string) $request->query('polda', 'SULBAR'));
-        $selectedPolda = $allPoldas->firstWhere('code', $selectedCode) ?: $allPoldas->first();
+        [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
+        $selectedPolda = $selectedPolda ?? $allPoldas->first();
         $poldaId = $selectedPolda ? $selectedPolda->id : null;
 
         // Ambil konfigurasi (spesifik polda atau global)
         $setting = RssSyncSetting::forPolda($poldaId);
         $globalSetting = RssSyncSetting::forPolda(null);
 
+        // Sumber Feed RSS untuk Polda ini
+        $feeds = MediaFeed::withCount('articles')
+            ->when($poldaId, function ($q) use ($poldaId) {
+                $q->where('polda_id', $poldaId);
+            })
+            ->orderBy('name')
+            ->get()
+            ->map(function ($feed) {
+                return [
+                    'id'             => $feed->id,
+                    'polda_id'       => $feed->polda_id,
+                    'name'           => $feed->name,
+                    'url'            => $feed->url,
+                    'category'       => $feed->category ?: 'Nasional & Umum',
+                    'is_active'      => (bool) $feed->is_active,
+                    'articles_count' => (int) $feed->articles_count,
+                    'created_at'     => $feed->created_at ? $feed->created_at->format('d M Y') : '-',
+                ];
+            });
+
+        $categories = $feeds->pluck('category')->filter()->unique()->values();
+
         // Telemetri Kapasitas & Kestabilan
         $poldaArticleCount = $poldaId ? MediaArticle::where('polda_id', $poldaId)->count() : 0;
         $poldaBookmarkedCount = $poldaId ? MediaArticle::where('polda_id', $poldaId)->where('is_bookmarked', true)->count() : 0;
         $totalArticleCount = MediaArticle::count();
-        $totalFeedCount = $poldaId ? MediaFeed::where('polda_id', $poldaId)->where('is_active', true)->count() : MediaFeed::where('is_active', true)->count();
+        $totalFeedCount = $feeds->count();
+        $activeFeedsCount = $feeds->where('is_active', true)->count();
         $isLocked = Cache::has('rss_sync_engine_lock') || ($poldaId && Cache::has('rss_sync_polda_lock_' . $poldaId));
 
         // 15 Log Telemetri Terakhir
@@ -93,12 +117,19 @@ class RssSyncController extends Controller
                 'last_sync_at'     => $globalSetting->last_sync_at ? $globalSetting->last_sync_at->format('d M Y, H:i:s') . ' WITA' : '-',
                 'last_sync_status' => $globalSetting->last_sync_status ?: 'idle',
             ],
+            'feeds'          => $feeds,
+            'feedCategories' => $categories,
+            'feedsTelemetry' => [
+                'total_feeds'    => $totalFeedCount,
+                'active_feeds'   => $activeFeedsCount,
+                'inactive_feeds' => $totalFeedCount - $activeFeedsCount,
+            ],
             'telemetry'      => [
                 'is_locked'             => $isLocked,
                 'polda_articles'        => $poldaArticleCount,
                 'polda_bookmarked'      => $poldaBookmarkedCount,
                 'total_articles'        => $totalArticleCount,
-                'active_feeds'          => $totalFeedCount,
+                'active_feeds'          => $activeFeedsCount,
                 'memory_limit'          => ini_get('memory_limit') ?: '512M',
                 'max_execution_time'    => (int) ini_get('max_execution_time'),
             ],
@@ -187,5 +218,130 @@ class RssSyncController extends Controller
         }
 
         return back()->with('success', "Uji sinkron {$polda->name} selesai: {$res['articles_saved']} berita disimpan, {$res['pruned_count']} dipangkas ({$res['duration_ms']}ms).");
+    }
+
+    /**
+     * Tambah Sumber RSS Baru untuk Polda Aktif.
+     */
+    public function storeFeed(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'polda_id' => 'nullable|exists:poldas,id',
+            'name'     => 'required|string|max:100',
+            'url'      => 'required|url|max:255',
+            'category' => 'nullable|string|max:50',
+        ]);
+
+        [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
+        $targetPoldaId = $validated['polda_id'] ?? $poldaId;
+
+        $feed = MediaFeed::updateOrCreate(
+            ['polda_id' => $targetPoldaId, 'url' => $validated['url']],
+            [
+                'name'      => $validated['name'],
+                'category'  => $validated['category'] ?: 'Nasional & Umum',
+                'is_active' => true,
+            ]
+        );
+
+        AuditLog::create([
+            'user_id'    => auth()->id(),
+            'action'     => 'CREATE_RSS_FEED',
+            'ip_address' => $request->ip() ?: '127.0.0.1',
+            'details'    => "Sumber RSS baru ditambahkan: {$feed->name} ({$feed->url}) untuk Polda ID {$targetPoldaId}.",
+        ]);
+
+        return back()->with('success', "✓ Sumber RSS [{$feed->name}] berhasil ditambahkan!");
+    }
+
+    /**
+     * Toggle status aktif / nonaktif Sumber RSS.
+     */
+    public function toggleFeed(Request $request, $id): RedirectResponse
+    {
+        $feed = MediaFeed::findOrFail($id);
+        $this->authorizeTenantRecord($request, $feed);
+
+        $feed->is_active = !$feed->is_active;
+        $feed->save();
+
+        $status = $feed->is_active ? 'diaktifkan' : 'dinonaktifkan';
+
+        AuditLog::create([
+            'user_id'    => auth()->id(),
+            'action'     => 'TOGGLE_RSS_FEED',
+            'ip_address' => $request->ip() ?: '127.0.0.1',
+            'details'    => "Sumber RSS [{$feed->name}] {$status}.",
+        ]);
+
+        return back()->with('success', "✓ Sumber RSS [{$feed->name}] berhasil {$status}.");
+    }
+
+    /**
+     * Hapus Sumber RSS.
+     */
+    public function deleteFeed(Request $request, $id): RedirectResponse
+    {
+        $feed = MediaFeed::findOrFail($id);
+        $this->authorizeTenantRecord($request, $feed);
+        $feedName = $feed->name;
+        $feed->delete();
+
+        AuditLog::create([
+            'user_id'    => auth()->id(),
+            'action'     => 'DELETE_RSS_FEED',
+            'ip_address' => $request->ip() ?: '127.0.0.1',
+            'details'    => "Sumber RSS [{$feedName}] dihapus oleh admin.",
+        ]);
+
+        return back()->with('success', "✓ Sumber RSS [{$feedName}] berhasil dihapus.");
+    }
+
+    /**
+     * Uji kelayakan URL feed RSS secara realtime (latensi, HTTP status, dan validasi XML).
+     */
+    public function testFeed(Request $request): JsonResponse
+    {
+        $url = $request->input('url');
+        if (!filter_var($url, FILTER_VALIDATE_URL)) {
+            return response()->json(['valid' => false, 'message' => 'Format URL tidak valid.'], 422);
+        }
+
+        $start = microtime(true);
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'SIMOD-Enterprise-Validator/2.0');
+        $body = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        $latency = round((microtime(true) - $start) * 1000);
+
+        if ($httpCode >= 200 && $httpCode < 400 && !empty($body)) {
+            $isXml = str_contains($body, '<rss') || str_contains($body, '<feed') || str_contains($body, '<channel');
+            preg_match_all('/<(item|entry)[\s>]/i', $body, $matches);
+            $itemsCount = count($matches[0] ?? []);
+
+            return response()->json([
+                'valid'       => true,
+                'http_code'   => $httpCode,
+                'latency_ms'  => $latency,
+                'items_count' => $itemsCount,
+                'is_xml'      => $isXml,
+                'message'     => $isXml
+                    ? "✓ URL Feed RSS Aktif & Valid! Terdeteksi {$itemsCount} artikel ({$latency}ms)."
+                    : "Peringatan: URL merespons HTTP {$httpCode} tetapi bukan format RSS/Atom standar.",
+            ]);
+        }
+
+        return response()->json([
+            'valid'      => false,
+            'http_code'  => $httpCode ?: 0,
+            'latency_ms' => $latency,
+            'message'    => "Gagal menghubungi URL feed (HTTP {$httpCode}, {$latency}ms). Pastikan server portal dapat diakses publik.",
+        ], 400);
     }
 }

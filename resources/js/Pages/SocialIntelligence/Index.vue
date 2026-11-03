@@ -2148,56 +2148,46 @@ const getPublicPlatformBadge = (platform) => {
         </div>
 
         <form @submit.prevent="saveSettings" class="space-y-5 text-xs">
-          <!-- Token Apify -->
-          <div>
-            <div class="flex items-center justify-between mb-1.5">
-              <label class="block font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider text-[11px]">
-                APIFY PERSONAL API TOKEN (MULTI-API TOKEN POOL)
-              </label>
-              <button
-                type="button"
-                @click="testConnection"
-                :disabled="isTestingConnection || !settingsForm.apify_api_token"
-                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-bold bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 transition disabled:opacity-40 cursor-pointer"
-              >
-                <RefreshCw :class="['w-3 h-3', isTestingConnection ? 'animate-spin' : '']" />
-                <span>{{ isTestingConnection ? 'Menguji Semua...' : 'Uji Koneksi Token' }}</span>
-              </button>
-            </div>
-            <textarea
-              v-model="settingsForm.apify_api_token"
-              rows="2"
-              placeholder="apify_api_token1&#10;apify_api_token2 (pisahkan koma atau baris baru untuk multi-akun)"
-              class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono placeholder-slate-400 focus:outline-none focus:border-amber-400 leading-relaxed"
-            ></textarea>
-            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-              <strong class="text-amber-500">Multi-API Pool Ready:</strong> Anda bisa memasukkan 1 atau beberapa token akun Apify (pisahkan dengan koma atau baris baru). Sistem akan otomatis merotasi kuota $5/bulan per akun dan beralih otomatis (*auto-failover*) jika salah satu token habis.
-            </p>
-
-            <!-- Status Hasil Uji Koneksi Multi-Akun -->
-            <div v-if="testConnectionResult" class="mt-2.5 p-3.5 rounded-xl border text-xs" :class="testConnectionResult.success ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300' : 'bg-rose-500/10 border-rose-500/30 text-rose-800 dark:text-rose-300'">
-              <div class="flex items-start gap-2.5">
-                <CheckCircle2 v-if="testConnectionResult.success" class="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                <AlertTriangle v-else class="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                <div class="space-y-2 w-full">
-                  <p class="font-bold">{{ testConnectionResult.message }}</p>
-                  
-                  <div v-if="testConnectionResult.accounts && testConnectionResult.accounts.length" class="space-y-1.5 pt-1 border-t border-emerald-500/20 dark:border-emerald-500/30">
-                    <div v-for="(acc, i) in testConnectionResult.accounts" :key="i" class="flex flex-wrap items-center justify-between p-2 rounded-lg bg-white/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 font-mono text-[11px]">
-                      <div>
-                        <span class="font-black mr-2 text-slate-800 dark:text-slate-200">Akun #{{ i + 1 }}:</span>
-                        <span class="text-slate-700 dark:text-slate-300 font-bold">{{ acc.username || acc.token_masked }}</span>
-                        <span v-if="acc.email" class="text-slate-500 dark:text-slate-400 ml-1">({{ acc.email }})</span>
-                      </div>
-                      <div class="flex items-center gap-1.5 mt-1 sm:mt-0">
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold" :class="acc.status === 'connected' ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/20 text-rose-600 dark:text-rose-400'">
-                          {{ acc.status === 'connected' ? (acc.plan || 'Active') : 'Gagal' }}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+          <!-- Banner Pengelolaan Kredensial Apify Terpusat (Admin Governance) -->
+          <div class="p-4 rounded-2xl bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 space-y-3">
+            <div class="flex items-start justify-between gap-3 flex-wrap">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-xl bg-amber-400/10 flex items-center justify-center shrink-0 border border-amber-400/30">
+                  <ShieldCheck class="w-4 h-4 text-amber-500" />
+                </div>
+                <div>
+                  <h3 class="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                    Kredensial API Apify Dikelola Tersentralisasi
+                  </h3>
+                  <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                    Untuk keamanan kredensial dinas dan rotasi kuota, Personal API Token Apify dikelola khusus oleh Administrator pada menu:
+                    <strong class="text-slate-800 dark:text-slate-200"> Keamanan &amp; Pemeliharaan &rarr; Mesin Intelijen AI</strong>.
+                  </p>
                 </div>
               </div>
+
+              <!-- Status Badge -->
+              <span
+                class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 border flex items-center gap-1.5"
+                :class="(settings?.apify_api_token || settingsForm.apify_api_token) ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30'"
+              >
+                <span class="w-1.5 h-1.5 rounded-full" :class="(settings?.apify_api_token || settingsForm.apify_api_token) ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"></span>
+                <span>{{ (settings?.apify_api_token || settingsForm.apify_api_token) ? 'Token Aktif & Terhubung' : 'Token Belum Diatur' }}</span>
+              </span>
+            </div>
+
+            <div class="flex items-center justify-between text-[11px] pt-2 border-t border-slate-200 dark:border-slate-800 flex-wrap gap-2">
+              <span class="text-slate-500 dark:text-slate-400 font-mono">
+                Status Integrasi: <strong class="text-slate-700 dark:text-slate-300">{{ (settings?.apify_api_token || settingsForm.apify_api_token) ? 'Multi-API Failover Pool Siaga' : 'Memerlukan Konfigurasi Admin' }}</strong>
+              </span>
+
+              <Link
+                href="/settings/ai"
+                class="text-amber-600 dark:text-amber-400 font-bold hover:underline inline-flex items-center gap-1"
+              >
+                <span>Kelola Kredensial di Admin</span>
+                <ExternalLink class="w-3 h-3" />
+              </Link>
             </div>
           </div>
 
