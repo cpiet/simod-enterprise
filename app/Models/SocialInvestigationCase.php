@@ -92,3 +92,4 @@ class SocialInvestigationCase extends Model
         ]);
     }
 }
+
