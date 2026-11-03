@@ -12,6 +12,8 @@ import {
   Newspaper,
   CheckCircle2,
   ExternalLink,
+  ArrowRight,
+  Hash,
   Bookmark,
   TrendingUp,
   MapPin,
@@ -171,12 +173,17 @@ const getArticleImage = (article) => {
 };
 
 const handleImageError = (e, article) => {
-  if (article && !brokenImages.value.has(article.id)) {
+  if (!article) return;
+  if (!brokenImages.value.has(article.id)) {
     brokenImages.value.add(article.id);
     const fallback = getArticleImage(article);
-    if (e?.target) {
+    if (e?.target && e.target.src !== fallback) {
       e.target.src = fallback;
+      return;
     }
+  }
+  if (e?.target) {
+    e.target.src = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='450' viewBox='0 0 800 450'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23070d1d'/%3E%3Cstop offset='50%25' stop-color='%230d1b38'/%3E%3Cstop offset='100%25' stop-color='%23081024'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='800' height='450' fill='url(%23g)'/%3E%3Ccircle cx='400' cy='200' r='60' fill='%23f59e0b' fill-opacity='0.15' stroke='%23f59e0b' stroke-width='2' stroke-opacity='0.4'/%3E%3Cpath d='M380 180h40v40h-40z' fill='none' stroke='%23f59e0b' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M370 200h60M400 170v60' stroke='%23f59e0b' stroke-width='2' stroke-opacity='0.6' stroke-linecap='round'/%3E%3Ctext x='400' y='290' font-family='sans-serif' font-size='15' font-weight='bold' fill='%2394a3b8' text-anchor='middle' letter-spacing='2'%3EWARTA INTELIJEN HUMAS POLRI%3C/text%3E%3Ctext x='400' y='315' font-family='sans-serif' font-size='11' fill='%2364748b' text-anchor='middle'%3EDokumentasi Siaran Pers Resmi%3C/text%3E%3C/svg%3E";
   }
 };
 
@@ -433,6 +440,26 @@ const getTopicNewArticlesCount = (topic) => {
   const currentCount = topic.articles_count || 0;
   const analyzedCount = topic.ai_articles_count || 0;
   return Math.max(0, currentCount - analyzedCount);
+};
+
+const getTopicSentiment = (analysis) => {
+  if (!analysis) return { positif: 0, netral: 100, negatif: 0, dominant: 'Netral' };
+  const sa = analysis.sentiment_analysis || analysis.sentiment_breakdown || {};
+  const pos = Number(sa.positif ?? 0);
+  const net = Number(sa.netral ?? 0);
+  const neg = Number(sa.negatif ?? 0);
+  let dominant = sa.dominant_sentiment || analysis.dominant_sentiment;
+  if (!dominant) {
+    if (pos > neg && pos > net) dominant = 'Positif';
+    else if (neg > pos && neg > net) dominant = 'Negatif';
+    else dominant = 'Netral';
+  }
+  return {
+    positif: pos,
+    netral: net,
+    negatif: neg,
+    dominant: String(dominant).charAt(0).toUpperCase() + String(dominant).slice(1)
+  };
 };
 
 const openCachedTopicAi = (topic) => {
@@ -1435,60 +1462,116 @@ const submitIssue = () => {
         <!-- Dossier Detail Bar (Muncul saat Topik Dipilih) -->
         <div
           v-if="currentSelectedTopic"
-          class="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-900/90 to-slate-900 border border-amber-500/40 space-y-3"
+          class="rounded-3xl bg-gradient-to-b from-[#0e172a] via-[#0b1426] to-[#070d1d] border border-amber-500/40 p-5 md:p-6 shadow-2xl space-y-4 relative overflow-hidden"
         >
-          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-            <div class="space-y-1">
-              <div class="flex items-center gap-2 flex-wrap">
-                <span
-                  class="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider"
-                  :class="currentSelectedTopic.priority === 'urgent' ? 'bg-rose-500 text-white' : 'bg-amber-400 text-slate-950'"
-                >
-                  {{ currentSelectedTopic.priority === 'urgent' ? '🚨 SANGAT MENDESAK' : '⭐ PRIORITAS TINGGI' }}
-                </span>
-                <h4 class="text-sm font-black text-white">
-                  {{ currentSelectedTopic.title }}
-                </h4>
-                <span class="text-[10px] text-amber-400 font-mono font-bold">
-                  ({{ currentSelectedTopic.articles_count || 0 }} Berita Terkait)
-                </span>
-              </div>
-              <p v-if="currentSelectedTopic.description" class="text-xs text-slate-300 italic leading-relaxed">
-                "{{ currentSelectedTopic.description }}"
-              </p>
-              <!-- Keywords Tags with Quick Remove 'X' -->
-              <div class="flex items-center gap-1.5 flex-wrap pt-1">
-                <span class="text-[10px] text-slate-400 font-bold">Kata Kunci Pantau:</span>
-                <span
-                  v-for="kw in (currentSelectedTopic.keywords_array || [])"
-                  :key="kw"
-                  class="px-2 py-0.5 rounded-md text-[9px] font-mono bg-slate-800 text-slate-200 border border-slate-700 flex items-center gap-1.5"
-                >
-                  <span>#{{ kw }}</span>
-                  <button
-                    @click.stop="removeKeywordFromTopic(currentSelectedTopic, kw)"
-                    type="button"
-                    class="p-0.5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 rounded transition cursor-pointer"
-                    title="Hapus kata kunci ini dari pantauan"
-                  >
-                    <X class="w-2.5 h-2.5" />
-                  </button>
-                </span>
-              </div>
+          <!-- Background Glow -->
+          <div class="absolute -top-12 -right-12 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <!-- TIER 1: HEADER & UTILITY CONTROLS (Full-Width Responsive Bar) -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80 relative z-10">
+            <!-- Left: Priority Badge + Title + Article Count -->
+            <div class="flex items-center gap-2.5 flex-wrap">
+              <span
+                class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider shadow-sm"
+                :class="currentSelectedTopic.priority === 'urgent' ? 'bg-rose-500 text-white shadow-rose-500/20' : 'bg-amber-400 text-slate-950 shadow-amber-400/20'"
+              >
+                {{ currentSelectedTopic.priority === 'urgent' ? '🚨 SANGAT MENDESAK' : '⭐ PRIORITAS TINGGI' }}
+              </span>
+              <h3 class="text-base md:text-lg font-black text-white tracking-tight">
+                {{ currentSelectedTopic.title }}
+              </h3>
+              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-400/30 shadow-xs">
+                {{ currentSelectedTopic.articles_count || 0 }} Berita Terkait
+              </span>
             </div>
 
-            <!-- Action Buttons for Selected Topic -->
-            <div class="flex items-center gap-2 shrink-0 flex-wrap">
+            <!-- Right: Utility Actions (Edit, Hapus, Tutup) -->
+            <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+              <button
+                @click="openEditTopicModal(currentSelectedTopic)"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 text-xs font-bold transition cursor-pointer select-none"
+                title="Edit Judul & Kata Kunci"
+              >
+                <Edit3 class="w-3.5 h-3.5 text-amber-400" />
+                <span>Edit Kata Kunci</span>
+              </button>
+
+              <button
+                @click="deleteTopic(currentSelectedTopic)"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-rose-950/60 text-slate-300 hover:text-rose-400 border border-slate-700/80 hover:border-rose-500/50 text-xs font-bold transition cursor-pointer select-none"
+                title="Hapus Topik Atensi Ini"
+              >
+                <Trash2 class="w-3.5 h-3.5 text-rose-500" />
+                <span class="hidden sm:inline">Hapus</span>
+              </button>
+
+              <button
+                @click="selectedTopicId = null; currentPage = 1"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold transition cursor-pointer select-none"
+                title="Tutup Filter Topik"
+              >
+                <X class="w-3.5 h-3.5" />
+                <span>Tutup</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- TIER 2: DIRECTIVE QUOTE & MONITORED KEYWORDS TAG CLOUD (Full-Width) -->
+          <div class="space-y-2.5 relative z-10">
+            <!-- Pimpinan Directive Quote -->
+            <div
+              v-if="currentSelectedTopic.description"
+              class="p-3.5 rounded-xl bg-amber-500/5 border-l-4 border-amber-400 text-xs text-amber-100/90 leading-relaxed italic shadow-xs"
+            >
+              "{{ currentSelectedTopic.description }}"
+            </div>
+
+            <!-- Monitored Keywords Cloud -->
+            <div class="flex items-center gap-2 flex-wrap pt-0.5">
+              <span class="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                <Hash class="w-3.5 h-3.5 text-amber-400" />
+                <span>Kata Kunci Pantau:</span>
+              </span>
+              <span
+                v-for="kw in (currentSelectedTopic.keywords_array || [])"
+                :key="kw"
+                class="px-2.5 py-1 rounded-lg text-[10px] font-mono bg-slate-900/90 text-slate-200 border border-slate-700/80 hover:border-amber-400/50 flex items-center gap-1.5 shadow-sm transition"
+              >
+                <span class="text-amber-400/80">#</span>
+                <span class="font-bold">{{ kw }}</span>
+                <button
+                  @click.stop="removeKeywordFromTopic(currentSelectedTopic, kw)"
+                  type="button"
+                  class="p-0.5 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 rounded transition cursor-pointer"
+                  title="Hapus kata kunci ini"
+                >
+                  <X class="w-2.5 h-2.5" />
+                </button>
+              </span>
+              <button
+                @click="openEditTopicModal(currentSelectedTopic)"
+                type="button"
+                class="px-2 py-0.5 text-[10px] text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-1 cursor-pointer font-bold"
+              >
+                <span>+ Tambah Kata Kunci</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- TIER 3: COMMAND TOOLBAR (Balanced AI & Ingestion Actions) -->
+          <div class="p-3 rounded-2xl bg-[#070d19]/80 border border-slate-800/90 flex flex-wrap items-center justify-between gap-3 relative z-10">
+            <!-- Group A: Intelijen AI Actions -->
+            <div class="flex items-center gap-2 flex-wrap">
               <!-- Kasus 1: Sudah ada analisis tersimpan -->
               <template v-if="currentSelectedTopic.ai_analysis">
                 <!-- Tombol Buka Hasil (Instan, 0 Token) -->
                 <button
                   @click="openCachedTopicAi(currentSelectedTopic)"
                   type="button"
-                  class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:brightness-110 text-slate-950 text-xs font-black shadow-md shadow-amber-500/20 transition cursor-pointer select-none"
+                  class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:brightness-110 text-slate-950 text-xs font-black shadow-lg shadow-amber-500/25 transition cursor-pointer select-none"
                   title="Buka hasil analisis intelijen yang tersimpan (instan, 0 kuota token)"
                 >
-                  <Eye class="w-3.5 h-3.5 text-slate-950" />
+                  <Eye class="w-4 h-4 text-slate-950" />
                   <span>👁️ Lihat Hasil Analisis AI</span>
                 </button>
 
@@ -1497,14 +1580,14 @@ const submitIssue = () => {
                   @click="runTopicAiAnalysis(currentSelectedTopic, true)"
                   :disabled="isAnalyzingTopic"
                   type="button"
-                  class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-bold transition cursor-pointer disabled:opacity-50 select-none"
+                  class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700 text-xs font-bold transition cursor-pointer disabled:opacity-50 select-none"
                   :title="getTopicNewArticlesCount(currentSelectedTopic) > 0 ? `Ada ${getTopicNewArticlesCount(currentSelectedTopic)} berita baru sejak analisis terakhir. Klik untuk memperbarui!` : 'Panggil ulang Gemini AI untuk menyerap berita terkini'"
                 >
                   <RotateCw class="w-3.5 h-3.5 text-amber-400" :class="{ 'animate-spin': isAnalyzingTopic && activeAnalyzingTopic?.id === currentSelectedTopic.id }" />
                   <span>{{ (isAnalyzingTopic && activeAnalyzingTopic?.id === currentSelectedTopic.id) ? 'Menganalisis...' : 'Perbarui Analisis' }}</span>
                   <span
                     v-if="getTopicNewArticlesCount(currentSelectedTopic) > 0"
-                    class="px-1.5 py-0.2 rounded-full text-[9px] bg-rose-500 text-white font-mono font-bold animate-pulse"
+                    class="px-2 py-0.5 rounded-full text-[9px] bg-rose-500 text-white font-mono font-bold animate-pulse"
                   >
                     +{{ getTopicNewArticlesCount(currentSelectedTopic) }} Baru
                   </span>
@@ -1517,63 +1600,37 @@ const submitIssue = () => {
                   @click="runTopicAiAnalysis(currentSelectedTopic, false)"
                   :disabled="isAnalyzingTopic"
                   type="button"
-                  class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-md transition cursor-pointer disabled:opacity-50 select-none"
+                  class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-110 text-slate-950 text-xs font-black shadow-lg shadow-amber-500/25 transition cursor-pointer disabled:opacity-50 select-none"
                   title="Jalankan analisis AI khusus untuk seluruh berita dalam kasus ini"
                 >
-                  <Zap class="w-3.5 h-3.5 fill-slate-950" :class="{ 'animate-pulse': isAnalyzingTopic && activeAnalyzingTopic?.id === currentSelectedTopic.id }" />
+                  <Zap class="w-4 h-4 fill-slate-950" :class="{ 'animate-pulse': isAnalyzingTopic && activeAnalyzingTopic?.id === currentSelectedTopic.id }" />
                   <span>{{ (isAnalyzingTopic && activeAnalyzingTopic?.id === currentSelectedTopic.id) ? 'Sedang Menganalisis...' : '⚡ Analisis Kasus Ini' }}</span>
                 </button>
               </template>
+            </div>
 
+            <!-- Group B: Live Crawl Internet & WhatsApp Script -->
+            <div class="flex items-center gap-2 flex-wrap">
               <!-- Live Crawl Internet (Google News) Button -->
               <button
                 @click="openLiveCrawlModal(currentSelectedTopic)"
                 :disabled="isCrawlingLive"
                 type="button"
-                class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition cursor-pointer select-none disabled:opacity-50"
+                class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-cyan-600 to-blue-500 hover:from-blue-500 hover:to-cyan-400 text-white text-xs font-extrabold shadow-md shadow-blue-500/20 transition cursor-pointer select-none disabled:opacity-50"
                 title="Tarik sebaran berita terbaru dari seluruh portal berita online Indonesia via Google News"
               >
                 <Globe class="w-3.5 h-3.5" :class="{ 'animate-spin': isCrawlingLive && crawlingTopic?.id === currentSelectedTopic.id }" />
-                <span>{{ (isCrawlingLive && crawlingTopic?.id === currentSelectedTopic.id) ? 'Menarik...' : '🌐 Tarik Berita Internet' }}</span>
+                <span>{{ (isCrawlingLive && crawlingTopic?.id === currentSelectedTopic.id) ? 'Menarik...' : '🌐 Tarik Berita Internet (Google News)' }}</span>
               </button>
 
               <!-- WhatsApp Report Button -->
               <button
                 @click="copyTopicWaScript(currentSelectedTopic)"
-                class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition cursor-pointer"
+                class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-extrabold shadow-md shadow-emerald-500/20 transition cursor-pointer select-none"
                 title="Salin Naskah WhatsApp Laporan Khusus Pimpinan"
               >
                 <MessageSquare class="w-3.5 h-3.5" />
                 <span>📱 Salin Naskah WA</span>
-              </button>
-
-              <!-- Edit Topic & Keywords -->
-              <button
-                @click="openEditTopicModal(currentSelectedTopic)"
-                class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-bold transition cursor-pointer"
-                title="Edit Judul & Kata Kunci"
-              >
-                <Edit3 class="w-3.5 h-3.5 text-amber-400" />
-                <span>Edit Kata Kunci</span>
-              </button>
-
-              <!-- Delete Topic -->
-              <button
-                @click="deleteTopic(currentSelectedTopic)"
-                class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-400 border border-slate-700 hover:border-rose-500/50 text-xs font-bold transition cursor-pointer"
-                title="Hapus Topik Atensi Ini"
-              >
-                <Trash2 class="w-3.5 h-3.5 text-rose-500" />
-                <span>Hapus Topik</span>
-              </button>
-
-              <!-- Close Topic Filter -->
-              <button
-                @click="selectedTopicId = null; currentPage = 1"
-                class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-400 hover:text-white border border-slate-700 transition cursor-pointer"
-                title="Tutup Filter Topik"
-              >
-                ✕ Kembali
               </button>
             </div>
           </div>
@@ -1581,7 +1638,7 @@ const submitIssue = () => {
           <!-- CALLOUT JIKA BELUM ADA BERITA TERKAIT DI RADAR LOKAL -->
           <div
             v-if="!currentSelectedTopic.articles_count || currentSelectedTopic.articles_count === 0"
-            class="pt-3 border-t border-slate-800/80"
+            class="pt-1 relative z-10"
           >
             <div class="p-4 rounded-2xl bg-gradient-to-r from-blue-950/40 via-slate-900 to-blue-950/40 border border-blue-500/30 flex items-center justify-between gap-4 flex-wrap">
               <div class="space-y-1">
@@ -1607,53 +1664,107 @@ const submitIssue = () => {
             </div>
           </div>
 
-          <!-- MINI PREVIEW SUMMARY BOX (JIKA SUDAH ADA ANALISIS TERSIMPAN) -->
+          <!-- TIER 4: AI INTELLIGENCE SUMMARY & POLARISASI SENTIMEN CARD (JIKA SUDAH ADA ANALISIS TERSIMPAN) -->
           <div
             v-if="currentSelectedTopic.ai_analysis"
-            class="pt-3 border-t border-slate-800/80 space-y-2.5"
+            class="p-4 md:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3.5 relative z-10 shadow-lg"
           >
-            <div class="flex items-center justify-between text-[11px] text-slate-400 flex-wrap gap-2">
+            <!-- Status & Freshness Header -->
+            <div class="flex items-center justify-between text-xs text-slate-400 flex-wrap gap-2 pb-2.5 border-b border-slate-800/80">
               <div class="flex items-center gap-2 flex-wrap">
-                <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                <span class="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5 shadow-sm">
                   <CheckCircle2 class="w-3 h-3 text-emerald-400" />
                   <span>Analisis AI Tersimpan</span>
                 </span>
-                <span>
+                <span class="text-[11px]">
                   Dianalisis: <strong class="text-slate-200">{{ currentSelectedTopic.ai_analyzed_at_humans || 'Baru saja' }}</strong>
-                  ({{ currentSelectedTopic.ai_articles_count || 0 }} berita)
+                  ({{ currentSelectedTopic.ai_articles_count || currentSelectedTopic.articles_count || 0 }} berita)
                 </span>
                 <span
                   v-if="getTopicNewArticlesCount(currentSelectedTopic) > 0"
-                  class="px-2 py-0.5 rounded-full text-[9px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                  class="px-2.5 py-0.5 rounded-full text-[9px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse"
                 >
                   ⚠️ Ada {{ getTopicNewArticlesCount(currentSelectedTopic) }} Berita Baru Sejak Analisis Terakhir
                 </span>
                 <span
                   v-else
-                  class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1"
+                  class="px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1"
                 >
                   ✓ Data Terkini (Up-to-Date)
                 </span>
               </div>
+
               <button
                 @click="openCachedTopicAi(currentSelectedTopic)"
                 type="button"
-                class="text-amber-400 hover:text-amber-300 font-bold hover:underline flex items-center gap-1 cursor-pointer select-none"
+                class="text-amber-400 hover:text-amber-300 font-extrabold hover:underline flex items-center gap-1 cursor-pointer select-none text-xs"
               >
-                <span>Buka Analisis Lengkap (Talking Points &amp; Risiko) &rarr;</span>
+                <span>Buka Analisis Lengkap (Talking Points &amp; Mitigasi Risiko)</span>
+                <ArrowRight class="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <!-- Snippet Ringkasan Eksekutif -->
-            <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300 leading-relaxed space-y-1.5">
-              <p class="line-clamp-2">
-                <strong class="text-amber-400">Ringkasan Intelijen:</strong> {{ currentSelectedTopic.ai_analysis.executive_summary }}
+            <!-- Executive Summary Snippet -->
+            <div class="space-y-1.5 text-xs text-slate-200 leading-relaxed">
+              <div class="flex items-center gap-1.5 font-bold text-amber-400 text-xs uppercase tracking-wider">
+                <FileText class="w-3.5 h-3.5 text-amber-400" />
+                <span>Ringkasan Eksekutif Intelijen:</span>
+              </div>
+              <p class="text-slate-300 line-clamp-3 pl-4 border-l-2 border-amber-400/50 italic">
+                "{{ currentSelectedTopic.ai_analysis.executive_summary }}"
               </p>
-              <div class="flex items-center gap-3 text-[11px] pt-1 text-slate-400 font-mono flex-wrap">
-                <span class="text-slate-300">Sentimen Media: <strong class="text-amber-300 uppercase">{{ currentSelectedTopic.ai_analysis.dominant_sentiment || 'Netral' }}</strong></span>
-                <span class="text-emerald-400">🟢 {{ currentSelectedTopic.ai_analysis.sentiment_breakdown?.positif || 0 }}% Positif</span>
-                <span class="text-slate-400">⚪ {{ currentSelectedTopic.ai_analysis.sentiment_breakdown?.netral || 0 }}% Netral</span>
-                <span class="text-rose-400">🔴 {{ currentSelectedTopic.ai_analysis.sentiment_breakdown?.negatif || 0 }}% Negatif</span>
+            </div>
+
+            <!-- Polarisasi Sentimen Media & Visual Proportional Bar -->
+            <div class="pt-2 border-t border-slate-800/80 space-y-2">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-slate-400 font-bold">Sentimen Media:</span>
+                  <span
+                    class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider"
+                    :class="getTopicSentiment(currentSelectedTopic.ai_analysis).dominant.toLowerCase() === 'positif'
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : getTopicSentiment(currentSelectedTopic.ai_analysis).dominant.toLowerCase() === 'negatif'
+                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                        : 'bg-amber-400/20 text-amber-300 border border-amber-400/30'"
+                  >
+                    {{ getTopicSentiment(currentSelectedTopic.ai_analysis).dominant }}
+                  </span>
+                </div>
+
+                <div class="flex items-center gap-3 text-xs font-mono font-bold">
+                  <span class="text-emerald-400 flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span>{{ getTopicSentiment(currentSelectedTopic.ai_analysis).positif }}% Positif</span>
+                  </span>
+                  <span class="text-slate-300 flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+                    <span>{{ getTopicSentiment(currentSelectedTopic.ai_analysis).netral }}% Netral</span>
+                  </span>
+                  <span class="text-rose-400 flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                    <span>{{ getTopicSentiment(currentSelectedTopic.ai_analysis).negatif }}% Negatif</span>
+                  </span>
+                </div>
+              </div>
+
+              <!-- Proportional Sentiment Progress Bar -->
+              <div class="h-2 w-full rounded-full bg-slate-800 overflow-hidden flex shadow-inner">
+                <div
+                  :style="{ width: getTopicSentiment(currentSelectedTopic.ai_analysis).positif + '%' }"
+                  class="bg-emerald-500 transition-all duration-500"
+                  :title="'Positif: ' + getTopicSentiment(currentSelectedTopic.ai_analysis).positif + '%'"
+                ></div>
+                <div
+                  :style="{ width: getTopicSentiment(currentSelectedTopic.ai_analysis).netral + '%' }"
+                  class="bg-slate-500 transition-all duration-500"
+                  :title="'Netral: ' + getTopicSentiment(currentSelectedTopic.ai_analysis).netral + '%'"
+                ></div>
+                <div
+                  :style="{ width: getTopicSentiment(currentSelectedTopic.ai_analysis).negatif + '%' }"
+                  class="bg-rose-500 transition-all duration-500"
+                  :title="'Negatif: ' + getTopicSentiment(currentSelectedTopic.ai_analysis).negatif + '%'"
+                ></div>
               </div>
             </div>
           </div>

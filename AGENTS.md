@@ -143,7 +143,12 @@ Seluruh 29 portal media dikonfigurasi melalui seeder [`SulbarRssFeedsSeeder.php`
   - **Penarikan Cepat Lintas Internet**: Mengunduh Google News RSS (`https://news.google.com/rss/search?q=...`) untuk topik baru atau saat pimpinan membutuhkan cakupan sebaran nasional yang lebih luas.
   - **Ekstraksi & Penyimpanan Permanen**: Mengekstrak nama sumber asli dari tag `<source>` (contoh: *Tribratanews Polda Sumsel*, *Antara News*), mengklasifikasikan kategori kepolisian (*Harkamtibmas*, *Gakkum*, dll.), mendeteksi sentimen, dan menyimpannya secara permanen ke tabel `media_articles` terhubung ke topik.
   - **Pengelompokan Portal**: Berita hasil crawling internet otomatis dikelompokkan dalam filter portal `🌐 SEBARAN INTERNET (GOOGLE NEWS)`.
-  - **Standar Visual Card Grid Simetris**: Grid kartu berita dikunci pada tinggi seragam `h-[435px]` dengan batas 2 baris untuk judul (`h-10 md:h-11`) dan ringkasan (`h-9`). Jika berita internet tidak membawa thumbnail, sistem secara otomatis menginjeksi palet gambar cover editorial kepolisian berkualitas tinggi (*editorial police fallback photos*).
+  - **Standar Visual Card Grid Simetris**: Grid kartu berita dikunci pada tinggi seragam `h-[435px]` dengan batas 2 baris untuk judul (`h-10 md:h-11`) dan ringkasan (`h-9`). Jika berita internet tidak membawa thumbnail, sistem secara otomatis menginjeksi palet gambar cover editorial kepolisian berkualitas tinggi (*editorial police fallback photos*) dengan lapis pelindung SVG Data URI kedinasan Polri saat offline/jaringan terputus.
+  - **Ergonomi Smart Dossier 4-Tier**: Kotak detail topik atensi aktif ditata ulang dalam 4 tingkat hierarkis simetris:
+    1. *Header Bar*: Judul kasus, tingkat urgensi (`🚨 SANGAT MENDESAK` / `⭐ PRIORITAS TINGGI`), badge hitungan berita terkait, dan tombol utilitas (`Edit Kata Kunci`, `Hapus Topik`, `Tutup`).
+    2. *Directive & Keywords Cloud*: Kutipan arahan pimpinan dan awan tag kata kunci pantau (#tags) yang membentang horizontal secara penuh (*full-width flex-wrap*).
+    3. *Command Toolbar*: Pengelompokan seimbang tombol AI (`👁️ Lihat Hasil Analisis AI`, `🔄 Perbarui Analisis +X Baru`) dan Ingesti Media (`🌐 Tarik Berita Internet`, `📱 Salin Naskah WA`).
+    4. *AI Summary & Polarisasi Sentimen*: Ringkasan eksekutif intelijen, deteksi akurat persentase sentimen (`positif`, `netral`, `negatif`), dan *visual multi-color proportional progress bar*.
 
 ---
 
