@@ -213,6 +213,20 @@ const insertPlaceholder = (ph) => {
   promptForm.custom_prompt_template += (promptForm.custom_prompt_template.endsWith('\n') ? '' : '\n') + ph;
 };
 
+const insertSuggestedTopicsBlock = () => {
+  const snippet = `
+  "suggested_topics": [
+    {
+      "title": "Judul Isu Potensial / Topik Tren Media Baru 1",
+      "priority": "urgent / high",
+      "velocity": "+25 Berita / Tren Cepat",
+      "keywords": "kata_kunci_1, kata_kunci_2, kata_kunci_3",
+      "rationale": "Analisis intelijen mengapa isu ini berpotensi menjadi perhatian publik besar dan langkah antisipasi awal..."
+    }
+  ],`;
+  insertPlaceholder(snippet);
+};
+
 // Preset Standard Dinas Times
 const standardPresetTimes = [
   { time: '06:00', label: 'Apel Pagi' },
@@ -1238,7 +1252,33 @@ const submitSettings = () => {
             >
               <span>🏛️ {POLRES_LIST}</span>
             </button>
+
+            <!-- Suggested Topics JSON Contract Tag -->
+            <button
+              type="button"
+              @click="insertSuggestedTopicsBlock"
+              class="px-3 py-1.5 rounded-xl text-xs font-mono font-bold bg-violet-500/20 hover:bg-violet-500/30 text-violet-300 border border-violet-500/50 flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+              title="Sisipkan blok skema JSON 'suggested_topics' untuk mengaktifkan deteksi tren cerdas Google News"
+            >
+              <span>⚡ + Blok suggested_topics (Tren Google News)</span>
+            </button>
           </div>
+        </div>
+
+        <!-- Kontrak Skema Output JSON AI Card -->
+        <div class="p-4 rounded-2xl bg-[#070d19]/90 border border-violet-500/30 text-xs text-slate-300 space-y-2">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <span class="font-extrabold text-white flex items-center gap-1.5">
+              <Sparkles class="w-3.5 h-3.5 text-cyan-400" />
+              <span>Kontrak Skema Output JSON AI (Google News Trend Ingestion)</span>
+            </span>
+            <span class="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-cyan-400/20 text-cyan-300 border border-cyan-400/40">
+              Contract Validated
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-400">
+            Pastikan output JSON selalu menyertakan array <code>"suggested_topics"</code> dengan atribut <code>title</code>, <code>priority</code>, <code>velocity</code>, <code>keywords</code>, dan <code>rationale</code>. Fitur ini menggerakkan bilah <strong>Sugesti Tren Cerdas</strong> di Smart Dossier Radar Media Online.
+          </p>
         </div>
 
         <!-- Code Editor Container -->

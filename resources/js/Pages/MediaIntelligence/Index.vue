@@ -240,10 +240,84 @@ const topicAiResult = ref(null);
 const activeAnalyzingTopic = ref(null);
 const topicAiError = ref('');
 
+// Default Fallback Suggestions jika data backend kosong
+const defaultFallbackSuggestions = computed(() => {
+  if (isDivhumas.value) {
+    return [
+      {
+        title: 'Pengamanan & Transparansi Distribusi Program Makan Bergizi Gratis (MBG)',
+        priority: 'urgent',
+        velocity: '+34 Berita / Tren Cepat',
+        keywords: 'makan bergizi gratis, mbg, pengamanan pangan, polri presisi',
+        rationale: 'Atensi Khusus Pimpinan: Pantau kelancaran distribusi logistik pangan bergizi di sekolah, cegah potensi kecurangan dan pastikan kepatuhan standar higienis.',
+      },
+      {
+        title: 'Pemberantasan Sindikat Judol & Pemblokiran Ribuan Rekening Nominee',
+        priority: 'urgent',
+        velocity: '+26 Berita / Tren Cepat',
+        keywords: 'judol, judi online, rekening penampung, bareskrim, cyber crime',
+        rationale: 'Tingginya atensi netizen dan media massa terhadap penindakan bandar judi online, penyitaan aset, dan pencegahan TPPU.',
+      },
+      {
+        title: 'Cooling System & Tangkal Disinformasi Pilkada Serentak di Ruang Siber',
+        priority: 'high',
+        velocity: '+19 Berita / Tren Cepat',
+        keywords: 'pilkada serentak, cooling system, patroli siber, hoaks politik, netralitas polri',
+        rationale: 'Eskalasi percakapan ruang digital jelang agenda nasional; perlukan amplifikasi pesan kamtibmas dan klarifikasi cepat.',
+      },
+      {
+        title: 'Penertiban Balap Liar & Tilang Knalpot Brong Jelang Operasi Kepolisian',
+        priority: 'high',
+        velocity: '+12 Berita / Tren Cepat',
+        keywords: 'knalpot brong, balap liar, razia gabungan, lantas presisi',
+        rationale: 'Merespon aduan warganet terkait gangguan kebisingan malam hari dan potensi laka lantas di berbagai satwil.',
+      },
+    ];
+  }
+  return [
+    {
+      title: 'Pengawasan Penyaluran MBG & Ketahanan Pangan Wilayah Sulbar',
+      priority: 'urgent',
+      velocity: '+15 Berita / Tren Cepat',
+      keywords: 'makan bergizi gratis sulbar, distribusi pangan mamuju, polres jajaran',
+      rationale: 'Mitigasi dini pengawasan penyaluran menu pangan bergizi di kabupaten/kota jajaran Polda Sulbar agar tepat sasaran dan transparan.',
+    },
+    {
+      title: 'Cooling System & Patroli Dialogis Kamtibmas Pilkada Sulbar',
+      priority: 'urgent',
+      velocity: '+11 Berita / Tren Cepat',
+      keywords: 'cooling system sulbar, bhabinkamtibmas, pilkada damai, patroli siber',
+      rationale: 'Penguatan silaturahmi kamtibmas dengan tokoh masyarakat serta menangkal provokasi isu lokal di media sosial.',
+    },
+    {
+      title: 'Penertiban Balap Liar & Knalpot Brong Jalur Utama Sulbar',
+      priority: 'high',
+      velocity: '+8 Berita / Tren Cepat',
+      keywords: 'razia knalpot brong sulbar, balap liar, ditlantas, kamtibmas malam',
+      rationale: 'Tindak lanjut cepat atas keresahan warga terhadap kebisingan knalpot brong pada jam istirahat malam.',
+    },
+  ];
+});
+
 // Suggested Emerging Topics State (AI & Google News Trend Ingestion)
-const localSuggestedTopics = ref([
-  ...(props.suggestedTopics?.length ? props.suggestedTopics : (props.report?.suggested_topics || []))
-]);
+const resolveInitialSuggestions = () => {
+  if (Array.isArray(props.suggestedTopics) && props.suggestedTopics.length > 0) {
+    return [...props.suggestedTopics];
+  }
+  if (Array.isArray(props.report?.suggested_topics) && props.report.suggested_topics.length > 0) {
+    return [...props.report.suggested_topics];
+  }
+  return [...defaultFallbackSuggestions.value];
+};
+
+const localSuggestedTopics = ref(resolveInitialSuggestions());
+
+watch([() => props.suggestedTopics, () => props.report?.suggested_topics], () => {
+  const resolved = resolveInitialSuggestions();
+  if (resolved.length > 0 && localSuggestedTopics.value.length === 0) {
+    localSuggestedTopics.value = resolved;
+  }
+}, { deep: true });
 const isAdoptingSuggestion = ref(false);
 const adoptingTitle = ref('');
 

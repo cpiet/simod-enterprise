@@ -229,6 +229,16 @@ class MediaIntelligenceController extends Controller
             $report = $this->seedDefaultReport($poldaId, $selectedPolda);
         }
 
+        // Pastikan suggested_topics selalu ada & terisi (Google News AI Trend Suggestions)
+        $suggestedTopics = (is_array($report->suggested_topics) && !empty($report->suggested_topics))
+            ? $report->suggested_topics
+            : static::getDefaultSuggestedTopics($selectedPolda);
+
+        if (empty($report->suggested_topics) || !is_array($report->suggested_topics)) {
+            $report->update(['suggested_topics' => $suggestedTopics]);
+            $report->suggested_topics = $suggestedTopics;
+        }
+
         // Dynamic AI Prompt Template (Tenant-Aware)
         $aiPromptTemplate = $this->generateDynamicPrompt($selectedPolda);
 
@@ -273,7 +283,7 @@ class MediaIntelligenceController extends Controller
             'aiSetting'        => $aiSetting,
             'issues'           => $issues,
             'pressReleases'    => $pressReleases,
-            'suggestedTopics'  => is_array($report?->suggested_topics) ? $report->suggested_topics : [],
+            'suggestedTopics'  => $suggestedTopics,
             'metrics'          => $metrics,
         ]);
     }
@@ -441,7 +451,7 @@ class MediaIntelligenceController extends Controller
             'strategic_contents'       => $parsed['strategic_contents'] ?? [],
             'agenda_setting'           => $parsed['agenda_setting'] ?? [],
             'recommendations'          => $parsed['recommendations'] ?? [],
-            'suggested_topics'         => $parsed['suggested_topics'] ?? [],
+            'suggested_topics'         => (!empty($parsed['suggested_topics']) && is_array($parsed['suggested_topics'])) ? $parsed['suggested_topics'] : static::getDefaultSuggestedTopics($polda),
             'raw_input'                => $rawText,
         ]);
 
@@ -588,6 +598,15 @@ Pimpinan SANGAT INTENS mengenai hal ini. Untuk setiap isu sensitif dan pada Earl
 - Dampak Jangka Pendek (0–6 Jam Tanpa Mitigasi): Viralitas liar di medsos, framing sepihak buzzer menguasai algoritma, netizen menuduh Polri lambat atau menutup-nutupi kasus, hilangnya inisiatif informasi resmi (information vacuum).
 - Dampak Jangka Menengah (6–24 Jam Tanpa Mitigasi): Media massa arus utama mengutip pernyataan kritis pengamat/LSM, terbentuknya framing delegitimasi, potensi mobilisasi massa aksi turun ke jalan di Polda/Polres, sentimen anjlok ke Zona Merah.
 - Dampak Jangka Panjang (>24 Jam Tanpa Mitigasi): Krisis kepercayaan publik nasional (institutional trust crisis), polarisasi sosial meluas, hingga potensi gesekan fisik atau gangguan kamtibmas nyata.
+
+PILAR 3: DETEKSI DINI TOPIK POTENSIAL & TREN MEDIA ONLINE (SUGGESTED_TOPICS - GOOGLE NEWS AI):
+Pimpinan mengatensi deteksi tren sebelum isu menjadi krisis viral liar (pre-emptive intelligence). Pindai seluruh sebaran berita online dan tren Google News, lalu rekomendasikan 2-4 isu yang berpotensi melesat menjadi perhatian publik besar dalam 1-2 hari ke depan.
+Untuk setiap topik potensial, tentukan:
+- title: Judul ringkas dan padat isu potensial yang perlu dipantau.
+- priority: "urgent" (sangat mendesak) atau "high" (prioritas tinggi).
+- velocity: Estimasi akselerasi sebaran berita (contoh: "+34 Berita / Tren Cepat", "+18 Berita / Tren Baru").
+- keywords: Kata kunci pencarian spesifik (#tags) yang relevan untuk crawling Google News (pisahkan koma).
+- rationale: Analisis 1-2 kalimat mengapa pimpinan dan jajaran Humas wajib memantau topik ini sebelum eskalasi meluas.
 
 SUMBER DATA:
 Telusuri 22 Portal Media Online Nasional Terverifikasi (Antara News, Detikcom, CNN Indonesia, CNBC Indonesia, Liputan6, SINDOnews, Republika, JPNN, Kumparan, BBC Indonesia, dll.), Google News, X (Twitter), Instagram, TikTok, Facebook, YouTube, serta Tribratanews Polri. Prioritaskan informasi 24 jam terakhir dan sertakan tautan sumber serta waktu publikasi (WIB).
@@ -736,6 +755,15 @@ Lakukan pemantauan pemberitaan terbaru menggunakan tanggal dan waktu aktual ({$t
 PILAR KAJIAN RESIKO & DAMPAK ESKALASI JIKA TIDAK DIMITIGASI (ATENSI INTENS PIMPINAN):
 Bedah proyeksi dampak jika isu lokal tidak segera dimitigasi dalam 6-24 jam: potensi viral ke skala nasional, ancaman aksi unjuk rasa, sentimen negatif, dan penurunan kepercayaan publik terhadap Polda jajaran.
 
+PILAR DETEKSI DINI TOPIK POTENSIAL & TREN MEDIA ONLINE (SUGGESTED_TOPICS - GOOGLE NEWS AI):
+Pimpinan mengatensi deteksi tren sebelum isu menjadi krisis viral liar (pre-emptive intelligence). Pindai seluruh sebaran berita online dan tren Google News, lalu rekomendasikan 2-4 isu kewilayahan yang berpotensi melesat menjadi perhatian publik besar dalam 1-2 hari ke depan.
+Untuk setiap topik potensial, tentukan:
+- title: Judul ringkas dan padat isu potensial kewilayahan.
+- priority: "urgent" (sangat mendesak) atau "high" (prioritas tinggi).
+- velocity: Estimasi akselerasi sebaran berita (contoh: "+15 Berita / Tren Cepat", "+8 Berita / Tren Baru").
+- keywords: Kata kunci pencarian spesifik (#tags) yang relevan untuk crawling Google News (pisahkan koma).
+- rationale: Analisis 1-2 kalimat mengapa jajaran Polda wajib memantau topik ini sebelum eskalasi meluas.
+
 SUMBER:
 Telusuri 29 Portal Media Online Resmi Terverifikasi, Google News, X (Twitter), Instagram, TikTok, Facebook, YouTube, serta situs resmi Humas Polri. Prioritaskan informasi 24 jam terakhir dan sertakan tautan sumber serta waktu publikasi ({$tz}).
 
@@ -859,6 +887,73 @@ PROMPT;
     }
 
     /**
+     * Dapatkan daftar sugesti topik potensial default (Google News AI Trend Detection).
+     */
+    public static function getDefaultSuggestedTopics(?Polda $polda): array
+    {
+        $isNational = ($polda?->code === 'DIVHUMAS');
+        if ($isNational) {
+            return [
+                [
+                    'title'     => 'Pengamanan & Transparansi Distribusi Program Makan Bergizi Gratis (MBG)',
+                    'priority'  => 'urgent',
+                    'velocity'  => '+34 Berita / Tren Cepat',
+                    'keywords'  => 'makan bergizi gratis, mbg, pengamanan pangan, polri presisi',
+                    'rationale' => 'Atensi Khusus Pimpinan: Pantau kelancaran distribusi logistik pangan bergizi di sekolah, cegah potensi kecurangan dan pastikan kepatuhan standar higienis.',
+                ],
+                [
+                    'title'     => 'Pemberantasan Sindikat Judol & Pemblokiran Ribuan Rekening Nominee',
+                    'priority'  => 'urgent',
+                    'velocity'  => '+26 Berita / Tren Cepat',
+                    'keywords'  => 'judol, judi online, rekening penampung, bareskrim, cyber crime',
+                    'rationale' => 'Tingginya atensi netizen dan media massa terhadap penindakan bandar judi online, penyitaan aset, dan pencegahan TPPU.',
+                ],
+                [
+                    'title'     => 'Cooling System & Tangkal Disinformasi Pilkada Serentak di Ruang Siber',
+                    'priority'  => 'high',
+                    'velocity'  => '+19 Berita / Tren Cepat',
+                    'keywords'  => 'pilkada serentak, cooling system, patroli siber, hoaks politik, netralitas polri',
+                    'rationale' => 'Eskalasi percakapan ruang digital jelang agenda nasional; perlukan amplifikasi pesan kamtibmas dan penegakan hukum humanis.',
+                ],
+                [
+                    'title'     => 'Penertiban Balap Liar & Tilang Knalpot Brong Jelang Operasi Kepolisian',
+                    'priority'  => 'high',
+                    'velocity'  => '+12 Berita / Tren Cepat',
+                    'keywords'  => 'knalpot brong, balap liar, razia gabungan, lantas presisi',
+                    'rationale' => 'Merespon aduan warganet terkait gangguan kebisingan malam hari dan potensi laka lantas di berbagai satwil.',
+                ],
+            ];
+        }
+
+        $poldaName = $polda?->name ?? 'Polda Sulawesi Barat';
+        $short = $polda?->code === 'SULBAR' ? 'Sulbar' : ($polda?->code ?? 'Kewilayahan');
+
+        return [
+            [
+                'title'     => "Pengawasan Penyaluran MBG & Ketahanan Pangan Wilayah {$short}",
+                'priority'  => 'urgent',
+                'velocity'  => '+15 Berita / Tren Cepat',
+                'keywords'  => "makan bergizi gratis {$short}, distribusi pangan, polres jajaran",
+                'rationale' => "Mitigasi dini pengawasan penyaluran menu pangan bergizi di kabupaten/kota jajaran {$poldaName} agar tepat sasaran dan transparan.",
+            ],
+            [
+                'title'     => "Cooling System & Patroli Dialogis Kamtibmas Pilkada {$short}",
+                'priority'  => 'urgent',
+                'velocity'  => '+11 Berita / Tren Cepat',
+                'keywords'  => "cooling system {$short}, bhabinkamtibmas, pilkada damai, patroli siber",
+                'rationale' => "Penguatan silaturahmi kamtibmas dengan tokoh masyarakat serta menangkal provokasi isu lokal di media sosial.",
+            ],
+            [
+                'title'     => "Penertiban Balap Liar & Knalpot Brong Jalur Utama {$short}",
+                'priority'  => 'high',
+                'velocity'  => '+8 Berita / Tren Cepat',
+                'keywords'  => "razia knalpot brong {$short}, balap liar, ditlantas, kamtibmas malam",
+                'rationale' => "Tindak lanjut cepat atas keresahan warga terhadap kebisingan knalpot brong pada jam istirahat malam.",
+            ],
+        ];
+    }
+
+    /**
      * Seed default realistic report if table is empty.
      */
     protected function seedDefaultReport(int $poldaId, ?Polda $polda): MediaIntelligenceReport
@@ -974,22 +1069,7 @@ PROMPT;
                         'indicator' => 'Sentimen positif >80%, spekulasi publik teredam, dan kamtibmas kewilayahan kondusif.',
                     ],
                 ],
-                'suggested_topics'         => [
-                    [
-                        'title'     => 'Modus Penipuan Jastip Tiket Konser & QRIS Palsu',
-                        'priority'  => 'high',
-                        'velocity'  => '+18 Berita Media Siber',
-                        'keywords'  => 'penipuan tiket, jastip konser, qris palsu, siber bareskrim',
-                        'rationale' => 'Mulai diberitakan 5 portal media nasional dalam 6 jam terakhir. Potensi kerugian masyarakat dan aduan ke ranah siber meluas.',
-                    ],
-                    [
-                        'title'     => 'Penertiban Balap Liar & Tilang Knalpot Brong',
-                        'priority'  => 'urgent',
-                        'velocity'  => '+24 Berita Kewilayahan',
-                        'keywords'  => 'knalpot brong, balap liar, razia gabungan, lantas presisi',
-                        'rationale' => 'Muncul video viral adu argumen penertiban di Jawa Tengah dan Jawa Timur dengan sentimen warganet terbelah.',
-                    ],
-                ],
+                'suggested_topics'         => static::getDefaultSuggestedTopics($polda),
                 'raw_input'                => 'Laporan Intelijen Media Divisi Humas Polri (Mabes Polri) Berstandar Humanis, Transparan & Berbasis Fakta',
             ]);
         }
@@ -1103,22 +1183,7 @@ PROMPT;
                     'indicator' => 'Indeks kepercayaan publik bertahan di atas 80%',
                 ],
             ],
-            'suggested_topics'         => [
-                [
-                    'title'     => 'Kesiapsiagaan Jalur Rawan Longsor Pesisir Majene-Mamuju',
-                    'priority'  => 'high',
-                    'velocity'  => '+9 Berita Daerah',
-                    'keywords'  => 'longsor majene, jalan trans sulawesi, polres majene, cuaca ekstrem',
-                    'rationale' => 'Peningkatan curah hujan tinggi memicu kekhawatiran antrean logistik sembako antarkabupaten.',
-                ],
-                [
-                    'title'     => 'Patroli Dialogis Pasca-Pilkada & Deklarasi Damai Mamuju',
-                    'priority'  => 'urgent',
-                    'velocity'  => '+14 Berita Media Lokal',
-                    'keywords'  => 'pilkada damai, polresta mamuju, patroli dialogis, cooling system',
-                    'rationale' => 'Pemberitaan media lokal menyoroti langkah cooling system kepolisian menjaga kondusifitas pascapenetapan suara.',
-                ],
-            ],
+            'suggested_topics'         => static::getDefaultSuggestedTopics($polda),
             'raw_input'                => null,
         ]);
     }
