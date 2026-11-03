@@ -22,6 +22,7 @@ class AiSetting extends Model
         'interval_minutes',
         'scheduled_times',
         'temperature',
+        'custom_prompt_template',
         'last_analyzed_at',
         'last_status',
         'last_error',

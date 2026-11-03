@@ -530,9 +530,37 @@ class MediaIntelligenceController extends Controller
     }
 
     /**
-     * Generate dynamic AI Prompt based on selected Polda.
+     * Resolve effective AI Prompt based on custom template in database or standard fallback.
+     */
+    public static function resolvePromptTemplate(?Polda $polda): string
+    {
+        if ($polda) {
+            $setting = AiSetting::where('polda_id', $polda->id)->first();
+            if (!empty(trim((string) $setting?->custom_prompt_template))) {
+                return $setting->custom_prompt_template;
+            }
+        }
+
+        $global = AiSetting::whereNull('polda_id')->first();
+        if (!empty(trim((string) $global?->custom_prompt_template))) {
+            return $global->custom_prompt_template;
+        }
+
+        return self::getStandardPromptTemplate($polda);
+    }
+
+    /**
+     * Generate dynamic AI Prompt based on selected Polda (with custom prompt override).
      */
     protected function generateDynamicPrompt(?Polda $polda): string
+    {
+        return self::resolvePromptTemplate($polda);
+    }
+
+    /**
+     * Get official standard AI prompt template based on Polda.
+     */
+    public static function getStandardPromptTemplate(?Polda $polda): string
     {
         $isNational = ($polda?->code === 'DIVHUMAS');
         if ($isNational) {

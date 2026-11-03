@@ -167,6 +167,7 @@ Seluruh 29 portal media dikonfigurasi melalui seeder [`SulbarRssFeedsSeeder.php`
    - Tombol manual kuno (*Salin Prompt*, *Lihat Prompt*, *Tempel Ringkasan AI*) serta tombol *Kelola Sumber RSS* telah dibersihkan dari antarmuka operasional radar.
    - Hak akses operasional `media_intelligence_ai` di `/roles` terdefinisi sebagai *Sinkronisasi Berita & Analisis Otomatis AI*.
    - **Sentralisasi Kredensial Apify**: Pengaturan Personal API Token Apify dipindahkan dari tampilan operator `/social-intelligence` ke panel admin **Keamanan & Pemeliharaan -> Mesin Intelijen AI** (`/settings/ai`) di bawah tab *Mesin Scraper Patroli Siber (Apify Cloud)* dengan dukungan Multi-Token Failover Pool dan proteksi dari akses langsung operator.
+   - **Studio Editor Template Prompt AI Dinamis**: Pengaturan naskah prompt intelijen AI dipusatkan di panel admin `/settings/ai` pada tab **Template Prompt Intelijen (Editor Dinamis)**. Administrator dapat meninjau, mengedit naskah prompt secara mandiri tanpa menyentuh kode PHP, menyisipkan variabel dinamis (`[Tempelkan teks berita...]`, `{COMMAND_NAME}`, `{LEADER_TITLE}`, `{TIMEZONE}`, `{POLRES_LIST}`), mereset kembali ke template standar resmi Polri dalam 1-klik (`POST /settings/ai/reset-prompt`), dan menerapkan template kustom secara nasional ke 34 Polda Jajaran. Sistem otomatis memprioritaskan template kustom di tabel `ai_settings` (`custom_prompt_template`) di atas default bawaan sistem.
 
 ---
 

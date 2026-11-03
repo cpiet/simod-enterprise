@@ -200,4 +200,50 @@ class GeminiMediaIntelligenceTest extends TestCase
             'active_count' => 2,
         ]);
     }
+
+    public function test_admin_can_customize_ai_prompt_template_and_it_persists(): void
+    {
+        $user = User::factory()->create();
+        $divhumas = Polda::where('code', 'DIVHUMAS')->first();
+
+        $customPrompt = "DOKTRIN KHUSUS KEDINASAN HUMAS POLRI 2026\n[Tempelkan teks berita, rangkuman patroli siber, atau link isu di sini]";
+
+        $response = $this->actingAs($user)->post('/settings/ai?polda=ALL', [
+            'gemini_model'           => 'gemini-3.5-flash-lite',
+            'custom_prompt_template' => $customPrompt,
+            'apply_to_all_poldas'    => false,
+        ]);
+
+        $response->assertStatus(302);
+        $response->assertSessionHas('success');
+
+        $divSetting = AiSetting::where('polda_id', $divhumas->id)->first();
+        $this->assertNotNull($divSetting);
+        $this->assertEquals($customPrompt, $divSetting->custom_prompt_template);
+
+        // Verify that resolvePromptTemplate returns the custom prompt
+        $resolvedPrompt = \App\Http\Controllers\MediaIntelligenceController::resolvePromptTemplate($divhumas);
+        $this->assertEquals($customPrompt, $resolvedPrompt);
+    }
+
+    public function test_admin_can_reset_custom_ai_prompt_template(): void
+    {
+        $user = User::factory()->create();
+        $divhumas = Polda::where('code', 'DIVHUMAS')->first();
+
+        $setting = AiSetting::forPolda($divhumas->id);
+        $setting->update(['custom_prompt_template' => 'PROMPT KUSTOM SEMENTARA']);
+
+        $response = $this->actingAs($user)->post('/settings/ai/reset-prompt?polda=ALL');
+
+        $response->assertStatus(302);
+        $response->assertSessionHas('success');
+
+        $setting->refresh();
+        $this->assertNull($setting->custom_prompt_template);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'RESET_AI_PROMPT_TEMPLATE',
+        ]);
+    }
 }

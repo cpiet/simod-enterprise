@@ -128,6 +128,7 @@ Route::post('/maintenance/rss-sync/feeds/test', [\App\Http\Controllers\RssSyncCo
 Route::get('/settings/ai', [\App\Http\Controllers\AiSettingController::class, 'index'])->name('settings.ai');
 Route::post('/settings/ai', [\App\Http\Controllers\AiSettingController::class, 'update'])->name('settings.ai.update');
 Route::post('/settings/ai/test', [\App\Http\Controllers\AiSettingController::class, 'testConnection'])->name('settings.ai.test');
+Route::post('/settings/ai/reset-prompt', [\App\Http\Controllers\AiSettingController::class, 'resetPrompt'])->name('settings.ai.reset-prompt');
 Route::post('/settings/ai/apify', [\App\Http\Controllers\AiSettingController::class, 'updateApify'])->name('settings.ai.apify.update');
 Route::post('/settings/ai/test-apify', [\App\Http\Controllers\AiSettingController::class, 'testApify'])->name('settings.ai.apify.test');
 

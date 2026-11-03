@@ -80,6 +80,12 @@ class AiSettingController extends Controller
         $latestReport = MediaIntelligenceReport::where('polda_id', $selectedPolda->id)->latest()->first();
         $totalArticles = MediaArticle::where('polda_id', $selectedPolda->id)->count();
 
+        // Prompt Template resolution (Custom vs Standard)
+        $defaultPrompt = MediaIntelligenceController::getStandardPromptTemplate($selectedPolda);
+        $customPrompt = $aiSetting->custom_prompt_template;
+        $effectivePrompt = !empty(trim((string) $customPrompt)) ? $customPrompt : $defaultPrompt;
+        $hasCustomPrompt = !empty(trim((string) $customPrompt));
+
         $recentReports = MediaIntelligenceReport::where('polda_id', $selectedPolda->id)
             ->latest()
             ->limit(6)
@@ -90,23 +96,27 @@ class AiSettingController extends Controller
             'selectedPolda'  => $selectedPolda,
             'selectedCode'   => $selectedCode,
             'setting'        => [
-                'has_api_key'       => !empty($rawApiKey),
-                'masked_api_key'    => $maskedKey,
-                'raw_api_keys_text' => implode("\n", $allKeys),
-                'api_keys_pool'     => $allKeys,
-                'keys_detail'       => $keysDetail,
-                'total_keys'        => count($allKeys),
-                'gemini_model'      => $activeModel,
-                'is_auto_analyze'   => (bool) ($aiSetting->is_auto_analyze ?? true),
-                'sync_mode'         => $aiSetting->sync_mode ?: 'after_rss',
-                'interval_minutes'  => (int) ($aiSetting->interval_minutes ?: 180),
-                'scheduled_times'   => is_array($aiSetting->scheduled_times) && !empty($aiSetting->scheduled_times)
+                'has_api_key'               => !empty($rawApiKey),
+                'masked_api_key'            => $maskedKey,
+                'raw_api_keys_text'         => implode("\n", $allKeys),
+                'api_keys_pool'             => $allKeys,
+                'keys_detail'               => $keysDetail,
+                'total_keys'                => count($allKeys),
+                'gemini_model'              => $activeModel,
+                'is_auto_analyze'           => (bool) ($aiSetting->is_auto_analyze ?? true),
+                'sync_mode'                 => $aiSetting->sync_mode ?: 'after_rss',
+                'interval_minutes'          => (int) ($aiSetting->interval_minutes ?: 180),
+                'scheduled_times'           => is_array($aiSetting->scheduled_times) && !empty($aiSetting->scheduled_times)
                     ? $aiSetting->scheduled_times
                     : ['06:00', '12:00', '18:00', '22:00'],
-                'temperature'       => (float) ($aiSetting->temperature ?? 0.20),
-                'last_analyzed_at'  => $aiSetting->last_analyzed_at ? $aiSetting->last_analyzed_at->diffForHumans() : null,
-                'last_status'       => $aiSetting->last_status,
-                'last_error'        => $aiSetting->last_error,
+                'temperature'               => (float) ($aiSetting->temperature ?? 0.20),
+                'custom_prompt_template'    => $customPrompt,
+                'default_prompt_template'   => $defaultPrompt,
+                'effective_prompt_template' => $effectivePrompt,
+                'has_custom_prompt'         => $hasCustomPrompt,
+                'last_analyzed_at'          => $aiSetting->last_analyzed_at ? $aiSetting->last_analyzed_at->diffForHumans() : null,
+                'last_status'               => $aiSetting->last_status,
+                'last_error'                => $aiSetting->last_error,
             ],
             'socialSetting'  => $socialSettingData,
             'globalSetting'  => [
@@ -131,15 +141,17 @@ class AiSettingController extends Controller
     public function update(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'gemini_api_key'      => 'nullable|string',
-            'api_keys_pool'       => 'nullable',
-            'gemini_model'        => 'required|string|in:gemini-3.5-flash-lite,gemini-flash-lite-latest,gemini-3.8-flash,gemini-3.1-pro-preview,gemini-2.5-pro,gemini-1.5-pro,gemini-2.5-flash,gemini-1.5-flash',
-            'is_auto_analyze'     => 'nullable|boolean',
-            'sync_mode'           => 'nullable|string|in:manual,after_rss,interval,scheduled_times',
-            'interval_minutes'    => 'nullable|integer|min:15|max:1440',
-            'scheduled_times'     => 'nullable|array',
-            'temperature'         => 'nullable|numeric|min:0.0|max:1.0',
-            'apply_to_all_poldas' => 'nullable|boolean',
+            'gemini_api_key'          => 'nullable|string',
+            'api_keys_pool'           => 'nullable',
+            'gemini_model'            => 'required|string|in:gemini-3.5-flash-lite,gemini-flash-lite-latest,gemini-3.8-flash,gemini-3.1-pro-preview,gemini-2.5-pro,gemini-1.5-pro,gemini-2.5-flash,gemini-1.5-flash',
+            'is_auto_analyze'         => 'nullable|boolean',
+            'sync_mode'               => 'nullable|string|in:manual,after_rss,interval,scheduled_times',
+            'interval_minutes'        => 'nullable|integer|min:15|max:1440',
+            'scheduled_times'         => 'nullable|array',
+            'temperature'             => 'nullable|numeric|min:0.0|max:1.0',
+            'custom_prompt_template'  => 'nullable|string',
+            'reset_prompt_to_default' => 'nullable|boolean',
+            'apply_to_all_poldas'     => 'nullable|boolean',
         ]);
 
         [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
@@ -166,6 +178,14 @@ class AiSettingController extends Controller
                 : ['06:00', '12:00', '18:00', '22:00'],
             'temperature'      => (float) ($validated['temperature'] ?? 0.20),
         ];
+
+        // Custom Prompt Template Handling
+        if ($request->boolean('reset_prompt_to_default')) {
+            $updateData['custom_prompt_template'] = null;
+        } elseif ($request->has('custom_prompt_template')) {
+            $val = trim((string) $request->input('custom_prompt_template'));
+            $updateData['custom_prompt_template'] = !empty($val) ? $val : null;
+        }
 
         // Only update API keys if user submitted non-empty keys, or keep existing ones
         if (!empty($parsedKeys)) {
@@ -200,11 +220,41 @@ class AiSettingController extends Controller
                 'interval_minutes'    => $updateData['interval_minutes'],
                 'keys_count'          => $keysCount,
                 'is_auto_analyze'     => $updateData['is_auto_analyze'],
+                'has_custom_prompt'   => !empty($updateData['custom_prompt_template']),
                 'apply_to_all_poldas' => (bool) ($validated['apply_to_all_poldas'] ?? false),
             ]),
         ]);
 
         return back()->with('success', "✓ Konfigurasi Mesin Intelijen AI, {$keysCount} Kunci Pool & Jadwal Otomasi Berhasil Disimpan!");
+    }
+
+    /**
+     * Reset custom AI prompt template back to default standard prompt (Admin Only).
+     */
+    public function resetPrompt(Request $request): RedirectResponse
+    {
+        [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
+        $selectedPolda = $selectedPolda ?? Polda::first();
+
+        $aiSetting = AiSetting::forPolda($selectedPolda->id);
+        $aiSetting->update(['custom_prompt_template' => null]);
+
+        if ($request->boolean('apply_to_all_poldas')) {
+            AiSetting::query()->update(['custom_prompt_template' => null]);
+        }
+
+        AuditLog::create([
+            'user_id'    => auth()->id(),
+            'action'     => 'RESET_AI_PROMPT_TEMPLATE',
+            'ip_address' => $request->ip() ?: '127.0.0.1',
+            'details'    => json_encode([
+                'polda_id'   => $selectedPolda->id,
+                'polda_code' => $selectedPolda->code,
+                'message'    => 'Template prompt AI dikembalikan ke standar resmi Divhumas/Polda.',
+            ]),
+        ]);
+
+        return back()->with('success', '✓ Template Prompt Intelijen AI berhasil direset ke standar resmi Divhumas Polri.');
     }
 
     /**

@@ -35,6 +35,9 @@ import {
   Lock,
   MessageSquare,
   Share2,
+  Code,
+  Copy,
+  FileText,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -128,6 +131,87 @@ const apifyTokensCount = computed(() => {
   if (!apifyForm.apify_api_token) return 0;
   return apifyForm.apify_api_token.split(/[\r\n,;]+/).map(t => t.trim()).filter(Boolean).length;
 });
+
+// Prompt Studio Form State & Computed Helpers
+const promptForm = useForm({
+  custom_prompt_template: props.setting?.custom_prompt_template || props.setting?.default_prompt_template || '',
+  apply_to_all_poldas: false,
+});
+
+const isPromptCustomized = computed(() => {
+  return Boolean(props.setting?.has_custom_prompt || (promptForm.custom_prompt_template && promptForm.custom_prompt_template !== props.setting?.default_prompt_template));
+});
+
+const hasMandatoryNewsPlaceholder = computed(() => {
+  return (promptForm.custom_prompt_template || '').includes('[Tempelkan teks berita, rangkuman patroli siber, atau link isu di sini]');
+});
+
+const promptLineCount = computed(() => {
+  if (!promptForm.custom_prompt_template) return 0;
+  return promptForm.custom_prompt_template.split('\n').length;
+});
+
+const promptCharCount = computed(() => {
+  return (promptForm.custom_prompt_template || '').length;
+});
+
+const copyPromptToClipboard = () => {
+  if (navigator?.clipboard) {
+    navigator.clipboard.writeText(promptForm.custom_prompt_template);
+    saveSuccessToast.value = true;
+    saveToastMessage.value = 'Naskah Prompt AI Berhasil Disalin ke Clipboard!';
+    setTimeout(() => {
+      saveSuccessToast.value = false;
+    }, 4000);
+  }
+};
+
+const loadStandardTemplate = () => {
+  if (props.setting?.default_prompt_template) {
+    promptForm.custom_prompt_template = props.setting.default_prompt_template;
+    saveSuccessToast.value = true;
+    saveToastMessage.value = 'Template standar resmi dimuat ke editor. Klik "Simpan Perubahan Prompt" jika ingin menetapkannya.';
+    setTimeout(() => {
+      saveSuccessToast.value = false;
+    }, 4000);
+  }
+};
+
+const submitPromptSettings = () => {
+  promptForm.post('/settings/ai', {
+    preserveScroll: true,
+    onSuccess: () => {
+      saveSuccessToast.value = true;
+      saveToastMessage.value = 'Template Prompt Intelijen AI Berhasil Disimpan & Berlaku Dinamis!';
+      setTimeout(() => {
+        saveSuccessToast.value = false;
+      }, 5000);
+    },
+  });
+};
+
+const resetPromptToDefault = () => {
+  if (!confirm('Apakah Anda yakin ingin mereset prompt ke standar resmi bawaan Divhumas Polri? Kustomisasi sebelumnya akan dihapus dari basis data.')) {
+    return;
+  }
+  router.post('/settings/ai/reset-prompt', {
+    apply_to_all_poldas: promptForm.apply_to_all_poldas,
+  }, {
+    preserveScroll: true,
+    onSuccess: () => {
+      promptForm.custom_prompt_template = props.setting?.default_prompt_template || '';
+      saveSuccessToast.value = true;
+      saveToastMessage.value = 'Template Prompt AI Berhasil Direset ke Standar Resmi Polri!';
+      setTimeout(() => {
+        saveSuccessToast.value = false;
+      }, 5000);
+    },
+  });
+};
+
+const insertPlaceholder = (ph) => {
+  promptForm.custom_prompt_template += (promptForm.custom_prompt_template.endsWith('\n') ? '' : '\n') + ph;
+};
 
 // Preset Standard Dinas Times
 const standardPresetTimes = [
@@ -320,6 +404,16 @@ const submitSettings = () => {
           </button>
 
           <button
+            v-else-if="activeAiTab === 'prompt'"
+            type="button"
+            @click="copyPromptToClipboard"
+            class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-amber-400/50 text-slate-200 text-xs font-bold transition cursor-pointer shadow-md"
+          >
+            <Copy class="w-4 h-4 text-amber-400" />
+            <span>Salin Naskah Prompt</span>
+          </button>
+
+          <button
             v-else-if="activeAiTab === 'apify'"
             type="button"
             @click="testApifyConnection"
@@ -350,6 +444,24 @@ const submitSettings = () => {
             :class="props.setting?.has_api_key ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'"
           >
             {{ props.setting?.has_api_key ? `${props.setting?.total_keys || 1} Kunci Aktif` : 'Belum Ada Kunci' }}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          @click="activeAiTab = 'prompt'"
+          class="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition cursor-pointer"
+          :class="activeAiTab === 'prompt'
+            ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
+            : 'text-slate-300 hover:text-white hover:bg-slate-800/60'"
+        >
+          <Code class="w-4 h-4" />
+          <span>Template Prompt Intelijen (Editor Dinamis)</span>
+          <span
+            class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider"
+            :class="isPromptCustomized ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'"
+          >
+            {{ isPromptCustomized ? '⚡ Kustom Dinas' : '✓ Standar Polri' }}
           </span>
         </button>
 
@@ -987,6 +1099,260 @@ const submitSettings = () => {
         </div>
       </div>
       </div> <!-- End of Tab 1: Gemini -->
+
+      <!-- ============================================================== -->
+      <!-- TAB 2: TEMPLATE PROMPT INTELIJEN AI (EDITOR DINAMIS)           -->
+      <!-- ============================================================== -->
+      <div v-if="activeAiTab === 'prompt'" class="space-y-6">
+        <!-- 4 KPI Summary Cards for Prompt Studio -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <!-- Card 1: Status Template -->
+          <div class="p-5 rounded-2xl bg-[#0b1426] border border-slate-800 shadow-lg space-y-1">
+            <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
+              <span>Status Template</span>
+              <FileText class="w-4 h-4 text-amber-400" />
+            </div>
+            <p class="text-lg md:text-xl font-black truncate" :class="isPromptCustomized ? 'text-amber-400' : 'text-emerald-400'">
+              {{ isPromptCustomized ? 'Kustomisasi Aktif' : 'Standar Mabes Polri' }}
+            </p>
+            <p class="text-[11px] text-slate-400">
+              {{ isPromptCustomized ? 'Naskah modifikasi tersimpan di database' : 'Menggunakan doktrin bawaan resmi' }}
+            </p>
+          </div>
+
+          <!-- Card 2: Lingkup Tenant -->
+          <div class="p-5 rounded-2xl bg-[#0b1426] border border-slate-800 shadow-lg space-y-1">
+            <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
+              <span>Lingkup Satker</span>
+              <ShieldCheck class="w-4 h-4 text-amber-400" />
+            </div>
+            <p class="text-lg md:text-xl font-black text-white truncate">
+              {{ isDivhumas ? 'Divhumas Mabes' : (selectedPolda?.name || 'Polda') }}
+            </p>
+            <p class="text-[11px] text-slate-400">
+              {{ isDivhumas ? 'Orkestrasi Skala Nasional' : 'Kewilayahan ' + (selectedPolda?.code || '') }}
+            </p>
+          </div>
+
+          <!-- Card 3: Metrik Naskah -->
+          <div class="p-5 rounded-2xl bg-[#0b1426] border border-slate-800 shadow-lg space-y-1">
+            <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
+              <span>Ukuran Naskah</span>
+              <Layers class="w-4 h-4 text-amber-400" />
+            </div>
+            <p class="text-lg md:text-xl font-black text-white font-mono flex items-baseline gap-1.5">
+              <span>{{ promptLineCount }}</span>
+              <span class="text-xs text-slate-400 font-sans font-semibold">Baris</span>
+              <span class="text-xs text-amber-400 font-mono">({{ promptCharCount.toLocaleString() }} char)</span>
+            </p>
+            <p class="text-[11px] text-slate-400">Siap diumpankan ke Gemini</p>
+          </div>
+
+          <!-- Card 4: Validasi Injeksi Berita -->
+          <div class="p-5 rounded-2xl bg-[#0b1426] border border-slate-800 shadow-lg space-y-1">
+            <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
+              <span>Token Injeksi Berita</span>
+              <Zap class="w-4 h-4" :class="hasMandatoryNewsPlaceholder ? 'text-emerald-400' : 'text-rose-500'" />
+            </div>
+            <p class="text-lg md:text-xl font-black flex items-center gap-1.5" :class="hasMandatoryNewsPlaceholder ? 'text-emerald-400' : 'text-rose-400'">
+              <CheckCircle2 v-if="hasMandatoryNewsPlaceholder" class="w-5 h-5 text-emerald-400 shrink-0" />
+              <AlertTriangle v-else class="w-5 h-5 text-rose-500 shrink-0 animate-bounce" />
+              <span>{{ hasMandatoryNewsPlaceholder ? 'Valid & Siap' : 'Hilang / Error' }}</span>
+            </p>
+            <p class="text-[11px]" :class="hasMandatoryNewsPlaceholder ? 'text-slate-400' : 'text-rose-300 font-bold'">
+              {{ hasMandatoryNewsPlaceholder ? 'Titik 30 berita terdeteksi' : 'Wajib mencantumkan placeholder berita!' }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Dynamic Placeholders Palette Card -->
+        <div class="p-6 rounded-3xl bg-[#0b1426] border border-amber-500/30 shadow-2xl space-y-3">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div class="space-y-0.5">
+              <div class="flex items-center gap-2">
+                <span class="flex h-2.5 w-2.5 relative">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                </span>
+                <h3 class="text-sm font-extrabold text-white flex items-center gap-1.5">
+                  <span>Variabel Dinamis &amp; Token Injeksi Otomatis</span>
+                  <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                    Live Tags
+                  </span>
+                </h3>
+              </div>
+              <p class="text-xs text-slate-400">
+                Klik salah satu token di bawah ini untuk menyalin atau menyisipkannya langsung ke dalam editor naskah prompt.
+              </p>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2 pt-1">
+            <!-- Mandatory News Ingestion Placeholder -->
+            <button
+              type="button"
+              @click="insertPlaceholder('[Tempelkan teks berita, rangkuman patroli siber, atau link isu di sini]')"
+              class="px-3 py-1.5 rounded-xl text-xs font-mono font-bold bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/50 flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+              title="Wajib Ada: Tempat 30 artikel berita disuntikkan oleh sistem secara otomatis"
+            >
+              <span>📌 [Tempelkan teks berita, rangkuman patroli siber, atau link isu di sini]</span>
+              <span class="text-[9px] uppercase px-1.5 py-0.2 rounded bg-rose-600 text-white font-sans font-black">Wajib</span>
+            </button>
+
+            <!-- Command Name Tag -->
+            <button
+              type="button"
+              @click="insertPlaceholder('{COMMAND_NAME}')"
+              class="px-3 py-1.5 rounded-xl text-xs font-mono font-bold bg-slate-900 hover:bg-slate-800 text-amber-300 border border-amber-500/40 flex items-center gap-1.5 transition cursor-pointer"
+              title="Nama Satker / Polda otomatis: Divisi Humas Polri atau Polda Sulawesi Barat"
+            >
+              <span>🏷️ {COMMAND_NAME}</span>
+            </button>
+
+            <!-- Leader Title Tag -->
+            <button
+              type="button"
+              @click="insertPlaceholder('{LEADER_TITLE}')"
+              class="px-3 py-1.5 rounded-xl text-xs font-mono font-bold bg-slate-900 hover:bg-slate-800 text-amber-300 border border-amber-500/40 flex items-center gap-1.5 transition cursor-pointer"
+              title="Gelar Pimpinan: Kapolri & Kadivhumas atau Kapolda & Kabid Humas"
+            >
+              <span>⭐ {LEADER_TITLE}</span>
+            </button>
+
+            <!-- Timezone Tag -->
+            <button
+              type="button"
+              @click="insertPlaceholder('{TIMEZONE}')"
+              class="px-3 py-1.5 rounded-xl text-xs font-mono font-bold bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-500/40 flex items-center gap-1.5 transition cursor-pointer"
+              title="Zona waktu kedinasan: WIB atau WITA"
+            >
+              <span>🕒 {TIMEZONE}</span>
+            </button>
+
+            <!-- Polres List Tag -->
+            <button
+              type="button"
+              @click="insertPlaceholder('{POLRES_LIST}')"
+              class="px-3 py-1.5 rounded-xl text-xs font-mono font-bold bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1.5 transition cursor-pointer"
+              title="Daftar nama Polres jajaran kewilayahan"
+            >
+              <span>🏛️ {POLRES_LIST}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Code Editor Container -->
+        <div class="p-6 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-2xl space-y-4">
+          <!-- Editor Action Toolbar -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+            <div class="flex items-center gap-2">
+              <Code class="w-4 h-4 text-amber-400" />
+              <h3 class="text-sm font-bold text-white">Naskah System &amp; Task Prompt (Dapat Diedit Langsung)</h3>
+              <span
+                class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider"
+                :class="isPromptCustomized ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'"
+              >
+                {{ isPromptCustomized ? 'Kustom Aktif' : 'Default Polri' }}
+              </span>
+            </div>
+
+            <div class="flex items-center gap-2 flex-wrap">
+              <!-- Muat Template Standar -->
+              <button
+                type="button"
+                @click="loadStandardTemplate"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold transition cursor-pointer"
+                title="Muat teks template standar resmi Divhumas Polri ke dalam kotak editor"
+              >
+                <RotateCcw class="w-3.5 h-3.5 text-amber-400" />
+                <span>Muat Template Standar</span>
+              </button>
+
+              <!-- Salin Prompt -->
+              <button
+                type="button"
+                @click="copyPromptToClipboard"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold transition cursor-pointer"
+                title="Salin seluruh teks naskah prompt ke clipboard"
+              >
+                <Copy class="w-3.5 h-3.5 text-cyan-400" />
+                <span>Salin Naskah</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Warning Callout if Placeholder Missing -->
+          <div
+            v-if="!hasMandatoryNewsPlaceholder"
+            class="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/40 text-rose-200 text-xs flex items-center justify-between gap-3 flex-wrap"
+          >
+            <div class="flex items-center gap-2">
+              <AlertTriangle class="w-4 h-4 text-rose-400 shrink-0" />
+              <p>
+                <strong>Peringatan Kritis:</strong> Naskah prompt belum memiliki token <code>[Tempelkan teks berita, rangkuman patroli siber, atau link isu di sini]</code>. Token ini wajib ada agar SIMOD dapat menyuntikkan 30 berita terbaru secara otomatis.
+              </p>
+            </div>
+            <button
+              type="button"
+              @click="insertPlaceholder('[Tempelkan teks berita, rangkuman patroli siber, atau link isu di sini]')"
+              class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs cursor-pointer shadow-sm"
+            >
+              + Sisipkan Token Sekarang
+            </button>
+          </div>
+
+          <!-- Textarea Editor -->
+          <div class="relative">
+            <textarea
+              v-model="promptForm.custom_prompt_template"
+              rows="24"
+              spellcheck="false"
+              class="w-full p-4 rounded-2xl bg-[#070d19] border text-white font-mono text-xs leading-relaxed focus:outline-none transition shadow-inner scrollbar-thin"
+              :class="!hasMandatoryNewsPlaceholder ? 'border-rose-500/70 focus:border-rose-400' : 'border-slate-700 focus:border-amber-400'"
+              placeholder="Ketik atau tempelkan template prompt intelijen AI kustom Anda di sini..."
+            ></textarea>
+          </div>
+
+          <!-- Bottom Footer Bar & Actions -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-3 border-t border-slate-800">
+            <!-- Apply to All Poldas Checkbox -->
+            <label class="flex items-center gap-2.5 text-xs text-slate-300 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                v-model="promptForm.apply_to_all_poldas"
+                class="rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-400"
+              />
+              <span>Terapkan template kustom ini ke seluruh 34 Polda Jajaran (Konsolidasi Nasional)</span>
+            </label>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center gap-2.5 shrink-0 flex-wrap">
+              <!-- Reset Button -->
+              <button
+                type="button"
+                @click="resetPromptToDefault"
+                :disabled="promptForm.processing"
+                class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-rose-950/60 border border-slate-700 hover:border-rose-500/50 text-slate-300 hover:text-rose-400 text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                title="Hapus kustomisasi dan kembalikan ke template standar resmi Polri"
+              >
+                <Trash2 class="w-4 h-4 text-rose-500" />
+                <span>Reset ke Standar Resmi Polri</span>
+              </button>
+
+              <!-- Save Button -->
+              <button
+                type="button"
+                @click="submitPromptSettings"
+                :disabled="promptForm.processing || !hasMandatoryNewsPlaceholder"
+                class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-black shadow-lg shadow-amber-400/25 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed select-none"
+              >
+                <Save class="w-4 h-4 text-slate-950" />
+                <span>{{ promptForm.processing ? 'Menyimpan...' : 'Simpan Perubahan Prompt' }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- ============================================================== -->
       <!-- TAB 2: MESIN SCRAPER PATROLI SIBER (APIFY API)                 -->
