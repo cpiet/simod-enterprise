@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\Issue;
 use App\Models\MediaArticle;
 use App\Models\MediaFeed;
+use App\Models\MediaIntelligenceReport;
 use App\Models\Polda;
 use App\Models\Polres;
 use App\Models\Publication;
+use App\Models\SocialIntelligenceReport;
 use App\Models\SocialPost;
 use App\Models\Task;
 use Carbon\Carbon;
@@ -257,12 +259,33 @@ class DashboardController extends Controller
         // 7. PETA NUSANTARA INDONESIA (Agregasi Berita Berbasis Database untuk Mabes & Nasional)
         $nationalMapData = $this->buildNationalMapData();
 
+        // 8. LATEST AI INTELLIGENCE REPORTS (Media Online & Media Sosial)
+        $latestMediaReport = MediaIntelligenceReport::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))
+            ->latest('report_date')
+            ->latest('id')
+            ->first();
+
+        if (!$latestMediaReport) {
+            $latestMediaReport = MediaIntelligenceReport::latest('report_date')->latest('id')->first();
+        }
+
+        $latestSocialReport = SocialIntelligenceReport::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))
+            ->latest('report_date')
+            ->latest('id')
+            ->first();
+
+        if (!$latestSocialReport) {
+            $latestSocialReport = SocialIntelligenceReport::latest('report_date')->latest('id')->first();
+        }
+
         return Inertia::render('Dashboard', [
             'allPoldas'            => $allPoldas,
             'selectedPolda'        => $selectedPolda,
             'selectedCode'         => $selectedCode,
             'isNational'           => $isNational,
             'nationalMapData'      => $nationalMapData,
+            'latestMediaReport'    => $latestMediaReport,
+            'latestSocialReport'   => $latestSocialReport,
             'kpi'                  => [
                 'total_articles'       => $totalArticles,
                 'active_feeds_count'   => $activeFeedsCount,

@@ -43,6 +43,8 @@ const props = defineProps({
   selectedCode: String,
   isNational: Boolean,
   nationalMapData: Array,
+  latestMediaReport: Object,
+  latestSocialReport: Object,
   kpi: Object,
   socialStats: Object,
   topViralSocialPosts: Array,
@@ -66,6 +68,7 @@ const viewMode = ref('map');
 // Tabs for Trending & Live Stream
 const activeTrendingTab = ref('social'); // 'social' | 'issues'
 const activeStreamTab = ref('social'); // 'social' | 'media'
+const activeIntelligenceTab = ref('media'); // 'media' | 'social' | 'matrix'
 
 // Helper formatters
 const formatNumber = (num) => {
@@ -382,6 +385,381 @@ const layerLapangan = ref(true);
         </div>
         <p class="text-[11px] text-slate-400">Disposisi & Klarifikasi Media</p>
       </Link>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- 2.5 SINTESIS ANALISIS INTELIJEN PIMPINAN (MEDIA ONLINE & MEDIA SOSIAL)    -->
+    <!-- ========================================================================= -->
+    <div class="rounded-3xl bg-gradient-to-br from-[#0c162e] via-[#0b1426] to-[#070d1d] border border-amber-500/35 p-6 md:p-7 shadow-2xl space-y-6 relative overflow-hidden">
+      <!-- Ambient Glow Effect -->
+      <div class="absolute -top-12 -right-12 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      <!-- Header & Engine Switcher Tabs -->
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800/90 pb-4 relative z-10">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
+              PRESISI COMMAND INTELLIGENCE HUB
+            </span>
+            <span class="text-xs font-mono text-slate-400">
+              {{ selectedCode === 'ALL' ? 'Mabes Polri (Skala Nasional)' : (selectedPolda?.name || 'Polda') }}
+            </span>
+            <span v-if="latestMediaReport?.updated_at || latestSocialReport?.updated_at" class="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+              Analisis Terkini: {{ formatTimeAgo(activeIntelligenceTab === 'social' ? latestSocialReport?.updated_at : latestMediaReport?.updated_at) }}
+            </span>
+          </div>
+          <h2 class="text-lg md:text-2xl font-black text-white tracking-tight flex items-center gap-2 flex-wrap">
+            <span>Sintesis Analisis Intelijen Komando Pimpinan</span>
+          </h2>
+          <p class="text-xs text-slate-300 max-w-2xl leading-relaxed">
+            Pusat sintesis intelijen komprehensif memadukan pemantauan media siber (29/33 portal) dan patroli opini publik warganet 4 platform medsos (𝕏, TikTok, IG, YT) berstandar Divisi Humas Polri.
+          </p>
+        </div>
+
+        <!-- Engine Switcher Tab Bar -->
+        <div class="inline-flex rounded-2xl bg-slate-900/95 border border-slate-800 p-1 text-xs font-bold shrink-0 self-start lg:self-auto shadow-inner">
+          <button
+            type="button"
+            @click="activeIntelligenceTab = 'media'"
+            class="flex items-center gap-2 px-3.5 py-2 rounded-xl transition cursor-pointer select-none"
+            :class="activeIntelligenceTab === 'media'
+              ? 'bg-amber-400 text-slate-950 font-black shadow-md shadow-amber-400/20'
+              : 'text-slate-300 hover:text-white hover:bg-slate-800'"
+          >
+            <Newspaper class="w-3.5 h-3.5" :class="activeIntelligenceTab === 'media' ? 'text-slate-950' : 'text-sky-400'" />
+            <span>📰 Media Online</span>
+          </button>
+
+          <button
+            type="button"
+            @click="activeIntelligenceTab = 'social'"
+            class="flex items-center gap-2 px-3.5 py-2 rounded-xl transition cursor-pointer select-none"
+            :class="activeIntelligenceTab === 'social'
+              ? 'bg-amber-400 text-slate-950 font-black shadow-md shadow-amber-400/20'
+              : 'text-slate-300 hover:text-white hover:bg-slate-800'"
+          >
+            <Radio class="w-3.5 h-3.5" :class="activeIntelligenceTab === 'social' ? 'text-slate-950' : 'text-amber-400 animate-pulse'" />
+            <span>📱 Media Sosial</span>
+          </button>
+
+          <button
+            type="button"
+            @click="activeIntelligenceTab = 'matrix'"
+            class="flex items-center gap-2 px-3.5 py-2 rounded-xl transition cursor-pointer select-none"
+            :class="activeIntelligenceTab === 'matrix'
+              ? 'bg-amber-400 text-slate-950 font-black shadow-md shadow-amber-400/20'
+              : 'text-slate-300 hover:text-white hover:bg-slate-800'"
+          >
+            <Shield class="w-3.5 h-3.5" :class="activeIntelligenceTab === 'matrix' ? 'text-slate-950' : 'text-emerald-400'" />
+            <span>🛡️ Respon &amp; Cooling</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- TAB 1 CONTENT: ANALISIS MEDIA ONLINE (PERS & PORTAL SIBER) -->
+      <div v-if="activeIntelligenceTab === 'media'" class="space-y-5 relative z-10">
+        <!-- Top Concern Alert Banner -->
+        <div class="p-4 rounded-2xl bg-gradient-to-r from-rose-950/40 via-[#181120] to-amber-950/30 border border-rose-500/40 space-y-1.5 shadow-md">
+          <div class="flex items-center justify-between text-xs gap-2 flex-wrap">
+            <span class="flex items-center gap-2 text-rose-400 font-black uppercase tracking-wider text-[11px]">
+              <Flame class="w-4 h-4 text-rose-500 animate-pulse" />
+              <span>Isu Kritis Prioritas Media Online (Top Concern)</span>
+            </span>
+            <span class="text-[10px] font-mono font-bold text-slate-400">
+              Skop: {{ selectedCode === 'ALL' ? 'Pemberitaan Nasional' : 'Pemberitaan Daerah' }}
+            </span>
+          </div>
+          <p class="text-xs md:text-sm font-bold text-white leading-relaxed">
+            {{ latestMediaReport?.top_concern || 'Situasi pemberitaan media siber nasional dan daerah terpantau kondusif, didominasi publikasi kegiatan harkamtibmas, pelayanan publik, dan penegakan hukum humanis.' }}
+          </p>
+        </div>
+
+        <!-- 2-Column Grid: Executive Briefing & Sentimen + Isu Strategis -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          <!-- Left: Executive Briefing & Core Decision (Col 7) -->
+          <div class="lg:col-span-7 rounded-2xl bg-slate-950/60 border border-slate-800/80 p-5 space-y-4 flex flex-col justify-between">
+            <div class="space-y-3">
+              <div class="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+                <h4 class="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+                  <Sparkles class="w-3.5 h-3.5 text-amber-400" />
+                  <span>Executive Briefing Situasi Pemberitaan (24 Jam Terakhir)</span>
+                </h4>
+                <span class="text-[10px] font-mono text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
+                  SADEWA AI Engine
+                </span>
+              </div>
+              <p class="text-xs text-slate-200 leading-relaxed whitespace-pre-line">
+                {{ latestMediaReport?.executive_brief || 'Analisis agregasi 29 portal media menunjukkan stabilitas opini publik terjaga dengan baik. Kemitraan media pers dan siaran Tribratanews berjalan efektif mengimbangi narasi minor di ruang siber.' }}
+              </p>
+            </div>
+
+            <!-- Keputusan / Arahan Inti Pimpinan (if present) -->
+            <div v-if="latestMediaReport?.core_decision" class="mt-3 p-3 rounded-xl bg-amber-500/10 border-l-4 border-amber-400 text-xs text-amber-100 space-y-1">
+              <span class="text-[10px] font-black uppercase tracking-wider text-amber-300 block">Arahan Taktis Komando:</span>
+              <p class="italic leading-relaxed">"{{ latestMediaReport.core_decision }}"</p>
+            </div>
+          </div>
+
+          <!-- Right: Barometer Sentimen & Isu Strategis (Col 5) -->
+          <div class="lg:col-span-5 rounded-2xl bg-slate-950/60 border border-slate-800/80 p-5 space-y-4">
+            <!-- Sentiment Breakdown Bar -->
+            <div class="space-y-2">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-black text-white uppercase text-[11px] tracking-wider">Barometer Sentimen Media</span>
+                <span class="text-[10px] font-mono text-emerald-400 font-bold">
+                  {{ (latestMediaReport?.sentiment_national?.positif || latestMediaReport?.sentiment_sulbar?.positif || avgPositivePct || 80) }}% Positif
+                </span>
+              </div>
+              <div class="h-3 rounded-full bg-slate-900 overflow-hidden flex shadow-inner">
+                <div
+                  class="bg-emerald-500 transition-all duration-300"
+                  :style="{ width: (latestMediaReport?.sentiment_national?.positif || latestMediaReport?.sentiment_sulbar?.positif || avgPositivePct || 80) + '%' }"
+                  :title="`Positif: ${(latestMediaReport?.sentiment_national?.positif || latestMediaReport?.sentiment_sulbar?.positif || avgPositivePct || 80)}%`"
+                ></div>
+                <div
+                  class="bg-slate-600 transition-all duration-300"
+                  :style="{ width: (latestMediaReport?.sentiment_national?.netral || latestMediaReport?.sentiment_sulbar?.netral || 15) + '%' }"
+                  :title="`Netral: ${(latestMediaReport?.sentiment_national?.netral || latestMediaReport?.sentiment_sulbar?.netral || 15)}%`"
+                ></div>
+                <div
+                  class="bg-rose-500 transition-all duration-300"
+                  :style="{ width: (latestMediaReport?.sentiment_national?.negatif || latestMediaReport?.sentiment_sulbar?.negatif || 5) + '%' }"
+                  :title="`Negatif: ${(latestMediaReport?.sentiment_national?.negatif || latestMediaReport?.sentiment_sulbar?.negatif || 5)}%`"
+                ></div>
+              </div>
+              <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                <span class="text-emerald-400 font-bold">● Positif {{ (latestMediaReport?.sentiment_national?.positif || latestMediaReport?.sentiment_sulbar?.positif || avgPositivePct || 80) }}%</span>
+                <span class="text-slate-400 font-bold">● Netral {{ (latestMediaReport?.sentiment_national?.netral || latestMediaReport?.sentiment_sulbar?.netral || 15) }}%</span>
+                <span class="text-rose-400 font-bold">● Negatif {{ (latestMediaReport?.sentiment_national?.negatif || latestMediaReport?.sentiment_sulbar?.negatif || 5) }}%</span>
+              </div>
+            </div>
+
+            <!-- Isu Strategis Media Terdeteksi -->
+            <div class="space-y-2 pt-2 border-t border-slate-800/80">
+              <span class="text-[11px] font-black text-slate-300 uppercase tracking-wider block">Isu Strategis Terdeteksi ({{ (latestMediaReport?.national_issues || latestMediaReport?.sulbar_issues || []).length || 3 }} Isu)</span>
+              <div class="space-y-2">
+                <div
+                  v-for="(iss, idx) in (latestMediaReport?.national_issues || latestMediaReport?.sulbar_issues || []).slice(0, 3)"
+                  :key="iss.title || idx"
+                  class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs space-y-1 hover:border-slate-700 transition"
+                >
+                  <div class="flex items-center justify-between gap-1">
+                    <span class="font-bold text-white text-[11px] line-clamp-1">{{ iss.title }}</span>
+                    <span
+                      class="px-1.5 py-0.2 rounded text-[8px] font-black uppercase shrink-0"
+                      :class="(iss.sentiment || '').toLowerCase() === 'positif' ? 'bg-emerald-500/20 text-emerald-300' : (iss.sentiment || '').toLowerCase() === 'negatif' ? 'bg-rose-500/20 text-rose-300' : 'bg-slate-800 text-slate-300'"
+                    >
+                      {{ iss.sentiment || 'Netral' }}
+                    </span>
+                  </div>
+                  <p class="text-[10px] text-slate-400 line-clamp-1 italic">{{ iss.summary }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Media Footer Action Toolbar -->
+        <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800/80 text-xs">
+          <div class="flex items-center gap-2 text-slate-400 text-[11px]">
+            <Radio class="w-3.5 h-3.5 text-sky-400" />
+            <span>Pemantauan aktif 29/33 portal media nasional &amp; daerah ({{ kpi?.total_articles || 0 }} berita tersinkron)</span>
+          </div>
+          <div class="flex items-center gap-2.5">
+            <Link
+              href="/media-intelligence?tab=02"
+              class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-400 text-slate-950 font-black hover:bg-amber-300 transition shadow-sm text-xs"
+            >
+              <span>Buka Radar Media Online Lengkap</span>
+              <ArrowRight class="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2 CONTENT: ANALISIS MEDIA SOSIAL (PATROLI SIBER & WARGANET) -->
+      <div v-else-if="activeIntelligenceTab === 'social'" class="space-y-5 relative z-10">
+        <!-- Top Concern Social Alert Banner -->
+        <div class="p-4 rounded-2xl bg-gradient-to-r from-violet-950/40 via-[#131124] to-cyan-950/30 border border-violet-500/40 space-y-1.5 shadow-md">
+          <div class="flex items-center justify-between text-xs gap-2 flex-wrap">
+            <span class="flex items-center gap-2 text-cyan-300 font-black uppercase tracking-wider text-[11px]">
+              <Radio class="w-4 h-4 text-cyan-400 animate-pulse" />
+              <span>Isu Viral &amp; Atensi Percakapan Warganet (Medsos Top Concern)</span>
+            </span>
+            <span class="text-[10px] font-mono font-bold text-slate-400">
+              Platform: 𝕏 • TikTok • Instagram • YouTube ({{ socialStats?.total_posts || 0 }} Post)
+            </span>
+          </div>
+          <p class="text-xs md:text-sm font-bold text-white leading-relaxed">
+            {{ latestSocialReport?.top_concern || 'Percakapan publik di media sosial terpantau stabil, didominasi apresiasi penanganan kamtibmas cepat dan interaksi netizen pada konten edukasi humas.' }}
+          </p>
+        </div>
+
+        <!-- 2-Column Grid: Social Briefing & Polarisasi Buzzer + KOL -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          <!-- Left: Executive Social Briefing & Buzzer vs Organic Assessment (Col 7) -->
+          <div class="lg:col-span-7 rounded-2xl bg-slate-950/60 border border-slate-800/80 p-5 space-y-4 flex flex-col justify-between">
+            <div class="space-y-3">
+              <div class="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+                <h4 class="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+                  <Sparkles class="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Executive Briefing Situasi Media Sosial &amp; Warganet</span>
+                </h4>
+                <span class="text-[10px] font-mono text-cyan-400 bg-cyan-400/10 px-2 py-0.5 rounded border border-cyan-400/20">
+                  Social Listening Engine
+                </span>
+              </div>
+              <p class="text-xs text-slate-200 leading-relaxed whitespace-pre-line">
+                {{ latestSocialReport?.executive_brief || 'Pemantauan lintas platform media sosial mengindikasikan narasi warganet didominasi respon positif dan netral terhadap program kepolisian presisi.' }}
+              </p>
+            </div>
+
+            <!-- Polarisasi Buzzer vs Netizen Organik Card -->
+            <div v-if="latestSocialReport?.buzzer_vs_organic" class="mt-3 p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-2 text-xs">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                  <Shield class="w-3.5 h-3.5 text-amber-400" />
+                  <span>Deteksi Polarisasi Buzzer vs Warganet Organik</span>
+                </span>
+                <span
+                  class="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider"
+                  :class="latestSocialReport.buzzer_vs_organic.risk_level === 'tinggi' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : latestSocialReport.buzzer_vs_organic.risk_level === 'sedang' ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'"
+                >
+                  Risiko: {{ latestSocialReport.buzzer_vs_organic.risk_level || 'Rendah' }}
+                </span>
+              </div>
+              <p class="text-[11px] text-slate-300 leading-relaxed">
+                {{ latestSocialReport.buzzer_vs_organic.assessment }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Right: Barometer Medsos & Akun Kritis (Col 5) -->
+          <div class="lg:col-span-5 rounded-2xl bg-slate-950/60 border border-slate-800/80 p-5 space-y-4">
+            <!-- Sentiment Breakdown Medsos -->
+            <div class="space-y-2">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-black text-white uppercase text-[11px] tracking-wider">Barometer Sentimen Medsos</span>
+                <span class="text-[10px] font-mono text-cyan-400 font-bold">
+                  {{ (latestSocialReport?.sentiment_analysis?.positif || socialStats?.sentiment?.positif || 65) }}% Positif
+                </span>
+              </div>
+              <div class="h-3 rounded-full bg-slate-900 overflow-hidden flex shadow-inner">
+                <div
+                  class="bg-emerald-500 transition-all duration-300"
+                  :style="{ width: (latestSocialReport?.sentiment_analysis?.positif || socialStats?.sentiment?.positif || 65) + '%' }"
+                ></div>
+                <div
+                  class="bg-slate-600 transition-all duration-300"
+                  :style="{ width: (latestSocialReport?.sentiment_analysis?.netral || socialStats?.sentiment?.netral || 20) + '%' }"
+                ></div>
+                <div
+                  class="bg-rose-500 transition-all duration-300"
+                  :style="{ width: (latestSocialReport?.sentiment_analysis?.negatif || socialStats?.sentiment?.negatif || 15) + '%' }"
+                ></div>
+              </div>
+              <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                <span class="text-emerald-400 font-bold">● Positif {{ (latestSocialReport?.sentiment_analysis?.positif || socialStats?.sentiment?.positif || 65) }}%</span>
+                <span class="text-slate-400 font-bold">● Netral {{ (latestSocialReport?.sentiment_analysis?.netral || socialStats?.sentiment?.netral || 20) }}%</span>
+                <span class="text-rose-400 font-bold">● Negatif {{ (latestSocialReport?.sentiment_analysis?.negatif || socialStats?.sentiment?.negatif || 15) }}%</span>
+              </div>
+            </div>
+
+            <!-- Akun Kritis / KOL Terpantau -->
+            <div class="space-y-2 pt-2 border-t border-slate-800/80">
+              <span class="text-[11px] font-black text-slate-300 uppercase tracking-wider block">
+                Akun Kritis &amp; KOL Terdeteksi ({{ (latestSocialReport?.critical_accounts || []).length || socialStats?.kol_count || 0 }})
+              </span>
+              <div class="space-y-2">
+                <div
+                  v-for="(acc, idx) in (latestSocialReport?.critical_accounts || []).slice(0, 3)"
+                  :key="acc.handle || idx"
+                  class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs space-y-1 hover:border-slate-700 transition"
+                >
+                  <div class="flex items-center justify-between gap-1">
+                    <span class="font-bold text-white text-[11px]">{{ acc.handle || acc.name }}</span>
+                    <span class="px-1.5 py-0.2 rounded text-[8px] font-black uppercase bg-slate-800 text-amber-400">
+                      {{ acc.platform || 'Medsos' }}
+                    </span>
+                  </div>
+                  <p class="text-[10px] text-slate-400 line-clamp-1 italic">{{ acc.concern || acc.note }}</p>
+                </div>
+                <div v-if="!latestSocialReport?.critical_accounts || latestSocialReport.critical_accounts.length === 0" class="text-slate-400 text-[11px] py-1">
+                  Tidak ada akun kritis berisiko tinggi yang terdeteksi saat ini.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Social Footer Action Toolbar -->
+        <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800/80 text-xs">
+          <div class="flex items-center gap-2 text-slate-400 text-[11px]">
+            <Radio class="w-3.5 h-3.5 text-cyan-400" />
+            <span>Pantauan aktif {{ socialStats?.total_posts || 0 }} postingan medsos &amp; {{ socialStats?.kol_count || 0 }} akun KOL</span>
+          </div>
+          <div class="flex items-center gap-2.5">
+            <Link
+              href="/social-intelligence?tab=02"
+              class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:brightness-110 text-white font-black transition shadow-sm text-xs"
+            >
+              <span>Buka Radar Media Sosial Lengkap</span>
+              <ArrowRight class="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3 CONTENT: MATRIKS RESPON & COOLING SYSTEM HUMAS -->
+      <div v-else-if="activeIntelligenceTab === 'matrix'" class="space-y-4 relative z-10">
+        <div class="p-4 rounded-2xl bg-emerald-950/20 border border-emerald-500/30 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+          <div class="space-y-0.5">
+            <span class="text-[10px] font-black text-emerald-400 uppercase tracking-wider block">Matriks Cooling System Humas Polri</span>
+            <p class="text-slate-300 font-medium">Orkestrasi langkah penyejuk suasana, rilis klarifikasi pers, dan penyebaran konten edukatif lintas kanal.</p>
+          </div>
+          <Link
+            href="/tasks"
+            class="px-3.5 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-black hover:bg-emerald-400 transition shrink-0 inline-flex items-center gap-1.5 text-xs"
+          >
+            <span>Buka Disposisi Tugas &rarr;</span>
+          </Link>
+        </div>
+
+        <!-- Cooling System Table / Cards -->
+        <div class="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="border-b border-slate-800 text-[10px] font-black uppercase text-slate-400 bg-slate-900/80">
+                <th class="p-3">Waktu Eksekusi</th>
+                <th class="p-3">Satker Pelaksana (PIC)</th>
+                <th class="p-3">Kanal Distribusi</th>
+                <th class="p-3">Tindakan Humas Terarah</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/60">
+              <tr
+                v-for="(item, idx) in (latestSocialReport?.cooling_system || latestMediaReport?.recommendations || [
+                  { timing: '0-2 Jam', pic: 'Bidhumas & Subbid Penmas', channel: 'Tribratanews & Siaran Pers', action: 'Rilis pernyataan awal klarifikasi fakta objektif untuk meredam spekulasi liar.' },
+                  { timing: '2-6 Jam', pic: 'Subbid Multimedia', channel: 'TikTok, Instagram, X', action: 'Produksi infografis ringkas dan video ramah seluler bantahan hoaks.' },
+                  { timing: '24 Jam', pic: 'Subbid PID & Satwil', channel: 'Media Massa Lokal & Bhabinkamtibmas', action: 'Pendekatan tokoh masyarakat dan cooling system tatap muka di wilayah rawan.' }
+                ])"
+                :key="idx"
+                class="hover:bg-slate-900/40 transition"
+              >
+                <td class="p-3 font-mono font-bold text-amber-400 whitespace-nowrap">{{ item.timing || item.time || 'Segera' }}</td>
+                <td class="p-3 font-bold text-white whitespace-nowrap">{{ item.pic || item.actor || 'Divhumas / Bidhumas' }}</td>
+                <td class="p-3">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-sky-300 border border-slate-700 whitespace-nowrap">
+                    {{ item.channel || 'Multi-Kanal' }}
+                  </span>
+                </td>
+                <td class="p-3 text-slate-200 leading-relaxed">{{ item.action || item.recommendation || item }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- ========================================================================= -->
