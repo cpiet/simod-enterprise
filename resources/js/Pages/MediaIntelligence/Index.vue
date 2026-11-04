@@ -183,6 +183,55 @@ const getCleanSummary = (article) => {
   return s;
 };
 
+// Smart Thematic Press Cover Palette & Authority Emblem Resolver (0 Lag)
+const getThematicCover = (article) => {
+  const cat = (article?.category || article?.category_badge || '').toLowerCase();
+  const sent = (article?.sentiment || '').toLowerCase();
+
+  if (cat.includes('hukum') || cat.includes('kriminal') || cat.includes('pidana') || sent === 'negatif') {
+    return {
+      gradient: 'from-[#1c080e] via-[#101222] to-[#070b16]',
+      glow: 'bg-rose-500/20',
+      badgeBorder: 'border-rose-500/40 text-rose-300 bg-rose-950/70',
+      tagText: 'GAKKUM & RESKRIM',
+      icon: Shield,
+      accentColor: 'text-rose-400',
+    };
+  }
+
+  if (cat.includes('lantas') || cat.includes('lalu lintas')) {
+    return {
+      gradient: 'from-[#1c1103] via-[#12121f] to-[#080d18]',
+      glow: 'bg-amber-500/20',
+      badgeBorder: 'border-amber-500/40 text-amber-300 bg-amber-950/70',
+      tagText: 'KEAMANAN LANTAS',
+      icon: TrendingUp,
+      accentColor: 'text-amber-400',
+    };
+  }
+
+  if (cat.includes('siber') || cat.includes('teknologi')) {
+    return {
+      gradient: 'from-[#061824] via-[#091224] to-[#050b14]',
+      glow: 'bg-cyan-500/20',
+      badgeBorder: 'border-cyan-500/40 text-cyan-300 bg-cyan-950/70',
+      tagText: 'PATROLI SIBER',
+      icon: Cpu,
+      accentColor: 'text-cyan-400',
+    };
+  }
+
+  // Default Harkamtibmas / Nasional
+  return {
+    gradient: 'from-[#0a1630] via-[#081022] to-[#050a16]',
+    glow: 'bg-blue-500/20',
+    badgeBorder: 'border-blue-400/40 text-blue-300 bg-blue-950/70',
+    tagText: 'HARKAMTIBMAS NASIONAL',
+    icon: Newspaper,
+    accentColor: 'text-blue-400',
+  };
+};
+
 // Filter States
 const selectedPortal = ref('Semua Portal');
 const selectedCategory = ref('all');
@@ -2146,20 +2195,61 @@ const submitIssue = () => {
                 @error="handleImageError(article)"
               />
 
-              <!-- Default Placeholder: Tulisan Default Tidak Ada Gambar Ditampilkan -->
+              <!-- Smart Thematic Press Cover (Saat Berita Teks / Google News Tanpa Foto) -->
               <div
                 v-else
-                class="w-full h-full flex flex-col items-center justify-center p-4 bg-gradient-to-b from-slate-100 via-slate-50 to-white dark:from-[#091122] dark:via-[#070d1a] dark:to-[#050914] text-center select-none"
+                class="w-full h-full relative overflow-hidden select-none flex flex-col justify-between p-3.5 bg-gradient-to-br transition-all duration-300"
+                :class="getThematicCover(article).gradient"
               >
-                <div class="w-10 h-10 rounded-2xl bg-slate-200/70 dark:bg-slate-800/60 border border-slate-300 dark:border-slate-700/60 flex items-center justify-center mb-1.5 shadow-inner">
-                  <ImageOff class="w-5 h-5 text-slate-400 dark:text-slate-500" />
+                <!-- Background Ambient Glow & Grid Micro-Pattern -->
+                <div
+                  class="absolute -top-8 -right-8 w-36 h-36 rounded-full blur-2xl pointer-events-none opacity-50"
+                  :class="getThematicCover(article).glow"
+                ></div>
+                <div class="absolute inset-0 bg-[radial-gradient(#ffffff0a_1px,transparent_1px)] [background-size:12px_12px] opacity-40 pointer-events-none"></div>
+
+                <!-- Watermark Text in Background -->
+                <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.04]">
+                  <span class="text-2xl font-black tracking-widest text-white uppercase transform -rotate-12 select-none">
+                    MEDIA INTEL BRIEFING
+                  </span>
                 </div>
-                <span class="text-[11px] font-black tracking-wider text-slate-700 dark:text-slate-300 uppercase">
-                  Tidak Ada Gambar Ditampilkan
-                </span>
-                <span class="text-[10px] text-slate-500 dark:text-slate-500 mt-0.5">
-                  Dokumentasi Berita Teks &bull; {{ article.source_name }}
-                </span>
+
+                <!-- Top Spacer for source & time-ago pills -->
+                <div class="h-6"></div>
+
+                <!-- Centerpiece: Authority Emblem & Media Branding -->
+                <div class="relative z-10 flex flex-col items-center justify-center text-center my-auto px-1">
+                  <div
+                    class="w-10 h-10 rounded-2xl border flex items-center justify-center mb-1.5 shadow-lg backdrop-blur-md transition-transform group-hover:scale-110 duration-300"
+                    :class="[getThematicCover(article).badgeBorder, 'shadow-black/50']"
+                  >
+                    <component
+                      :is="getThematicCover(article).icon"
+                      class="w-5 h-5 drop-shadow"
+                      :class="getThematicCover(article).accentColor"
+                    />
+                  </div>
+                  
+                  <span class="text-xs font-black tracking-widest text-white uppercase drop-shadow-md truncate max-w-[210px]">
+                    {{ article.source_name || 'MEDIA NASIONAL' }}
+                  </span>
+                  
+                  <span class="text-[9px] font-mono font-bold tracking-wider text-slate-300/80 uppercase mt-0.5 flex items-center gap-1">
+                    <span>DOKUMENTASI PERS</span>
+                    <span>•</span>
+                    <span :class="getThematicCover(article).accentColor">{{ getThematicCover(article).tagText }}</span>
+                  </span>
+                </div>
+
+                <!-- Bottom Watermark Footer Line -->
+                <div class="relative z-10 flex items-center justify-between text-[8px] font-mono uppercase tracking-wider text-slate-400/80 border-t border-white/10 pt-1">
+                  <span class="flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>SINDIKASI PERS SIBER</span>
+                  </span>
+                  <span class="font-bold text-slate-400">POLRI PRESISI</span>
+                </div>
               </div>
 
               <!-- Dark Gradient Overlay (Hanya jika ada gambar asli) -->

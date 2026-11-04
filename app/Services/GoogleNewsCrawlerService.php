@@ -51,6 +51,12 @@ class GoogleNewsCrawlerService
         $ingestedArticles = [];
 
         foreach ($parsed as $item) {
+            // INSTANT LOCAL IMAGE MATCHING:
+            // Cek apakah artikel serupa sudah ada di database lokal SIMOD yang memiliki foto resmi (0 detik delay)
+            if (empty($item['image_url'])) {
+                $item['image_url'] = $this->findLocalMatchingImage($item['title'], $item['source_name'], $poldaId);
+            }
+
             // Gunakan updateOrCreate berbasis URL unik
             $article = MediaArticle::where('url', $item['url'])->first();
             if (!$article) {
@@ -68,8 +74,11 @@ class GoogleNewsCrawlerService
                     'is_bookmarked' => false,
                 ]);
             } else {
-                if (empty($article->image_url) && !empty($item['image_url'])) {
-                    $article->update(['image_url' => $item['image_url']]);
+                if (empty($article->image_url)) {
+                    $matched = $item['image_url'] ?: $this->findLocalMatchingImage($article->title, $article->source_name, $poldaId);
+                    if ($matched) {
+                        $article->update(['image_url' => $matched]);
+                    }
                 }
             }
 
@@ -353,5 +362,72 @@ class GoogleNewsCrawlerService
         }
 
         return 'Nasional';
+    }
+
+    /**
+     * Cari foto asli dari database berita lokal SIMOD yang relevan (0 detik delay, tanpa scraping luar).
+     */
+    public function findLocalMatchingImage(string $title, string $sourceName, ?int $poldaId = null): ?string
+    {
+        // 1. Ekstrak kata-kata kunci utama dari judul (panjang >= 4 huruf, singkirkan stopwords)
+        $words = preg_split('/[\s,\.\-\"\':;!?()\[\]\/]+/u', mb_strtolower($title));
+        $stopwords = [
+            'dari', 'yang', 'pada', 'untuk', 'dengan', 'dalam', 'oleh', 'akan', 'atau', 'ini', 'itu', 
+            'juga', 'atas', 'kini', 'saat', 'usai', 'jadi', 'bisa', 'terkait', 'soal', 'kasus', 'sebut',
+            'minta', 'ungkap', 'beberkan', 'sebutkan', 'buka', 'suara', 'respons', 'reaksi', 'viral'
+        ];
+        
+        $significantWords = [];
+        foreach ($words as $w) {
+            $w = trim($w);
+            if (mb_strlen($w) >= 4 && !in_array($w, $stopwords, true)) {
+                $significantWords[] = $w;
+            }
+        }
+
+        if (empty($significantWords)) {
+            return null;
+        }
+
+        // 2. Query ke artikel lokal yang sudah punya image_url valid (bukan unsplash)
+        $query = MediaArticle::query()
+            ->whereNotNull('image_url')
+            ->where('image_url', '!=', '')
+            ->where('image_url', 'not like', '%unsplash.com%');
+
+        // Gunakan 2-3 kata kunci pertama yang paling kuat
+        $targetWords = array_slice($significantWords, 0, 3);
+        $query->where(function ($q) use ($targetWords) {
+            foreach ($targetWords as $word) {
+                $q->where('title', 'like', "%{$word}%");
+            }
+        });
+
+        $candidate = $query->latest('pub_date')->first();
+        if ($candidate && filter_var($candidate->image_url, FILTER_VALIDATE_URL)) {
+            return $candidate->image_url;
+        }
+
+        // 3. Fallback: coba 2 kata kunci jika 3 kata kunci terlalu spesifik
+        if (count($targetWords) >= 2) {
+            $fallbackWords = array_slice($targetWords, 0, 2);
+            $fallbackCandidate = MediaArticle::query()
+                ->whereNotNull('image_url')
+                ->where('image_url', '!=', '')
+                ->where('image_url', 'not like', '%unsplash.com%')
+                ->where(function ($q) use ($fallbackWords) {
+                    foreach ($fallbackWords as $w) {
+                        $q->where('title', 'like', "%{$w}%");
+                    }
+                })
+                ->latest('pub_date')
+                ->first();
+
+            if ($fallbackCandidate && filter_var($fallbackCandidate->image_url, FILTER_VALIDATE_URL)) {
+                return $fallbackCandidate->image_url;
+            }
+        }
+
+        return null;
     }
 }
