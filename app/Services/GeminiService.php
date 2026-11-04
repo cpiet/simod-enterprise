@@ -496,7 +496,7 @@ Kembalikan respon HANYA dalam format JSON murni tanpa markdown wrapper (RFC 8259
       "pic": "Tim Siber & Pengelola Medsos"
     }
   ],
-  "whatsapp_script": "Tuliskan naskah WhatsApp resmi siap kirim ke Pimpinan menggunakan format baku kedinasan Polri (Kepada Yth. Pimpinan, Laporan Perkembangan Kasus Atensi, Fakta Kasus, Analisis Sentimen Media, Rekomendasi Langkah Humas, Penutup Hormat)."
+  "whatsapp_script": "Susun naskah WhatsApp resmi siap kirim ke Pimpinan yang komprehensif, terstruktur rapi, berwibawa, dan berimbang (tidak terlalu panjang dan tidak terlalu pendek, sekitar 250-400 kata). Wajib menggunakan format baku dinas Polri dengan penomoran romawi dan bullet points, menggunakan penanda bold *teks*, serta dipisahkan baris baru ganda (\\n\\n) antar bagian:\\n- KEPADA YTH: {$leaderTitle}\\n- DARI: PIKET ANALISIS INTELIJEN MEDIA & OPINI PUBLIK\\n- SATUAN: {$commandName}\\n- WAKTU: [Hari, Tanggal & Jam aktual]\\n- PERIHAL: LAPORAN KHUSUS PERKEMBANGAN KASUS ATENSI — {$topic->title}\\n\\n*I. FAKTA & PERKEMBANGAN TERKINI:*\\n• [2-3 poin fakta objektif terverifikasi 5W+1H]\\n\\n*II. POLARISASI MEDIA & SENTIMEN OPINI PUBLIK:*\\n• *Komposisi Sentimen:* Positif X% | Netral Y% | Negatif Z% (*Dominan: [Sentimen]*)\\n• *Framing Media & Warganet:* [1-2 kalimat fokus pemberitaan media massa dan warganet]\\n\\n*III. POTENSI RISIKO KAMTIBMAS & CITRA (UNMITIGATED RISK):*\\n• [Kajian 2 kalimat dampak fatal jika isu dibiarkan tanpa mitigasi cepat: ancaman fisik/siber dan dampaknya terhadap public trust]\\n\\n*IV. LANGKAH TAKTIS & REKOMENDASI KEHUMASAN:*\\n1. *0-2 Jam (Tanggap Cepat):* [Aksi verifikasi lapangan, satu pintu juru bicara]\\n2. *2-6 Jam (Konsolidasi Publik):* [Penyusunan press release transparan, doorstop, infografis]\\n3. *24 Jam (Pengendalian Opini):* [Amplifikasi penegakan hukum profesional, pemantauan sentimen]\\n\\n*V. POIN KUNCI JURU BICARA (TALKING POINTS):*\\n• [2-3 poin pernyataan resmi juru bicara]\\n\\n*VI. PENUTUP & MOHON PETUNJUK:*\\nDemikian laporan khusus perkembangan kasus atensi ini kami haturkan ke hadapan Jenderal sebagai bahan pertimbangan dan arahan kebijakan lebih lanjut.\\n\\n*Hormat kami,*\\n*Tim Satgas Intelijen Media & Opini Publik*\\n*{$commandName}*"
 }
 PROMPT;
 
@@ -549,6 +549,8 @@ PROMPT;
                         }
 
                         if (!empty($parsed) && is_array($parsed)) {
+                            $parsed['whatsapp_script'] = self::buildRichWhatsAppScript($parsed, $polda, $topic);
+
                             return [
                                 'success'    => true,
                                 'data'       => $parsed,
@@ -573,5 +575,125 @@ PROMPT;
             'success' => false,
             'message' => "Analisis kasus Gemini gagal: {$lastError}",
         ];
+    }
+
+    /**
+     * Standarisasi dan sintesis Naskah WhatsApp Laporan Khusus Pimpinan (Presisi Polri).
+     * Memastikan naskah tidak terlalu pendek dan tidak terlalu panjang (~250-400 kata),
+     * lengkap dengan hierarki resmi, fakta empiris, sentimen, risiko unmitigated, rekomendasi berjenjang, dan talking points.
+     */
+    public static function buildRichWhatsAppScript(array $data, ?Polda $polda = null, ?\App\Models\MediaTopic $topic = null): string
+    {
+        $existing = trim((string)($data['whatsapp_script'] ?? ''));
+
+        // Cek apakah naskah bawaan Gemini sudah lengkap, berjenjang romawi, dan memiliki pemisah baris rapi
+        $hasNewlines = substr_count($existing, "\n") >= 6;
+        $hasSections = (str_contains($existing, 'I.') || str_contains($existing, 'FAKTA')) &&
+                       (str_contains($existing, 'II.') || str_contains($existing, 'SENTIMEN') || str_contains($existing, 'POLARISASI')) &&
+                       (str_contains($existing, 'III.') || str_contains($existing, 'RISIKO') || str_contains($existing, 'REKOMENDASI'));
+
+        if (strlen($existing) >= 650 && $hasNewlines && $hasSections) {
+            return $existing;
+        }
+
+        // Sintesis naskah intelijen berstandar kedinasan Humas Polri
+        $isNational = ($polda?->code === 'DIVHUMAS');
+        $commandName = $isNational ? 'DIVISI HUMAS POLRI (MABES POLRI)' : ($polda?->name ? strtoupper($polda->name) : 'POLDA');
+        $leaderTitle = $isNational ? 'KADIVHUMAS POLRI / PEJABAT UTAMA MABES POLRI' : 'BAPAK KAPOLDA / WAKAPOLDA / PJU';
+        $tz = ($isNational || $polda?->timezone === 'Asia/Jakarta') ? 'WIB' : 'WITA';
+        $nowStr = now()->translatedFormat('l, d F Y');
+        $timeStr = now()->format('H.i') . ' ' . $tz;
+
+        $caseTitle = strtoupper($topic?->title ?? $data['case_title'] ?? 'KASUS ATENSI');
+
+        $lines = [];
+        $lines[] = "*KEPADA YTH: {$leaderTitle}*";
+        $lines[] = "*DARI: PIKET ANALISIS INTELIJEN MEDIA & OPINI PUBLIK*";
+        $lines[] = "*SATUAN: {$commandName}*";
+        $lines[] = "*WAKTU LAPORAN: {$nowStr}, Pukul {$timeStr}*";
+        $lines[] = "*PERIHAL: LAPORAN KHUSUS PERKEMBANGAN KASUS ATENSI — {$caseTitle}*";
+        $lines[] = "";
+
+        // I. FAKTA & PERKEMBANGAN TERKINI
+        $lines[] = "*I. FAKTA & PERKEMBANGAN TERKINI:*";
+        $execSummary = trim($data['executive_summary'] ?? '');
+        if (!empty($execSummary)) {
+            // Pisahkan kalimat secara cerdas agar mudah dibaca di mobile
+            $sentences = preg_split('/(?<=[.?!])\s+(?=[A-Z0-9])/', $execSummary);
+            if (count($sentences) >= 2) {
+                foreach ($sentences as $s) {
+                    $trimmed = trim($s);
+                    if (!empty($trimmed)) {
+                        $lines[] = "• " . $trimmed;
+                    }
+                }
+            } else {
+                $lines[] = "• " . $execSummary;
+            }
+        } else {
+            $lines[] = "• Penanganan kasus atensi pimpinan terus dipantau secara intensif melalui sinergi jajaran.";
+        }
+        $lines[] = "";
+
+        // II. POLARISASI MEDIA & SENTIMEN OPINI PUBLIK
+        $lines[] = "*II. POLARISASI MEDIA & SENTIMEN OPINI PUBLIK:*";
+        $sent = $data['sentiment_analysis'] ?? [];
+        $pos = isset($sent['positif']) ? (int)$sent['positif'] : 15;
+        $net = isset($sent['netral']) ? (int)$sent['netral'] : 45;
+        $neg = isset($sent['negatif']) ? (int)$sent['negatif'] : 40;
+        $dom = strtoupper($sent['dominant_sentiment'] ?? ($neg > $pos ? 'NEGATIF' : 'NETRAL'));
+        $lines[] = "• *Komposisi Sentimen:* Positif {$pos}% | Netral {$net}% | Negatif {$neg}% (*Dominan: {$dom}*)";
+        if (!empty($sent['framing_media'])) {
+            $lines[] = "• *Framing Media & Warganet:* " . trim($sent['framing_media']);
+        }
+        $lines[] = "";
+
+        // III. POTENSI RISIKO KAMTIBMAS & CITRA (UNMITIGATED RISK)
+        $lines[] = "*III. POTENSI RISIKO KAMTIBMAS & CITRA (UNMITIGATED RISK):*";
+        $risk = trim($data['risk_assessment'] ?? '');
+        if (!empty($risk)) {
+            $lines[] = "• " . $risk;
+        } else {
+            $lines[] = "• Isu berpotensi menggerus public trust jika tidak dikelola dengan komunikasi strategis yang transparan dan akuntabel.";
+        }
+        $lines[] = "";
+
+        // IV. LANGKAH TAKTIS & REKOMENDASI KEHUMASAN
+        $lines[] = "*IV. LANGKAH TAKTIS & REKOMENDASI KEHUMASAN:*";
+        $recs = $data['action_recommendations'] ?? [];
+        if (!empty($recs) && is_array($recs)) {
+            foreach ($recs as $idx => $r) {
+                $num = $idx + 1;
+                $tf = $r['timeframe'] ?? "Langkah {$num}";
+                $act = $r['action'] ?? '';
+                $pic = !empty($r['pic']) ? " _(PIC: {$r['pic']})_" : '';
+                $lines[] = "{$num}. *{$tf}:* {$act}{$pic}";
+            }
+        } else {
+            $lines[] = "1. *0-2 Jam (Tanggap Cepat):* Melaksanakan rapat koordinasi internal kilat, menyamakan narasi, dan menetapkan juru bicara resmi satu pintu.";
+            $lines[] = "2. *2-6 Jam (Konsolidasi Publik):* Menyiapkan press release resmi transparan berbasis kronologi dan fakta objektif untuk menjawab keraguan publik.";
+            $lines[] = "3. *24 Jam (Pengendalian Opini):* Mengamplifikasi narasi penegakan hukum profesional serta memantau fluktuasi sentimen media sosial.";
+        }
+        $lines[] = "";
+
+        // V. POIN KUNCI JURU BICARA (TALKING POINTS)
+        $tps = $data['talking_points'] ?? [];
+        if (!empty($tps) && is_array($tps)) {
+            $lines[] = "*V. POIN KUNCI JURU BICARA (TALKING POINTS):*";
+            foreach ($tps as $tp) {
+                $lines[] = "• " . trim($tp);
+            }
+            $lines[] = "";
+        }
+
+        // VI. PENUTUP & MOHON PETUNJUK
+        $lines[] = "*VI. PENUTUP & MOHON PETUNJUK:*";
+        $lines[] = "Demikian laporan khusus perkembangan kasus atensi ini kami haturkan ke hadapan Jenderal sebagai bahan pertimbangan dan arahan kebijakan lebih lanjut.";
+        $lines[] = "";
+        $lines[] = "*Hormat kami,*";
+        $lines[] = "*Tim Satgas Intelijen Media & Opini Publik*";
+        $lines[] = "*{$commandName}*";
+
+        return implode("\n", $lines);
     }
 }

@@ -96,6 +96,11 @@ class MediaIntelligenceController extends Controller
 
         $topicsMap = [];
         foreach ($dbTopics as $t) {
+            $aiAnalysis = $t->ai_analysis;
+            if (!empty($aiAnalysis) && is_array($aiAnalysis)) {
+                $aiAnalysis['whatsapp_script'] = GeminiService::buildRichWhatsAppScript($aiAnalysis, $selectedPolda, $t);
+            }
+
             $topicsMap[$t->id] = [
                 'id'                    => $t->id,
                 'title'                 => $t->title,
@@ -104,7 +109,7 @@ class MediaIntelligenceController extends Controller
                 'description'           => $t->description,
                 'priority'              => $t->priority,
                 'status'                => $t->status,
-                'ai_analysis'           => $t->ai_analysis,
+                'ai_analysis'           => $aiAnalysis,
                 'ai_analyzed_at'        => $t->ai_analyzed_at?->toISOString(),
                 'ai_analyzed_at_humans' => $t->ai_analyzed_at ? $t->ai_analyzed_at->diffForHumans() : null,
                 'ai_articles_count'     => (int) ($t->ai_articles_count ?? 0),
@@ -1406,6 +1411,9 @@ PROMPT;
         if (!$result['success']) {
             return response()->json($result, 500);
         }
+
+        // Pastikan naskah WhatsApp diperkaya dan berstruktur resmi kedinasan Polri
+        $result['data']['whatsapp_script'] = GeminiService::buildRichWhatsAppScript($result['data'], $polda, $topic);
 
         // Simpan hasil analisis AI secara permanen ke basis data (Smart Caching)
         $topic->update([

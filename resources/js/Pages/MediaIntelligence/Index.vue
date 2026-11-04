@@ -708,8 +708,16 @@ const runTopicAiAnalysis = async (topic, forceRefresh = false) => {
   }
 };
 
+const isTopicWaCopied = ref(false);
+
 const copyTopicWaScript = (topic) => {
   if (!topic) return;
+  // Jika topik sudah memiliki hasil analisis AI dengan naskah WhatsApp resmi berstandar Polri, salin naskah tersebut
+  if (topic.ai_analysis?.whatsapp_script) {
+    copyText(topic.ai_analysis.whatsapp_script, `Naskah WhatsApp Atensi "${topic.title}"`);
+    return;
+  }
+
   const matched = (props.sampleArticles || []).filter(a => (a.matched_topic_ids || []).includes(topic.id));
   const isDiv = props.selectedCode === 'ALL' || props.selectedCode === 'DIVHUMAS';
   const tz = isDiv ? 'WIB' : 'WITA';
@@ -749,6 +757,14 @@ const copyTopicWaScript = (topic) => {
 const copyAiWaScript = () => {
   if (!topicAiResult.value?.whatsapp_script) return;
   copyText(topicAiResult.value.whatsapp_script, 'Naskah WhatsApp Resmi Hasil Analisis AI');
+  isTopicWaCopied.value = true;
+  setTimeout(() => { isTopicWaCopied.value = false; }, 3000);
+};
+
+const openTopicWaDirect = () => {
+  if (!topicAiResult.value?.whatsapp_script) return;
+  const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(topicAiResult.value.whatsapp_script)}`;
+  window.open(url, '_blank');
 };
 
 // Modal state for viewing/copying prompt manually
@@ -3913,22 +3929,49 @@ const submitIssue = () => {
 
           <!-- 6. WhatsApp Script (Naskah Siap Kirim) -->
           <div class="p-5 rounded-2xl bg-emerald-950/30 border border-emerald-500/40 space-y-3">
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between flex-wrap gap-2">
               <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-2">
                 <MessageSquare class="w-4 h-4" />
                 <span>6. Naskah WhatsApp Laporan Khusus Pimpinan (Siap Kirim)</span>
               </span>
-              <button
-                @click="copyAiWaScript"
-                class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-md transition cursor-pointer"
-              >
-                <Copy class="w-3.5 h-3.5" />
-                <span>Salin Naskah WA</span>
-              </button>
+              <div class="flex items-center gap-2">
+                <button
+                  @click="openTopicWaDirect"
+                  type="button"
+                  class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-300 border border-emerald-500/40 text-xs font-bold shadow-sm transition cursor-pointer"
+                  title="Buka langsung dan kirim melalui WhatsApp"
+                >
+                  <Send class="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Kirim ke WA</span>
+                </button>
+                <button
+                  @click="copyAiWaScript"
+                  type="button"
+                  class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-md transition cursor-pointer"
+                >
+                  <Check v-if="isTopicWaCopied" class="w-3.5 h-3.5" />
+                  <Copy v-else class="w-3.5 h-3.5" />
+                  <span>{{ isTopicWaCopied ? 'Berhasil Disalin!' : 'Salin Naskah WA' }}</span>
+                </button>
+              </div>
             </div>
 
-            <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-emerald-300 whitespace-pre-line leading-relaxed max-h-72 overflow-y-auto">
+            <!-- Terminal Text Box -->
+            <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-emerald-300 whitespace-pre-wrap leading-relaxed max-h-[460px] overflow-y-auto select-all shadow-inner custom-scrollbar">
               {{ topicAiResult.whatsapp_script }}
+            </div>
+
+            <!-- Sub Footer Meta -->
+            <div class="flex items-center justify-between text-[11px] text-slate-400 px-1 pt-1 border-t border-emerald-950/60 flex-wrap gap-2">
+              <div class="flex items-center gap-3 flex-wrap">
+                <span class="flex items-center gap-1.5 text-emerald-400 font-semibold">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Format Baku Kedinasan Polri (Presisi)
+                </span>
+                <span>Karakter: <strong class="text-white">{{ (topicAiResult.whatsapp_script || '').length }}</strong></span>
+                <span>Estimasi Baca: <strong class="text-white">~2 Menit</strong></span>
+              </div>
+              <span class="text-slate-500 hidden sm:inline">Siap Teruskan ke Pimpinan</span>
             </div>
           </div>
         </div>
@@ -3946,8 +3989,9 @@ const submitIssue = () => {
             @click="copyAiWaScript"
             class="flex items-center gap-2 px-5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition cursor-pointer shadow-lg shadow-amber-400/20"
           >
-            <Copy class="w-4 h-4" />
-            <span>Salin Naskah WA Pimpinan</span>
+            <Check v-if="isTopicWaCopied" class="w-4 h-4" />
+            <Copy v-else class="w-4 h-4" />
+            <span>{{ isTopicWaCopied ? 'Tersalin ke Clipboard!' : 'Salin Naskah WA Pimpinan' }}</span>
           </button>
         </div>
       </div>
