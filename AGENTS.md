@@ -105,9 +105,9 @@ Seluruh 29 portal media dikonfigurasi melalui seeder [`SulbarRssFeedsSeeder.php`
   - *Visual Word Cloud Semantik*: Ekstraksi 36 kata/frasa teratas dengan filtering 70+ Indonesian stopwords, skala dinamis (12-36px), pewarnaan sentimen dominan (Emerald, Slate, Rose), klaster tema kepolisian, dan filter 1-klik ke pencarian feed.
   - *On-Demand Keyword Tracker*: Tombol `⚡ Lacak Topik Baru (On-Demand)` dan modal drawer untuk crawling kasus/topik mendadak lintas 𝕏, TikTok, IG, YT, FB via `POST /social-intelligence/track-keyword` (`ApifySyncService::crawlKeyword`) dengan multi-token failover dan smart synthetic fallback ingestion.
 
-### 4.5. Radar Media Online Divhumas Polri (22 Feed Nasional Terverifikasi 100% Gambar)
+### 4.5. Radar Media Online Divhumas Polri (33 Feed Nasional Terverifikasi & Sindikasi Google News)
 - **Tenant Scope**: Kode `DIVHUMAS` (ID `10`) atau query parameter `?polda=ALL`.
-- **Daftar 22 Feed Resmi Aktif**:
+- **Daftar 33 Feed Resmi Aktif**:
   1. ANTARA News Terkini (`https://www.antaranews.com/rss/terkini.xml`)
   2. ANTARA Top News (`https://www.antaranews.com/rss/top-news.xml`)
   3. ANTARA Politik & Pemerintahan (`https://www.antaranews.com/rss/politik.xml`)
@@ -130,7 +130,18 @@ Seluruh 29 portal media dikonfigurasi melalui seeder [`SulbarRssFeedsSeeder.php`
   20. JPNN Berita Terkini (`https://www.jpnn.com/rss`)
   21. Kumparan News (`https://lapi.kumparan.com/v2.0/rss/`)
   22. BBC News Indonesia (`https://feeds.bbci.co.uk/indonesia/rss.xml`)
-- **Verifikasi Kualitas Gambar**: 100% artikel memiliki thumbnail/cover image resolusi tinggi dari CDN resmi media yang diekstrak melalui parser `RssFeedService` (`enclosure`, `media:content`, `media:thumbnail`, `img src`).
+  23. Tempo.co Utama (`https://rss.tempo.co/`)
+  24. Tempo.co Nasional (`https://rss.tempo.co/nasional`)
+  25. CNN Indonesia Utama (`https://www.cnnindonesia.com/rss`)
+  26. CNBC Indonesia Terkini (`https://www.cnbcindonesia.com/rss`)
+  27. Google News - Berita Utama (`https://news.google.com/rss?hl=id&gl=ID&ceid=ID:id`)
+  28. Google News - Bisnis & Ekonomi (`https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=id&gl=ID&ceid=ID:id`)
+  29. Google News - Teknologi & Siber (`https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=id&gl=ID&ceid=ID:id`)
+  30. Google News - Hiburan & Budaya (`https://news.google.com/rss/headlines/section/topic/ENTERTAINMENT?hl=id&gl=ID&ceid=ID:id`)
+  31. Google News - Olahraga (`https://news.google.com/rss/headlines/section/topic/SPORTS?hl=id&gl=ID&ceid=ID:id`)
+  32. Google News - Sains & Lingkungan (`https://news.google.com/rss/headlines/section/topic/SCIENCE?hl=id&gl=ID&ceid=ID:id`)
+  33. Google News - Kesehatan (`https://news.google.com/rss/headlines/section/topic/HEALTH?hl=id&gl=ID&ceid=ID:id`)
+- **Verifikasi Kualitas Feed**: Portal media arus utama membawa gambar dan konten lengkap, sementara Google News RSS menyediakan agregasi sebaran topik publik yang luas.
 - **Sinkronisasi CLI**: `php artisan rss:sync --polda=ALL` otomatis memetakan ke tenant Divhumas Polri.
 
 ### 4.6. Smart Dossier Topik Atensi, Caching AI & Mesin Ingesti Live Google News

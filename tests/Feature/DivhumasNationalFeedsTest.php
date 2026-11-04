@@ -48,10 +48,10 @@ class DivhumasNationalFeedsTest extends TestCase
         $this->assertEquals('DIVHUMAS', $divhumas->code);
 
         $feeds = MediaFeed::where('polda_id', $divhumas->id)->get();
-        $this->assertCount(22, $feeds);
+        $this->assertCount(33, $feeds);
 
         $activeFeeds = $feeds->where('is_active', true);
-        $this->assertCount(22, $activeFeeds);
+        $this->assertCount(33, $activeFeeds);
     }
 
     public function test_media_intelligence_loads_for_national_scope(): void
@@ -62,7 +62,7 @@ class DivhumasNationalFeedsTest extends TestCase
         $response->assertInertia(fn ($page) =>
             $page->component('MediaIntelligence/Index')
                 ->where('selectedCode', 'ALL')
-                ->has('mediaFeeds', 22)
+                ->has('mediaFeeds', 33)
         );
     }
 
