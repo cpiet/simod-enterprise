@@ -7,7 +7,6 @@ import {
   Bot,
   Volume2,
   VolumeX,
-  RotateCcw,
   X,
   Send,
   Shield,
@@ -17,6 +16,11 @@ import {
   Sliders,
   Square,
   Sparkles,
+  FolderClock,
+  Plus,
+  MessageSquare,
+  CornerDownLeft,
+  ArrowRight,
 } from 'lucide-vue-next';
 
 // Configure marked parser for clean HTML rendering
@@ -32,17 +36,20 @@ const renderMarkdown = (content) => {
 
 const page = usePage();
 
-// Persistent State from LocalStorage
+// Persistent Storage Keys
 const STORAGE_KEY = 'simod_sadewa_chat_history_v2';
+const SESSIONS_KEY = 'simod_sadewa_sessions_v1';
+const ACTIVE_SESSION_KEY = 'simod_sadewa_active_session_id_v1';
 const VOICE_PRESET_KEY = 'simod_sadewa_voice_preset_v2';
 const MUTE_KEY = 'simod_sadewa_voice_muted_v2';
 
 const isSadewaOpen = ref(false);
 const isMinimized = ref(false);
+const showArchiveView = ref(false);
 const isSadewaSpeaking = ref(false);
 const isSpeechMuted = ref(false);
 const showVoiceSettings = ref(false);
-const voicePitch = ref(0.78); // Deep authoritative male baritone default
+const voicePitch = ref(0.78); // Bariton wibawa perwira default
 const voiceRate = ref(0.98);
 const selectedVoicePreset = ref('baritone'); // 'baritone' | 'command' | 'tactical'
 const sadewaInput = ref('');
@@ -54,6 +61,8 @@ const DEFAULT_GREETING = {
   time: 'Realtime',
 };
 
+const currentSessionId = ref(null);
+const chatSessions = ref([]);
 const sadewaMessages = ref([DEFAULT_GREETING]);
 
 const sadewaChips = [
@@ -75,79 +84,137 @@ const loadVoices = () => {
   }
 };
 
-// Load saved chat history & voice preferences
-onMounted(() => {
-  loadVoices();
-  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-    window.speechSynthesis.onvoiceschanged = loadVoices;
-  }
+// Sessions Archive Management
+const generateSessionId = () => 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
 
+const loadSessions = () => {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        sadewaMessages.value = parsed;
-      }
-    }
-
-    const savedMute = localStorage.getItem(MUTE_KEY);
-    if (savedMute !== null) {
-      isSpeechMuted.value = savedMute === 'true';
-    }
-
-    const savedPreset = localStorage.getItem(VOICE_PRESET_KEY);
-    if (savedPreset) {
-      applyVoicePreset(savedPreset);
+    const raw = localStorage.getItem(SESSIONS_KEY);
+    if (raw) {
+      chatSessions.value = JSON.parse(raw);
     }
   } catch (e) {
-    // Fallback gracefully
-  }
-
-  // Listen to global open event from other pages/components
-  window.addEventListener('open-sadewa-copilot', handleGlobalOpen);
-
-  // Auto-stop voice when navigating across menus in Inertia
-  removeBeforeHook = router.on('before', stopSpeech);
-  removeNavigateHook = router.on('navigate', stopSpeech);
-});
-
-let removeBeforeHook = null;
-let removeNavigateHook = null;
-
-onBeforeUnmount(() => {
-  stopSpeech();
-  window.removeEventListener('open-sadewa-copilot', handleGlobalOpen);
-  if (removeBeforeHook) removeBeforeHook();
-  if (removeNavigateHook) removeNavigateHook();
-});
-
-const handleGlobalOpen = (e) => {
-  isSadewaOpen.value = true;
-  isMinimized.value = false;
-  if (e.detail?.query) {
-    sendSadewaMessage(e.detail.query);
+    chatSessions.value = [];
   }
 };
 
-// Save chat history on update
-watch(
-  sadewaMessages,
-  (newVal) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newVal));
-    } catch (e) {}
-  },
-  { deep: true }
-);
-
-watch(isSpeechMuted, (val) => {
+const persistSessions = () => {
   try {
-    localStorage.setItem(MUTE_KEY, val.toString());
+    localStorage.setItem(SESSIONS_KEY, JSON.stringify(chatSessions.value));
   } catch (e) {}
-});
+};
 
-// Voice Presets for Masculine Authority
+const syncActiveSessionToArchive = () => {
+  const hasUserMsg = sadewaMessages.value.some((m) => m.role === 'user');
+  if (!hasUserMsg) return;
+
+  if (!currentSessionId.value) {
+    currentSessionId.value = generateSessionId();
+    try {
+      localStorage.setItem(ACTIVE_SESSION_KEY, currentSessionId.value);
+    } catch (e) {}
+  }
+
+  const firstUserMsg = sadewaMessages.value.find((m) => m.role === 'user');
+  let title = firstUserMsg ? firstUserMsg.text : 'Percakapan Intelijen SADEWA';
+  if (title.length > 60) title = title.substring(0, 57) + '...';
+
+  const lastAssistantMsg = [...sadewaMessages.value].reverse().find((m) => m.role === 'assistant');
+  let snippet = lastAssistantMsg ? lastAssistantMsg.text.replace(/[#*`_~]/g, '').trim() : '';
+  if (snippet.length > 85) snippet = snippet.substring(0, 82) + '...';
+
+  const now = new Date();
+  const timeLabel =
+    now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }) +
+    ', ' +
+    now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) +
+    ' WITA';
+
+  const sessionObj = {
+    id: currentSessionId.value,
+    title,
+    snippet,
+    messages: JSON.parse(JSON.stringify(sadewaMessages.value)),
+    updatedAt: now.toISOString(),
+    timeLabel,
+  };
+
+  const existingIdx = chatSessions.value.findIndex((s) => s.id === currentSessionId.value);
+  if (existingIdx >= 0) {
+    chatSessions.value[existingIdx] = sessionObj;
+  } else {
+    chatSessions.value.unshift(sessionObj);
+  }
+
+  if (chatSessions.value.length > 30) {
+    chatSessions.value = chatSessions.value.slice(0, 30);
+  }
+
+  persistSessions();
+};
+
+const resumeSession = (session) => {
+  stopSpeech();
+  // Auto-archive active thread if it has unsaved questions and isn't the same
+  if (currentSessionId.value !== session.id) {
+    syncActiveSessionToArchive();
+  }
+
+  currentSessionId.value = session.id;
+  sadewaMessages.value = JSON.parse(JSON.stringify(session.messages));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sadewaMessages.value));
+    localStorage.setItem(ACTIVE_SESSION_KEY, session.id);
+  } catch (e) {}
+
+  showArchiveView.value = false;
+  setTimeout(() => {
+    const el = document.getElementById('sadewa-chat-body-global');
+    if (el) el.scrollTop = el.scrollHeight;
+  }, 50);
+};
+
+const startNewSession = () => {
+  stopSpeech();
+  syncActiveSessionToArchive();
+  currentSessionId.value = null;
+  sadewaMessages.value = [DEFAULT_GREETING];
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sadewaMessages.value));
+    localStorage.removeItem(ACTIVE_SESSION_KEY);
+  } catch (e) {}
+  showArchiveView.value = false;
+};
+
+const deleteSession = (id) => {
+  chatSessions.value = chatSessions.value.filter((s) => s.id !== id);
+  persistSessions();
+  if (currentSessionId.value === id) {
+    currentSessionId.value = null;
+  }
+};
+
+const clearAllArchives = () => {
+  chatSessions.value = [];
+  persistSessions();
+};
+
+// Auto-Archive & Reset on Navigation Hook
+const handleNavigation = () => {
+  stopSpeech();
+  // Auto-archive active session so user can resume it later
+  syncActiveSessionToArchive();
+  // Reset active screen to empty greeting so user on the new page gets a fresh slate
+  currentSessionId.value = null;
+  sadewaMessages.value = [DEFAULT_GREETING];
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sadewaMessages.value));
+    localStorage.removeItem(ACTIVE_SESSION_KEY);
+  } catch (e) {}
+  showArchiveView.value = false;
+};
+
+// Voice Presets
 const applyVoicePreset = (preset) => {
   selectedVoicePreset.value = preset;
   try {
@@ -227,13 +294,10 @@ const stopSpeech = () => {
 
 const speakText = (text) => {
   if (isSpeechMuted.value) return;
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-    return;
-  }
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
 
   stopSpeech();
 
-  // Strip markdown, asterisks, brackets, parenthetical English, and bullets for clean Indonesian speech
   const clean = text
     .replace(/[#*`_~]/g, '')
     .replace(/\[.*?\]/g, '')
@@ -268,23 +332,88 @@ const testVoice = () => {
   speakText('Siap Jenderal. Karakter suara pria bariton SADEWA siap menyajikan analisis intelijen media siber.');
 };
 
-const clearChatHistory = () => {
-  stopSpeech();
-  sadewaMessages.value = [
-    {
-      role: 'assistant',
-      text: 'Riwayat percakapan telah dibersihkan. Saya siap menerima instruksi dan pertanyaan analisis situasi berita selanjutnya, Jenderal.',
-      time: 'Baru saja',
-    },
-  ];
+let removeBeforeHook = null;
+let removeNavigateHook = null;
+
+onMounted(() => {
+  loadVoices();
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+  }
+
+  loadSessions();
+
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        sadewaMessages.value = parsed;
+      }
+    }
+
+    const savedSessionId = localStorage.getItem(ACTIVE_SESSION_KEY);
+    if (savedSessionId) {
+      currentSessionId.value = savedSessionId;
+    }
+
+    const savedMute = localStorage.getItem(MUTE_KEY);
+    if (savedMute !== null) {
+      isSpeechMuted.value = savedMute === 'true';
+    }
+
+    const savedPreset = localStorage.getItem(VOICE_PRESET_KEY);
+    if (savedPreset) {
+      applyVoicePreset(savedPreset);
+    }
   } catch (e) {}
+
+  window.addEventListener('open-sadewa-copilot', handleGlobalOpen);
+
+  // Auto-archive active session and stop audio when navigating between menus in Inertia
+  removeBeforeHook = router.on('before', handleNavigation);
+  removeNavigateHook = router.on('navigate', stopSpeech);
+});
+
+onBeforeUnmount(() => {
+  stopSpeech();
+  syncActiveSessionToArchive();
+  window.removeEventListener('open-sadewa-copilot', handleGlobalOpen);
+  if (removeBeforeHook) removeBeforeHook();
+  if (removeNavigateHook) removeNavigateHook();
+});
+
+const handleGlobalOpen = (e) => {
+  isSadewaOpen.value = true;
+  isMinimized.value = false;
+  showArchiveView.value = false;
+  if (e.detail?.query) {
+    sendSadewaMessage(e.detail.query);
+  }
 };
+
+// Save chat history on update
+watch(
+  sadewaMessages,
+  (newVal) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newVal));
+    } catch (e) {}
+  },
+  { deep: true }
+);
+
+watch(isSpeechMuted, (val) => {
+  try {
+    localStorage.setItem(MUTE_KEY, val.toString());
+  } catch (e) {}
+});
 
 const sendSadewaMessage = async (customText = null) => {
   const query = (customText || sadewaInput.value).trim();
   if (!query || isSadewaThinking.value) return;
+
+  showArchiveView.value = false;
 
   sadewaMessages.value.push({
     role: 'user',
@@ -293,6 +422,9 @@ const sendSadewaMessage = async (customText = null) => {
   });
   sadewaInput.value = '';
   isSadewaThinking.value = true;
+
+  // Immediately sync session so it exists in archive
+  syncActiveSessionToArchive();
 
   setTimeout(() => {
     const el = document.getElementById('sadewa-chat-body-global');
@@ -318,6 +450,9 @@ const sendSadewaMessage = async (customText = null) => {
         time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
       };
       sadewaMessages.value.push(replyObj);
+
+      // Persist full answer to archive
+      syncActiveSessionToArchive();
 
       setTimeout(() => {
         const el = document.getElementById('sadewa-chat-body-global');
@@ -351,37 +486,39 @@ const sendSadewaMessage = async (customText = null) => {
 </script>
 
 <template>
-  <!-- Floating Action Launcher Button (Bottom Right) -->
+  <!-- Floating Action Launcher Button (Theme: Midnight Command Navy & Amber Gold) -->
   <div class="fixed bottom-6 right-6 z-40 no-print flex items-center gap-2">
     <button
       type="button"
       @click="isSadewaOpen = !isSadewaOpen; if (isSadewaOpen) isMinimized = false"
-      class="group flex items-center gap-3 px-4 py-3 rounded-full bg-gradient-to-r from-red-700 via-rose-700 to-red-800 hover:from-red-600 hover:to-rose-600 text-white font-black text-xs shadow-2xl shadow-red-700/40 border border-red-500/50 hover:scale-105 active:scale-95 transition-all cursor-pointer select-none"
+      class="group flex items-center gap-3 px-4 py-3 rounded-full bg-gradient-to-r from-[#070d1d] via-[#0b1426] to-[#0f1d38] hover:from-[#0b1426] hover:to-[#16274a] text-white font-black text-xs shadow-2xl shadow-amber-500/10 border border-amber-500/50 hover:border-amber-400 hover:scale-105 active:scale-95 transition-all cursor-pointer select-none"
       title="Buka Tanya Jawab SADEWA AI seputar berita & intelijen media"
     >
-      <div class="relative flex items-center justify-center w-6 h-6 rounded-full bg-white/20">
-        <Bot class="w-4 h-4 text-white" />
+      <div class="relative flex items-center justify-center w-7 h-7 rounded-full bg-gradient-to-tr from-[#0b1426] to-[#1a2d52] border border-amber-400/40 text-amber-400">
+        <Bot class="w-4 h-4" />
         <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
         <span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400"></span>
       </div>
       <div class="text-left">
         <div class="flex items-center gap-1.5">
-          <span class="tracking-wider">SADEWA AI</span>
-          <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-white/25 text-white uppercase">Copilot</span>
+          <span class="tracking-wider font-black text-amber-300">SADEWA AI</span>
+          <span class="px-1.5 py-0.2 rounded text-[9px] font-black bg-amber-400/20 text-amber-300 border border-amber-400/30 uppercase">
+            Copilot
+          </span>
         </div>
-        <p class="text-[10px] text-red-100 font-normal">Tanya Situasi Berita</p>
+        <p class="text-[10px] text-slate-300 font-normal">Tanya Situasi Berita</p>
       </div>
 
       <!-- Live Speaking Equalizer Indicator on Launcher -->
-      <div v-if="isSadewaSpeaking" class="flex items-center gap-0.5 h-3 pl-1 border-l border-white/20">
-        <span class="w-0.5 h-full bg-amber-300 animate-pulse"></span>
-        <span class="w-0.5 h-2 bg-amber-300 animate-pulse delay-75"></span>
-        <span class="w-0.5 h-3 bg-amber-300 animate-pulse delay-150"></span>
+      <div v-if="isSadewaSpeaking" class="flex items-center gap-0.5 h-3 pl-1 border-l border-slate-700">
+        <span class="w-0.5 h-full bg-amber-400 animate-pulse"></span>
+        <span class="w-0.5 h-2 bg-amber-400 animate-pulse delay-75"></span>
+        <span class="w-0.5 h-3 bg-amber-400 animate-pulse delay-150"></span>
       </div>
     </button>
   </div>
 
-  <!-- SADEWA AI Floating Chat Window (Desktop: 440px wide x 620px tall, Mobile: Responsive) -->
+  <!-- SADEWA AI Floating Chat Window (Desktop: 460px wide x 630px tall, Mobile: Responsive) -->
   <Teleport to="body">
     <transition
       enter-active-class="transition duration-300 ease-out"
@@ -393,40 +530,65 @@ const sendSadewaMessage = async (customText = null) => {
     >
       <div
         v-if="isSadewaOpen"
-        class="fixed bottom-20 right-4 sm:right-6 z-50 w-[calc(100vw-32px)] sm:w-[450px] bg-white dark:bg-[#080f1e] text-slate-800 dark:text-slate-100 border border-red-500/40 rounded-3xl shadow-2xl overflow-hidden flex flex-col no-print ring-1 ring-red-500/20 backdrop-blur-xl transition-all"
-        :class="isMinimized ? 'h-[62px]' : 'h-[620px] max-h-[85vh]'"
+        class="fixed bottom-20 right-4 sm:right-6 z-50 w-[calc(100vw-32px)] sm:w-[460px] bg-white dark:bg-[#070d1d] text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-amber-500/30 rounded-3xl shadow-2xl overflow-hidden flex flex-col no-print ring-1 ring-black/10 dark:ring-amber-500/10 backdrop-blur-xl transition-all"
+        :class="isMinimized ? 'h-[64px]' : 'h-[630px] max-h-[85vh]'"
       >
-        <!-- Header (Merah Maroon Elegance khas Kamar Juang / Presisi) -->
-        <div class="px-4 py-3 bg-gradient-to-r from-[#7f1d1d] via-[#991b1b] to-[#450a0a] border-b border-red-500/30 flex items-center justify-between text-white shrink-0">
+        <!-- Header (Executive Midnight Navy & Gold Accents - SIMOD Theme) -->
+        <div class="px-4 py-3 bg-gradient-to-r from-[#070d1d] via-[#0b1426] to-[#0f1d38] border-b border-amber-500/30 flex items-center justify-between text-white shrink-0">
           <div class="flex items-center gap-3">
-            <div class="relative w-9 h-9 rounded-full bg-gradient-to-tr from-red-950 to-rose-700 border border-white/20 flex items-center justify-center shadow-inner">
-              <Bot class="w-5 h-5 text-white" />
-              <span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-rose-900"></span>
+            <div class="relative w-9 h-9 rounded-full bg-gradient-to-tr from-[#0b1426] to-[#1a2d52] border border-amber-400/40 flex items-center justify-center text-amber-400 shadow-inner">
+              <Bot class="w-5 h-5" />
+              <span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#0b1426]"></span>
             </div>
             <div>
               <div class="flex items-center gap-2">
                 <h3 class="font-black text-sm text-white tracking-wide">SADEWA AI</h3>
-                <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-black/40 text-rose-200 border border-rose-300/30">
+                <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-400/10 text-amber-300 border border-amber-400/30">
                   Command Center Copilot
                 </span>
               </div>
-              <p class="text-[10px] text-rose-200 line-clamp-1">
+              <p class="text-[10px] text-slate-300 line-clamp-1">
                 Sistem Analisis Digital & Evaluasi Wacana Aktual
               </p>
             </div>
           </div>
 
-          <!-- Utility Buttons (Voice Settings, Mute, Trash, Minimize, Close) -->
-          <div class="flex items-center gap-1 text-rose-200">
+          <!-- Utility Buttons (Arsip, Sesi Baru, Suara, Mute, Minimize, Close) -->
+          <div class="flex items-center gap-1 text-slate-300">
+            <!-- Archive View Toggle Button -->
+            <button
+              type="button"
+              @click="showArchiveView = !showArchiveView; showVoiceSettings = false"
+              class="px-2 py-1 rounded-lg text-[10.5px] font-bold border transition flex items-center gap-1 cursor-pointer"
+              :class="showArchiveView ? 'bg-amber-400 text-slate-950 border-amber-300 font-black shadow-sm' : 'bg-slate-900/80 border-slate-700/80 text-amber-300 hover:bg-slate-800'"
+              title="Buka Arsip Percakapan Sebelumnya"
+            >
+              <FolderClock class="w-3.5 h-3.5" />
+              <span class="hidden sm:inline">Arsip</span>
+              <span v-if="chatSessions.length > 0" class="px-1.5 py-0.2 rounded-full text-[9px]" :class="showArchiveView ? 'bg-slate-950 text-amber-300' : 'bg-amber-400/20 text-amber-300'">
+                {{ chatSessions.length }}
+              </span>
+            </button>
+
+            <!-- New Chat / Archive Current Session Button -->
+            <button
+              type="button"
+              @click="startNewSession"
+              class="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-amber-300 transition cursor-pointer"
+              title="Mulai Sesi Baru (+ Arsipkan Chat Saat Ini)"
+            >
+              <Plus class="w-4 h-4" />
+            </button>
+
             <!-- Voice Settings Popover Trigger -->
             <button
               type="button"
-              @click="showVoiceSettings = !showVoiceSettings"
+              @click="showVoiceSettings = !showVoiceSettings; showArchiveView = false"
               class="p-1.5 rounded-lg hover:bg-white/10 transition cursor-pointer"
               :class="showVoiceSettings ? 'bg-white/20 text-white' : ''"
               title="Pengaturan Karakter Suara Pria SADEWA"
             >
-              <Sliders class="w-3.5 h-3.5" />
+              <Sliders class="w-3.5 h-3.5 text-slate-300 hover:text-white" />
             </button>
 
             <!-- Mute/Unmute Audio Toggle -->
@@ -440,16 +602,6 @@ const sendSadewaMessage = async (customText = null) => {
               <Volume2 v-else class="w-4 h-4 text-emerald-300" />
             </button>
 
-            <!-- Clear History -->
-            <button
-              type="button"
-              @click="clearChatHistory"
-              class="p-1.5 rounded-lg hover:bg-white/10 transition cursor-pointer"
-              title="Hapus riwayat obrolan dan mulai sesi baru"
-            >
-              <Trash2 class="w-3.5 h-3.5 text-rose-200 hover:text-white" />
-            </button>
-
             <!-- Minimize / Expand Toggle -->
             <button
               type="button"
@@ -457,8 +609,8 @@ const sendSadewaMessage = async (customText = null) => {
               class="p-1.5 rounded-lg hover:bg-white/10 transition cursor-pointer"
               :title="isMinimized ? 'Perluas jendela' : 'Minimalkan jendela'"
             >
-              <Maximize2 v-if="isMinimized" class="w-3.5 h-3.5 text-rose-200 hover:text-white" />
-              <Minimize2 v-else class="w-3.5 h-3.5 text-rose-200 hover:text-white" />
+              <Maximize2 v-if="isMinimized" class="w-3.5 h-3.5 text-slate-300 hover:text-white" />
+              <Minimize2 v-else class="w-3.5 h-3.5 text-slate-300 hover:text-white" />
             </button>
 
             <!-- Close Window Button -->
@@ -468,7 +620,7 @@ const sendSadewaMessage = async (customText = null) => {
               class="p-1.5 rounded-lg hover:bg-white/10 transition cursor-pointer"
               title="Tutup SADEWA AI"
             >
-              <X class="w-4 h-4 text-rose-200 hover:text-white" />
+              <X class="w-4 h-4 text-slate-300 hover:text-white" />
             </button>
           </div>
         </div>
@@ -476,7 +628,7 @@ const sendSadewaMessage = async (customText = null) => {
         <!-- Voice Settings Sub-Panel (Dropdown Modal) -->
         <div
           v-if="showVoiceSettings && !isMinimized"
-          class="p-3 bg-[#0d1627] text-white border-b border-slate-700 space-y-2.5 text-xs animate-in slide-in-from-top-2 duration-150"
+          class="p-3 bg-[#0b1426] text-white border-b border-slate-700/80 space-y-2.5 text-xs animate-in slide-in-from-top-2 duration-150"
         >
           <div class="flex items-center justify-between">
             <span class="font-bold text-slate-200 flex items-center gap-1.5 text-[11px]">
@@ -551,39 +703,154 @@ const sendSadewaMessage = async (customText = null) => {
         <!-- Active Voice Playback Banner (Animated Equalizer & Instant Stop) -->
         <div
           v-if="isSadewaSpeaking && !isMinimized"
-          class="px-4 py-2 bg-gradient-to-r from-red-950 via-rose-950 to-slate-900 border-b border-red-500/40 flex items-center justify-between text-xs text-rose-200 shrink-0 animate-pulse"
+          class="px-4 py-2 bg-gradient-to-r from-[#070d1d] via-[#0f1d38] to-[#070d1d] border-b border-amber-500/30 flex items-center justify-between text-xs text-amber-200 shrink-0"
         >
           <div class="flex items-center gap-2.5">
             <!-- Animated Soundwave Equalizer -->
             <div class="flex items-center gap-0.5 h-3.5">
-              <span class="w-1 bg-rose-400 rounded-full h-full animate-[pulse_0.4s_ease-in-out_infinite]"></span>
-              <span class="w-1 bg-amber-400 rounded-full h-2 animate-[pulse_0.6s_ease-in-out_infinite]"></span>
-              <span class="w-1 bg-rose-400 rounded-full h-3.5 animate-[pulse_0.3s_ease-in-out_infinite]"></span>
-              <span class="w-1 bg-amber-400 rounded-full h-1.5 animate-[pulse_0.5s_ease-in-out_infinite]"></span>
+              <span class="w-1 bg-amber-400 rounded-full h-full animate-[pulse_0.4s_ease-in-out_infinite]"></span>
+              <span class="w-1 bg-amber-300 rounded-full h-2 animate-[pulse_0.6s_ease-in-out_infinite]"></span>
+              <span class="w-1 bg-amber-400 rounded-full h-3.5 animate-[pulse_0.3s_ease-in-out_infinite]"></span>
+              <span class="w-1 bg-amber-300 rounded-full h-1.5 animate-[pulse_0.5s_ease-in-out_infinite]"></span>
             </div>
             <span class="font-bold text-[11px] text-white">SADEWA sedang membacakan laporan...</span>
           </div>
           <button
             type="button"
             @click="stopSpeech"
-            class="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white font-black text-[10px] flex items-center gap-1 transition shadow-sm cursor-pointer"
+            class="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[10px] flex items-center gap-1 transition shadow-sm cursor-pointer"
           >
-            <Square class="w-2.5 h-2.5 fill-white" />
+            <Square class="w-2.5 h-2.5 fill-slate-950" />
             <span>Hentikan Suara</span>
           </button>
         </div>
 
-        <!-- Main Content Area when not minimized -->
-        <template v-if="!isMinimized">
+        <!-- VIEW A: ARSIP CHAT SESSIONS (Ketika showArchiveView Aktif) -->
+        <template v-if="!isMinimized && showArchiveView">
+          <div class="p-3 bg-slate-100 dark:bg-[#0b1426] border-b border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs shrink-0">
+            <div class="flex items-center gap-2">
+              <FolderClock class="w-4 h-4 text-amber-400" />
+              <span class="font-bold text-slate-900 dark:text-white text-xs">Riwayat Sesi Percakapan</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                {{ chatSessions.length }} Tersimpan
+              </span>
+            </div>
+            <button
+              type="button"
+              @click="showArchiveView = false"
+              class="text-[11px] font-bold text-amber-500 hover:text-amber-400 flex items-center gap-1 cursor-pointer"
+            >
+              <span>✕ Kembali ke Chat</span>
+            </button>
+          </div>
+
+          <!-- Empty Archive State -->
+          <div
+            v-if="chatSessions.length === 0"
+            class="flex-1 p-8 flex flex-col items-center justify-center text-center text-slate-400 space-y-3 bg-slate-50/70 dark:bg-[#070d18]"
+          >
+            <div class="w-12 h-12 rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-400">
+              <FolderClock class="w-6 h-6 text-amber-400" />
+            </div>
+            <div class="space-y-1">
+              <h4 class="font-bold text-slate-800 dark:text-slate-200 text-xs">Belum Ada Sesi Diarsipkan</h4>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">
+                Setiap percakapan akan otomatis diarsipkan saat Anda berpindah menu atau menekan tombol <strong>+ Sesi Baru</strong>.
+              </p>
+            </div>
+            <button
+              type="button"
+              @click="showArchiveView = false"
+              class="px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs transition shadow-sm cursor-pointer"
+            >
+              Mulai Tanya SADEWA
+            </button>
+          </div>
+
+          <!-- Archive List -->
+          <div
+            v-else
+            class="flex-1 p-3 overflow-y-auto space-y-2.5 custom-scrollbar bg-slate-50/70 dark:bg-[#070d18]"
+          >
+            <div
+              v-for="sess in chatSessions"
+              :key="sess.id"
+              class="p-3.5 rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 hover:border-amber-500/50 hover:shadow-lg transition space-y-2 group"
+            >
+              <!-- Card Header -->
+              <div class="flex items-start justify-between gap-2">
+                <h4
+                  @click="resumeSession(sess)"
+                  class="font-bold text-xs text-slate-900 dark:text-slate-100 group-hover:text-amber-400 transition cursor-pointer line-clamp-2"
+                  :title="sess.title"
+                >
+                  {{ sess.title }}
+                </h4>
+                <span class="text-[10px] text-slate-400 font-mono whitespace-nowrap shrink-0">{{ sess.timeLabel }}</span>
+              </div>
+
+              <!-- Card Snippet -->
+              <p
+                v-if="sess.snippet"
+                @click="resumeSession(sess)"
+                class="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed cursor-pointer"
+              >
+                {{ sess.snippet }}
+              </p>
+
+              <!-- Card Footer Action -->
+              <div class="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/80 text-[11px]">
+                <span class="text-[10px] text-slate-400 flex items-center gap-1 font-mono">
+                  <MessageSquare class="w-3 h-3 text-amber-400" />
+                  <span>{{ sess.messages.length }} Pesan</span>
+                </span>
+
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    @click.stop="deleteSession(sess.id)"
+                    class="p-1 rounded-lg hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition cursor-pointer"
+                    title="Hapus sesi arsip ini"
+                  >
+                    <Trash2 class="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    @click="resumeSession(sess)"
+                    class="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-400 text-amber-300 hover:text-slate-950 font-bold text-[10.5px] border border-amber-500/30 transition flex items-center gap-1 cursor-pointer"
+                    title="Lanjutkan percakapan ini"
+                  >
+                    <span>▶ Lanjutkan</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Clear All Option -->
+            <div v-if="chatSessions.length > 1" class="text-center pt-2 pb-1">
+              <button
+                type="button"
+                @click="clearAllArchives"
+                class="text-[10.5px] text-rose-400 hover:text-rose-300 underline cursor-pointer"
+              >
+                Hapus Semua Arsip ({{ chatSessions.length }})
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <!-- VIEW B: ACTIVE CHAT CONVERSATION -->
+        <template v-else-if="!isMinimized">
           <!-- Quick Prompts Horizontal Pills -->
-          <div class="px-3 py-2 bg-slate-100/90 dark:bg-[#0b1426] border-b border-slate-200 dark:border-slate-800/80 flex items-center gap-2 overflow-x-auto custom-scrollbar shrink-0">
+          <div class="px-3 py-2 bg-slate-100/90 dark:bg-[#070d18] border-b border-slate-200 dark:border-slate-800/80 flex items-center gap-2 overflow-x-auto custom-scrollbar shrink-0">
             <button
               v-for="(chip, cIdx) in sadewaChips"
               :key="'chip-' + cIdx"
               type="button"
               @click="sendSadewaMessage(chip.query)"
               :disabled="isSadewaThinking"
-              class="px-3 py-1 rounded-full text-[11px] font-bold bg-white dark:bg-[#070d19] hover:bg-rose-50 dark:hover:bg-rose-950/60 text-slate-700 dark:text-slate-300 hover:text-red-700 dark:hover:text-rose-300 border border-slate-300 dark:border-slate-700/80 hover:border-red-400 dark:hover:border-rose-500/50 whitespace-nowrap transition cursor-pointer shrink-0 disabled:opacity-50 shadow-xs"
+              class="px-3 py-1 rounded-full text-[11px] font-bold bg-white dark:bg-[#0b1426] hover:bg-amber-50 dark:hover:bg-amber-500/10 text-slate-700 dark:text-slate-300 hover:text-amber-500 dark:hover:text-amber-300 border border-slate-300 dark:border-slate-800 hover:border-amber-500/60 whitespace-nowrap transition cursor-pointer shrink-0 disabled:opacity-50 shadow-xs"
             >
               {{ chip.label }}
             </button>
@@ -592,7 +859,7 @@ const sendSadewaMessage = async (customText = null) => {
           <!-- Conversation Scrollable Body -->
           <div
             id="sadewa-chat-body-global"
-            class="flex-1 p-4 overflow-y-auto space-y-4 custom-scrollbar bg-slate-50/70 dark:bg-gradient-to-b dark:from-[#080f1e] dark:via-[#091122] dark:to-[#070d18]"
+            class="flex-1 p-4 overflow-y-auto space-y-4 custom-scrollbar bg-slate-50/70 dark:bg-gradient-to-b dark:from-[#070d1d] dark:via-[#091122] dark:to-[#070d18]"
           >
             <div
               v-for="(msg, mIdx) in sadewaMessages"
@@ -600,31 +867,31 @@ const sendSadewaMessage = async (customText = null) => {
               class="flex flex-col"
               :class="msg.role === 'user' ? 'items-end' : 'items-start'"
             >
-              <!-- User Bubble (Red Rounded Card) -->
+              <!-- User Bubble (Executive Command Center Navy Card with Gold Accent) -->
               <div
                 v-if="msg.role === 'user'"
-                class="max-w-[85%] rounded-2xl rounded-tr-sm bg-gradient-to-r from-red-600 to-rose-600 text-white px-4 py-2.5 text-xs shadow-md leading-relaxed"
+                class="max-w-[85%] rounded-2xl rounded-tr-xs bg-[#132244] border border-amber-500/30 text-slate-100 px-4 py-2.5 text-xs shadow-md leading-relaxed"
               >
                 {{ msg.text }}
-                <div class="text-[9px] text-rose-200/90 text-right mt-1 font-mono">{{ msg.time }}</div>
+                <div class="text-[9px] text-amber-300/80 text-right mt-1 font-mono font-medium">{{ msg.time }}</div>
               </div>
 
-              <!-- Assistant Bubble (Card with SADEWA Avatar & Speaker Button) -->
+              <!-- Assistant Bubble (Command Slate Card with Emerald Live Badge) -->
               <div
                 v-else
                 class="flex items-start gap-2.5 max-w-[92%]"
               >
                 <!-- Left Mini Avatar -->
-                <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-red-800 to-rose-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                  <Bot class="w-4 h-4 text-white" />
+                <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-[#0b1426] to-[#1a2d52] border border-amber-400/40 text-amber-400 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                  <Bot class="w-4 h-4" />
                 </div>
 
                 <!-- Message Card -->
-                <div class="flex-1 rounded-2xl rounded-tl-sm bg-white dark:bg-[#0f1b33] border border-slate-200 dark:border-slate-700/70 text-slate-800 dark:text-slate-100 p-3.5 text-xs shadow-md space-y-2 leading-relaxed">
+                <div class="flex-1 rounded-2xl rounded-tl-xs bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800/80 text-slate-800 dark:text-slate-100 p-3.5 text-xs shadow-md space-y-2 leading-relaxed">
                   <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-1.5 gap-2">
                     <div class="flex items-center gap-2">
                       <span class="font-extrabold text-slate-900 dark:text-white text-[11px]">SADEWA AI</span>
-                      <span class="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40">
+                      <span class="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
                         • RADAR LIVE
                       </span>
                     </div>
@@ -633,10 +900,10 @@ const sendSadewaMessage = async (customText = null) => {
                     <button
                       type="button"
                       @click="speakText(msg.text)"
-                      class="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-amber-400 transition cursor-pointer"
+                      class="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-amber-400 transition cursor-pointer"
                       title="Dengarkan pembacaan suara pria SADEWA"
                     >
-                      <Volume2 class="w-3.5 h-3.5" :class="{ 'text-red-600 dark:text-amber-400 animate-pulse': isSadewaSpeaking }" />
+                      <Volume2 class="w-3.5 h-3.5" :class="{ 'text-amber-400 animate-pulse': isSadewaSpeaking }" />
                     </button>
                   </div>
 
@@ -656,21 +923,21 @@ const sendSadewaMessage = async (customText = null) => {
 
             <!-- Thinking / Loading Indicator -->
             <div v-if="isSadewaThinking" class="flex items-start gap-2.5">
-              <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-red-800 to-rose-600 text-white flex items-center justify-center shrink-0 mt-0.5">
-                <Bot class="w-4 h-4 text-white" />
+              <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-[#0b1426] to-[#1a2d52] border border-amber-400/40 text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+                <Bot class="w-4 h-4" />
               </div>
-              <div class="px-4 py-3 rounded-2xl rounded-tl-sm bg-white dark:bg-[#0f1b33] border border-slate-200 dark:border-slate-700/70 text-slate-800 dark:text-slate-200 text-xs shadow-md flex items-center gap-2.5">
+              <div class="px-4 py-3 rounded-2xl rounded-tl-xs bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800/80 text-slate-800 dark:text-slate-200 text-xs shadow-md flex items-center gap-2.5">
                 <span class="relative flex h-2 w-2">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                  <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                 </span>
-                <span class="text-[11px] font-semibold text-red-700 dark:text-rose-300 animate-pulse">SADEWA sedang menganalisis radar berita...</span>
+                <span class="text-[11px] font-semibold text-amber-600 dark:text-amber-400 animate-pulse">SADEWA sedang menganalisis radar berita...</span>
               </div>
             </div>
           </div>
 
-          <!-- Chat Input Bar (Red Ring & Circular Red Send Button) -->
-          <div class="p-3 bg-white dark:bg-[#0b1426] border-t border-slate-200 dark:border-slate-800 shrink-0 space-y-1.5 shadow-lg">
+          <!-- Chat Input Bar (Sleek Command Field & Amber Gold Send Arrow) -->
+          <div class="p-3 bg-white dark:bg-[#070d1d] border-t border-slate-200 dark:border-slate-800 shrink-0 space-y-1.5 shadow-lg">
             <form @submit.prevent="sendSadewaMessage()" class="flex items-center gap-2">
               <div class="relative flex-1">
                 <input
@@ -678,16 +945,16 @@ const sendSadewaMessage = async (customText = null) => {
                   type="text"
                   placeholder="Tanya SADEWA seputar dinamika berita & isu Polri..."
                   :disabled="isSadewaThinking"
-                  class="w-full px-4 py-2.5 rounded-2xl bg-slate-100 dark:bg-[#060b16] border border-slate-300 dark:border-red-500/40 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 disabled:opacity-50"
+                  class="w-full px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-[#0b1426] border border-slate-300 dark:border-slate-700/80 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 disabled:opacity-50 transition"
                 />
               </div>
               <button
                 type="submit"
                 :disabled="!sadewaInput.trim() || isSadewaThinking"
-                class="w-9 h-9 rounded-full bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white flex items-center justify-center shrink-0 transition shadow-lg shadow-red-600/30 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                class="w-9 h-9 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-bold flex items-center justify-center shrink-0 transition shadow-lg shadow-amber-500/20 active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 title="Kirim pertanyaan"
               >
-                <Send class="w-4 h-4" />
+                <Send class="w-4 h-4 text-slate-950" />
               </button>
             </form>
 
@@ -725,7 +992,7 @@ const sendSadewaMessage = async (customText = null) => {
   background: rgba(245, 158, 11, 0.5);
 }
 
-/* SADEWA AI Natural Markdown Body Styling */
+/* SADEWA AI Natural Markdown Body Styling (Theme: SIMOD Gold & Slate) */
 .sadewa-markdown-body :deep(h1),
 .sadewa-markdown-body :deep(h2),
 .sadewa-markdown-body :deep(h3),
@@ -735,13 +1002,13 @@ const sendSadewaMessage = async (customText = null) => {
   line-height: 1.45;
   margin-top: 0.75rem;
   margin-bottom: 0.35rem;
-  color: #991b1b;
+  color: #b45309;
 }
 :root.dark .sadewa-markdown-body :deep(h1),
 :root.dark .sadewa-markdown-body :deep(h2),
 :root.dark .sadewa-markdown-body :deep(h3),
 :root.dark .sadewa-markdown-body :deep(h4) {
-  color: #f87171;
+  color: #fbbf24;
 }
 .sadewa-markdown-body :deep(p) {
   margin-bottom: 0.45rem;
