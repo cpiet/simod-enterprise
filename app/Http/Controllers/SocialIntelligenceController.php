@@ -8,6 +8,8 @@ use App\Models\SocialInvestigationCase;
 use App\Models\SocialPost;
 use App\Models\SocialSetting;
 use App\Services\ApifySyncService;
+use App\Services\GeminiService;
+use App\Services\SocialSyndicationService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -349,9 +351,12 @@ class SocialIntelligenceController extends Controller
     }
 
     /**
-     * Trigger manual sync or simulated real-time crawl.
+     * Trigger manual sync — Multi-Tier Autonomous Ingestion (Syndication first, Apify fallback).
+     * Tier 1: Zero-cost Google News Social Syndication.
+     * Tier 2: Apify Cloud Power-Scraper (if token available).
+     * Tier 3: Smart Local Synthetic Fallback.
      */
-    public function sync(Request $request, ApifySyncService $service)
+    public function sync(Request $request, ApifySyncService $apifyService, SocialSyndicationService $syndicationService)
     {
         [$selectedCode, $selectedPolda, $resolvedPoldaId] = $this->resolveActiveTenant($request);
         $poldaId = (int) $request->input('polda_id');
@@ -363,7 +368,16 @@ class SocialIntelligenceController extends Controller
                 ?: 1;
         }
 
-        $result = $service->syncPolda($poldaId);
+        // Try Tier 1: Zero-cost syndication first
+        $result = $syndicationService->syncRadarForPolda($poldaId);
+
+        // If syndication yielded zero posts AND Apify token available, try Apify as Tier 2
+        if (($result['new_posts'] ?? 0) === 0) {
+            $apifyResult = $apifyService->syncPolda($poldaId);
+            if ($apifyResult['success'] && ($apifyResult['new_posts'] ?? 0) > 0) {
+                $result = $apifyResult;
+            }
+        }
 
         if (!$result['success']) {
             return redirect()->back()->with('error', $result['message']);
@@ -731,9 +745,9 @@ class SocialIntelligenceController extends Controller
     }
 
     /**
-     * Trigger on-demand keyword tracking across selected platforms.
+     * Trigger on-demand keyword tracking — Multi-Tier Syndication + Apify fallback.
      */
-    public function trackKeyword(Request $request, ApifySyncService $service)
+    public function trackKeyword(Request $request, ApifySyncService $apifyService, SocialSyndicationService $syndicationService)
     {
         $validated = $request->validate([
             'keyword'   => 'required|string|min:2|max:200',
@@ -743,11 +757,29 @@ class SocialIntelligenceController extends Controller
         ]);
 
         [$selectedCode, $selectedPolda, $resolvedPoldaId] = $this->resolveActiveTenant($request);
-        $poldaId = (int) ($validated['polda_id'] ?? $selectedPolda?->id ?? 1);
+        $poldaId   = (int) ($validated['polda_id'] ?? $selectedPolda?->id ?? 1);
         $platforms = $validated['platforms'] ?? ['x', 'tiktok', 'instagram', 'youtube', 'facebook'];
-        $maxItems = (int) ($validated['max_items'] ?? 20);
+        $maxItems  = (int) ($validated['max_items'] ?? 20);
 
-        $result = $service->crawlKeyword($validated['keyword'], $platforms, $poldaId, $maxItems);
+        // Tier 1: Zero-cost syndication
+        $result = $syndicationService->crawlKeywordViaSyndication(
+            $validated['keyword'],
+            $platforms,
+            $poldaId,
+            $maxItems
+        );
+
+        // Tier 2: If syndication found nothing, try Apify
+        if (($result['new_posts'] ?? 0) === 0) {
+            $apifyResult = $apifyService->crawlKeyword($validated['keyword'], $platforms, $poldaId, $maxItems, $result['case_id'] ?? null);
+            if (!empty($apifyResult['new_posts']) && $apifyResult['new_posts'] > 0) {
+                $result['new_posts'] = $apifyResult['new_posts'];
+                $result['mode']      = 'apify_fallback';
+                if (!empty($apifyResult['case_id'])) {
+                    $result['case_id'] = $apifyResult['case_id'];
+                }
+            }
+        }
 
         $caseId = $result['case_id'] ?? null;
 
@@ -755,7 +787,7 @@ class SocialIntelligenceController extends Controller
             'polda'   => $selectedCode,
             'tab'     => 'radar',
             'case_id' => $caseId,
-        ]))->with('success', "Topik atensi pimpinan \"{$result['keyword']}\" berhasil dilacak dan dibuka!");
+        ]))->with('success', "✓ Topik atensi \"{$validated['keyword']}\" berhasil dilacak! ({$result['new_posts']} percakapan warganet dihimpun).");
     }
 
     /**
@@ -787,14 +819,20 @@ class SocialIntelligenceController extends Controller
     }
 
     /**
-     * Refresh / Re-crawl an active investigation case.
+     * Refresh / Re-crawl an active investigation case — Syndication first, Apify fallback.
      */
-    public function refreshCase(Request $request, $id, ApifySyncService $service)
+    public function refreshCase(Request $request, $id, ApifySyncService $apifyService, SocialSyndicationService $syndicationService)
     {
-        $case = SocialInvestigationCase::findOrFail($id);
+        $case      = SocialInvestigationCase::findOrFail($id);
         $platforms = $case->platforms ?? ['x', 'tiktok', 'instagram', 'youtube', 'facebook'];
-        
-        $result = $service->crawlKeyword($case->keywords, $platforms, $case->polda_id, 20, $case->id);
+
+        // Tier 1: Syndication
+        $result = $syndicationService->crawlKeywordViaSyndication($case->keywords, $platforms, $case->polda_id, 20, $case->id);
+
+        // Tier 2: Apify fallback
+        if (($result['new_posts'] ?? 0) === 0) {
+            $apifyService->crawlKeyword($case->keywords, $platforms, $case->polda_id, 20, $case->id);
+        }
 
         [$selectedCode] = $this->resolveActiveTenant($request);
 
@@ -803,6 +841,94 @@ class SocialIntelligenceController extends Controller
             'tab'     => 'radar',
             'case_id' => $case->id,
         ])->with('success', "Pembaruan topik atensi \"{$case->title}\" berhasil diambil ({$result['new_posts']} postingan baru)!");
+    }
+
+    /**
+     * SADEWA Social AI — Sintesis Intelijen Media Sosial Terpadu (1-Klik).
+     * Memanggil GeminiService::analyzeSocialPosts() untuk menghasilkan:
+     * - Executive Social Briefing
+     * - Analisis Polarisasi (Buzzer vs Warganet Organik)
+     * - Akun Kritis & KOL Impact
+     * - Rekomendasi Cooling System
+     * - Naskah WhatsApp Format Komando Pimpinan
+     */
+    public function analyzeAI(Request $request, GeminiService $geminiService)
+    {
+        [$selectedCode, $selectedPolda, $resolvedPoldaId] = $this->resolveActiveTenant($request);
+
+        if (!$selectedPolda) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Polda tidak ditemukan. Pastikan tenant aktif.',
+            ], 422);
+        }
+
+        $isNational = ($selectedCode === 'ALL');
+
+        // Gather top 40 recent posts for AI context
+        $postsQuery = SocialPost::when(!$isNational, fn($q) => $q->where('polda_id', $selectedPolda->id))
+            ->orderByDesc('virality_score')
+            ->orderByDesc('posted_at')
+            ->limit(40);
+
+        $posts = $postsQuery->get()->map(fn($p) => [
+            'platform'       => $p->platform,
+            'author_name'    => $p->author_name,
+            'author_handle'  => $p->author_handle,
+            'is_kol'         => $p->is_kol,
+            'kol_category'   => $p->kol_category,
+            'content'        => $p->content,
+            'sentiment'      => $p->sentiment,
+            'views_count'    => $p->views_count,
+            'likes_count'    => $p->likes_count,
+            'shares_count'   => $p->shares_count,
+            'comments_count' => $p->comments_count,
+            'virality_score' => $p->virality_score,
+            'posted_at'      => $p->posted_at?->diffForHumans() ?? 'baru saja',
+        ])->all();
+
+        if (empty($posts)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Belum ada data percakapan warganet yang tersimpan. Lakukan sinkronisasi radar terlebih dahulu.',
+            ], 422);
+        }
+
+        $result = $geminiService->analyzeSocialPosts($selectedPolda, $posts);
+
+        if (!$result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'] ?? 'Analisis AI gagal. Pastikan Gemini API Key sudah dikonfigurasi di menu Pengaturan AI.',
+            ], 503);
+        }
+
+        // Log audit
+        AuditLog::create([
+            'polda_id'     => $selectedPolda->id,
+            'user_id'      => auth()->id(),
+            'action'       => 'social_intelligence.ai_analysis',
+            'subject_type' => 'social_post',
+            'subject_id'   => '0',
+            'ip_address'   => $request->ip() ?? '127.0.0.1',
+            'user_agent'   => $request->userAgent() ?? 'SocialIntelligenceController',
+            'metadata'     => [
+                'polda'       => $selectedCode,
+                'posts_count' => count($posts),
+                'model_used'  => $result['model_used'] ?? 'unknown',
+                'latency_ms'  => $result['latency_ms'] ?? 0,
+            ],
+            'created_at'   => now(),
+        ]);
+
+        return response()->json([
+            'success'     => true,
+            'polda'       => $selectedCode,
+            'data'        => $result['data'],
+            'model_used'  => $result['model_used'] ?? 'SADEWA AI',
+            'latency_ms'  => $result['latency_ms'] ?? 0,
+            'posts_count' => count($posts),
+        ]);
     }
 
     /**

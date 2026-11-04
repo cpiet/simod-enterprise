@@ -96,3 +96,4 @@ Sebagai bagian dari orkestrasi kecerdasan buatan terpadu, sistem dilengkapi deng
 
 - **Kompilasi Frontend**: `npm run build` sukses mengompilasi seluruh chunk Vite tanpa peringatan.
 - **Automated Test Suite**: Seluruh **92 tests (522 assertions)** pada `php artisan test` lulus 100% hijau, menjamin tidak adanya regresi pada multi-tenant scoping, RBAC roles, maupun ingesti data media.
+

@@ -28,6 +28,7 @@ Dokumentasi ini memandu arsitektur, seluruh perintah CLI, modul operasional, int
 | **16** | [16. Peta Situasi Kamtibmas Nusantara & Integritas KPI](16-peta-nusantara-dan-integritas-kpi-command-center.md) | Peta Indonesia interaktif berbasis berita database (11 sentra), dual-scope map toggle, dan eliminasi KPI *gimmick*. |
 | **17** | [17. Perbaikan Navigasi Tab, Kontras Keamanan, & Otomasi Sinkron Topik Atensi](17-perbaikan-kontras-keamanan-dan-penarikan-otomatis-topik-atensi.md) | Redesain tab 2 baris 5 kolom anti-truncate, pembersihan gambar stok Unsplash, default placeholder teks berita, dan otomasi sinkron Google News saat adopsi Topik Atensi. |
 | **18** | [18. Optimalisasi UX Dossier & Arsitektur 4 Pilar Media Intelligence](18-optimalisasi-ux-dossier-dan-arsitektur-4-pilar-media-intelligence.md) | Eliminasi redundansi tab kuno, layout 2-kolom Smart Dossier, baki collapsible rekomendasi tren AI, command bar 1-baris, dan asisten intelijen SADEWA AI Copilot. |
+| **19** | [19. Optimalisasi Radar Medsos & Sintesis AI SADEWA](19-optimalisasi-radar-media-sosial-dan-sintesis-ai-sadewa.md) | Multi-Tier Autonomous Ingestion Engine (zero-cost syndication), SADEWA Social AI Synthesis, restrukturisasi 4 pilar tab, dan sentralisasi token Apify di admin. |
 
 ---
 

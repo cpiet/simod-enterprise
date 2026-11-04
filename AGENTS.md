@@ -88,22 +88,21 @@ Seluruh 29 portal media dikonfigurasi melalui seeder [`SulbarRssFeedsSeeder.php`
 
 ### 4.4. Radar Media Sosial & Social Listening (𝕏, TikTok, Instagram, YouTube, Facebook)
 - **Tabel Basis Data**: `social_posts` (data postingan, metrik views/likes/shares/comments, virality_score 0-100, is_kol, sentiment, `case_id`), `social_investigation_cases` (berkas kasus atensi pimpinan, keywords, platforms, posts_count, sentiment_breakdown, status active/archived), dan `social_settings` (konfigurasi Apify token, kata kunci pantau, frekuensi sinkronisasi per Polda).
-- **Tab Navigasi Utama**: Tab 01 (Radar Multi-Platform), Tab 02 (Tokoh Kritis & KOL Tracker), Tab 03 (Tren Tagar & Isu Viral), Tab 04 (Integrasi Apify & Pengaturan).
-- **Smart Dossier Terpadu (Topik Atensi & Request Pimpinan)**: Terintegrasi langsung pada baris teratas Tab 01 dengan antarmuka yang identik dengan Media Intelligence:
-  - *Header Atensi*: Indikator radar pulsing amber, tombol aksi cepat `+ Lacak Topik Atensi` (membuka on-demand crawling drawer).
-  - *Pill Bar Navigasi*: `🌐 Semua Percakapan`, `🔖 Disimpan`, pembatas vertikal, serta pill dinamis seluruh kasus atensi aktif lengkap dengan indikator tingkat urgensi, hitungan postingan, dan tombol `✕` untuk menutup/mengarsipkan kasus dalam 1 klik.
-  - *Dossier Expansion Detail*: Menampilkan metadata kata kunci pantau (#tags), mini KPI (Total Postingan, Views, Interaksi, Polarisasi Negatif %), bar sentimen tri-warna, rekomendasi komunikasi Humas, tombol tarik update postingan, dan eskalasi 1-klik ke laporan isu.
-  - *Feed Sinkron*: Feed di bawahnya otomatis memfilter dan menampilkan postingan relevan sesuai kasus yang sedang aktif.
-- **Dual-Mode Architecture (Tab 03)**:
-  - *Mode 01 — Lensa Kamtibmas & Humas Polri*: Monitoring tagar kedinasan dinamis dan kurva jam puncak aktivitas netizen siang & malam (`peakHours`).
-  - *Mode 02 — Lensa Tren Publik Medsos Indonesia*: Agregasi tren publik lintas 5 platform (𝕏, YouTube, Instagram, TikTok, Facebook) dengan deteksi kerawanan siber (`is_security_relevant: true`) dan filter cepat isu beresiko tinggi.
-- **Katalog Apify Actor (Tab 04)**: Katalog pemetaan format tren unik dan rekomendasi Actor resmi Apify (`easyapi/twitter-trending-topics-scraper`, `streamers/youtube-scraper`, `yugenox/instagram-trends-scraper`, `apify/facebook-posts-scraper`, `clockworks/free-tiktok-scraper`).
+- **Multi-Tier Autonomous Ingestion Engine**:
+  - *Tier 1 (Zero-Cost Syndication)*: Penarikan otomatis live dari internet menggunakan sindikasi Google News Social RSS (`site:x.com`, `site:tiktok.com`, `site:instagram.com`, dll.) tanpa kuota API pihak ketiga via `SocialSyndicationService`.
+  - *Tier 2 (Apify Cloud Fallback)*: Beroperasi otomatis jika kuota dan token Apify tersedia.
+  - *Tier 3 (Smart Synthetic Fallback)*: Pola interaksi realistis warganet daerah untuk menjamin ketersediaan sistem 24/7 saat offline.
+- **SADEWA Social AI Synthesis (`POST /social-intelligence/analyze-ai`)**:
+  - Memproses percakapan warganet menggunakan `GeminiService::analyzeSocialPosts()`.
+  - Menghasilkan: Executive Brief Situasi Medsos, Isu Kritis Prioritas Pimpinan (*Top Concern*), Komposisi & Stabilitas Sentimen, Deteksi Polarisasi Buzzer vs Netizen Organik, Akun Kritis Terdeteksi, Rekomendasi Cooling System Humas, dan Naskah WhatsApp Komando Pimpinan (siap salin 1-klik).
+- **Tab Navigasi Utama (4 Pilar Terpadu)**:
+  - *Tab 01 (Radar Percakapan)*: Smart Dossier Topik Atensi, feed multi-platform, Spike Timeline 7 Hari, Semantic Word Cloud, dan tombol `🚨 Eskalasi Jadi Isu`.
+  - *Tab 02 (Executive Briefing & Naskah WA)*: Command bar sintesis 1-klik SADEWA AI, visualisasi polarisasi buzzer, matriks cooling system, dan naskah dinas WA pimpinan.
+  - *Tab 03 (Radar KOL & Akun Kritis)*: Direktori tokoh berpengaruh, pengamat hukum, LSM/LBH, dan riwayat postingan.
+  - *Tab 04 (Tren Tagar & Kerawanan Siber)*: Dual-mode lens (Lensa Kamtibmas Polri & Lensa Tren Publik Medsos Indonesia WOEID 23424846).
+- **Sentralisasi Kredensial Apify**:
+  - Pengaturan API Token Apify dan pool failover telah dipindahkan dari operator radar ke panel Administrator: **Keamanan & Pemeliharaan &rarr; Mesin Intelijen AI (`/settings/ai`) &rarr; Tab Mesin Scraper Patroli Siber (Apify Cloud)**.
 - **Direct One-Click Escalation**: Tombol `🚨 Eskalasi Jadi Isu` pada setiap kartu postingan medsos dan kartu tren publik otomatis mengarahkan ke formulir `/issues/create` dengan pra-isi judul, kategori (`📱 Isu Medsos & Opini Publik`), URL sumber, tingkat prioritas, dan ringkasan.
-- **API Endpoint Sinkronisasi Tren**: `POST /social-intelligence/sync-trends` memicu refresh tren multi-platform dan mencatat log audit ke tabel `audit_logs`.
-- **Instrumen Analitik Terpadu (Spike Chart, Word Cloud, On-Demand Tracker)**:
-  - *Multi-Line Spike Chart Sentimen*: Pure SVG rendering dinamika 7 hari (Positif, Netral, Negatif) dengan deteksi otomatis anomali krisis negatif (`>= 1.5x` rata-rata) disertai efek visual pulsating ping radar dan skor stabilitas opini (0-100).
-  - *Visual Word Cloud Semantik*: Ekstraksi 36 kata/frasa teratas dengan filtering 70+ Indonesian stopwords, skala dinamis (12-36px), pewarnaan sentimen dominan (Emerald, Slate, Rose), klaster tema kepolisian, dan filter 1-klik ke pencarian feed.
-  - *On-Demand Keyword Tracker*: Tombol `⚡ Lacak Topik Baru (On-Demand)` dan modal drawer untuk crawling kasus/topik mendadak lintas 𝕏, TikTok, IG, YT, FB via `POST /social-intelligence/track-keyword` (`ApifySyncService::crawlKeyword`) dengan multi-token failover dan smart synthetic fallback ingestion.
 
 ### 4.5. Radar Media Online Divhumas Polri (33 Feed Nasional Terverifikasi & Sindikasi Google News)
 - **Tenant Scope**: Kode `DIVHUMAS` (ID `10`) atau query parameter `?polda=ALL`.

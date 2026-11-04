@@ -640,6 +640,67 @@ const getPublicPlatformBadge = (platform) => {
       return { label: (platform || 'SEMUA').toUpperCase(), class: 'bg-slate-800 text-slate-300' };
   }
 };
+
+// ─── SADEWA SOCIAL AI SYNTHESIS ───────────────────────────────────────────────
+const isAnalyzingAI = ref(false);
+const socialAiReport = ref(null);
+const socialAiError = ref(null);
+const showWaCopied = ref(false);
+const activeAiTab = ref('briefing'); // 'briefing' | 'polarisasi' | 'cooling' | 'wa'
+
+const analyzeAI = async () => {
+  isAnalyzingAI.value = true;
+  socialAiReport.value = null;
+  socialAiError.value = null;
+  try {
+    const res = await axios.post('/social-intelligence/analyze-ai', {
+      polda: props.selectedCode,
+    });
+    if (res.data.success) {
+      socialAiReport.value = res.data;
+    } else {
+      socialAiError.value = res.data.message || 'Gagal mendapatkan respons AI.';
+    }
+  } catch (err) {
+    socialAiError.value = err.response?.data?.message || 'Gagal menghubungi server analisis AI.';
+  } finally {
+    isAnalyzingAI.value = false;
+  }
+};
+
+const triggerSyncAndAnalyze = () => {
+  isSyncing.value = true;
+  router.post('/social-intelligence/sync', {
+    polda_id: props.selectedPolda?.id || 1,
+  }, {
+    preserveScroll: true,
+    onFinish: () => {
+      isSyncing.value = false;
+      activeTab.value = 'briefing';
+      analyzeAI();
+    },
+  });
+};
+
+const copyWaScript = () => {
+  const script = socialAiReport.value?.data?.whatsapp_script || '';
+  navigator.clipboard.writeText(script).then(() => {
+    showWaCopied.value = true;
+    setTimeout(() => { showWaCopied.value = false; }, 3000);
+  });
+};
+
+const getSentimentStabilityClass = (score) => {
+  if (score >= 75) return 'text-emerald-600 dark:text-emerald-400';
+  if (score >= 50) return 'text-amber-600 dark:text-amber-400';
+  return 'text-rose-600 dark:text-rose-400';
+};
+
+const getBuzzerRiskClass = (level) => {
+  if (level === 'tinggi') return 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30';
+  if (level === 'sedang') return 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30';
+  return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30';
+};
 </script>
 
 <template>
@@ -672,42 +733,60 @@ const getPublicPlatformBadge = (platform) => {
       </div>
 
       <!-- Action Buttons -->
-      <div class="flex flex-wrap items-center gap-2.5">
-        <Link
-          :href="`/?polda=${selectedCode}`"
-          class="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 border border-slate-300 transition"
-        >
-          &larr; Dashboard
-        </Link>
+      <div class="flex flex-col items-end gap-2">
+        <div class="flex flex-wrap items-center gap-2.5">
+          <Link
+            :href="`/?polda=${selectedCode}`"
+            class="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 border border-slate-300 transition"
+          >
+            &larr; Dashboard
+          </Link>
 
-        <!-- Sinkronisasi Medsos -->
-        <button
-          @click="triggerSync"
-          type="button"
-          :disabled="isSyncing"
-          class="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 transition flex items-center gap-2 cursor-pointer shadow-sm select-none disabled:opacity-50"
-        >
-          <RefreshCw class="w-4 h-4 text-sky-500" :class="{ 'animate-spin': isSyncing }" />
-          <span>{{ isSyncing ? 'Menyinkronkan...' : 'Sinkronisasi Radar' }}</span>
-        </button>
+          <!-- ↺ Perbarui Data (secondary) -->
+          <button
+            @click="triggerSync"
+            type="button"
+            :disabled="isSyncing || isAnalyzingAI"
+            class="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 transition flex items-center gap-2 cursor-pointer shadow-sm select-none disabled:opacity-50"
+          >
+            <RefreshCw class="w-4 h-4 text-sky-500" :class="{ 'animate-spin': isSyncing }" />
+            <span>{{ isSyncing ? 'Memperbarui...' : '↺ Perbarui Data' }}</span>
+          </button>
 
-        <!-- Lacak Topik Baru On-Demand -->
-        <button
-          @click="openTrackKeywordModal"
-          type="button"
-          class="px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white shadow-md shadow-sky-500/20 flex items-center gap-2 cursor-pointer transition select-none"
-        >
-          <Sparkles class="w-4 h-4 text-amber-300" />
-          <span>⚡ Lacak Topik Baru</span>
-        </button>
+          <!-- Lacak Topik Baru On-Demand -->
+          <button
+            @click="openTrackKeywordModal"
+            type="button"
+            class="px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white shadow-md shadow-sky-500/20 flex items-center gap-2 cursor-pointer transition select-none"
+          >
+            <Sparkles class="w-4 h-4 text-amber-300" />
+            <span>⚡ Lacak Topik Baru</span>
+          </button>
 
-        <!-- Buat Laporan Baru -->
-        <Link
-          :href="`/issues/create?polda=${selectedCode}`"
-          class="px-4 py-2.5 rounded-xl text-xs font-black bg-amber-400 text-slate-950 hover:bg-amber-300 shadow-lg shadow-amber-400/25 flex items-center gap-2 cursor-pointer transition select-none"
-        >
-          <span>+ Buat Laporan Isu</span>
-        </Link>
+          <!-- MAIN CTA: Sinkron & Sintesis Intelijen Medsos -->
+          <button
+            @click="triggerSyncAndAnalyze"
+            type="button"
+            :disabled="isSyncing || isAnalyzingAI"
+            class="px-5 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-110 text-slate-950 shadow-lg shadow-amber-400/25 flex items-center gap-2 cursor-pointer transition select-none disabled:opacity-60"
+          >
+            <Sparkles class="w-4 h-4" :class="{ 'animate-spin': isSyncing || isAnalyzingAI }" />
+            <span>{{ (isSyncing || isAnalyzingAI) ? 'SADEWA Sedang Bekerja...' : '⚡ Sinkron & Analisis Intelijen Medsos' }}</span>
+          </button>
+
+          <!-- Buat Laporan Baru -->
+          <Link
+            :href="`/issues/create?polda=${selectedCode}`"
+            class="px-4 py-2.5 rounded-xl text-xs font-black bg-rose-500 text-white hover:bg-rose-600 shadow-lg shadow-rose-500/20 flex items-center gap-2 cursor-pointer transition select-none"
+          >
+            <span>+ Buat Laporan Isu</span>
+          </Link>
+        </div>
+        <!-- Engine Status Badge -->
+        <div class="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
+          <span>Multi-Tier Engine Aktif (Sindikasi Google News + Apify Standby)</span>
+        </div>
       </div>
     </div>
 
@@ -794,7 +873,20 @@ const getPublicPlatformBadge = (platform) => {
           : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700'"
       >
         <Radio class="w-4 h-4" />
-        <span>01. Radar Multi-Platform</span>
+        <span>01. Radar Percakapan</span>
+      </button>
+
+      <button
+        @click="switchTab('briefing')"
+        type="button"
+        class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer select-none whitespace-nowrap"
+        :class="activeTab === 'briefing'
+          ? 'bg-amber-400 text-slate-950 font-black shadow-md'
+          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700'"
+      >
+        <Sparkles class="w-4 h-4 text-amber-500" />
+        <span>02. Executive Briefing & Naskah WA</span>
+        <span class="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-400 text-slate-950" v-if="activeTab !== 'briefing'">AI</span>
       </button>
 
       <button
@@ -806,7 +898,7 @@ const getPublicPlatformBadge = (platform) => {
           : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700'"
       >
         <UserCheck class="w-4 h-4" />
-        <span>02. Tokoh Kritis & KOL Tracker</span>
+        <span>03. Radar KOL & Akun Kritis</span>
       </button>
 
       <button
@@ -818,21 +910,8 @@ const getPublicPlatformBadge = (platform) => {
           : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700'"
       >
         <TrendingUp class="w-4 h-4" />
-        <span>03. Tren Tagar & Isu Viral</span>
+        <span>04. Tren Tagar & Kerawanan Siber</span>
       </button>
-
-      <button
-        @click="switchTab('settings')"
-        type="button"
-        class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer select-none whitespace-nowrap"
-        :class="activeTab === 'settings'
-          ? 'bg-amber-400 text-slate-950 font-black shadow-md'
-          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700'"
-      >
-        <KeyRound class="w-4 h-4" />
-        <span>04. Integrasi Apify & Pengaturan</span>
-      </button>
-
     </div>
 
     <!-- TAB 01: RADAR MULTI-PLATFORM (LIVE FEEDS) -->
@@ -1588,7 +1667,233 @@ const getPublicPlatformBadge = (platform) => {
       </div>
     </div>
 
-    <!-- TAB 02: TOKOH KRITIS & KOL TRACKER -->
+    <!-- TAB 02: EXECUTIVE SOCIAL BRIEFING & NASKAH WA PIMPINAN (SADEWA AI) -->
+    <div v-if="activeTab === 'briefing'" class="space-y-5">
+      <!-- Header Command Bar -->
+      <div class="p-5 rounded-3xl bg-gradient-to-r from-[#070d1d] via-[#0b1426] to-indigo-950 border border-amber-500/30 shadow-2xl">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="animate-pulse w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span>
+              <span class="text-xs font-black text-amber-400 uppercase tracking-widest">SADEWA Social AI Synthesis</span>
+            </div>
+            <h2 class="text-xl font-black text-white">Executive Social Briefing & Naskah WA Pimpinan</h2>
+            <p class="text-xs text-slate-400 mt-0.5">Sintesis intelijen otomatis dari {{ metrics?.total_posts || posts?.total || 0 }} percakapan warganet lintas 5 platform media sosial</p>
+          </div>
+          <button
+            @click="analyzeAI"
+            :disabled="isAnalyzingAI"
+            type="button"
+            class="px-5 py-3 rounded-xl text-sm font-black bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-110 text-slate-950 shadow-lg shadow-amber-400/25 flex items-center gap-2 disabled:opacity-60 cursor-pointer transition select-none"
+          >
+            <Sparkles class="w-5 h-5 text-slate-950" :class="{'animate-spin': isAnalyzingAI}" />
+            <span>{{ isAnalyzingAI ? 'SADEWA Sedang Menganalisis...' : '⚡ Sintesis Intelijen Medsos Otomatis' }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div v-if="isAnalyzingAI" class="p-10 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 text-center space-y-3">
+        <div class="w-12 h-12 rounded-full border-4 border-amber-400 border-t-transparent animate-spin mx-auto"></div>
+        <p class="text-sm font-bold text-slate-900 dark:text-white">SADEWA AI sedang menganalisis percakapan warganet & sentimen...</p>
+        <p class="text-xs text-slate-500">Memproses narasi, mendeteksi polarisasi buzzer, merumuskan cooling system, dan menyusun naskah dinas...</p>
+      </div>
+
+      <!-- Error State -->
+      <div v-else-if="socialAiError" class="p-5 rounded-3xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-300 flex items-start gap-3">
+        <AlertTriangle class="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
+        <div>
+          <p class="font-black text-sm">Analisis AI Belum Berhasil</p>
+          <p class="text-xs mt-1">{{ socialAiError }}</p>
+          <button @click="analyzeAI" class="mt-2 text-xs font-bold underline cursor-pointer">Coba Lagi</button>
+        </div>
+      </div>
+
+      <!-- Empty / Intro State (before first analysis) -->
+      <div v-else-if="!socialAiReport" class="p-12 rounded-3xl bg-white dark:bg-[#0b1426] border border-dashed border-slate-300 dark:border-slate-700 text-center space-y-4">
+        <Sparkles class="w-12 h-12 text-amber-400 mx-auto" />
+        <h3 class="text-base font-black text-slate-900 dark:text-white">Belum Ada Sintesis Intelijen Medsos</h3>
+        <p class="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+          Klik tombol <strong>"⚡ Sintesis Intelijen Medsos Otomatis"</strong> di atas untuk memproses percakapan warganet, memetakan polarisasi buzzer vs organik, dan menghasilkan rekomendasi cooling system beserta naskah WhatsApp pimpinan.
+        </p>
+        <button
+          @click="analyzeAI"
+          :disabled="isAnalyzingAI"
+          type="button"
+          class="px-5 py-2.5 rounded-xl text-xs font-black bg-amber-400 hover:bg-amber-300 text-slate-950 transition cursor-pointer shadow-md inline-flex items-center gap-2"
+        >
+          <Sparkles class="w-4 h-4" />
+          <span>Mulai Analisis Sekarang</span>
+        </button>
+      </div>
+
+      <!-- RESULTS SECTION (when socialAiReport is populated) -->
+      <div v-else class="space-y-5">
+        <!-- Sub-tabs for results navigation -->
+        <div class="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 overflow-x-auto">
+          <button
+            v-for="subTab in [
+              { id: 'briefing', label: '📋 Executive Briefing' },
+              { id: 'polarisasi', label: '⚡ Polarisasi & Buzzer' },
+              { id: 'cooling', label: '🎯 Cooling System' },
+              { id: 'wa', label: '📱 Naskah WA Pimpinan' }
+            ]"
+            :key="subTab.id"
+            @click="activeAiTab = subTab.id"
+            type="button"
+            class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap"
+            :class="activeAiTab === subTab.id
+              ? 'bg-amber-400 text-slate-950 font-black shadow-md'
+              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700'"
+          >
+            {{ subTab.label }}
+          </button>
+        </div>
+
+        <!-- SUB-TAB 1: EXECUTIVE BRIEFING -->
+        <div v-if="activeAiTab === 'briefing'" class="space-y-4">
+          <!-- Model info banner -->
+          <div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <span>Dianalisis oleh SADEWA AI ({{ socialAiReport.model_used }})</span>
+            <span>&bull; {{ socialAiReport.posts_count }} postingan diproses</span>
+            <span>&bull; Waktu respons: {{ socialAiReport.latency_ms }}ms</span>
+          </div>
+
+          <!-- Executive Brief Card -->
+          <div class="p-5 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <h3 class="font-black text-slate-900 dark:text-white flex items-center gap-2 text-sm border-b border-slate-100 dark:border-slate-800 pb-3">
+              <Activity class="w-4 h-4 text-amber-500" /> Ringkasan Eksekutif Situasi Medsos
+            </h3>
+            <p class="text-sm text-slate-700 dark:text-slate-200 leading-relaxed">{{ socialAiReport.data?.executive_brief }}</p>
+
+            <!-- Top Concern -->
+            <div class="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800">
+              <span class="text-xs font-black text-rose-600 dark:text-rose-400 uppercase tracking-wider">⚠️ Isu Kritis Prioritas Pimpinan</span>
+              <p class="text-sm text-rose-800 dark:text-rose-200 mt-1 leading-relaxed">{{ socialAiReport.data?.top_concern }}</p>
+            </div>
+
+            <!-- Sentiment Breakdown -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="space-y-2">
+                <h4 class="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-wider">Komposisi Sentimen Percakapan</h4>
+                <div class="flex items-center gap-2 text-xs font-bold">
+                  <span class="text-emerald-600 dark:text-emerald-400">🟢 Positif: {{ socialAiReport.data?.sentiment_analysis?.positif || 0 }}%</span>
+                  <span class="text-slate-500">⚪ Netral: {{ socialAiReport.data?.sentiment_analysis?.netral || 0 }}%</span>
+                  <span class="text-rose-600 dark:text-rose-400">🔴 Negatif: {{ socialAiReport.data?.sentiment_analysis?.negatif || 0 }}%</span>
+                </div>
+                <div class="w-full h-3 rounded-full overflow-hidden flex bg-slate-200 dark:bg-slate-800">
+                  <div :style="{width: (socialAiReport.data?.sentiment_analysis?.positif || 0) + '%'}" class="bg-emerald-500 h-full"></div>
+                  <div :style="{width: (socialAiReport.data?.sentiment_analysis?.netral || 0) + '%'}" class="bg-slate-400 dark:bg-slate-600 h-full"></div>
+                  <div :style="{width: (socialAiReport.data?.sentiment_analysis?.negatif || 0) + '%'}" class="bg-rose-500 h-full"></div>
+                </div>
+                <p class="text-xs font-bold" :class="getSentimentStabilityClass(socialAiReport.data?.sentiment_analysis?.stability_index || 50)">
+                  Stabilitas Opini: {{ socialAiReport.data?.sentiment_analysis?.stability_label }} (Skor {{ socialAiReport.data?.sentiment_analysis?.stability_index }}/100)
+                </p>
+              </div>
+              <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <span class="text-[10px] font-bold text-slate-500 uppercase">Framing &amp; Persepsi Warganet</span>
+                <p class="text-xs text-slate-700 dark:text-slate-300 mt-1 leading-relaxed">{{ socialAiReport.data?.sentiment_analysis?.narrative_framing }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Critical Accounts Card -->
+          <div v-if="socialAiReport.data?.critical_accounts?.length" class="p-5 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <h3 class="font-black text-slate-900 dark:text-white flex items-center gap-2 text-sm border-b border-slate-100 dark:border-slate-800 pb-3">
+              <UserCheck class="w-4 h-4 text-amber-500" /> Akun Kritis &amp; Influencer Terdeteksi
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div
+                v-for="(acc, idx) in socialAiReport.data.critical_accounts"
+                :key="idx"
+                class="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1"
+              >
+                <div class="flex items-center justify-between">
+                  <span class="font-black text-sm text-slate-900 dark:text-white">{{ acc.name }}</span>
+                  <span
+                    class="text-[10px] font-bold px-2 py-0.5 rounded"
+                    :class="acc.tone === 'Kritis' ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400' : acc.tone === 'Suportif' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'"
+                  >
+                    {{ acc.tone }}
+                  </span>
+                </div>
+                <p class="text-[11px] text-slate-500">{{ acc.platform }} &bull; {{ acc.category }}</p>
+                <p class="text-[11px] text-slate-600 dark:text-slate-400">{{ acc.reach_note }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB-TAB 2: POLARISASI & BUZZER -->
+        <div v-else-if="activeAiTab === 'polarisasi'" class="space-y-4">
+          <div class="p-5 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <h3 class="font-black text-slate-900 dark:text-white flex items-center gap-2 text-sm border-b border-slate-100 dark:border-slate-800 pb-3">
+              <Zap class="w-4 h-4 text-amber-500" /> Analisis Polarisasi: Netizen Organik vs Koordinasi Buzzer
+            </h3>
+            <div class="p-4 rounded-2xl border" :class="getBuzzerRiskClass(socialAiReport.data?.buzzer_vs_organic?.risk_level)">
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-black text-sm">Tingkat Risiko Koordinasi Buzzer</span>
+                <span class="px-3 py-1 rounded-full text-xs font-black uppercase">{{ socialAiReport.data?.buzzer_vs_organic?.risk_level || 'rendah' }}</span>
+              </div>
+              <p class="text-sm leading-relaxed">{{ socialAiReport.data?.buzzer_vs_organic?.assessment }}</p>
+              <p class="text-xs mt-2 opacity-80">{{ socialAiReport.data?.buzzer_vs_organic?.risk_note }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB-TAB 3: COOLING SYSTEM -->
+        <div v-else-if="activeAiTab === 'cooling'" class="space-y-4">
+          <div class="p-5 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <h3 class="font-black text-slate-900 dark:text-white flex items-center gap-2 text-sm border-b border-slate-100 dark:border-slate-800 pb-3">
+              <Target class="w-4 h-4 text-amber-500" /> Rekomendasi Taktis Cooling System Humas
+            </h3>
+            <div class="space-y-3">
+              <div
+                v-for="(cs, idx) in (socialAiReport.data?.cooling_system || [])"
+                :key="idx"
+                class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
+              >
+                <div class="flex items-start gap-3">
+                  <span class="w-7 h-7 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-black text-xs shrink-0 mt-0.5">{{ idx + 1 }}</span>
+                  <div class="flex-1 space-y-1">
+                    <span class="font-black text-sm text-slate-900 dark:text-white">{{ cs.action }}</span>
+                    <div class="flex items-center gap-3 text-[11px] text-slate-500 mt-1">
+                      <span>📱 Saluran: {{ cs.channel }}</span>
+                      <span>🕐 Waktu: {{ cs.timing }}</span>
+                      <span v-if="cs.pic">👤 PIC: {{ cs.pic }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB-TAB 4: NASKAH WA PIMPINAN -->
+        <div v-else-if="activeAiTab === 'wa'" class="space-y-4">
+          <div class="p-5 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 class="font-black text-slate-900 dark:text-white flex items-center gap-2 text-sm">
+                <Send class="w-4 h-4 text-emerald-500" /> Naskah WhatsApp Format Komando Pimpinan
+              </h3>
+              <button
+                @click="copyWaScript"
+                type="button"
+                class="px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition select-none"
+                :class="showWaCopied ? 'bg-emerald-500 text-white' : 'bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-md'"
+              >
+                <Check v-if="showWaCopied" class="w-3.5 h-3.5" />
+                <Send v-else class="w-3.5 h-3.5" />
+                {{ showWaCopied ? '✓ Tersalin ke Clipboard!' : '📋 Salin Naskah WA' }}
+              </button>
+            </div>
+            <pre class="whitespace-pre-wrap text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-sans bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 max-h-[600px] overflow-y-auto">{{ socialAiReport.data?.whatsapp_script }}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 03: RADAR KOL & AKUN KRITIS -->
     <div v-if="activeTab === 'kol'" class="space-y-4">
       <div class="rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4">
         <div class="border-b border-slate-200 dark:border-slate-800 pb-3">
@@ -1654,7 +1959,7 @@ const getPublicPlatformBadge = (platform) => {
       </div>
     </div>
 
-    <!-- TAB 03: TREN TAGAR & ISU VIRAL (DUAL-MODE ARCHITECTURE) -->
+    <!-- TAB 04: TREN TAGAR & KERAWANAN SIBER (DUAL-MODE ARCHITECTURE) -->
     <div v-if="activeTab === 'trends'" class="space-y-5">
       <!-- DUAL-MODE LENS SWITCHER -->
       <div class="p-2 rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-2 shadow-sm">
@@ -2127,8 +2432,8 @@ const getPublicPlatformBadge = (platform) => {
       </div>
     </div>
 
-    <!-- TAB 04: KONFIGURASI APIFY & KATA KUNCI -->
-    <div v-if="activeTab === 'settings'" class="space-y-4">
+    <!-- TAB 04: KONFIGURASI APIFY & KATA KUNCI (ADMIN ONLY - HIDDEN FROM OPERATOR) -->
+    <div v-if="false" class="space-y-4">
       <div class="max-w-3xl rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-6 md:p-8 shadow-sm space-y-6">
         <div class="border-b border-slate-200 dark:border-slate-800 pb-4">
           <div class="flex items-center gap-2">
@@ -2153,7 +2458,7 @@ const getPublicPlatformBadge = (platform) => {
             <div class="flex items-start justify-between gap-3 flex-wrap">
               <div class="flex items-center gap-2.5">
                 <div class="w-8 h-8 rounded-xl bg-amber-400/10 flex items-center justify-center shrink-0 border border-amber-400/30">
-                  <ShieldCheck class="w-4 h-4 text-amber-500" />
+                  <Shield class="w-4 h-4 text-amber-500" />
                 </div>
                 <div>
                   <h3 class="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">

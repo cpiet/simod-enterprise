@@ -261,5 +261,90 @@ class SocialIntelligenceTest extends TestCase
             'action' => 'social_case.archive',
         ]);
     }
+
+    public function test_analyze_ai_endpoint_returns_json_and_records_audit_log(): void
+    {
+        // Seed a sample social post for analysis
+        SocialPost::create([
+            'polda_id'        => $this->polda->id,
+            'platform'        => 'x',
+            'post_id'         => 'test_post_ai_123',
+            'author_name'     => 'Warganet Peduli',
+            'author_handle'   => '@warganet_peduli',
+            'content'         => 'Apresiasi kesigapan patroli siber Polda Sulbar menjaga situasi kamtibmas tetap kondusif.',
+            'sentiment'       => 'positif',
+            'post_url'        => 'https://x.com/warganet_peduli/status/123',
+            'posted_at'       => now(),
+            'virality_score'  => 45,
+            'likes_count'     => 120,
+            'shares_count'    => 35,
+            'comments_count'  => 12,
+            'views_count'     => 4500,
+            'is_kol'          => false,
+        ]);
+
+        $mockGemini = $this->mock(\App\Services\GeminiService::class);
+        $mockGemini->shouldReceive('analyzeSocialPosts')
+            ->once()
+            ->andReturn([
+                'success'     => true,
+                'model_used'  => 'gemini-3.5-flash-lite',
+                'latency_ms'  => 120,
+                'posts_count' => 1,
+                'data'        => [
+                    'executive_brief'    => 'Situasi kondusif di wilayah jajaran.',
+                    'top_concern'        => 'Tidak ada isu kritis menonjol.',
+                    'sentiment_analysis' => [
+                        'positif'           => 80,
+                        'netral'            => 15,
+                        'negatif'           => 5,
+                        'stability_index'   => 85,
+                        'stability_label'   => 'Sangat Stabil',
+                        'narrative_framing' => 'Apresiasi masyarakat terhadap pelayanan kepolisian.',
+                    ],
+                    'buzzer_vs_organic' => [
+                        'risk_level' => 'rendah',
+                        'assessment' => 'Didominasi percakapan warganet organik tanpa pola koordinasi buatan.',
+                        'risk_note'  => 'Tidak terdeteksi anomali buzzer serempak.',
+                    ],
+                    'critical_accounts' => [],
+                    'cooling_system'    => [
+                        [
+                            'action'  => 'Lanjutkan publikasi konten edukatif kamtibmas',
+                            'channel' => 'Instagram & TikTok',
+                            'timing'  => 'Pukul 12.00 WITA',
+                            'pic'     => 'Tim Medsos Bidhumas',
+                        ]
+                    ],
+                    'whatsapp_script' => "*LAPORAN INTELIJEN MEDIA SOSIAL POLRI*\n\nSituasi aman terkendali.",
+                ],
+            ]);
+
+        $response = $this->actingAs($this->user)->postJson('/social-intelligence/analyze-ai', [
+            'polda' => $this->polda->code,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonStructure([
+            'success',
+            'polda',
+            'posts_count',
+            'model_used',
+            'latency_ms',
+            'data' => [
+                'executive_brief',
+                'top_concern',
+                'sentiment_analysis',
+                'buzzer_vs_organic',
+                'critical_accounts',
+                'cooling_system',
+                'whatsapp_script',
+            ],
+        ]);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'social_intelligence.ai_analysis',
+        ]);
+    }
 }
 

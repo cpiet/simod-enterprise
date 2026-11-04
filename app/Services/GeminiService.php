@@ -698,6 +698,270 @@ PROMPT;
     }
 
     /**
+     * SADEWA Social AI — Analisis Intelijen Media Sosial Terpadu (Executive Social Briefing).
+     * Menghasilkan 5 instrumen analitik siber dari data percakapan warganet lintas platform.
+     */
+    public function analyzeSocialPosts(Polda $polda, array $posts, ?string $apiKey = null, ?string $model = null): array
+    {
+        $keysPool = !empty($apiKey) ? $this->parseApiKeys($apiKey) : $this->getAllApiKeys($polda->id);
+        $model    = $model ?: $this->getModel($polda->id);
+
+        if (empty($keysPool)) {
+            return [
+                'success' => false,
+                'status'  => 'missing_api_key',
+                'message' => 'Google Gemini API Key belum dikonfigurasi. Masukkan API Key pada menu Pengaturan AI (/settings/ai).',
+            ];
+        }
+
+        $isNational  = ($polda->code === 'DIVHUMAS');
+        $commandName = $isNational ? 'Divisi Humas Polri (Mabes Polri)' : $polda->name;
+        $leaderTitle = $isNational ? 'Kepala Divisi Humas Polri' : 'Kepala Kepolisian Daerah (Kapolda)';
+        $tz          = ($isNational || $polda->timezone === 'Asia/Jakarta') ? 'WIB' : 'WITA';
+        $nowStr      = now()->translatedFormat('l, d F Y') . ', Pukul ' . now()->format('H.i') . ' ' . $tz;
+
+        // Build post context (up to 40 latest posts)
+        $limitPosts  = array_slice($posts, 0, 40);
+        $postLines   = [];
+        $totalViews  = 0;
+        $totalEngage = 0;
+        $sentCounts  = ['positif' => 0, 'netral' => 0, 'negatif' => 0];
+
+        foreach ($limitPosts as $idx => $post) {
+            $num      = $idx + 1;
+            $platform = strtoupper($post['platform'] ?? 'MEDSOS');
+            $author   = $post['author_name'] ?? 'Warganet';
+            $handle   = $post['author_handle'] ?? '';
+            $isKol    = !empty($post['is_kol']) ? '[KOL]' : '';
+            $sent     = strtoupper($post['sentiment'] ?? 'NETRAL');
+            $content  = mb_substr(strip_tags($post['content'] ?? ''), 0, 200);
+            $views    = (int) ($post['views_count'] ?? 0);
+            $likes    = (int) ($post['likes_count'] ?? 0);
+            $shares   = (int) ($post['shares_count'] ?? 0);
+            $viral    = (int) ($post['virality_score'] ?? 0);
+
+            $totalViews  += $views;
+            $totalEngage += $likes + $shares + (int) ($post['comments_count'] ?? 0);
+            $sentKey      = in_array(strtolower($post['sentiment'] ?? ''), ['positif', 'negatif', 'netral']) ? strtolower($post['sentiment']) : 'netral';
+            $sentCounts[$sentKey]++;
+
+            $postLines[] = "{$num}. [{$platform} {$isKol}| Sentimen: {$sent} | Jangkauan: " . number_format($views) . " views | Interaksi: " . number_format($likes + $shares) . " | Viralisasi: {$viral}/100]";
+            $postLines[] = "   Akun: {$author} {$handle}";
+            $postLines[] = "   Konten: {$content}";
+            $postLines[] = '';
+        }
+
+        $totalPosts  = count($limitPosts);
+        $postsContext = implode("\n", $postLines);
+        $totalPos    = $sentCounts['positif'];
+        $totalNet    = $sentCounts['netral'];
+        $totalNeg    = $sentCounts['negatif'];
+        $totalSent   = max(1, $totalPos + $totalNet + $totalNeg);
+
+        $prompt = <<<PROMPT
+Anda adalah analis intelijen media sosial terpercaya untuk Komando Siber {$commandName}.
+Tanggal & Waktu Analisis: {$nowStr}
+
+DATA PERCAKAPAN WARGANET TERPANTAU (Total: {$totalPosts} postingan dari 5 platform medsos):
+{$postsContext}
+
+STATISTIK GLOBAL:
+- Total Jangkauan (Estimasi Views): {$totalViews}
+- Total Interaksi (Likes + Shares + Komentar): {$totalEngage}
+- Komposisi Sentimen Awal: Positif {$totalPos} ({$totalPos}/{$totalSent}), Netral {$totalNet}, Negatif {$totalNeg}
+
+INSTRUKSI ANALISIS INTELIJEN SIBER (kembalikan HANYA JSON murni tanpa markdown, tanpa komentar):
+{
+  "executive_brief": "Ringkasan eksekutif 2-3 paragraf: topik dominan percakapan warganet 24 jam terakhir, platform mana yang paling aktif, nada dan arah opini publik. Gunakan bahasa Indonesia yang lugas, mengalir, dan bernilai intelijen tinggi.",
+  "top_concern": "1-2 kalimat: isu atau narasi paling mengkhawatirkan dari sudut pandang keamanan siber dan reputasi institusi Polri yang perlu segera ditangani.",
+  "sentiment_analysis": {
+    "positif": 25,
+    "netral": 45,
+    "negatif": 30,
+    "dominant": "netral",
+    "stability_index": 72,
+    "stability_label": "Waspada",
+    "narrative_framing": "Deskripsi singkat framing dominan warganet: sudut pandang mayoritas yang muncul di postingan."
+  },
+  "buzzer_vs_organic": {
+    "assessment": "Apakah pola sentimen negatif terlihat organik (keluhan asli warga) atau terkoordinasi (buzzer dengan pola hashtag serentak, posting burst)? Jelaskan sinyal-sinyal yang terdeteksi.",
+    "risk_level": "rendah|sedang|tinggi",
+    "risk_note": "Dampak potensial jika pola buzzer dibiarkan tidak dimitigasi."
+  },
+  "critical_accounts": [
+    {
+      "name": "Nama/Handle Akun Paling Vokal",
+      "platform": "Nama Platform",
+      "category": "Jurnalis|KOL|Aktivis|Politisi|Warganet Viral|Anonim",
+      "tone": "Kritis|Netral|Suportif",
+      "reach_note": "Estimasi jangkauan dan urgensi pemantauan."
+    }
+  ],
+  "cooling_system": [
+    {
+      "action": "Rekomendasi taktis komunikasi Humas konkret (bukan generik).",
+      "channel": "Platform medsos target (TikTok / Instagram / 𝕏 / WhatsApp).",
+      "timing": "Jam terbaik untuk eksekusi berdasarkan pola aktivitas warganet.",
+      "pic": "Unit Polri yang bertanggung jawab."
+    }
+  ],
+  "whatsapp_script": "Naskah WhatsApp format komando pimpinan, siap kirim ke Kapolri/Kapolda/PJU. Gunakan format baku dinas Polri (penomoran romawi, bullet points, penanda bold *teks*, baris baru \\n antar bagian). Panjang ideal 300-450 kata. Wajib mencakup: (1) Kepada Yth, (2) Ringkasan Situasi Medsos, (3) Komposisi Sentimen, (4) Isu Kritis & Potensi Risiko, (5) Rekomendasi Taktis Bertahap (0-2 jam, 2-6 jam, 24 jam), (6) Penutup hormat. Gunakan nama komandan: {$leaderTitle}."
+}
+PROMPT;
+
+        $modelsToTry = array_values(array_unique(array_filter([
+            $model,
+            'gemini-3.5-flash-lite',
+            'gemini-flash-lite-latest',
+            'gemini-2.5-flash',
+            'gemini-2.0-flash',
+            'gemini-1.5-flash',
+            'gemini-2.5-pro',
+            'gemini-1.5-pro',
+        ])));
+
+        $lastError = 'Gagal memproses analisis SADEWA Social AI';
+
+        foreach ($keysPool as $keyIndex => $currentKey) {
+            $maskedKey = $this->maskApiKey($currentKey);
+            $start     = microtime(true);
+
+            foreach ($modelsToTry as $m) {
+                try {
+                    $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$m}:generateContent?key={$currentKey}";
+                    $response = Http::timeout(90)->withHeaders(['Content-Type' => 'application/json'])->post($endpoint, [
+                        'contents' => [['parts' => [['text' => $prompt]]]],
+                        'generationConfig' => [
+                            'temperature'     => 0.2,
+                            'maxOutputTokens' => 8192,
+                            'responseMimeType' => 'application/json',
+                        ],
+                    ]);
+
+                    $latency = round((microtime(true) - $start) * 1000);
+
+                    if ($response->successful()) {
+                        $json    = $response->json();
+                        $rawText = $json['candidates'][0]['content']['parts'][0]['text'] ?? '';
+                        $parsed  = json_decode($rawText, true);
+
+                        if (!$parsed && preg_match('/```(?:json)?\s*([\s\S]*?)\s*```/', $rawText, $matches)) {
+                            $parsed = json_decode($matches[1], true);
+                        }
+
+                        if (!empty($parsed) && is_array($parsed)) {
+                            // Enhance whatsapp_script if too short
+                            if (empty($parsed['whatsapp_script']) || strlen($parsed['whatsapp_script']) < 400) {
+                                $parsed['whatsapp_script'] = $this->buildSocialWhatsAppScript($parsed, $polda, $totalPosts, $sentCounts);
+                            }
+
+                            return [
+                                'success'    => true,
+                                'data'       => $parsed,
+                                'model_used' => $m,
+                                'key_used'   => $maskedKey,
+                                'latency_ms' => $latency,
+                            ];
+                        }
+
+                        $lastError = 'JSON tidak valid: ' . substr($rawText, 0, 150);
+                    } else {
+                        $errMsg    = $response->json('error.message') ?? "HTTP {$response->status()}";
+                        $lastError = $errMsg;
+                        if (in_array($response->status(), [429, 403])) break; // switch key
+                        if ($response->status() === 404) continue; // try next model
+                    }
+                } catch (\Throwable $e) {
+                    $lastError = $e->getMessage();
+                    Log::error("SADEWA Social AI exception [{$maskedKey}]: " . $e->getMessage());
+                }
+            }
+        }
+
+        return ['success' => false, 'message' => "Analisis SADEWA Social AI gagal: {$lastError}"];
+    }
+
+    /**
+     * Build structured WhatsApp script for social media intelligence report.
+     */
+    private function buildSocialWhatsAppScript(array $data, Polda $polda, int $totalPosts, array $sentCounts): string
+    {
+        $isNational  = ($polda->code === 'DIVHUMAS');
+        $commandName = $isNational ? 'DIVISI HUMAS POLRI (MABES POLRI)' : strtoupper($polda->name);
+        $leaderTitle = $isNational ? 'KADIVHUMAS POLRI / WAKADIVHUMAS / PJU' : 'BAPAK KAPOLDA / WAKAPOLDA / PJU';
+        $tz          = ($isNational || $polda->timezone === 'Asia/Jakarta') ? 'WIB' : 'WITA';
+        $nowStr      = now()->translatedFormat('l, d F Y');
+        $timeStr     = now()->format('H.i') . ' ' . $tz;
+
+        $totalSent = max(1, array_sum($sentCounts));
+        $posPct    = round(($sentCounts['positif'] / $totalSent) * 100);
+        $netPct    = round(($sentCounts['netral'] / $totalSent) * 100);
+        $negPct    = round(($sentCounts['negatif'] / $totalSent) * 100);
+
+        $sent  = $data['sentiment_analysis'] ?? [];
+        $domSent = strtoupper($sent['dominant'] ?? ($negPct > $posPct ? 'NEGATIF' : 'NETRAL'));
+        $stability = $sent['stability_label'] ?? ($sent['stability_index'] >= 75 ? 'Sangat Terkendali' : ($sent['stability_index'] >= 50 ? 'Waspada' : 'Kritis'));
+
+        $lines = [];
+        $lines[] = "*LAPORAN SITUASI DINAMIKA MEDIA SOSIAL & OPINI PUBLIK*";
+        $lines[] = "*KEPADA YTH: {$leaderTitle}*";
+        $lines[] = "*DARI: PIKET ANALISIS INTELIJEN MEDIA SOSIAL & PATROLI SIBER*";
+        $lines[] = "*SATUAN: {$commandName}*";
+        $lines[] = "*WAKTU: {$nowStr}, Pukul {$timeStr}*";
+        $lines[] = "";
+
+        $lines[] = "*I. RINGKASAN SITUASI MEDSOS (24 JAM)*";
+        $lines[] = "• *Total Percakapan Terpantau:* {$totalPosts} postingan warganet lintas 𝕏, TikTok, Instagram, YouTube, Facebook.";
+        $briefText = $data['executive_brief'] ?? 'Percakapan warganet terpantau dalam batas kondusif.';
+        $lines[] = "• " . mb_substr(strip_tags($briefText), 0, 400);
+        $lines[] = "";
+
+        $lines[] = "*II. INDEKS POLARISASI SENTIMEN OPINI PUBLIK*";
+        $lines[] = "• *Komposisi:* Positif {$posPct}% | Netral {$netPct}% | Negatif {$negPct}% (*Dominan: {$domSent}*)";
+        $lines[] = "• *Status Stabilitas Opini:* {$stability}";
+        if (!empty($sent['narrative_framing'])) {
+            $lines[] = "• *Framing Warganet:* " . mb_substr($sent['narrative_framing'], 0, 200);
+        }
+        $lines[] = "";
+
+        $lines[] = "*III. ISU KRITIS & POTENSI RISIKO SIBER*";
+        $topConcern = $data['top_concern'] ?? 'Tidak ada isu kritis yang terdeteksi saat ini.';
+        $lines[]   = "• " . mb_substr($topConcern, 0, 300);
+        $buzzer    = $data['buzzer_vs_organic'] ?? [];
+        if (!empty($buzzer['risk_level']) && in_array($buzzer['risk_level'], ['sedang', 'tinggi'])) {
+            $lines[] = "• *⚠️ Potensi Buzzer/Koordinasi:* Risiko " . strtoupper($buzzer['risk_level']) . " — " . mb_substr($buzzer['risk_note'] ?? '', 0, 150);
+        }
+        $lines[] = "";
+
+        $lines[] = "*IV. REKOMENDASI TAKTIS COOLING SYSTEM*";
+        $cooling = $data['cooling_system'] ?? [];
+        if (!empty($cooling)) {
+            foreach (array_slice($cooling, 0, 3) as $idx => $cs) {
+                $n       = $idx + 1;
+                $action  = $cs['action'] ?? '';
+                $channel = $cs['channel'] ?? '';
+                $timing  = $cs['timing'] ?? '';
+                $pic     = $cs['pic'] ?? '';
+                $lines[] = "{$n}. *{$timing}* ({$channel}): {$action}" . ($pic ? " _(PIC: {$pic})_" : '');
+            }
+        } else {
+            $lines[] = "1. *0-2 Jam (Tanggap Cepat):* Rilis konten klarifikasi resmi melalui akun media sosial Divhumas/Bidhumas.";
+            $lines[] = "2. *2-6 Jam (Konsolidasi):* Tayangkan video humanis di TikTok & Instagram Reels pada jam puncak malam (19.30-21.00).";
+            $lines[] = "3. *24 Jam (Pengendalian Opini):* Intensifkan patroli siber dan replikasi narasi positif lintas platform.";
+        }
+        $lines[] = "";
+
+        $lines[] = "*V. PENUTUP & MOHON PETUNJUK*";
+        $lines[] = "Demikian laporan situasi dinamika media sosial dan opini publik ini disampaikan ke hadapan Jenderal sebagai bahan pertimbangan dan arahan kebijakan strategis lebih lanjut.";
+        $lines[] = "";
+        $lines[] = "*Hormat kami,*";
+        $lines[] = "*Piket Analis Intelijen Media & Patroli Siber*";
+        $lines[] = "*{$commandName}*";
+
+        return implode("\n", $lines);
+    }
+
+    /**
      * SADEWA AI - Conversational Radar & Grounded Intelligence Assistant
      */
     public function chatWithRadar(Polda $polda, string $userMessage, array $conversationHistory, array $articles, ?array $activeReport = null, ?string $apiKey = null, ?string $model = null): array
