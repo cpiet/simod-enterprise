@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import axios from 'axios';
+import { marked } from 'marked';
 import { router } from '@inertiajs/vue3';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
 import {
@@ -256,6 +257,16 @@ const printExecutiveBriefing = () => {
 };
 
 // Tahap 2: AI Copilot Chatbot (SADEWA AI)
+marked.setOptions({
+  gfm: true,
+  breaks: true,
+});
+
+const renderMarkdown = (content) => {
+  if (!content) return '';
+  return marked.parse(content);
+};
+
 const isSadewaOpen = ref(false);
 const isSadewaSpeaking = ref(false);
 const isSpeechMuted = ref(false);
@@ -264,7 +275,7 @@ const isSadewaThinking = ref(false);
 const sadewaMessages = ref([
   {
     role: 'assistant',
-    text: 'Siap Jenderal / Komandan. Saya **SADEWA** (*Sistem Analisis Digital & Evaluasi Wacana Aktual*), asisten AI intelijen media siber Humas Polri. Seluruh pantauan radar 33 portal media terkini telah terhimpun dan siap ditelaah. Ada dinamika atau isu tertentu yang ingin Anda telaah?',
+    text: 'Siap Jenderal / Komandan. Berdasarkan pemantauan radar media siber terkini oleh **SADEWA** (*Sistem Analisis Digital & Evaluasi Wacana Aktual*), seluruh arus informasi dan dinamika opini publik dari 33 portal media telah terhimpun secara real-time. Ada isu spesifik atau pemutakhiran situasi yang ingin didalami?',
     time: 'Realtime',
   },
 ]);
@@ -289,9 +300,10 @@ const speakText = (text) => {
   }
 
   const clean = text
-    .replace(/[*_#`]/g, '')
-    .replace(/[•]/g, ' ')
+    .replace(/[#*`_~]/g, '')
     .replace(/\[.*?\]/g, '')
+    .replace(/\(.*?\)/g, '')
+    .replace(/•/g, ' ')
     .trim();
 
   const utterance = new SpeechSynthesisUtterance(clean);
@@ -4783,12 +4795,13 @@ const submitIssue = () => {
                 </div>
 
                 <!-- Message Content (Markdown/Formatted) -->
-                <div class="text-[11.5px] text-slate-700 dark:text-slate-200 whitespace-pre-wrap leading-relaxed space-y-1">
-                  {{ msg.text }}
-                </div>
+                <div
+                  class="text-[11.5px] text-slate-700 dark:text-slate-200 leading-relaxed sadewa-markdown-body"
+                  v-html="renderMarkdown(msg.text)"
+                ></div>
 
                 <div class="text-[9px] text-slate-400 font-mono text-right pt-1 flex items-center justify-between border-t border-slate-100 dark:border-slate-800/60">
-                  <span v-if="msg.model" class="text-slate-400 dark:text-slate-500">{{ msg.model }}</span>
+                  <span class="text-slate-400 dark:text-slate-500 font-sans font-medium">Terverifikasi 33 Media</span>
                   <span>{{ msg.time }}</span>
                 </div>
               </div>
@@ -4834,9 +4847,9 @@ const submitIssue = () => {
 
           <!-- Footer Attribution -->
           <div class="flex items-center justify-between text-[9px] text-slate-500 dark:text-slate-400 px-1">
-            <span class="flex items-center gap-1 font-medium">
+            <span class="flex items-center gap-1.5 font-medium">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              <span>Real-time Radar Intel</span>
+              <span>SADEWA (Sistem Analisis Digital & Evaluasi Wacana Aktual)</span>
             </span>
             <span class="flex items-center gap-1 font-semibold text-slate-600 dark:text-slate-400">
               <Shield class="w-2.5 h-2.5 text-amber-500" />
@@ -4894,5 +4907,59 @@ const submitIssue = () => {
     margin: 0 !important;
     padding: 0 !important;
   }
+}
+
+/* SADEWA AI Natural Markdown Body Styling */
+.sadewa-markdown-body :deep(h1),
+.sadewa-markdown-body :deep(h2),
+.sadewa-markdown-body :deep(h3),
+.sadewa-markdown-body :deep(h4) {
+  font-weight: 800;
+  font-size: 12px;
+  line-height: 1.45;
+  margin-top: 0.75rem;
+  margin-bottom: 0.35rem;
+  color: #991b1b;
+}
+:root.dark .sadewa-markdown-body :deep(h1),
+:root.dark .sadewa-markdown-body :deep(h2),
+:root.dark .sadewa-markdown-body :deep(h3),
+:root.dark .sadewa-markdown-body :deep(h4) {
+  color: #f87171;
+}
+.sadewa-markdown-body :deep(p) {
+  margin-bottom: 0.45rem;
+  line-height: 1.6;
+}
+.sadewa-markdown-body :deep(p:last-child) {
+  margin-bottom: 0;
+}
+.sadewa-markdown-body :deep(ul),
+.sadewa-markdown-body :deep(ol) {
+  padding-left: 1.25rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0.45rem;
+}
+.sadewa-markdown-body :deep(ul) {
+  list-style-type: disc;
+}
+.sadewa-markdown-body :deep(ol) {
+  list-style-type: decimal;
+}
+.sadewa-markdown-body :deep(li) {
+  margin-bottom: 0.25rem;
+  line-height: 1.5;
+}
+.sadewa-markdown-body :deep(strong) {
+  font-weight: 800;
+  color: #0f172a;
+}
+:root.dark .sadewa-markdown-body :deep(strong) {
+  color: #f8fafc;
+}
+.sadewa-markdown-body :deep(hr) {
+  border: 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.25);
+  margin: 0.65rem 0;
 }
 </style>
