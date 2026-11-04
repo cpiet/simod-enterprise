@@ -172,8 +172,8 @@ Seluruh 29 portal media dikonfigurasi melalui seeder [`SulbarRssFeedsSeeder.php`
    - **Tahap 1 (Penarikan Berita Terkini)**: Menarik feed RSS dari 22/29 portal media secara paralel (`curl_multi`) dan menyimpan artikel terbaru secara adil (*fair quota* 25 berita/portal).
    - **Tahap 2 (Analisis Intelijen AI)**: 30 artikel paling segar seketika diumpankan ke mesin AI (`gemini-2.5-pro` dengan fallback otomatis ke `gemini-1.5-pro`).
    - Menerima keluaran JSON terstruktur dan menyimpannya permanen ke tabel `media_intelligence_reports`.
-3. **Penyajian Cepat Tanpa Klik Ganda**:
-   - Mengisi seketika seluruh tab: **Tab 02** (Executive Briefing), **Tab 03** (Polarisasi Sentimen), **Tab 05** (EWS), **Tab 06** (Counter Narasi & Rekomendasi), dan **Tab 07** (Naskah WhatsApp Siap Kirim).
+3. **Penyajian Cepat Tanpa Klik Ganda (Arsitektur 4 Pilar Terpadu)**:
+   - Mengisi seketika 4 pilar analisis komprehensif tanpa redundansi: **Tab 01** (Radar Berita Online & Smart Dossier), **Tab 02** (Executive Briefing & Sentimen Terpadu + Format WA Resmi), **Tab 03** (Early Warning System / EWS), dan **Tab 04** (Strategi Humas, Kontra-Opini & Orkestrasi Satwil). Menghilangkan duplikasi kuno naskah WA dan pemisahan sentimen yang terfragmentasi.
 4. **Sentralisasi Admin & Kebijakan Hak Akses (/roles)**:
    - Pengaturan sumber RSS XML dipusatkan di menu Admin **Keamanan & Pemeliharaan -> Otomasi Sinkron RSS** (`/maintenance/rss-sync`). Dilengkapi tab khusus **Daftar & Manajemen Sumber Feed RSS** (22 portal nasional / 29 portal daerah) dengan fitur penambahan feed baru, uji validasi XML realtime (latensi & artikel terdeteksi), toggle on/off, dan hapus portal.
    - Tombol manual kuno (*Salin Prompt*, *Lihat Prompt*, *Tempel Ringkasan AI*) serta tombol *Kelola Sumber RSS* telah dibersihkan dari antarmuka operasional radar.
@@ -236,4 +236,12 @@ Saat Anda (Agent) diminta memodifikasi kode ini:
    - Dilengkapi sistem caching analisis AI permanen (`ai_analysis`, `ai_analyzed_at`, `ai_articles_count`) untuk menghemat kuota token AI dan akses modal tanpa jeda.
    - Didukung mesin penarikan berita langsung `GoogleNewsCrawlerService` untuk menangkap liputan internet secara real-time dan disimpan permanen pada basis data.
    - **Sugesti Tren Potensial AI (Google News)**: Mesin AI mendeteksi dan mengembalikan array `suggested_topics` (title, priority, velocity, keywords, rationale) dari pemberitaan terkini. Ditampilkan pada baris interaktif tepat di dalam kotak Smart Dossier dengan tombol 1-klik `✓ Pantau` (`POST /media-intelligence/topics/adopt-suggestion`) yang otomatis mengadopsinya menjadi Topik Atensi, menarik sebaran berita Google News instan, serta tombol `✕` (`POST /media-intelligence/topics/dismiss-suggestion`) untuk mengabaikan.
+9. **Arsitektur 4 Pilar Terpadu, SADEWA AI Copilot & Desain Anti-Gimmick Media Intelligence**:
+   - Tab radar media online dikonsolidasikan secara ketat ke dalam **4 Pilar**:
+     1. `01. Berita Online (Live RSS)`: Feed real-time, filter Zona Merah, dan Smart Dossier Atensi Pimpinan.
+     2. `02. Executive Briefing & Sentimen`: Mengintegrasikan briefing eksekutif, barometer sentimen (Nasional & Wilayah), top concern, matriks respons taktis bertahap (0-2h, 2-6h, 24h), isu strategis, dan terminal format naskah WhatsApp pimpinan siap kirim (menghilangkan duplikasi Tab 07 lama).
+     3. `03. Early Warning System (EWS)`: Deteksi kerawanan kritis (Level Merah/Kuning), unmitigated risk 6-24 jam, dan protokol darurat 3-tahap.
+     4. `04. Strategi Humas & Aksi`: Ide konten kreatif medsos (Tribratanews, IG, TikTok, X), rekomendasi komunikasi publik juru bicara, dan orkestrasi 34 Polda / Polres jajaran.
+   - **SADEWA AI Copilot** (*Sistem Analisis Digital & Evaluasi Wacana Aktual*): Asisten AI percakapan cerdas bertenaga LLM yang mampu menganalisis arsip pemberitaan 24 jam secara real-time, menjawab pertanyaan pimpinan, dan terhubung melalui event dispatcher global `open-sadewa-copilot`.
+   - **Tata Letak Ergonomis (2-Kolom Dossier & Collapsible AI Tray)**: Dossier detail kasus atensi menggunakan layout 2-kolom responsif (menghemat ruang vertikal 45%), baki rekomendasi tren Google News AI dapat dilipat (*collapsible*), dan tombol status cepat (Semua Berita, Zona Merah, Tersimpan) terintegrasi pada Command Bar 1-baris.
 

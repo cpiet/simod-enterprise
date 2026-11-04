@@ -83,12 +83,11 @@ Modul ini bertugas memantau pemberitaan media massa daring secara real-time untu
    - Operator cukup mengklik 1 tombol utama pada top bar.
    - Sistem secara otomatis menarik berita terbaru dari 22/29 portal media (`curl_multi`), menyimpannya ke database dengan fair quota, dan seketika mengumpankannya ke mesin Google Gemini AI tanpa perlu reload halaman berulang kali.
    - Data otomatis tersimpan permanen pada tabel **`media_intelligence_reports`**.
-2. **Penyajian Terpadu Lintas Tab**:
-   - **Tab 02 (Executive Briefing)**: Ringkasan pimpinan 200 kata, Isu Strategis Nasional Polri, Isu Kewilayahan Sulbar, respon cepat 0–2 jam, 2–6 jam, 24 jam.
-   - **Tab 03 (Sentimen Berita)**: Polarisasi opini publik Nasional dan Kewilayahan.
-   - **Tab 05 (Early Warning System)**: Mitigasi risiko dan peringatan dini.
-   - **Tab 06 (Narasi & Rekomendasi)**: Framing narasi dan agenda setting.
-   - **Tab 07 (Naskah WA Pimpinan)**: Format naskah WhatsApp resmi siap kirim ke Bapak Kapolda dan Pejabat Utama.
+2. **Penyajian Terpadu Lintas 4 Pilar (Arsitektur Anti-Redundansi)**:
+   - **Tab 01 (Berita Online - Live RSS)**: Feed berita 29/33 portal, Smart Dossier, dan Command Bar 1-baris terpadu.
+   - **Tab 02 (Executive Briefing & Sentimen)**: Mengintegrasikan ringkasan pimpinan 200 kata, Barometer Sentimen Nasional & Kewilayahan, Top Concern, Matriks Respons Taktis Bertahap (0-2 Jam, 2-6 Jam, 24 Jam), Kajian Risiko & Doktrin Humas, Isu Strategis Nasional & Wilayah, serta Terminal Naskah WhatsApp resmi pimpinan siap kirim (menghilangkan Tab 07 lama yang redundan).
+   - **Tab 03 (Early Warning System - EWS)**: Mitigasi risiko krisis reputasi, level kerawanan MERAH/KUNING, dan Rencana Aksi Darurat 3-Tahap.
+   - **Tab 04 (Strategi Humas & Aksi)**: Ide konten viral multi-platform (Tribratanews, Instagram, TikTok, X), rekomendasi komunikasi publik juru bicara, dan orkestrasi 34 Polda / Polres jajaran.
 3. **Pemisahan Otoritas & Integrasi RBAC (`/roles`)**:
    - Modul `media_intelligence_ai`: Memberikan hak eksekusi sinkronisasi dan analisis AI otomatis.
    - Modul `media_intelligence_manage`: Khusus untuk administrator mengelola master URL feed RSS pada menu Keamanan & Pemeliharaan (`/maintenance/rss-sync`).
