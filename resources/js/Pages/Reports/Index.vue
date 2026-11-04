@@ -134,7 +134,7 @@ const formatDateWita = (dateStr) => {
         </button>
 
         <a
-          :href="`/reports/export/csv?polda=${selectedCode}`"
+          href="/reports/export/csv"
           class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-lg shadow-amber-400/20 transition cursor-pointer"
         >
           <Download class="w-3.5 h-3.5" />
@@ -373,7 +373,7 @@ const formatDateWita = (dateStr) => {
               </td>
               <td class="px-6 py-4 text-right print:hidden">
                 <Link
-                  :href="`/issues/${rep.id}?polda=${selectedCode}`"
+                  :href="`/issues/${rep.id}`"
                   class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-amber-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:border-slate-700 dark:text-amber-400 font-bold text-xs inline-flex items-center gap-1 transition shadow-sm"
                 >
                   <span>Detail &rarr;</span>

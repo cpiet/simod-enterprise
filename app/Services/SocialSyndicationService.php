@@ -434,7 +434,7 @@ class SocialSyndicationService
         try {
             $response = Http::timeout(15)
                 ->withHeaders([
-                    'User-Agent' => 'Mozilla/5.0 (compatible; SIMODPresisi/2.0; +https://simod-enterprise.test)',
+                    'User-Agent' => 'Mozilla/5.0 (compatible; SIMODPresisi/2.0; +' . config('app.url', 'https://polri.go.id') . ')',
                     'Accept'     => 'application/rss+xml, application/xml, text/xml, */*',
                 ])
                 ->get($url);

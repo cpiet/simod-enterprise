@@ -281,7 +281,7 @@ const submitReturn = () => {
         <div class="flex flex-col md:flex-row gap-4 justify-between items-start">
           <div class="space-y-1.5 flex-1">
             <Link
-              :href="`/issues/${issue.id}?polda=${selectedCode}`"
+              :href="`/issues/${issue.id}`"
               class="text-base md:text-lg font-black text-white hover:text-amber-400 transition block leading-snug"
             >
               {{ issue.title }}
@@ -344,7 +344,7 @@ const submitReturn = () => {
 
             <!-- Full Detail Link -->
             <Link
-              :href="`/issues/${issue.id}?polda=${selectedCode}`"
+              :href="`/issues/${issue.id}`"
               class="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-900 border border-slate-700 text-slate-300 hover:text-white transition"
             >
               Detail Lengkap &rarr;

@@ -66,6 +66,10 @@ class PublicationController extends Controller
         $validated['author_id'] = auth()->id();
         $validated['reviewed_at'] = now();
 
+        if ($request->user() && !$request->user()->isSuperAdmin() && $request->user()->polda_id) {
+            $validated['polda_id'] = $request->user()->polda_id;
+        }
+
         Publication::create($validated);
 
         return redirect()->back()->with('success', 'Konten narasi publikasi berhasil diterbitkan!');

@@ -107,7 +107,7 @@ const formatMetadata = (meta) => {
 
       <div class="flex items-center gap-2">
         <a
-          :href="`/reports/export/csv?polda=${selectedCode}`"
+          href="/reports/export/csv"
           class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-black transition"
         >
           <Download class="w-4 h-4 text-amber-400" />

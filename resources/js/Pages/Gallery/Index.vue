@@ -364,7 +364,7 @@ const formatDateWita = (dateStr) => {
           <!-- Linked Issue pill if available -->
           <div v-if="item.issue" class="pt-1">
             <Link
-              :href="`/issues/${item.issue.id}?polda=${selectedCode}`"
+              :href="`/issues/${item.issue.id}`"
               class="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-400 hover:text-amber-300 truncate max-w-full"
             >
               <ExternalLink class="w-3 h-3 flex-shrink-0" />

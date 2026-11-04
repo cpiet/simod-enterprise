@@ -181,6 +181,10 @@ class IssueController extends Controller
         $countYear = Issue::whereYear('created_at', $year)->count() + 1;
         $reportCode = sprintf('SIM-%s-%05d', $year, $countYear);
 
+        if ($request->user() && !$request->user()->isSuperAdmin() && $request->user()->polda_id) {
+            $validated['polda_id'] = $request->user()->polda_id;
+        }
+
         $validated['polres_id'] = !empty($validated['polres_id']) ? $validated['polres_id'] : null;
         $validated['report_code'] = $reportCode;
         $validated['slug'] = Str::slug($validated['title']) . '-' . Str::random(5);

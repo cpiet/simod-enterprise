@@ -802,7 +802,7 @@ const getBuzzerRiskClass = (level) => {
       <div class="flex flex-col items-end gap-2">
         <div class="flex flex-wrap items-center gap-2.5">
           <Link
-            :href="`/?polda=${selectedCode}`"
+            href="/"
             class="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 border border-slate-300 transition"
           >
             &larr; Dashboard
@@ -842,7 +842,7 @@ const getBuzzerRiskClass = (level) => {
 
           <!-- Buat Laporan Baru -->
           <Link
-            :href="`/issues/create?polda=${selectedCode}`"
+            href="/issues/create"
             class="px-4 py-2.5 rounded-xl text-xs font-black bg-rose-500 text-white hover:bg-rose-600 shadow-lg shadow-rose-500/20 flex items-center gap-2 cursor-pointer transition select-none"
           >
             <span>+ Buat Laporan Isu</span>
@@ -1731,7 +1731,7 @@ const getBuzzerRiskClass = (level) => {
 
                 <!-- One-Click Escalation to Laporan Isu (/issues/create) -->
                 <Link
-                  :href="`/issues/create?polda=${selectedCode}&title=${encodeURIComponent(`[PATROLI MEDSOS] ${post.author_handle || ''}: ${(post.content || '').slice(0, 60)}...`)}&category=📱 Isu Medsos & Opini Publik (Cyber Patrol)&source_media=${encodeURIComponent(getPlatformBadge(post.platform).label)}&source_url=${encodeURIComponent(post.post_url || '')}&summary=${encodeURIComponent(post.content || '')}`"
+                  :href="`/issues/create?title=${encodeURIComponent(`[PATROLI MEDSOS] ${post.author_handle || ''}: ${(post.content || '').slice(0, 60)}...`)}&category=📱 Isu Medsos & Opini Publik (Cyber Patrol)&source_media=${encodeURIComponent(getPlatformBadge(post.platform).label)}&source_url=${encodeURIComponent(post.post_url || '')}&summary=${encodeURIComponent(post.content || '')}`"
                   class="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition flex items-center gap-1 shadow-sm cursor-pointer select-none"
                   title="Jadikan Kasus / Laporan Isu di Polres/Polda"
                 >

@@ -169,6 +169,11 @@ class SystemModuleController extends Controller
         $validated['polres_id'] = !empty($validated['polres_id']) ? $validated['polres_id'] : null;
         $validated['issue_id'] = !empty($validated['issue_id']) ? $validated['issue_id'] : null;
         $validated['uploaded_by'] = auth()->id();
+
+        if ($request->user() && !$request->user()->isSuperAdmin() && $request->user()->polda_id) {
+            $validated['polda_id'] = $request->user()->polda_id;
+        }
+
         $validated['size_bytes'] = rand(1500000, 8500000);
         $validated['mime_type'] = $validated['file_type'] === 'video' ? 'video/mp4' : 'image/jpeg';
         $validated['review_status'] = 'approved';
@@ -1001,11 +1006,11 @@ class SystemModuleController extends Controller
             'polda_id'             => 'nullable|integer',
         ]);
 
-        $selectedCode = $request->query('polda', 'ALL');
-        $targetPoldaId = $validated['polda_id'] ?? null;
+        $targetPoldaId = $validated['polda_id'] ?? $request->session()->get('active_polda_id');
+        $selectedCode = $request->session()->get('active_polda_code', $request->query('polda', 'ALL'));
         if (!$targetPoldaId && $selectedCode !== 'ALL') {
             $targetPoldaId = Polda::where('code', $selectedCode)->value('id');
-        } elseif ($selectedCode === 'ALL') {
+        } elseif (!$targetPoldaId && $selectedCode === 'ALL') {
             $targetPoldaId = Polda::where('code', 'DIVHUMAS')->value('id');
         }
 
@@ -1052,12 +1057,14 @@ class SystemModuleController extends Controller
      */
     public function resetRolesMatrix(Request $request): RedirectResponse
     {
-        $selectedCode = $request->query('polda', 'ALL');
-        $targetPoldaId = null;
-        if ($selectedCode === 'ALL') {
-            $targetPoldaId = Polda::where('code', 'DIVHUMAS')->value('id');
-        } else {
-            $targetPoldaId = Polda::where('code', $selectedCode)->value('id');
+        $targetPoldaId = $request->input('polda_id') ?? $request->session()->get('active_polda_id');
+        $selectedCode = $request->session()->get('active_polda_code', $request->query('polda', 'ALL'));
+        if (!$targetPoldaId) {
+            if ($selectedCode === 'ALL') {
+                $targetPoldaId = Polda::where('code', 'DIVHUMAS')->value('id');
+            } else {
+                $targetPoldaId = Polda::where('code', $selectedCode)->value('id');
+            }
         }
 
         RolePermission::where('polda_id', $targetPoldaId)->delete();

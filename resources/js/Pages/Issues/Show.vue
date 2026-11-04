@@ -194,7 +194,7 @@ const formatWita = (dateStr) => {
     <!-- Top Breadcrumb & Return -->
     <div class="flex items-center justify-between gap-4 pb-2 border-b border-slate-800">
       <Link
-        :href="`/issues?polda=${selectedCode}`"
+        href="/issues"
         class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-slate-300 hover:text-white transition"
       >
         <ArrowLeft class="w-3.5 h-3.5" />

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { router, Link, usePage } from '@inertiajs/vue3';
 import SadewaCopilot from '@/Components/SadewaCopilot.vue';
 import {
@@ -12,6 +12,7 @@ import {
   Layers,
   Users,
   CheckCircle2,
+  AlertTriangle,
   ChevronDown,
   Bell,
   Share2,
@@ -157,8 +158,50 @@ const toggleTheme = () => {
   } catch (e) {}
 };
 
+// Global Toast System (Inertia Flash & Custom Events)
+const toast = ref({
+  show: false,
+  message: '',
+  type: 'success', // 'success' | 'error' | 'info'
+  timer: null,
+});
+
+const triggerToast = (message, type = 'success') => {
+  if (!message) return;
+  if (toast.value.timer) clearTimeout(toast.value.timer);
+  toast.value.show = true;
+  toast.value.message = message;
+  toast.value.type = type;
+  toast.value.timer = setTimeout(() => {
+    toast.value.show = false;
+  }, 4500);
+};
+
+const closeToast = () => {
+  if (toast.value.timer) clearTimeout(toast.value.timer);
+  toast.value.show = false;
+};
+
+// Auto-listen to Inertia Flash messages from backend
+watch(
+  () => page.props.flash,
+  (flash) => {
+    if (flash?.success) {
+      triggerToast(flash.success, 'success');
+    } else if (flash?.error) {
+      triggerToast(flash.error, 'error');
+    }
+  },
+  { deep: true, immediate: true }
+);
+
 onMounted(() => {
   initTheme();
+  window.addEventListener('simod-toast', (e) => {
+    if (e.detail?.message) {
+      triggerToast(e.detail.message, e.detail.type || 'success');
+    }
+  });
 });
 
 // Check if a route is currently active with reactive URL tracking & collision prevention
@@ -918,6 +961,46 @@ const switchRole = (newRole) => {
           <span>Laravel 12 + Inertia.js v2 + Vue 3</span>
         </div>
       </footer>
+      <!-- Floating Global Toast Notification -->
+      <transition
+        enter-active-class="transform ease-out duration-300 transition"
+        enter-from-class="translate-y-4 opacity-0 sm:translate-y-0 sm:translate-x-4"
+        enter-to-class="translate-y-0 opacity-100 sm:translate-x-0"
+        leave-active-class="transition ease-in duration-200"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="toast.show"
+          class="fixed bottom-6 right-6 z-[9999] max-w-md w-full sm:w-auto shadow-2xl rounded-2xl border p-4 backdrop-blur-xl flex items-start gap-3 transition"
+          :class="toast.type === 'error'
+            ? 'bg-rose-950/90 border-rose-500/40 text-rose-100 shadow-rose-950/50'
+            : 'bg-slate-900/95 border-emerald-500/40 text-slate-100 shadow-emerald-950/40'"
+        >
+          <div
+            class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+            :class="toast.type === 'error' ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'"
+          >
+            <AlertTriangle v-if="toast.type === 'error'" class="w-4 h-4" />
+            <CheckCircle2 v-else class="w-4 h-4" />
+          </div>
+          <div class="flex-1 pr-2 pt-0.5 min-w-[200px]">
+            <p class="text-[11px] font-black uppercase tracking-wider" :class="toast.type === 'error' ? 'text-rose-400' : 'text-emerald-400'">
+              {{ toast.type === 'error' ? 'Perhatian / Kendala' : 'Pemberitahuan Sistem' }}
+            </p>
+            <p class="text-xs font-medium text-slate-200 mt-0.5 leading-relaxed">
+              {{ toast.message }}
+            </p>
+          </div>
+          <button
+            type="button"
+            @click="closeToast"
+            class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+          >
+            <X class="w-4 h-4" />
+          </button>
+        </div>
+      </transition>
     </div>
   </div>
 </template>

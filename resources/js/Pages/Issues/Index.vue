@@ -47,7 +47,6 @@ const selectedPolres = ref(props.filters?.polres || 'all');
 
 const handleFilter = () => {
   router.get('/issues', {
-    polda: props.selectedCode,
     status: selectedStatus.value,
     priority: selectedPriority.value,
     category: selectedCategory.value,
@@ -62,7 +61,7 @@ const resetFilter = () => {
   selectedPriority.value = 'all';
   selectedCategory.value = 'all';
   selectedPolres.value = 'all';
-  router.get('/issues', { polda: props.selectedCode }, { preserveState: true, preserveScroll: true });
+  router.get('/issues', {}, { preserveState: true, preserveScroll: true });
 };
 
 // Modal Klarifikasi / Fact-Check Cepat
@@ -196,7 +195,7 @@ const getPriorityBadgeClass = (priority) => {
       <div class="flex flex-wrap items-center gap-2.5">
         <!-- Kembali ke Dashboard -->
         <Link
-          :href="`/?polda=${selectedCode}`"
+          href="/"
           class="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 border border-slate-300 transition"
         >
           &larr; Dashboard
@@ -204,7 +203,7 @@ const getPriorityBadgeClass = (priority) => {
 
         <!-- Ekspor CSV Resmi -->
         <a
-          :href="`/issues-export-csv?polda=${selectedCode}&status=${selectedStatus}&priority=${selectedPriority}&category=${selectedCategory}&polres=${selectedPolres}&q=${searchQuery}`"
+          :href="`/issues-export-csv?status=${selectedStatus}&priority=${selectedPriority}&category=${selectedCategory}&polres=${selectedPolres}&q=${searchQuery}`"
           class="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 transition flex items-center gap-2 cursor-pointer shadow-sm select-none"
         >
           <Download class="w-4 h-4 text-slate-600 dark:text-slate-400" />
@@ -213,7 +212,7 @@ const getPriorityBadgeClass = (priority) => {
 
         <!-- Buat Laporan Baru (Direct Navigate to Full Form Page) -->
         <Link
-          :href="`/issues/create?polda=${selectedCode}`"
+          href="/issues/create"
           class="px-4 py-2.5 rounded-xl text-xs font-black bg-amber-400 text-slate-950 hover:bg-amber-300 shadow-lg shadow-amber-400/25 flex items-center gap-2 cursor-pointer transition select-none"
         >
           <PlusCircle class="w-4 h-4 text-slate-950" />
@@ -354,7 +353,7 @@ const getPriorityBadgeClass = (priority) => {
         </p>
         <div class="pt-2">
           <Link
-            :href="`/issues/create?polda=${selectedCode}`"
+            href="/issues/create"
             class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-400 text-slate-950 font-black text-xs hover:bg-amber-300 shadow-md transition"
           >
             <PlusCircle class="w-4 h-4" />
@@ -425,7 +424,7 @@ const getPriorityBadgeClass = (priority) => {
         <!-- Issue Title & Kronologi -->
         <div class="space-y-1.5">
           <Link
-            :href="`/issues/${issue.id}?polda=${selectedCode}`"
+            :href="`/issues/${issue.id}`"
             class="text-base md:text-lg font-black text-slate-900 dark:text-white leading-snug hover:text-amber-500 dark:hover:text-amber-400 transition block"
           >
             {{ issue.title }}
@@ -473,7 +472,7 @@ const getPriorityBadgeClass = (priority) => {
             </button>
 
             <Link
-              :href="`/issues/${issue.id}?polda=${selectedCode}`"
+              :href="`/issues/${issue.id}`"
               class="px-4 py-1.5 rounded-xl text-xs font-black bg-amber-400 hover:bg-amber-300 text-slate-950 flex items-center gap-1.5 transition shadow"
             >
               <span>Detail & Tindak Lanjut</span>

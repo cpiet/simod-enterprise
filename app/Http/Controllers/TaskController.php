@@ -67,6 +67,10 @@ class TaskController extends Controller
         $validated['status'] = 'in_progress';
         $validated['created_by'] = auth()->id();
 
+        if ($request->user() && !$request->user()->isSuperAdmin() && $request->user()->polda_id) {
+            $validated['polda_id'] = $request->user()->polda_id;
+        }
+
         Task::create($validated);
 
         return redirect()->back()->with('success', 'Disposisi tugas berhasil dikirimkan ke Satker/Personel terkait!');

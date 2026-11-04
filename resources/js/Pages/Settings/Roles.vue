@@ -147,7 +147,7 @@ const toggleAllRolesForModule = (moduleKey) => {
 const saveMatrix = () => {
   isSaving.value = true;
   router.post(
-    `/roles?polda=${props.selectedCode || 'ALL'}`,
+    '/roles',
     {
       matrix: matrix.value,
       polda_id: props.targetPoldaId,
@@ -175,8 +175,10 @@ const confirmResetMatrix = () => {
   showResetModal.value = false;
   isResetting.value = true;
   router.post(
-    `/roles/reset?polda=${props.selectedCode || 'ALL'}`,
-    {},
+    '/roles/reset',
+    {
+      polda_id: props.targetPoldaId,
+    },
     {
       preserveScroll: true,
       onSuccess: () => {

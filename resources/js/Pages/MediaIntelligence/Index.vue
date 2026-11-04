@@ -119,6 +119,10 @@ onMounted(async () => {
   }
 });
 
+const switchTenant = (code) => {
+  router.post('/tenant/switch', { code }, { preserveScroll: true });
+};
+
 const toggleBookmark = async (id) => {
   const key = String(id);
   const wasOn = bookmarkedIds.value.includes(key);
@@ -887,8 +891,8 @@ const triggerGeminiAnalysis = async (withSync = true) => {
   }
 
   try {
-    const syncParam = withSync ? '&sync=1' : '';
-    const res = await axios.post(`/media-intelligence/analyze-gemini?polda=${props.selectedCode}${syncParam}`);
+    const syncParam = withSync ? '?sync=1' : '';
+    const res = await axios.post(`/media-intelligence/analyze-gemini${syncParam}`);
     showToastNotification(`✓ ${res.data.message || 'Sinkronisasi berita dan analisis intelijen otomatis selesai!'}`);
     router.reload({ preserveScroll: true });
   } catch (err) {
@@ -3342,13 +3346,14 @@ const submitIssue = () => {
                 <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
                 <span>Sentimen: <strong class="text-emerald-400">86% Positif</strong></span>
               </span>
-              <a
-                :href="'/media-intelligence?polda=' + polda.code"
-                class="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400 hover:text-amber-300 transition"
+              <button
+                type="button"
+                @click="switchTenant(polda.code)"
+                class="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400 hover:text-amber-300 transition cursor-pointer select-none"
               >
                 <span>Pantau Wilayah</span>
                 <ExternalLink class="w-3 h-3" />
-              </a>
+              </button>
             </div>
           </div>
         </div>
