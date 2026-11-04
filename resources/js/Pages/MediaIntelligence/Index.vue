@@ -1612,8 +1612,11 @@ const submitIssue = () => {
                 <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
                   Smart Dossier
                 </span>
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-900 border border-slate-700 text-slate-300">
-                  {{ topics.length }} Kasus Dipantau
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-900 border border-slate-700 text-slate-300 flex items-center gap-1.5 shadow-xs">
+                  <span>{{ topics.length }} Kasus Dipantau</span>
+                  <span v-if="topics.some(t => t.priority === 'urgent')" class="text-rose-400 font-black">
+                    • {{ topics.filter(t => t.priority === 'urgent').length }} Mendesak
+                  </span>
                 </span>
               </h3>
             </div>
@@ -1690,7 +1693,7 @@ const submitIssue = () => {
 
                 <!-- Title (Generous width, clean reading) -->
                 <span
-                  class="truncate max-w-[240px] font-bold"
+                  class="truncate max-w-[280px] sm:max-w-[340px] md:max-w-[420px] font-bold"
                   :class="selectedTopicId === t.id ? 'text-slate-950' : 'text-slate-100'"
                   :title="t.title"
                 >

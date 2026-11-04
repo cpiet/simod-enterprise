@@ -992,10 +992,16 @@ const getBuzzerRiskClass = (level) => {
                 <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                 <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
               </span>
-              <h3 class="text-sm md:text-base font-extrabold text-white flex items-center gap-1.5">
+              <h3 class="text-sm md:text-base font-extrabold text-white flex items-center gap-1.5 flex-wrap">
                 <span>Topik Atensi &amp; Request Pimpinan</span>
                 <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
                   Smart Dossier
+                </span>
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-900 border border-slate-700 text-slate-300 flex items-center gap-1.5 shadow-xs">
+                  <span>{{ investigationCases.length }} Kasus Dipantau</span>
+                  <span v-if="investigationCases.some(c => c.priority === 'urgent')" class="text-rose-400 font-black">
+                    • {{ investigationCases.filter(c => c.priority === 'urgent').length }} Mendesak
+                  </span>
                 </span>
               </h3>
             </div>
@@ -1016,92 +1022,91 @@ const getBuzzerRiskClass = (level) => {
           </div>
         </div>
 
-        <!-- Filter Pills Bar (Semua Percakapan, Disimpan, Kasus 1, Kasus 2...) -->
-        <div class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-          <!-- All Posts Pill -->
-          <button
-            @click="selectAllPosts"
-            type="button"
-            class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer select-none"
-            :class="selectedCaseId === null && !showBookmarksOnly
-              ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
-              : 'bg-slate-900 text-slate-300 hover:text-white border border-slate-800'"
-          >
-            <Globe class="w-3.5 h-3.5" />
-            <span>Semua Percakapan</span>
-            <span class="text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold" :class="selectedCaseId === null && !showBookmarksOnly ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-slate-400'">
-              {{ totalPostsCount || metrics?.total_posts || posts?.total || 0 }}
-            </span>
-          </button>
-
-          <!-- Bookmarked Pill -->
-          <button
-            @click="selectBookmarked"
-            type="button"
-            class="px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer select-none"
-            :class="showBookmarksOnly && selectedCaseId === null
-              ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
-              : 'bg-slate-900 text-slate-300 hover:text-white border border-slate-800'"
-          >
-            <Bookmark class="w-3.5 h-3.5" :class="showBookmarksOnly && selectedCaseId === null ? 'text-slate-950' : 'text-amber-400'" />
-            <span>Disimpan</span>
-            <span class="text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold" :class="showBookmarksOnly && selectedCaseId === null ? 'bg-slate-950 text-amber-400' : 'bg-slate-800 text-slate-400'">
-              {{ bookmarkedCount || 0 }}
-            </span>
-          </button>
-
-          <div class="h-5 border-r border-slate-800 mx-1"></div>
-
-          <!-- Dynamic Investigation Case Pills -->
+        <!-- KASUS ATENSI SELECTOR (ADAPTIVE RESPONSIVE FLEX BADGES - RAPI & BEBAS OVERFLOW) -->
+        <div class="space-y-2">
+          <!-- Empty State jika belum ada kasus -->
           <div
-            v-for="c in investigationCases"
-            :key="c.id"
-            class="inline-flex items-center rounded-xl p-0.5 transition shrink-0 border"
-            :class="selectedCaseId === c.id
-              ? 'bg-amber-400 border-amber-400 shadow-md ring-2 ring-amber-400/30'
-              : c.priority === 'urgent'
-                ? 'bg-rose-950/40 border-rose-500/40 hover:border-rose-400'
-                : 'bg-slate-900 border-slate-800 hover:border-slate-700'"
+            v-if="investigationCases.length === 0"
+            class="p-4 rounded-2xl bg-[#070d19]/80 border border-dashed border-slate-700/80 text-center space-y-1.5"
           >
-            <button
-              @click="selectCasePill(c.id)"
-              type="button"
-              class="px-2.5 py-1 text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer select-none"
-              :class="selectedCaseId === c.id
-                ? 'text-slate-950 font-black'
-                : c.priority === 'urgent' ? 'text-rose-200' : 'text-slate-200'"
-            >
-              <span
-                class="w-2 h-2 rounded-full shrink-0"
-                :class="selectedCaseId === c.id
-                  ? 'bg-slate-950'
-                  : c.priority === 'urgent' ? 'bg-rose-500 animate-pulse' : 'bg-amber-400'"
-              ></span>
-              <span class="truncate max-w-[170px]">{{ c.short_title }}</span>
-              <span
-                class="text-[10px] px-1.5 py-0.2 rounded-full font-mono font-extrabold"
-                :class="selectedCaseId === c.id
-                  ? 'bg-slate-950 text-amber-400'
-                  : c.priority === 'urgent' ? 'bg-rose-500/30 text-rose-300' : 'bg-slate-800 text-slate-300'"
-              >
-                {{ c.posts_count || 0 }}
-              </span>
-            </button>
-
-            <!-- Quick Close / Archive Button on the Pill -->
-            <button
-              @click.stop="closeCaseTab(c.id)"
-              type="button"
-              class="p-1 rounded-lg hover:bg-black/20 text-slate-400 hover:text-rose-500 transition cursor-pointer"
-              title="Tutup & Arsipkan Topik Atensi Ini"
-            >
-              <X class="w-3.5 h-3.5" />
-            </button>
+            <p class="text-xs font-bold text-slate-300">Belum ada topik atensi pimpinan yang aktif di media sosial.</p>
+            <p class="text-[11px] text-slate-500">
+              Klik <strong>"+ Lacak Topik Atensi"</strong> di atas untuk memantau tagar atau kasus spesifik secara terisolasi.
+            </p>
           </div>
 
-          <span v-if="investigationCases.length === 0" class="text-xs text-slate-500 italic px-2">
-            Belum ada topik atensi aktif. Klik "+ Lacak Topik Atensi" untuk memantau kasus request pimpinan.
-          </span>
+          <!-- Adaptive Case Badges List -->
+          <div v-else class="flex flex-wrap items-center gap-2.5">
+            <div
+              v-for="c in investigationCases"
+              :key="c.id"
+              class="group relative inline-flex items-center rounded-2xl transition-all shadow-sm border"
+              :class="selectedCaseId === c.id
+                ? 'bg-amber-400 border-amber-300 text-slate-950 font-black shadow-lg shadow-amber-400/20 ring-2 ring-amber-400/40'
+                : c.priority === 'urgent'
+                  ? 'bg-[#18111e] hover:bg-[#22132b] border-rose-500/50 hover:border-rose-400 text-rose-200'
+                  : 'bg-[#070d19] hover:bg-slate-800 border-slate-700/80 hover:border-amber-400/60 text-slate-200'"
+            >
+              <!-- Main Click Area -->
+              <button
+                @click="selectedCaseId === c.id ? selectAllPosts() : selectCasePill(c.id)"
+                type="button"
+                class="px-3.5 py-2 text-xs font-bold transition flex items-center gap-2 cursor-pointer select-none text-left"
+              >
+                <!-- Priority Dot -->
+                <span
+                  class="w-2.5 h-2.5 rounded-full shrink-0"
+                  :class="selectedCaseId === c.id
+                    ? 'bg-slate-950'
+                    : c.priority === 'urgent' ? 'bg-rose-500 animate-pulse' : 'bg-amber-400'"
+                ></span>
+
+                <!-- Title (Generous width, clean reading) -->
+                <span
+                  class="truncate max-w-[280px] sm:max-w-[340px] md:max-w-[420px] font-bold"
+                  :class="selectedCaseId === c.id ? 'text-slate-950' : 'text-slate-100'"
+                  :title="c.short_title"
+                >
+                  {{ c.short_title }}
+                </span>
+
+                <!-- Post Count Badge -->
+                <span
+                  class="text-[10px] px-2 py-0.5 rounded-full font-mono font-black shrink-0"
+                  :class="selectedCaseId === c.id
+                    ? 'bg-slate-950 text-amber-300'
+                    : c.priority === 'urgent' ? 'bg-rose-500/30 text-rose-300' : 'bg-slate-800 text-amber-300 border border-slate-700'"
+                >
+                  {{ c.posts_count || 0 }} Post
+                </span>
+              </button>
+
+              <!-- Archive Action Button -->
+              <div class="flex items-center pr-1 border-l" :class="selectedCaseId === c.id ? 'border-slate-950/20' : 'border-slate-800'">
+                <button
+                  @click.stop="closeCaseTab(c.id)"
+                  type="button"
+                  class="p-1.5 rounded-xl hover:bg-black/20 transition cursor-pointer"
+                  :class="selectedCaseId === c.id ? 'text-slate-950 hover:text-rose-950' : 'text-slate-400 hover:text-rose-400'"
+                  title="Tutup & Arsipkan Topik Atensi Ini"
+                >
+                  <X class="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            <!-- Quick Reset Button when a case is filtered -->
+            <button
+              v-if="selectedCaseId !== null"
+              @click="selectAllPosts"
+              type="button"
+              class="px-3 py-2 rounded-2xl text-xs font-bold bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 hover:text-white transition flex items-center gap-1.5 cursor-pointer shadow-sm select-none"
+              title="Tutup filter kasus dan tampilkan semua percakapan medsos"
+            >
+              <X class="w-3.5 h-3.5" />
+              <span>Tutup Filter Kasus</span>
+            </button>
+          </div>
         </div>
 
         <!-- Dossier Detail Bar (Muncul saat Kasus Dipilih) -->
@@ -1416,26 +1421,75 @@ const getBuzzerRiskClass = (level) => {
 
       <!-- Toolbar Filters -->
       <div class="p-4 rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 shadow-sm">
-        <!-- Platform Selector Pills -->
-        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
+        <!-- Left: Quick Status (Semua / Disimpan) + Platform Selector Pills -->
+        <div class="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0 flex-wrap sm:flex-nowrap">
+          <!-- Quick Status: Semua Percakapan -->
           <button
-            v-for="p in [
-              { id: 'all', label: 'Semua Platform' },
-              { id: 'x', label: '𝕏' },
-              { id: 'tiktok', label: 'TikTok' },
-              { id: 'instagram', label: 'Instagram' },
-              { id: 'youtube', label: 'YouTube' },
-            ]"
-            :key="p.id"
-            @click="selectedPlatform = p.id; handleFilter()"
+            @click="selectAllPosts"
             type="button"
-            class="px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer select-none"
-            :class="selectedPlatform === p.id
-              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-950 font-black shadow'
-              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer select-none border shrink-0"
+            :class="(!showBookmarksOnly && selectedCaseId === null)
+              ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md shadow-amber-400/20'
+              : 'bg-slate-100 dark:bg-[#070d19] text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-slate-500'"
+            title="Tampilkan semua percakapan radar"
           >
-            {{ p.label }}
+            <Globe class="w-3.5 h-3.5" :class="(!showBookmarksOnly && selectedCaseId === null) ? 'text-slate-950' : 'text-slate-400'" />
+            <span>Semua</span>
+            <span
+              class="px-1.5 py-0.5 rounded-full text-[10px] font-mono"
+              :class="(!showBookmarksOnly && selectedCaseId === null)
+                ? 'bg-slate-950 text-amber-300 font-black'
+                : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold'"
+            >
+              {{ totalPostsCount || metrics?.total_posts || posts?.total || 0 }}
+            </span>
           </button>
+
+          <!-- Quick Status: Disimpan -->
+          <button
+            @click="selectBookmarked"
+            type="button"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer select-none border shrink-0"
+            :class="(showBookmarksOnly && selectedCaseId === null)
+              ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md shadow-amber-400/20'
+              : 'bg-slate-100 dark:bg-[#070d19] text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-slate-500'"
+            title="Tampilkan postingan yang disimpan / bookmark"
+          >
+            <Bookmark class="w-3.5 h-3.5" :class="(showBookmarksOnly && selectedCaseId === null) ? 'text-slate-950' : 'text-amber-400'" />
+            <span>Disimpan</span>
+            <span
+              class="px-1.5 py-0.5 rounded-full text-[10px] font-mono"
+              :class="(showBookmarksOnly && selectedCaseId === null)
+                ? 'bg-slate-950 text-amber-300 font-black'
+                : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold'"
+            >
+              {{ bookmarkedCount || 0 }}
+            </span>
+          </button>
+
+          <div class="hidden sm:block h-5 border-r border-slate-300 dark:border-slate-700 mx-1 shrink-0"></div>
+
+          <!-- Platform Selector Pills -->
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button
+              v-for="p in [
+                { id: 'all', label: 'Semua Platform' },
+                { id: 'x', label: '𝕏' },
+                { id: 'tiktok', label: 'TikTok' },
+                { id: 'instagram', label: 'Instagram' },
+                { id: 'youtube', label: 'YouTube' },
+              ]"
+              :key="p.id"
+              @click="selectedPlatform = p.id; handleFilter()"
+              type="button"
+              class="px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer select-none"
+              :class="selectedPlatform === p.id
+                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-950 font-black shadow'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'"
+            >
+              {{ p.label }}
+            </button>
+          </div>
         </div>
 
         <!-- Right Filters (Search, Sentiment, KOL, Sort) -->
