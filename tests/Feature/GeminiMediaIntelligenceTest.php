@@ -246,4 +246,50 @@ class GeminiMediaIntelligenceTest extends TestCase
             'action' => 'RESET_AI_PROMPT_TEMPLATE',
         ]);
     }
+
+    public function test_chat_endpoint_validates_input(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->postJson('/media-intelligence/chat', []);
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['message']);
+    }
+
+    public function test_chat_endpoint_returns_ai_reply_with_mocked_gemini(): void
+    {
+        $user = User::factory()->create();
+        $divhumas = Polda::where('code', 'DIVHUMAS')->first();
+
+        $setting = AiSetting::forPolda($divhumas->id);
+        $setting->update([
+            'gemini_api_key' => 'AIzaSyFakeTestKeyForChatbot1234567890',
+            'gemini_model'   => 'gemini-2.5-flash',
+        ]);
+
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [
+                    [
+                        'content' => [
+                            'parts' => [
+                                ['text' => 'Siap Jenderal, berdasarkan pemantauan radar siber terkini, situasi kamtibmas dalam kendali kondusif.']
+                            ]
+                        ]
+                    ]
+                ]
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)->postJson('/media-intelligence/chat', [
+            'message'  => 'Bagaimana situasi isu hari ini?',
+            'polda_id' => $divhumas->id,
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'reply'   => 'Siap Jenderal, berdasarkan pemantauan radar siber terkini, situasi kamtibmas dalam kendali kondusif.',
+        ]);
+    }
 }

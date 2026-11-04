@@ -33,6 +33,7 @@ Route::get('/monitoring-media-online', [MediaIntelligenceController::class, 'ind
 Route::post('/media-intelligence/articles/{id}/bookmark', [MediaIntelligenceController::class, 'toggleBookmark'])->name('media-intelligence.bookmark');
 Route::post('/media-intelligence/articles/bookmarks/import', [MediaIntelligenceController::class, 'importBookmarks'])->name('media-intelligence.bookmark.import');
 Route::post('/media-intelligence/analyze-gemini', [MediaIntelligenceController::class, 'analyzeGemini'])->name('media-intelligence.analyze.gemini');
+Route::post('/media-intelligence/chat', [MediaIntelligenceController::class, 'chat'])->name('media-intelligence.chat');
 Route::post('/media-intelligence/gemini-settings', [MediaIntelligenceController::class, 'updateGeminiSettings'])->name('media-intelligence.gemini.settings');
 Route::post('/media-intelligence/gemini-test', [MediaIntelligenceController::class, 'testGeminiConnection'])->name('media-intelligence.gemini.test');
 

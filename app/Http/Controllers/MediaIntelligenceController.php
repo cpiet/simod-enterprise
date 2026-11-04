@@ -1663,4 +1663,65 @@ PROMPT;
             'remaining_suggestions'=> $remainingSuggestions,
         ]);
     }
+
+    /**
+     * SADEWA AI - Interactive Quick-Ask Chatbot Endpoint.
+     */
+    public function chat(Request $request, GeminiService $geminiService): JsonResponse
+    {
+        $request->validate([
+            'message' => 'required|string|max:1000',
+            'history' => 'nullable|array',
+            'polda_id'=> 'nullable',
+        ]);
+
+        [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
+        if ($request->filled('polda_id')) {
+            $selectedPolda = Polda::find($request->input('polda_id')) ?? $selectedPolda;
+        } elseif ($request->filled('polda_code')) {
+            $selectedPolda = Polda::where('code', strtoupper($request->input('polda_code')))->first() ?? $selectedPolda;
+        }
+        $selectedPolda = $selectedPolda ?? Polda::first();
+
+        // Retrieve latest 40 articles for live grounding
+        $articles = MediaArticle::where('polda_id', $selectedPolda->id)
+            ->latest('pub_date')
+            ->latest('id')
+            ->limit(40)
+            ->get()
+            ->map(fn($a) => [
+                'title'       => $a->title,
+                'source_name' => $a->source_name,
+                'sentiment'   => $a->sentiment ?: 'netral',
+                'summary'     => $a->summary,
+                'category'    => $a->category,
+                'pub_date'    => $a->pub_date ? $a->pub_date->format('d M Y, H:i') : null,
+            ])
+            ->toArray();
+
+        $activeReport = MediaIntelligenceReport::where('polda_id', $selectedPolda->id)
+            ->latest()
+            ->first();
+
+        $result = $geminiService->chatWithRadar(
+            $selectedPolda,
+            $request->input('message'),
+            $request->input('history', []),
+            $articles,
+            $activeReport ? $activeReport->toArray() : null
+        );
+
+        if (!$result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'] ?? 'Gagal memproses pesan AI',
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'reply'   => $result['reply'],
+            'model'   => $result['model'] ?? 'gemini-pro',
+        ]);
+    }
 }

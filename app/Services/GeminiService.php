@@ -696,4 +696,149 @@ PROMPT;
 
         return implode("\n", $lines);
     }
+
+    /**
+     * SADEWA AI - Conversational Radar & Grounded Intelligence Assistant
+     */
+    public function chatWithRadar(Polda $polda, string $userMessage, array $conversationHistory, array $articles, ?array $activeReport = null, ?string $apiKey = null, ?string $model = null): array
+    {
+        $keysPool = [];
+        if (!empty($apiKey)) {
+            $keysPool = $this->parseApiKeys($apiKey);
+        }
+        if (empty($keysPool)) {
+            $keysPool = $this->getAllApiKeys($polda->id);
+        }
+
+        $model = $model ?: $this->getModel($polda->id);
+
+        if (empty($keysPool)) {
+            return [
+                'success' => false,
+                'status'  => 'missing_api_key',
+                'message' => 'Google Gemini API Key belum dikonfigurasi pada Pengaturan AI.',
+            ];
+        }
+
+        $commandName = $polda->code === 'DIVHUMAS' || $polda->id === 10
+            ? 'Divisi Humas Polri'
+            : 'Bidang Humas ' . $polda->name;
+
+        // Build grounded article context (top 35 articles)
+        $articleLines = [];
+        $limitArticles = array_slice($articles, 0, 35);
+        foreach ($limitArticles as $idx => $art) {
+            $num = $idx + 1;
+            $src = strtoupper($art['source_name'] ?? 'MEDIA');
+            $sent = strtoupper($art['sentiment'] ?? 'NETRAL');
+            $title = $art['title'] ?? 'Tanpa Judul';
+            $summary = !empty($art['summary']) ? $art['summary'] : '';
+            $articleLines[] = "{$num}. [{$src} | Sentimen: {$sent}] {$title} - {$summary}";
+        }
+        $articlesContext = implode("\n", $articleLines);
+
+        $reportContext = '';
+        if ($activeReport) {
+            $reportContext = "Ringkasan Eksekutif Terkini: " . ($activeReport['executive_brief'] ?? '-') . "\n"
+                . "Atensi Utama Pimpinan: " . ($activeReport['top_concern'] ?? '-') . "\n"
+                . "Komposisi Sentimen: Positif " . ($activeReport['sentiment_positive'] ?? 0) . "%, Netral " . ($activeReport['sentiment_neutral'] ?? 0) . "%, Negatif " . ($activeReport['sentiment_negative'] ?? 0) . "%";
+        }
+
+        // Format recent conversation history
+        $historyLines = [];
+        $recentHistory = array_slice($conversationHistory, -6);
+        foreach ($recentHistory as $turn) {
+            $role = ($turn['role'] ?? 'user') === 'user' ? 'USER' : 'SADEWA';
+            $content = $turn['content'] ?? '';
+            $historyLines[] = "{$role}: {$content}";
+        }
+        $historyText = implode("\n", $historyLines);
+
+        $prompt = <<<PROMPT
+Anda adalah "SADEWA" (Sistem Analisis Digital & Evaluasi Wacana Aktual), asisten AI intelijen media siber dan opini publik resmi Komando Siber {$commandName}.
+Tugas Anda adalah melayani pertanyaan pimpinan dan personel piket intelijen seputar dinamika pemberitaan, analisis sentimen, deteksi isu rawan, dan rekomendasi komunikasi strategis kepolisian.
+
+DATA PENGAMATAN RADAR MEDIA TERKINI:
+{$articlesContext}
+
+{$reportContext}
+
+RIWAYAT PERCAKAPAN SEBELUMNYA:
+{$historyText}
+
+PERTANYAAN USER SAAT INI:
+"{$userMessage}"
+
+PETUNJUK FORMAT JAWABAN:
+1. Jawab secara lugas, berwibawa, profesional, objektif, dan terstruktur (gunakan bullet points atau penomoran jika relevan).
+2. Jawaban harus didasarkan (grounded) pada data radar media dan laporan terkini yang dihimpun di atas. Sebutkan nama portal media atau persentase jika relevan.
+3. Jika ditanya mengenai isu negatif/rawan, sajikan fakta kasus dan usulkan rekomendasi komunikasi taktis (mitigasi/counter opini).
+4. Gunakan Bahasa Indonesia kedinasan yang santun namun tegas (misal: "Siap Jenderal / Komandan", "Berdasarkan pantauan radar media siber hari ini...").
+5. Jangan memberikan informasi fiktif di luar konteks keamanan dan kehumasan.
+PROMPT;
+
+        $modelsToTry = array_values(array_unique(array_filter([
+            $model,
+            'gemini-2.5-flash',
+            'gemini-3.5-flash-lite',
+            'gemini-flash-lite-latest',
+            'gemini-2.0-flash',
+            'gemini-1.5-flash',
+            'gemini-2.5-pro',
+        ])));
+
+        $lastError = 'Gagal memproses respon SADEWA AI';
+
+        foreach ($keysPool as $keyIndex => $currentKey) {
+            $maskedKey = $this->maskApiKey($currentKey);
+
+            foreach ($modelsToTry as $m) {
+                try {
+                    $url = "https://generativelanguage.googleapis.com/v1beta/models/{$m}:generateContent?key={$currentKey}";
+
+                    $payload = [
+                        'contents' => [
+                            [
+                                'role'  => 'user',
+                                'parts' => [['text' => $prompt]]
+                            ]
+                        ],
+                        'generationConfig' => [
+                            'temperature'     => 0.4,
+                            'maxOutputTokens' => 1500,
+                        ],
+                    ];
+
+                    $response = Http::withHeaders(['Content-Type' => 'application/json'])
+                        ->timeout(30)
+                        ->post($url, $payload);
+
+                    if ($response->successful()) {
+                        $json = $response->json();
+                        $replyText = $json['candidates'][0]['content']['parts'][0]['text'] ?? '';
+
+                        if (!empty(trim($replyText))) {
+                            return [
+                                'success' => true,
+                                'reply'   => trim($replyText),
+                                'model'   => $m,
+                                'key'     => $maskedKey,
+                            ];
+                        }
+                    }
+
+                    $errorBody = $response->body();
+                    $lastError = "Model {$m} (Key #{$keyIndex}): " . ($response->json('error.message') ?? $errorBody);
+                } catch (\Throwable $e) {
+                    $lastError = "Exception Model {$m} (Key #{$keyIndex}): " . $e->getMessage();
+                }
+            }
+        }
+
+        return [
+            'success' => false,
+            'status'  => 'error',
+            'message' => $lastError,
+        ];
+    }
 }
