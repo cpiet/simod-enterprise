@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { router, Link, usePage } from '@inertiajs/vue3';
+import SadewaCopilot from '@/Components/SadewaCopilot.vue';
 import {
   Shield,
   ShieldAlert,
@@ -901,6 +902,9 @@ const switchRole = (newRole) => {
       <main class="flex-1 p-4 lg:p-8 w-full max-w-7xl mx-auto space-y-8">
         <slot />
       </main>
+
+      <!-- SADEWA AI Executive Copilot (Persistent Global Command Center Assistant) -->
+      <SadewaCopilot />
 
       <!-- Bottom System Status & Copyright Footer -->
       <footer class="border-t border-slate-800/80 py-4 px-6 text-center text-xs text-slate-300 bg-[#070d1d] flex flex-col sm:flex-row items-center justify-between gap-2">
