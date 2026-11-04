@@ -81,11 +81,11 @@ class MediaIntelligenceController extends Controller
             ->latest()
             ->get();
 
-        // Load articles from database (up to 1,500 latest articles)
+        // Load articles from database (up to 3,000 latest articles to prevent dropping any feed)
         $dbArticles = MediaArticle::where('polda_id', $poldaId)
             ->latest('pub_date')
             ->latest('id')
-            ->limit(1500)
+            ->limit(3000)
             ->get();
 
         $articleIds = $dbArticles->pluck('id')->toArray();
@@ -167,24 +167,30 @@ class MediaIntelligenceController extends Controller
                 'link'              => $a->url,
                 'sentiment'         => $a->sentiment ?: 'netral',
                 'is_bookmarked'     => (bool) $a->is_bookmarked,
+                'feed_id'           => $a->feed_id,
+                'source_id'         => $a->feed_id ?? 0,
                 'matched_topic_ids' => $matchedTopicIds,
                 'matched_topics'    => $matchedTopics,
                 'manual_topic_ids'  => $manualTopicIds,
             ];
         })->toArray();
 
-        // Portal Summary with counts directly from database for registered feeds
-        $dbPortalCounts = MediaArticle::where('polda_id', $poldaId)
-            ->selectRaw('UPPER(source_name) as src_name, COUNT(*) as cnt')
-            ->groupBy('src_name')
-            ->pluck('cnt', 'src_name')
-            ->toArray();
+        // Portal Summary with counts directly from loaded articles to guarantee 100% parity with frontend
+        $loadedPortalCounts = [];
+        $liveCrawlCount = 0;
+        foreach ($articles as $art) {
+            $srcUpper = strtoupper($art['source_name'] ?? '');
+            $loadedPortalCounts[$srcUpper] = ($loadedPortalCounts[$srcUpper] ?? 0) + 1;
+            if (empty($art['feed_id']) || str_contains($art['link'] ?? '', 'news.google.com')) {
+                $liveCrawlCount++;
+            }
+        }
 
         // Strictly ensure ONLY the registered active feeds for this Polda are shown in filter
         $mergedPortalCounts = [];
         foreach ($mediaFeeds as $feed) {
             $feedUpper = strtoupper($feed->name);
-            $mergedPortalCounts[$feedUpper] = $dbPortalCounts[$feedUpper] ?? 0;
+            $mergedPortalCounts[$feedUpper] = $loadedPortalCounts[$feedUpper] ?? 0;
         }
         ksort($mergedPortalCounts);
 
@@ -193,7 +199,6 @@ class MediaIntelligenceController extends Controller
         ];
 
         // Tambahkan opsi Sebaran Internet (Google News) jika terdapat artikel live crawling
-        $liveCrawlCount = MediaArticle::where('polda_id', $poldaId)->whereNull('feed_id')->count();
         if ($liveCrawlCount > 0) {
             $portalsList[] = [
                 'name'  => '🌐 SEBARAN INTERNET (GOOGLE NEWS)',

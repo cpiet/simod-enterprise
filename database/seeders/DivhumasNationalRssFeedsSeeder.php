@@ -41,12 +41,12 @@ class DivhumasNationalRssFeedsSeeder extends Seeder
             ],
             [
                 'name'     => 'ANTARA Politik & Pemerintahan',
-                'url'      => 'https://www.antaranews.com/rss/politik.xml',
+                'url'      => 'https://news.google.com/rss/search?q=site:antaranews.com+politik&hl=id&gl=ID&ceid=ID:id',
                 'category' => 'Politik',
             ],
             [
                 'name'     => 'ANTARA Hukum & Peradilan',
-                'url'      => 'https://www.antaranews.com/rss/hukum.xml',
+                'url'      => 'https://news.google.com/rss/search?q=site:antaranews.com+hukum&hl=id&gl=ID&ceid=ID:id',
                 'category' => 'Hukum & Kriminal',
             ],
             [
@@ -61,7 +61,7 @@ class DivhumasNationalRssFeedsSeeder extends Seeder
             ],
             [
                 'name'     => 'ANTARA Ekonomi & Bisnis',
-                'url'      => 'https://www.antaranews.com/rss/ekonomi.xml',
+                'url'      => 'https://news.google.com/rss/search?q=site:antaranews.com+ekonomi&hl=id&gl=ID&ceid=ID:id',
                 'category' => 'Ekonomi',
             ],
 

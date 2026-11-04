@@ -1679,7 +1679,7 @@ const submitIssue = () => {
             >
               <!-- Main Click Area -->
               <button
-                @click="selectedTopicId = (selectedTopicId === t.id ? null : t.id); showBookmarksOnly = false; showRedZoneOnly = false; currentPage = 1"
+                @click="selectedTopicId = (selectedTopicId === t.id ? null : t.id); selectedPortal = 'Semua Portal'; showBookmarksOnly = false; showRedZoneOnly = false; currentPage = 1"
                 type="button"
                 class="px-3.5 py-2 text-xs font-bold transition flex items-center gap-2 cursor-pointer select-none text-left"
               >
@@ -2198,7 +2198,7 @@ const submitIssue = () => {
             <span class="text-xs font-bold text-slate-400">Portal:</span>
             <select
               v-model="selectedPortal"
-              @change="currentPage = 1"
+              @change="selectedTopicId = null; currentPage = 1"
               class="px-2.5 py-2 rounded-xl text-xs font-bold bg-[#070d19] border border-slate-700 text-white focus:outline-none focus:border-amber-400 cursor-pointer"
             >
               <option value="Semua Portal">Semua Portal ({{ portalsList?.length > 1 ? portalsList.length - 1 : portalsList?.length || 29 }})</option>
@@ -2601,7 +2601,7 @@ const submitIssue = () => {
           Coba ganti pilihan portal, ubah kategori, atau klik tombol "Sinkron Berita" untuk menarik berita terkini dari seluruh portal.
         </p>
         <button
-          @click="selectedPortal = 'Semua Portal'; selectedCategory = 'all'; showBookmarksOnly = false; showRedZoneOnly = false; selectedSentiment = 'all'; searchQuery = ''; selectedTopicId = null"
+          @click="selectedPortal = 'Semua Portal'; selectedCategory = 'all'; showBookmarksOnly = false; showRedZoneOnly = false; selectedSentiment = 'all'; searchQuery = ''; selectedTopicId = null; currentPage = 1"
           class="px-4 py-2 rounded-xl bg-amber-400 text-slate-950 font-black text-xs cursor-pointer"
         >
           Reset Semua Filter
