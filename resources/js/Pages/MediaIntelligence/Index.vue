@@ -81,17 +81,14 @@ const props = defineProps({
 // Tenant Detection: Divhumas (Mabes Polri) vs Polda Wilayah
 const isDivhumas = computed(() => props.selectedCode === 'ALL' || props.selectedPolda?.code === 'DIVHUMAS');
 
-// Active Navigation Tab (01-07)
+// Active Navigation Tab (01-04)
 const activeTab = ref('01');
 
 const tabs = computed(() => [
   { id: '01', name: '01. Berita Online (Live RSS)', badge: 'LIVE', icon: Radio },
-  { id: '02', name: '02. Executive Briefing Pimpinan', badge: 'ANALISIS', icon: Newspaper },
-  { id: '03', name: '03. Sentimen Berita', badge: null, icon: Zap },
-  { id: '04', name: isDivhumas.value ? '04. Orkestrasi Satwil' : '04. Statistik Satwil', badge: null, icon: MapPin },
-  { id: '05', name: '05. Early Warning (EWS)', badge: 'EWS', icon: Shield },
-  { id: '06', name: '06. Narasi & Rekomendasi', badge: null, icon: Award },
-  { id: '07', name: '07. Naskah WA Pimpinan', badge: 'WA RESMI', icon: MessageSquare },
+  { id: '02', name: '02. Executive Briefing & Sentimen', badge: 'ANALISIS', icon: Newspaper },
+  { id: '03', name: '03. Early Warning System (EWS)', badge: 'EWS', icon: Shield },
+  { id: '04', name: '04. Strategi Humas & Aksi', badge: 'AKSI', icon: Award },
 ]);
 
 // Dynamic Categories from Server/Articles
@@ -1448,9 +1445,9 @@ const submitIssue = () => {
           <span v-if="props.aiSetting?.has_api_key" class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse ml-0.5" title="Mesin Analisis AI Aktif"></span>
         </button>
 
-        <!-- Button 2: Format WA Pimpinan (Tab 07) -->
+        <!-- Button 2: Format WA Pimpinan (Tab 02) -->
         <button
-          @click="activeTab = '07'"
+          @click="activeTab = '02'"
           class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white text-xs font-black transition shadow-lg shadow-emerald-600/25 border border-emerald-400/30 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
           title="Buka format naskah WhatsApp resmi siap kirim ke pimpinan"
         >
@@ -1524,7 +1521,7 @@ const submitIssue = () => {
       </div>
     </div>
 
-    <!-- Navigation Tabs Bar (01 - 06) -->
+    <!-- Navigation Tabs Bar (4 Pilar Terpadu 01 - 04) -->
     <div class="p-2 rounded-2xl bg-[#08101e] border border-slate-800 shadow-xl">
       <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
         <button
@@ -1532,7 +1529,7 @@ const submitIssue = () => {
           :key="t.id"
           @click="activeTab = t.id"
           type="button"
-          class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-[11px] md:text-xs font-extrabold text-center leading-tight transition-all duration-200 cursor-pointer"
+          class="flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-[11px] md:text-xs font-extrabold text-center leading-tight transition-all duration-200 cursor-pointer"
           :class="[
             activeTab === t.id
               ? 'bg-amber-500/20 text-amber-400 border-2 border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.25)] ring-1 ring-amber-400/50'
@@ -1545,7 +1542,7 @@ const submitIssue = () => {
             :class="[
               activeTab === t.id
                 ? 'text-amber-400'
-                : t.id === '05'
+                : t.id === '03'
                   ? 'text-rose-400'
                   : 'text-slate-400'
             ]"
@@ -1557,7 +1554,11 @@ const submitIssue = () => {
             :class="[
               t.id === '01'
                 ? 'bg-rose-500 text-white animate-pulse'
-                : 'bg-amber-400 text-slate-950'
+                : t.id === '03'
+                  ? 'bg-rose-500 text-white shadow-sm'
+                  : t.id === '04'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                    : 'bg-amber-400 text-slate-950'
             ]"
           >
             {{ t.badge }}
@@ -2657,12 +2658,157 @@ const submitIssue = () => {
         </p>
       </div>
 
+      <!-- BAROMETER SENTIMEN PUBLIK TERPADU (NASIONAL & KEWILAYAHAN) -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Sentiment Nasional Card -->
+        <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+            <h3 class="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+              <span>🇮🇩</span>
+              <span>Sentimen Publik Nasional</span>
+            </h3>
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+              Mabes Polri Scope
+            </span>
+          </div>
+
+          <div class="flex items-center justify-around py-2">
+            <div class="text-center">
+              <span class="text-2xl md:text-3xl font-black text-emerald-400 font-mono">{{ report?.sentiment_national?.positif || 60 }}%</span>
+              <p class="text-[11px] text-slate-400 font-bold mt-0.5">Positif</p>
+            </div>
+            <div class="text-center">
+              <span class="text-2xl md:text-3xl font-black text-amber-400 font-mono">{{ report?.sentiment_national?.netral || 30 }}%</span>
+              <p class="text-[11px] text-slate-400 font-bold mt-0.5">Netral</p>
+            </div>
+            <div class="text-center">
+              <span class="text-2xl md:text-3xl font-black text-rose-400 font-mono">{{ report?.sentiment_national?.negatif || 10 }}%</span>
+              <p class="text-[11px] text-slate-400 font-bold mt-0.5">Negatif</p>
+            </div>
+          </div>
+
+          <!-- Proportional Progress Bar -->
+          <div class="h-2.5 w-full rounded-full bg-slate-800 overflow-hidden flex shadow-inner">
+            <div
+              :style="{ width: (report?.sentiment_national?.positif || 60) + '%' }"
+              class="bg-emerald-500 transition-all duration-500"
+              :title="'Positif: ' + (report?.sentiment_national?.positif || 60) + '%'"
+            ></div>
+            <div
+              :style="{ width: (report?.sentiment_national?.netral || 30) + '%' }"
+              class="bg-amber-400 transition-all duration-500"
+              :title="'Netral: ' + (report?.sentiment_national?.netral || 30) + '%'"
+            ></div>
+            <div
+              :style="{ width: (report?.sentiment_national?.negatif || 10) + '%' }"
+              class="bg-rose-500 transition-all duration-500"
+              :title="'Negatif: ' + (report?.sentiment_national?.negatif || 10) + '%'"
+            ></div>
+          </div>
+
+          <p class="text-xs text-slate-300 leading-relaxed italic border-l-2 border-slate-700 pl-3">
+            {{ report?.snapshot_national_desc || 'Dinamika isu nasional Polri stabil dengan pengawasan intensif ruang siber dan keterbukaan informasi.' }}
+          </p>
+        </div>
+
+        <!-- Sentiment Wilayah / Satwil Card -->
+        <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+            <h3 class="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+              <MapPin class="w-3.5 h-3.5 text-rose-400" />
+              <span>{{ isDivhumas ? 'Sentimen Kewilayahan Satwil Jajaran' : ('Sentimen Publik ' + (selectedPolda?.name || 'Sulawesi Barat')) }}</span>
+            </h3>
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+              Kewilayahan
+            </span>
+          </div>
+
+          <div class="flex items-center justify-around py-2">
+            <div class="text-center">
+              <span class="text-2xl md:text-3xl font-black text-emerald-400 font-mono">
+                {{ (report?.sentiment_satwil || report?.sentiment_sulbar)?.positif || (isDivhumas ? 60 : 55) }}%
+              </span>
+              <p class="text-[11px] text-slate-400 font-bold mt-0.5">Positif</p>
+            </div>
+            <div class="text-center">
+              <span class="text-2xl md:text-3xl font-black text-amber-400 font-mono">
+                {{ (report?.sentiment_satwil || report?.sentiment_sulbar)?.netral || 30 }}%
+              </span>
+              <p class="text-[11px] text-slate-400 font-bold mt-0.5">Netral</p>
+            </div>
+            <div class="text-center">
+              <span class="text-2xl md:text-3xl font-black text-rose-400 font-mono">
+                {{ (report?.sentiment_satwil || report?.sentiment_sulbar)?.negatif || (isDivhumas ? 10 : 15) }}%
+              </span>
+              <p class="text-[11px] text-slate-400 font-bold mt-0.5">Negatif</p>
+            </div>
+          </div>
+
+          <!-- Proportional Progress Bar -->
+          <div class="h-2.5 w-full rounded-full bg-slate-800 overflow-hidden flex shadow-inner">
+            <div
+              :style="{ width: ((report?.sentiment_satwil || report?.sentiment_sulbar)?.positif || (isDivhumas ? 60 : 55)) + '%' }"
+              class="bg-emerald-500 transition-all duration-500"
+              :title="'Positif: ' + ((report?.sentiment_satwil || report?.sentiment_sulbar)?.positif || (isDivhumas ? 60 : 55)) + '%'"
+            ></div>
+            <div
+              :style="{ width: ((report?.sentiment_satwil || report?.sentiment_sulbar)?.netral || 30) + '%' }"
+              class="bg-amber-400 transition-all duration-500"
+              :title="'Netral: ' + ((report?.sentiment_satwil || report?.sentiment_sulbar)?.netral || 30) + '%'"
+            ></div>
+            <div
+              :style="{ width: ((report?.sentiment_satwil || report?.sentiment_sulbar)?.negatif || (isDivhumas ? 10 : 15)) + '%' }"
+              class="bg-rose-500 transition-all duration-500"
+              :title="'Negatif: ' + ((report?.sentiment_satwil || report?.sentiment_sulbar)?.negatif || (isDivhumas ? 10 : 15)) + '%'"
+            ></div>
+          </div>
+
+          <p class="text-xs text-slate-300 leading-relaxed italic border-l-2 border-slate-700 pl-3">
+            {{ report?.snapshot_satwil_desc || report?.snapshot_sulbar_desc || 'Situasi kamtibmas kewilayahan terpantau aman dan terkendali dengan stabilitas opini publik terjaga.' }}
+          </p>
+        </div>
+      </div>
+
       <!-- Top Concern -->
       <div class="p-5 rounded-2xl bg-rose-500/10 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-3">
         <AlertTriangle class="w-5 h-5 shrink-0 text-rose-400" />
         <div>
           <strong class="font-black uppercase tracking-wider block">Atensi Utama Pimpinan (Top Concern):</strong>
           <span>{{ report?.top_concern || 'Monitoring dan mitigasi disinformasi ruang digital di wilayah pesisir.' }}</span>
+        </div>
+      </div>
+
+      <!-- Matriks Respons Taktis Bertahap (Standar Humas Polri) -->
+      <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-3 flex-wrap gap-2">
+          <h3 class="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+            <Zap class="w-4 h-4 text-amber-400" />
+            <span>Matriks Protokol Respons Taktis Bertahap</span>
+          </h3>
+          <span class="text-[10px] font-mono text-slate-400 uppercase tracking-wider">SOP Mitigasi Krisis 24 Jam</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+            <span class="px-2.5 py-0.5 rounded text-[10px] font-black uppercase bg-rose-500/20 text-rose-300 border border-rose-500/30">
+              Tahap 0 - 2 Jam: Validasi
+            </span>
+            <p class="text-xs font-bold text-white">{{ report?.priority_responses?.response_0_2h?.title || 'Koordinasi Cepat & Cek Fakta' }}</p>
+            <p class="text-xs text-slate-300 leading-relaxed">{{ report?.priority_responses?.response_0_2h?.action || 'Lakukan verifikasi fakta lapangan dengan satker terkait dalam tempo maksimal 2 jam pertama.' }}</p>
+          </div>
+          <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+            <span class="px-2.5 py-0.5 rounded text-[10px] font-black uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              Tahap 2 - 6 Jam: Klarifikasi
+            </span>
+            <p class="text-xs font-bold text-white">{{ report?.priority_responses?.response_2_6h?.title || 'Rilis Pers Satu Pintu' }}</p>
+            <p class="text-xs text-slate-300 leading-relaxed">{{ report?.priority_responses?.response_2_6h?.action || 'Siapkan rilis pers terbuka berbasis 5W+1H untuk mematahkan spekulasi liar sebelum 6 jam.' }}</p>
+          </div>
+          <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+            <span class="px-2.5 py-0.5 rounded text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              Tahap 24 Jam: Amplifikasi
+            </span>
+            <p class="text-xs font-bold text-white">{{ report?.priority_responses?.response_24h?.title || 'Pemulihan & Penguatan Marwah' }}</p>
+            <p class="text-xs text-slate-300 leading-relaxed">{{ report?.priority_responses?.response_24h?.action || 'Amplifikasi testimoni tokoh masyarakat dan konten humanis untuk memulihkan kepercayaan publik.' }}</p>
+          </div>
         </div>
       </div>
 
@@ -2967,181 +3113,52 @@ const submitIssue = () => {
             <span>Karakter: {{ whatsappReportText.length }}</span>
             <span>Target: Bapak Kapolda & PJU</span>
           </div>
-          <button
-            @click="activeTab = '07'"
-            class="text-amber-400 hover:underline font-bold flex items-center gap-1"
-          >
-            <span>Buka Tampilan Penuh di Tab 07</span>
-            <span>&rarr;</span>
-          </button>
+          <div class="flex items-center gap-2">
+            <button
+              @click="downloadWaTxt"
+              type="button"
+              class="text-slate-300 hover:text-white font-bold flex items-center gap-1 text-[11px] cursor-pointer"
+            >
+              <Download class="w-3.5 h-3.5 text-slate-400" />
+              <span>Unduh .txt</span>
+            </button>
+            <span class="text-slate-600">•</span>
+            <button
+              @click="copyWaReport"
+              type="button"
+              class="text-amber-400 hover:text-amber-300 hover:underline font-bold flex items-center gap-1 text-[11px] cursor-pointer"
+            >
+              <Copy class="w-3.5 h-3.5" />
+              <span>{{ isWaCopied ? 'Tersalin!' : 'Salin Naskah' }}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- ========================================================================= -->
-    <!-- TAB 03: EXECUTIVE SNAPSHOT                                                -->
+    <!-- TAB 03: EARLY WARNING SYSTEM (EWS & DETEKSI KERAWANAN SIBER)              -->
     <!-- ========================================================================= -->
     <div v-show="activeTab === '03'" class="space-y-6">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Sentiment Nasional -->
-        <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
-          <h3 class="text-sm font-black text-white uppercase tracking-wider">Sentimen Publik Nasional</h3>
-          <div class="flex items-center justify-around py-4">
-            <div class="text-center">
-              <span class="text-3xl font-black text-emerald-400">{{ report?.sentiment_national?.positif || 60 }}%</span>
-              <p class="text-xs text-slate-400">Positif</p>
-            </div>
-            <div class="text-center">
-              <span class="text-3xl font-black text-amber-400">{{ report?.sentiment_national?.netral || 30 }}%</span>
-              <p class="text-xs text-slate-400">Netral</p>
-            </div>
-            <div class="text-center">
-              <span class="text-3xl font-black text-rose-400">{{ report?.sentiment_national?.negatif || 10 }}%</span>
-              <p class="text-xs text-slate-400">Negatif</p>
-            </div>
+      <!-- EWS Header Banner -->
+      <div class="rounded-3xl bg-gradient-to-r from-rose-950/40 via-[#0b1426] to-[#070d1d] border border-rose-500/40 p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2">
+            <Flame class="w-5 h-5 text-rose-500 animate-pulse" />
+            <h2 class="text-lg md:text-xl font-black text-white tracking-tight">
+              Early Warning System (EWS) &amp; Deteksi Kerawanan Siber
+            </h2>
           </div>
-          <p class="text-xs text-slate-300 leading-relaxed">{{ report?.snapshot_national_desc }}</p>
+          <p class="text-xs text-slate-300 max-w-2xl leading-relaxed">
+            Penyaringan otomatis terhadap isu-isu beresiko krisis reputasi dan eskalasi opini publik. Mengukur dimensi kamtibmas terancam, analisis dampak fatal tanpa mitigasi, serta pembagian PIC satker penanggung jawab.
+          </p>
         </div>
-
-        <!-- Sentiment Wilayah / 34 Polda Jajaran -->
-        <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
-          <h3 class="text-sm font-black text-white uppercase tracking-wider">
-            {{ isDivhumas ? 'Sentimen Kewilayahan Satwil Jajaran' : ('Sentimen Publik ' + (selectedPolda?.name || 'Sulawesi Barat')) }}
-          </h3>
-          <div class="flex items-center justify-around py-4">
-            <div class="text-center">
-              <span class="text-3xl font-black text-emerald-400">
-                {{ (report?.sentiment_satwil || report?.sentiment_sulbar)?.positif || (isDivhumas ? 60 : 55) }}%
-              </span>
-              <p class="text-xs text-slate-400">Positif</p>
-            </div>
-            <div class="text-center">
-              <span class="text-3xl font-black text-amber-400">
-                {{ (report?.sentiment_satwil || report?.sentiment_sulbar)?.netral || 30 }}%
-              </span>
-              <p class="text-xs text-slate-400">Netral</p>
-            </div>
-            <div class="text-center">
-              <span class="text-3xl font-black text-rose-400">
-                {{ (report?.sentiment_satwil || report?.sentiment_sulbar)?.negatif || (isDivhumas ? 10 : 15) }}%
-              </span>
-              <p class="text-xs text-slate-400">Negatif</p>
-            </div>
-          </div>
-          <p class="text-xs text-slate-300 leading-relaxed">{{ report?.snapshot_satwil_desc || report?.snapshot_sulbar_desc }}</p>
-        </div>
+        <span class="px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/40 shrink-0">
+          {{ (report?.early_warnings?.length || 0) }} Peringatan Siaga Aktif
+        </span>
       </div>
 
-      <!-- Priority Action Protocol (0-2h, 2-6h, 24h) -->
-      <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
-        <h3 class="text-sm font-black text-white uppercase tracking-wider">Matriks Respons Taktis Bertahap</h3>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
-            <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-rose-500/20 text-rose-300">0 - 2 Jam: Validasi</span>
-            <p class="text-xs font-bold text-white">{{ report?.priority_responses?.response_0_2h?.title }}</p>
-            <p class="text-xs text-slate-300">{{ report?.priority_responses?.response_0_2h?.action }}</p>
-          </div>
-          <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
-            <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-amber-500/20 text-amber-300">2 - 6 Jam: Klarifikasi</span>
-            <p class="text-xs font-bold text-white">{{ report?.priority_responses?.response_2_6h?.title }}</p>
-            <p class="text-xs text-slate-300">{{ report?.priority_responses?.response_2_6h?.action }}</p>
-          </div>
-          <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
-            <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-300">24 Jam: Amplifikasi</span>
-            <p class="text-xs font-bold text-white">{{ report?.priority_responses?.response_24h?.title }}</p>
-            <p class="text-xs text-slate-300">{{ report?.priority_responses?.response_24h?.action }}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ========================================================================= -->
-    <!-- TAB 04: STATISTIK SATWIL (ORKESTRASI 34 POLDA / POLRES JAJARAN)            -->
-    <!-- ========================================================================= -->
-    <div v-show="activeTab === '04'" class="space-y-4">
-      <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-2 mb-4">
-          <div>
-            <h3 class="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-              <MapPin class="w-4 h-4 text-amber-400" />
-              <span>{{ isDivhumas ? 'Pemetaan Kewilayahan Polda Jajaran' : ('Pemetaan Kondusifitas Jajaran ' + (selectedPolda?.name || 'Polda Sulbar')) }}</span>
-            </h3>
-            <p class="text-xs text-slate-400 mt-0.5">
-              {{ isDivhumas ? 'Monitoring komando Divhumas Polri atas stabilitas kamtibmas dan sentimen opini publik kewilayahan.' : 'Pantauan kondusifitas dan sentimen kamtibmas di tingkat Polres jajaran.' }}
-            </p>
-          </div>
-          <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0 self-start sm:self-auto">
-            {{ isDivhumas ? ((allPoldas?.filter(p => p.code !== 'DIVHUMAS').length || 1) + ' Polda Terpantau Kondusif') : ((selectedPolda?.polres?.length || 6) + ' Polres Jajaran Aktif') }}
-          </span>
-        </div>
-
-        <!-- Mode Divhumas: Grid 34 Polda Jajaran -->
-        <div v-if="isDivhumas" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div
-            v-for="polda in (allPoldas?.filter(p => p.code !== 'DIVHUMAS') || [])"
-            :key="polda.code"
-            class="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-amber-400/50 transition-all space-y-2.5"
-          >
-            <div class="flex items-start justify-between gap-2">
-              <div>
-                <span class="font-bold text-white block text-sm">{{ polda.name }}</span>
-                <span class="text-[10px] font-mono text-slate-400 uppercase tracking-wider">{{ polda.code }} • Zona {{ polda.timezone === 'Asia/Jakarta' ? 'WIB' : (polda.timezone === 'Asia/Jayapura' ? 'WIT' : 'WITA') }}</span>
-              </div>
-              <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
-                Kondusif
-              </span>
-            </div>
-            <p class="text-xs text-slate-300 leading-relaxed">
-              Stabilitas kamtibmas wilayah terpantau aman dan tertib. Koordinasi rilis terpadu bersama {{ polda.polres?.length || 0 }} Polres jajaran.
-            </p>
-            <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-              <span class="flex items-center gap-1">
-                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                <span>Sentimen: <strong class="text-emerald-400">86% Positif</strong></span>
-              </span>
-              <a
-                :href="'/media-intelligence?polda=' + polda.code"
-                class="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400 hover:text-amber-300 transition"
-              >
-                <span>Pantau Wilayah</span>
-                <ExternalLink class="w-3 h-3" />
-              </a>
-            </div>
-          </div>
-        </div>
-
-        <!-- Mode Polda Wilayah: Grid Polres Jajaran -->
-        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div
-            v-for="polres in (selectedPolda?.polres || [
-              { name: 'Polresta Mamuju', code: 'MAMUJU' },
-              { name: 'Polres Majene', code: 'MAJENE' },
-              { name: 'Polres Polewali Mandar', code: 'POLMAN' },
-              { name: 'Polres Mamasa', code: 'MAMASA' },
-              { name: 'Polres Pasangkayu', code: 'PASANGKAYU' },
-              { name: 'Polres Mamuju Tengah', code: 'MATENG' },
-            ])"
-            :key="polres.name"
-            class="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2"
-          >
-            <div class="flex items-center justify-between">
-              <span class="font-bold text-white">{{ polres.name }}</span>
-              <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300">Kondusif</span>
-            </div>
-            <p class="text-xs text-slate-300">Patroli presisi dan pemantauan ruang publik terpantau lancar tanpa gejolak menonjol.</p>
-            <div class="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
-              <span>Indeks Sentimen: 85% Positif</span>
-              <span class="text-amber-400 font-bold">Siaga Normal</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ========================================================================= -->
-    <!-- TAB 05: EARLY WARNING (EWS)                                               -->
-    <!-- ========================================================================= -->
-    <div v-show="activeTab === '05'" class="space-y-4">
+      <!-- EWS Cards List -->
       <div
         v-for="(ew, idx) in (report?.early_warnings || [])"
         :key="idx"
@@ -3210,223 +3227,152 @@ const submitIssue = () => {
     </div>
 
     <!-- ========================================================================= -->
-    <!-- TAB 06: NARASI & REKOMENDASI                                              -->
+    <!-- TAB 04: STRATEGI HUMAS, KONTRA-OPINI & ORKESTRASI SATWIL                   -->
     <!-- ========================================================================= -->
-    <div v-show="activeTab === '06'" class="space-y-6">
-      <!-- Strategic Content Ideas -->
+    <div v-show="activeTab === '04'" class="space-y-6">
+      <!-- Tab Header Banner -->
+      <div class="rounded-3xl bg-gradient-to-r from-emerald-950/40 via-[#0b1426] to-[#070d1d] border border-emerald-500/40 p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2">
+            <Award class="w-5 h-5 text-emerald-400" />
+            <h2 class="text-lg md:text-xl font-black text-white tracking-tight">
+              Strategi Humas, Kontra-Opini &amp; Orkestrasi Satwil
+            </h2>
+          </div>
+          <p class="text-xs text-slate-300 max-w-2xl leading-relaxed">
+            Pedoman taktis Divisi Humas &amp; Polda Jajaran dalam mengendalikan narasi ruang publik, membanjiri ruang digital dengan konten positif yang menyejukkan, serta orkestrasi serempak lintas Satwil.
+          </p>
+        </div>
+        <span class="px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0">
+          Operasional Taktis Humas
+        </span>
+      </div>
+
+      <!-- Section 1: Ide Konten Kreatif & Viralisasi Humas -->
       <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
-        <h3 class="text-sm font-black text-white uppercase tracking-wider">Ide Konten Kreatif & Viralisasi Humas</h3>
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-3 flex-wrap gap-2">
+          <h3 class="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+            <Sparkles class="w-4 h-4 text-amber-400" />
+            <span>Ide Konten Kreatif &amp; Viralisasi Positif (Multi-Platform)</span>
+          </h3>
+          <span class="text-[10px] font-mono text-slate-400">Tribratanews • Instagram • TikTok • 𝕏</span>
+        </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div
             v-for="(c, idx) in (report?.strategic_contents || [])"
             :key="idx"
-            class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2 text-xs"
+            class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2 text-xs hover:border-slate-700 transition"
           >
             <div class="flex items-center justify-between">
               <span class="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-amber-400 text-slate-950">{{ c.label }}</span>
               <span class="text-slate-400 font-mono text-[10px]">{{ c.platform }}</span>
             </div>
             <p class="font-bold text-white text-sm">{{ c.title }}</p>
-            <p class="text-slate-300">Format: {{ c.format }} &bull; Target: {{ c.target }}</p>
+            <p class="text-slate-300 leading-relaxed">Format: {{ c.format }} &bull; Target: {{ c.target }}</p>
           </div>
         </div>
       </div>
 
-      <!-- Action Recommendations -->
+      <!-- Section 2: Rekomendasi Komunikasi Publik & Talking Points Pimpinan -->
       <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
-        <h3 class="text-sm font-black text-white uppercase tracking-wider">Rekomendasi Komunikasi Publik</h3>
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-3 flex-wrap gap-2">
+          <h3 class="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+            <MessageSquare class="w-4 h-4 text-emerald-400" />
+            <span>Rekomendasi Komunikasi Publik &amp; Panduan Juru Bicara</span>
+          </h3>
+          <span class="text-[10px] font-mono text-slate-400">Arahan Pejabat Utama &amp; Kasatwil</span>
+        </div>
         <div class="space-y-3">
           <div
             v-for="(rec, idx) in (report?.recommendations || [])"
             :key="idx"
-            class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-1 text-xs"
+            class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-1 text-xs hover:border-slate-700 transition"
           >
             <div class="flex items-center justify-between">
-              <span class="font-bold text-white">{{ rec.issue }}</span>
+              <span class="font-bold text-white text-sm">{{ rec.issue }}</span>
               <span class="text-amber-400 font-bold text-[10px]">{{ rec.target }}</span>
             </div>
-            <p class="text-slate-300">{{ rec.action }}</p>
-            <p class="text-[10px] text-slate-400">PIC: {{ rec.pic }} &bull; Indikator: {{ rec.indicator }}</p>
+            <p class="text-slate-300 leading-relaxed">{{ rec.action }}</p>
+            <p class="text-[10px] text-slate-400 pt-1 border-t border-slate-800/80">PIC: {{ rec.pic }} &bull; Indikator: {{ rec.indicator }}</p>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- ========================================================================= -->
-    <!-- TAB 07: FORMAT NASKAH WHATSAPP PIMPINAN (KAPOLDA & PJU)                   -->
-    <!-- ========================================================================= -->
-    <div v-show="activeTab === '07'" class="space-y-6">
-      <!-- Executive Notification Banner -->
-      <div class="rounded-3xl bg-gradient-to-r from-emerald-950/60 via-[#0b1426] to-[#080f20] border border-emerald-500/30 p-6 shadow-2xl space-y-3">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2">
-              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                PRODUK INTELIJEN HUMAS RESMI
-              </span>
-              <span class="text-xs text-emerald-400 font-mono">{{ report?.report_time || '19.03 WITA' }}</span>
-            </div>
-            <h2 class="text-lg font-black text-white flex items-center gap-2">
-              <MessageSquare class="w-5 h-5 text-emerald-400" />
-              <span>Format Naskah WhatsApp Siap Kirim ke Pimpinan</span>
-            </h2>
-            <p class="text-xs text-slate-300 max-w-3xl leading-relaxed">
-              Disusun secara terstandarisasi untuk penyampaian cepat kepada <strong>{{ selectedPolda?.kapolda_name ? `Bapak Kapolda (${selectedPolda.kapolda_name})` : 'Bapak Kapolda' }}</strong>, Wakapolda, dan Irwasda. Format telah dioptimalkan dengan tipografi WhatsApp (bold, italic, divider, and bullets) agar nyaman dibaca pada perangkat mobile pimpinan.
+      <!-- Section 3: Pemetaan & Orkestrasi Diseminasi Satwil Jajaran -->
+      <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-2">
+          <div>
+            <h3 class="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+              <MapPin class="w-4 h-4 text-amber-400" />
+              <span>{{ isDivhumas ? 'Orkestrasi Diseminasi Narasi 34 Polda Jajaran' : ('Pemetaan Kondusifitas Jajaran ' + (selectedPolda?.name || 'Polda Sulbar')) }}</span>
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">
+              {{ isDivhumas ? 'Monitoring komando Divhumas Polri atas stabilitas kamtibmas dan sentimen opini publik kewilayahan.' : 'Pantauan kondusifitas dan sentimen kamtibmas di tingkat Polres jajaran.' }}
             </p>
           </div>
-
-          <!-- Top Quick Actions -->
-          <div class="flex items-center gap-2 shrink-0">
-            <button
-              @click="openWhatsAppDirect"
-              class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/50 text-emerald-200 text-xs font-bold transition shadow-sm"
-              title="Buka WhatsApp Web dan kirimkan teks laporan langsung"
-            >
-              <Send class="w-4 h-4 text-emerald-400" />
-              <span>Buka di WhatsApp Web</span>
-            </button>
-            <button
-              @click="copyWaReport"
-              class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 text-xs font-black transition shadow-lg shadow-emerald-500/25"
-            >
-              <Check v-if="isWaCopied" class="w-4 h-4" />
-              <Copy v-else class="w-4 h-4" />
-              <span>{{ isWaCopied ? '✓ Berhasil Disalin!' : 'Salin Seluruh Naskah' }}</span>
-            </button>
-          </div>
+          <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0 self-start sm:self-auto">
+            {{ isDivhumas ? ((allPoldas?.filter(p => p.code !== 'DIVHUMAS').length || 1) + ' Polda Terpantau Kondusif') : ((selectedPolda?.polres?.length || 6) + ' Polres Jajaran Aktif') }}
+          </span>
         </div>
 
-        <!-- 3-Step Flow Guide -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3 border-t border-slate-800/80 text-xs">
-          <div class="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
-            <span class="text-[10px] font-black uppercase text-amber-400">Langkah 1 &bull; Verifikasi Fakta</span>
-            <p class="text-slate-300 text-[11px]">Pastikan ringkasan briefing, sentimen, dan isu prioritas telah disinkronkan dari pemantauan 24 jam.</p>
-          </div>
-          <div class="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
-            <span class="text-[10px] font-black uppercase text-emerald-400">Langkah 2 &bull; Salin Naskah</span>
-            <p class="text-slate-300 text-[11px]">Klik tombol "Salin Seluruh Naskah" atau unduh salinan naskah .txt sebagai arsip fisik dinas.</p>
-          </div>
-          <div class="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-1">
-            <span class="text-[10px] font-black uppercase text-sky-400">Langkah 3 &bull; Diseminasi Berjenjang</span>
-            <p class="text-slate-300 text-[11px]">Tempelkan langsung ke chat WhatsApp dinas Bapak Kapolda dengan tembusan Wakapolda & Irwasda.</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Main WhatsApp Terminal Box -->
-      <div class="rounded-3xl bg-[#0b1426] border border-emerald-500/40 shadow-2xl overflow-hidden">
-        <!-- Terminal Header Toolbar -->
-        <div class="p-4 md:p-5 bg-gradient-to-r from-emerald-950/50 via-[#0c162e] to-[#080f20] border-b border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div class="flex items-center gap-3">
-            <div class="flex items-center gap-1.5">
-              <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block shadow-sm shadow-emerald-500/50"></span>
-              <span class="w-3 h-3 rounded-full bg-amber-400 inline-block"></span>
-              <span class="w-3 h-3 rounded-full bg-slate-600 inline-block"></span>
-            </div>
-            <span class="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider">
-              WA_DISPATCH_OFFICIAL_BRIEFING.TXT
-            </span>
-          </div>
-
-          <!-- Controls -->
-          <div class="flex items-center flex-wrap gap-2">
-            <!-- Scroll to Top -->
-            <button
-              @click="scrollWaToTop"
-              class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition"
-              title="Gulir ke Awal Teks"
-            >
-              <ChevronUp class="w-4 h-4" />
-            </button>
-            <!-- Scroll to Bottom -->
-            <button
-              @click="scrollWaToBottom"
-              class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition"
-              title="Gulir ke Akhir Teks"
-            >
-              <ChevronDown class="w-4 h-4" />
-            </button>
-            <!-- Maximize Toggle -->
-            <button
-              @click="isWaMaximized = !isWaMaximized"
-              class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white transition"
-              :title="isWaMaximized ? 'Perkecil Kotak' : 'Perluas Kotak Teks'"
-            >
-              <Minimize2 v-if="isWaMaximized" class="w-4 h-4 text-amber-400" />
-              <Maximize2 v-else class="w-4 h-4 text-slate-300" />
-            </button>
-            <!-- Download TXT -->
-            <button
-              @click="downloadWaTxt"
-              class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition"
-              title="Unduh naskah mentah sebagai file .txt"
-            >
-              <Download class="w-3.5 h-3.5 text-slate-400" />
-              <span>Unduh .txt</span>
-            </button>
-            <!-- Copy Main -->
-            <button
-              @click="copyWaReport"
-              class="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition shadow-md shadow-emerald-500/20"
-            >
-              <Check v-if="isWaCopied" class="w-4 h-4" />
-              <Copy v-else class="w-4 h-4" />
-              <span>{{ isWaCopied ? 'Tersalin ke Clipboard!' : 'Salin Naskah' }}</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Terminal Body -->
-        <div class="relative bg-[#060b14] p-5">
-          <!-- Floating Copy Button in top right -->
-          <button
-            @click="copyWaReport"
-            class="absolute top-8 right-8 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/50 text-emerald-300 text-[11px] font-bold backdrop-blur-md transition shadow-md"
-            title="Klik untuk salin cepat"
-          >
-            <Check v-if="isWaCopied" class="w-3.5 h-3.5 text-emerald-400" />
-            <Copy v-else class="w-3.5 h-3.5 text-emerald-400" />
-            <span>{{ isWaCopied ? 'Tersalin!' : 'Salin Teks' }}</span>
-          </button>
-
+        <!-- Mode Divhumas: Grid 34 Polda Jajaran -->
+        <div v-if="isDivhumas" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div
-            ref="waBoxRef"
-            :class="[
-              'overflow-y-auto font-mono text-xs leading-relaxed text-emerald-300/95 whitespace-pre-wrap select-all p-6 rounded-2xl bg-black/70 border border-emerald-950/90 shadow-2xl custom-scrollbar transition-all duration-300',
-              isWaMaximized ? 'max-h-[850px]' : 'max-h-[560px]'
-            ]"
+            v-for="polda in (allPoldas?.filter(p => p.code !== 'DIVHUMAS') || [])"
+            :key="polda.code"
+            class="p-5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-amber-400/50 transition-all space-y-2.5"
           >
-            {{ whatsappReportText }}
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <span class="font-bold text-white block text-sm">{{ polda.name }}</span>
+                <span class="text-[10px] font-mono text-slate-400 uppercase tracking-wider">{{ polda.code }} • Zona {{ polda.timezone === 'Asia/Jakarta' ? 'WIB' : (polda.timezone === 'Asia/Jayapura' ? 'WIT' : 'WITA') }}</span>
+              </div>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
+                Kondusif
+              </span>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Stabilitas kamtibmas wilayah terpantau aman dan tertib. Koordinasi rilis terpadu bersama {{ polda.polres?.length || 0 }} Polres jajaran.
+            </p>
+            <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+              <span class="flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span>Sentimen: <strong class="text-emerald-400">86% Positif</strong></span>
+              </span>
+              <a
+                :href="'/media-intelligence?polda=' + polda.code"
+                class="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400 hover:text-amber-300 transition"
+              >
+                <span>Pantau Wilayah</span>
+                <ExternalLink class="w-3 h-3" />
+              </a>
+            </div>
           </div>
         </div>
 
-        <!-- Footer Meta -->
-        <div class="px-6 py-4 bg-[#080f1e] border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-400">
-          <div class="flex items-center flex-wrap gap-4 text-[11px]">
-            <span class="flex items-center gap-1.5 text-emerald-400 font-bold">
-              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              Siap Kirim WhatsApp (UTF-8)
-            </span>
-            <span>Jumlah Karakter: <strong class="text-white">{{ whatsappReportText.length }}</strong></span>
-            <span>Estimasi Baca: <strong class="text-white">~3 Menit</strong></span>
-            <span>Tembusan: <strong class="text-slate-300">Wakapolda & Irwasda</strong></span>
-          </div>
-
-          <div class="flex items-center gap-2">
-            <button
-              @click="openWhatsAppDirect"
-              class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition"
-            >
-              <Send class="w-3.5 h-3.5 text-emerald-400" />
-              <span>Buka WhatsApp Web</span>
-            </button>
-            <button
-              @click="copyWaReport"
-              class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition"
-            >
-              <Copy class="w-3.5 h-3.5" />
-              <span>Salin Sekarang</span>
-            </button>
+        <!-- Mode Polda Wilayah: Grid Polres Jajaran -->
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div
+            v-for="polres in (selectedPolda?.polres || [
+              { name: 'Polresta Mamuju', code: 'MAMUJU' },
+              { name: 'Polres Majene', code: 'MAJENE' },
+              { name: 'Polres Polewali Mandar', code: 'POLMAN' },
+              { name: 'Polres Mamasa', code: 'MAMASA' },
+              { name: 'Polres Pasangkayu', code: 'PASANGKAYU' },
+              { name: 'Polres Mamuju Tengah', code: 'MATENG' },
+            ])"
+            :key="polres.name"
+            class="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2"
+          >
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-white">{{ polres.name }}</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300">Kondusif</span>
+            </div>
+            <p class="text-xs text-slate-300">Patroli presisi dan pemantauan ruang publik terpantau lancar tanpa gejolak menonjol.</p>
+            <div class="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+              <span>Indeks Sentimen: 85% Positif</span>
+              <span class="text-amber-400 font-bold">Siaga Normal</span>
+            </div>
           </div>
         </div>
       </div>
