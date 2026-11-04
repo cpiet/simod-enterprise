@@ -44,6 +44,8 @@ import {
   Target,
   FolderOpen,
   PlusCircle,
+  Printer,
+  FileText,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -67,6 +69,9 @@ const props = defineProps({
   wordCloud: Object,
   peakHours: Object,
   settings: Object,
+  latestReport: { type: Object, default: null },
+  reportHistory: { type: Array, default: () => [] },
+  satwils: { type: Array, default: () => [] },
   filters: Object,
 });
 
@@ -641,16 +646,37 @@ const getPublicPlatformBadge = (platform) => {
   }
 };
 
-// ─── SADEWA SOCIAL AI SYNTHESIS ───────────────────────────────────────────────
+// ─── SADEWA SOCIAL AI SYNTHESIS & PERSISTENCE ─────────────────────────────────
 const isAnalyzingAI = ref(false);
-const socialAiReport = ref(null);
+const socialAiReport = ref(props.latestReport || null);
+const selectedReportId = ref(props.latestReport?.id || (props.reportHistory?.[0]?.id || null));
+const isFetchingReport = ref(false);
 const socialAiError = ref(null);
 const showWaCopied = ref(false);
-const activeAiTab = ref('briefing'); // 'briefing' | 'polarisasi' | 'cooling' | 'wa'
+const showClarificationCopied = ref(false);
+const showHumanistCopied = ref(false);
+const showInfographicCopied = ref(false);
+const activeAiTab = ref('briefing'); // 'briefing' | 'polarisasi' | 'cooling' | 'counter' | 'wa'
+
+const loadReport = async (reportId) => {
+  if (!reportId) return;
+  isFetchingReport.value = true;
+  socialAiError.value = null;
+  try {
+    const res = await axios.get(`/social-intelligence/reports/${reportId}`);
+    if (res.data.success && res.data.report) {
+      socialAiReport.value = res.data.report;
+      selectedReportId.value = reportId;
+    }
+  } catch (err) {
+    socialAiError.value = 'Gagal memuat arsip laporan intelijen medsos.';
+  } finally {
+    isFetchingReport.value = false;
+  }
+};
 
 const analyzeAI = async () => {
   isAnalyzingAI.value = true;
-  socialAiReport.value = null;
   socialAiError.value = null;
   try {
     const res = await axios.post('/social-intelligence/analyze-ai', {
@@ -658,6 +684,9 @@ const analyzeAI = async () => {
     });
     if (res.data.success) {
       socialAiReport.value = res.data;
+      if (res.data.report_id) {
+        selectedReportId.value = res.data.report_id;
+      }
     } else {
       socialAiError.value = res.data.message || 'Gagal mendapatkan respons AI.';
     }
@@ -688,6 +717,43 @@ const copyWaScript = () => {
     showWaCopied.value = true;
     setTimeout(() => { showWaCopied.value = false; }, 3000);
   });
+};
+
+const copyClarification = () => {
+  const text = socialAiReport.value?.data?.counter_narrative?.objective_clarification || '';
+  navigator.clipboard.writeText(text).then(() => {
+    showClarificationCopied.value = true;
+    setTimeout(() => { showClarificationCopied.value = false; }, 3000);
+  });
+};
+
+const copyHumanist = () => {
+  const text = socialAiReport.value?.data?.counter_narrative?.humanist_reply || '';
+  navigator.clipboard.writeText(text).then(() => {
+    showHumanistCopied.value = true;
+    setTimeout(() => { showHumanistCopied.value = false; }, 3000);
+  });
+};
+
+const copyInfographic = () => {
+  const msgs = socialAiReport.value?.data?.counter_narrative?.infographic_key_messages || [];
+  const text = msgs.map((m, i) => `${i + 1}. ${m}`).join('\n');
+  navigator.clipboard.writeText(text).then(() => {
+    showInfographicCopied.value = true;
+    setTimeout(() => { showInfographicCopied.value = false; }, 3000);
+  });
+};
+
+const printA4SocialReport = () => {
+  window.print();
+};
+
+const isCriticalSpike = (post) => {
+  const viralScore = Number(post.virality_score || 0);
+  const views = Number(post.views_count || 0);
+  const engage = Number(post.likes_count || 0) + Number(post.shares_count || 0);
+  const isNeg = (post.sentiment || '').toLowerCase() === 'negatif';
+  return (viralScore >= 80) || (views >= 8000 && isNeg) || (engage >= 400 && isNeg);
 };
 
 const getSentimentStabilityClass = (score) => {
@@ -1386,17 +1452,24 @@ const getBuzzerRiskClass = (level) => {
             />
           </div>
 
-          <!-- Satwil / Polda Filter (National Divhumas View) -->
+          <!-- Satwil / Polda Filter (National Divhumas & Regional Polda Views) -->
           <select
-            v-if="isNational"
+            v-if="isNational || (satwils && satwils.length > 0)"
             v-model="selectedSatwil"
             @change="handleFilter"
             class="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-amber-400"
           >
-            <option value="all">🌐 Seluruh Wilayah Hukum</option>
-            <option v-for="p in (allPoldas || []).filter(item => item.code !== 'DIVHUMAS')" :key="p.id" :value="p.id">
-              {{ p.name }}
-            </option>
+            <option value="all">{{ isNational ? '🌐 Seluruh Wilayah Hukum' : '🏛️ Seluruh Satwil (Polres)' }}</option>
+            <template v-if="isNational">
+              <option v-for="p in (allPoldas || []).filter(item => item.code !== 'DIVHUMAS')" :key="p.id" :value="p.id">
+                {{ p.name }}
+              </option>
+            </template>
+            <template v-else>
+              <option v-for="s in (satwils || [])" :key="s.id" :value="s.id">
+                {{ s.name }}
+              </option>
+            </template>
           </select>
 
           <!-- Sentiment Filter -->
@@ -1463,6 +1536,16 @@ const getBuzzerRiskClass = (level) => {
                   class="px-2 py-0.5 rounded-lg text-[9px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-300 border border-amber-500/30"
                 >
                   🏛️ {{ post.polda.code || post.polda.name }}
+                </span>
+
+                <!-- Critical Spike Alert Badge -->
+                <span
+                  v-if="isCriticalSpike(post)"
+                  class="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider bg-rose-600 text-white animate-pulse shadow-sm flex items-center gap-1"
+                  title="Potensi viralisasi tinggi! Akselerasi interaksi ekstrem di ruang digital"
+                >
+                  <Flame class="w-3 h-3 text-amber-300" />
+                  <span>Critical Spike</span>
                 </span>
               </div>
 
@@ -1680,15 +1763,46 @@ const getBuzzerRiskClass = (level) => {
             <h2 class="text-xl font-black text-white">Executive Social Briefing & Naskah WA Pimpinan</h2>
             <p class="text-xs text-slate-400 mt-0.5">Sintesis intelijen otomatis dari {{ metrics?.total_posts || posts?.total || 0 }} percakapan warganet lintas 5 platform media sosial</p>
           </div>
-          <button
-            @click="analyzeAI"
-            :disabled="isAnalyzingAI"
-            type="button"
-            class="px-5 py-3 rounded-xl text-sm font-black bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-110 text-slate-950 shadow-lg shadow-amber-400/25 flex items-center gap-2 disabled:opacity-60 cursor-pointer transition select-none"
-          >
-            <Sparkles class="w-5 h-5 text-slate-950" :class="{'animate-spin': isAnalyzingAI}" />
-            <span>{{ isAnalyzingAI ? 'SADEWA Sedang Menganalisis...' : '⚡ Sintesis Intelijen Medsos Otomatis' }}</span>
-          </button>
+
+          <div class="flex flex-wrap items-center gap-2.5">
+            <!-- Historical Reports Dropdown (Fitur Arsip Laporan) -->
+            <div v-if="reportHistory && reportHistory.length > 0" class="flex items-center gap-1.5 bg-slate-900/90 border border-slate-700 rounded-xl px-3 py-2 text-xs">
+              <Clock class="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <select
+                v-model="selectedReportId"
+                @change="loadReport(selectedReportId)"
+                :disabled="isFetchingReport"
+                class="bg-transparent text-slate-200 font-bold outline-none cursor-pointer max-w-[200px]"
+              >
+                <option v-for="r in reportHistory" :key="r.id" :value="r.id" class="bg-slate-900 text-white">
+                  {{ r.label }}
+                </option>
+              </select>
+            </div>
+
+            <!-- Print / Export PDF Button (Fitur Ekspor Resmi) -->
+            <button
+              v-if="socialAiReport"
+              @click="printA4SocialReport"
+              type="button"
+              class="px-4 py-3 rounded-xl text-xs font-black bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 flex items-center gap-2 cursor-pointer shadow-md transition select-none"
+              title="Cetak atau simpan laporan intelijen medsos format A4 resmi"
+            >
+              <Printer class="w-4 h-4 text-amber-400" />
+              <span>📥 Cetak Laporan PDF</span>
+            </button>
+
+            <!-- Main AI Synthesis CTA Button -->
+            <button
+              @click="analyzeAI"
+              :disabled="isAnalyzingAI"
+              type="button"
+              class="px-5 py-3 rounded-xl text-xs font-black bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-110 text-slate-950 shadow-lg shadow-amber-400/25 flex items-center gap-2 disabled:opacity-60 cursor-pointer transition select-none"
+            >
+              <Sparkles class="w-4 h-4 text-slate-950" :class="{'animate-spin': isAnalyzingAI}" />
+              <span>{{ isAnalyzingAI ? 'SADEWA Sedang Menganalisis...' : '⚡ Sintesis Intelijen Medsos Otomatis' }}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1736,6 +1850,7 @@ const getBuzzerRiskClass = (level) => {
               { id: 'briefing', label: '📋 Executive Briefing' },
               { id: 'polarisasi', label: '⚡ Polarisasi & Buzzer' },
               { id: 'cooling', label: '🎯 Cooling System' },
+              { id: 'counter', label: '🛡️ Konter Opini & Narasi' },
               { id: 'wa', label: '📱 Naskah WA Pimpinan' }
             ]"
             :key="subTab.id"
@@ -1869,7 +1984,122 @@ const getBuzzerRiskClass = (level) => {
           </div>
         </div>
 
-        <!-- SUB-TAB 4: NASKAH WA PIMPINAN -->
+        <!-- SUB-TAB 4: KONTER OPINI & NARASI TANDINGAN (TACTICAL PLAYBOOK) -->
+        <div v-else-if="activeAiTab === 'counter'" class="space-y-4">
+          <!-- Card 1: Draf Siaran Pers / Klarifikasi Resmi -->
+          <div class="p-5 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 class="font-black text-slate-900 dark:text-white flex items-center gap-2 text-sm">
+                <FileText class="w-4 h-4 text-sky-500" />
+                <span>Draf Klarifikasi Resmi / Siaran Pers Objektif</span>
+              </h3>
+              <button
+                @click="copyClarification"
+                type="button"
+                class="px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition select-none"
+                :class="showClarificationCopied ? 'bg-emerald-500 text-white' : 'bg-sky-500 hover:bg-sky-400 text-white shadow-sm'"
+              >
+                <Check v-if="showClarificationCopied" class="w-3.5 h-3.5" />
+                <FileText v-else class="w-3.5 h-3.5" />
+                {{ showClarificationCopied ? '✓ Tersalin!' : '📋 Salin Draf Klarifikasi' }}
+              </button>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+              Digunakan juru bicara kepolisian (Kabid Humas / Kasihumas) untuk meluruskan framing berita dan membendung spekulasi:
+            </p>
+            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-sans">
+              {{ socialAiReport.data?.counter_narrative?.objective_clarification || 'Polri senantiasa mengedepankan transparansi, akuntabilitas, dan penegakan hukum berkeadilan dalam menindaklanjuti seluruh aduan masyarakat di ruang digital.' }}
+            </div>
+          </div>
+
+          <!-- Card 2: Template Respon Komentar Warganet (Humanis & Edukatif) -->
+          <div class="p-5 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 class="font-black text-slate-900 dark:text-white flex items-center gap-2 text-sm">
+                <MessageSquare class="w-4 h-4 text-emerald-500" />
+                <span>Template Respon Balasan Warganet (Social Reply)</span>
+              </h3>
+              <button
+                @click="copyHumanist"
+                type="button"
+                class="px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition select-none"
+                :class="showHumanistCopied ? 'bg-emerald-500 text-white' : 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-sm'"
+              >
+                <Check v-if="showHumanistCopied" class="w-3.5 h-3.5" />
+                <MessageSquare v-else class="w-3.5 h-3.5" />
+                {{ showHumanistCopied ? '✓ Tersalin!' : '📋 Salin Balasan Medsos' }}
+              </button>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+              Digunakan admin akun medsos (@humaspolri, @poldasulbar) untuk membalas komentar warganet dengan nada empati:
+            </p>
+            <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-sans italic">
+              "{{ socialAiReport.data?.counter_narrative?.humanist_reply || 'Terima kasih atas atensi dan masukannya Sobat Polri. Informasi telah kami teruskan ke satuan kerja terkait untuk pendalaman objektif.' }}"
+            </div>
+          </div>
+
+          <!-- Card 3: Pesan Kunci Pamflet / Infografis Kewilayahan -->
+          <div class="p-5 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 class="font-black text-slate-900 dark:text-white flex items-center gap-2 text-sm">
+                <Sparkles class="w-4 h-4 text-amber-500" />
+                <span>Pesan Kunci Materi Infografis (Key Messages Satwil)</span>
+              </h3>
+              <button
+                @click="copyInfographic"
+                type="button"
+                class="px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition select-none"
+                :class="showInfographicCopied ? 'bg-emerald-500 text-white' : 'bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-sm'"
+              >
+                <Check v-if="showInfographicCopied" class="w-3.5 h-3.5" />
+                <Sparkles v-else class="w-3.5 h-3.5" />
+                {{ showInfographicCopied ? '✓ Tersalin!' : '📋 Salin Poin Infografis' }}
+              </button>
+            </div>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+              Disampaikan ke tim multimedia / Si Humas Polres jajaran sebagai materi konten pamflet visual:
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div
+                v-for="(msg, mIdx) in (socialAiReport.data?.counter_narrative?.infographic_key_messages || [])"
+                :key="mIdx"
+                class="p-4 rounded-2xl bg-amber-400/10 border border-amber-400/30 text-xs text-slate-800 dark:text-slate-200 space-y-1.5"
+              >
+                <div class="flex items-center gap-2 font-black text-amber-600 dark:text-amber-400 text-xs">
+                  <span class="w-5 h-5 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center font-black text-[10px]">{{ mIdx + 1 }}</span>
+                  <span>Poin Kunci {{ mIdx + 1 }}</span>
+                </div>
+                <p class="leading-relaxed font-semibold">{{ msg }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 4: Proyeksi Viralisasi 24 Jam -->
+          <div class="p-5 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+            <h3 class="font-black text-slate-900 dark:text-white flex items-center gap-2 text-sm border-b border-slate-100 dark:border-slate-800 pb-3">
+              <TrendingUp class="w-4 h-4 text-rose-500" />
+              <span>Proyeksi Viralisasi &amp; Estimasi Jam Puncak (24 Jam ke Depan)</span>
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+              <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <span class="text-[10px] font-bold text-slate-500 uppercase block mb-1">Tingkat Risiko Viralisasi:</span>
+                <span class="font-black px-2 py-0.5 rounded text-xs" :class="socialAiReport.data?.virality_forecast?.risk_level === 'Tinggi' ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30' : 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30'">
+                  {{ socialAiReport.data?.virality_forecast?.risk_level || 'Sedang' }}
+                </span>
+              </div>
+              <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <span class="text-[10px] font-bold text-slate-500 uppercase block mb-1">Estimasi Jam Puncak:</span>
+                <span class="font-black text-slate-900 dark:text-white text-xs">{{ socialAiReport.data?.virality_forecast?.peak_window || '19.00 - 22.00 WITA' }}</span>
+              </div>
+              <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 md:col-span-1">
+                <span class="text-[10px] font-bold text-slate-500 uppercase block mb-1">Catatan Intelijen:</span>
+                <p class="text-[11px] text-slate-700 dark:text-slate-300 font-medium leading-relaxed">{{ socialAiReport.data?.virality_forecast?.forecast_summary || 'Dinamika opini diproyeksikan stabil jika rilis konter narasi disebar tepat waktu.' }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB-TAB 5: NASKAH WA PIMPINAN -->
         <div v-else-if="activeAiTab === 'wa'" class="space-y-4">
           <div class="p-5 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
             <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
@@ -2808,6 +3038,149 @@ const getBuzzerRiskClass = (level) => {
             </button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- DEDICATED PRINT CONTAINER UNTUK LAPORAN EKSEKUTIF MEDSOS A4               -->
+    <!-- ========================================================================= -->
+    <div id="print-a4-social" class="hidden print:block text-slate-900 bg-white p-6 font-sans">
+      <!-- Kop Dokumen Resmi Polri -->
+      <div class="flex items-center justify-between border-b-2 border-slate-900 pb-2 mb-3">
+        <div class="flex items-center gap-3">
+          <div class="w-14 h-14 rounded-full bg-slate-100 border border-slate-400 flex items-center justify-center p-1 shrink-0">
+            <Shield class="w-8 h-8 text-amber-600 fill-amber-500" />
+          </div>
+          <div>
+            <h4 class="text-[10px] font-black tracking-widest text-slate-800 uppercase">Kepolisian Negara Republik Indonesia</h4>
+            <h2 class="text-xs font-black tracking-wider text-slate-950 uppercase">{{ isNational ? 'Divisi Humas Polri' : 'Bidang Humas Polda ' + (props.selectedPolda?.name || '').toUpperCase() }}</h2>
+            <p class="text-[9px] text-slate-600 italic">Pusat Komando Analisis Media Sosial, Cyber Patrol &amp; Social Listening</p>
+          </div>
+        </div>
+        <div class="text-right border-l-2 border-slate-900 pl-3">
+          <span class="inline-block px-1.5 py-0.5 text-[8.5px] font-black uppercase tracking-wider bg-red-600 text-white rounded">
+            RAHASIA / SEGERA
+          </span>
+          <p class="text-[8.5px] text-slate-500 mt-0.5 font-mono">DOC: SOC-INTEL/24H</p>
+          <p class="text-[8.5px] text-slate-700 font-bold">{{ metrics?.server_wita || new Date().toLocaleDateString('id-ID') }}</p>
+        </div>
+      </div>
+
+      <!-- Judul Lembar Laporan -->
+      <div class="text-center py-1 bg-slate-100 border border-slate-300 rounded mb-3">
+        <h1 class="text-[11px] font-black text-slate-950 uppercase tracking-widest">
+          Laporan Eksekutif Intelijen Media Sosial &amp; Opini Warganet (SADEWA AI)
+        </h1>
+      </div>
+
+      <!-- Seksi I: Ringkasan Eksekutif & Atensi Kritis -->
+      <div class="mb-3 space-y-1">
+        <div class="text-[10px] font-black uppercase text-slate-900 border-b border-slate-300 pb-0.5">
+          I. Ringkasan Eksekutif Situasi Medsos &amp; Atensi Kritis Pimpinan
+        </div>
+        <p class="text-[9.5px] leading-relaxed text-slate-800 text-justify">
+          {{ socialAiReport?.data?.executive_brief || 'Pemantauan komprehensif percakapan warganet lintas 5 platform media sosial (𝕏, TikTok, Instagram, YouTube, Facebook) menunjukkan arus opini publik berada pada koridor kondusif.' }}
+        </p>
+        <div class="p-2 rounded border border-rose-300 bg-rose-50 text-[9px] text-rose-900 font-medium">
+          <strong class="text-rose-700 font-black">⚠️ ISU KRITIS PRIORITAS PIMPINAN:</strong> {{ socialAiReport?.data?.top_concern || 'Tidak ada anomali isu kritis mendesak.' }}
+        </div>
+      </div>
+
+      <!-- Seksi II: Polarisasi Sentimen & Risiko Buzzer -->
+      <div class="grid grid-cols-12 gap-2 mb-3">
+        <div class="col-span-6 border border-slate-300 rounded p-2 bg-slate-50">
+          <span class="text-[9.5px] font-black uppercase text-slate-900 block mb-1">Distribusi Sentimen Percakapan Medsos</span>
+          <div class="space-y-1 text-[9px]">
+            <div class="flex justify-between items-center font-bold">
+              <span class="text-emerald-700">Positif:</span>
+              <span class="font-black text-emerald-800">{{ socialAiReport?.data?.sentiment_analysis?.positif || metrics?.positive_pct || 0 }}%</span>
+            </div>
+            <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+              <div class="bg-emerald-600 h-full" :style="{ width: (socialAiReport?.data?.sentiment_analysis?.positif || metrics?.positive_pct || 0) + '%' }"></div>
+            </div>
+            <div class="flex justify-between items-center font-bold">
+              <span class="text-slate-600">Netral:</span>
+              <span class="font-black text-slate-700">{{ socialAiReport?.data?.sentiment_analysis?.netral || metrics?.neutral_pct || 0 }}%</span>
+            </div>
+            <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+              <div class="bg-slate-500 h-full" :style="{ width: (socialAiReport?.data?.sentiment_analysis?.netral || metrics?.neutral_pct || 0) + '%' }"></div>
+            </div>
+            <div class="flex justify-between items-center font-bold">
+              <span class="text-red-700">Negatif:</span>
+              <span class="font-black text-red-800">{{ socialAiReport?.data?.sentiment_analysis?.negatif || metrics?.negative_pct || 0 }}%</span>
+            </div>
+            <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+              <div class="bg-red-600 h-full" :style="{ width: (socialAiReport?.data?.sentiment_analysis?.negatif || metrics?.negative_pct || 0) + '%' }"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-span-6 border border-slate-300 rounded p-2 bg-slate-50 text-[9px] space-y-1">
+          <div class="flex items-center justify-between font-bold text-slate-900 border-b border-slate-200 pb-1">
+            <span>Deteksi Polarisasi Buzzer:</span>
+            <span class="px-1.5 py-0.2 rounded font-black text-white" :class="socialAiReport?.data?.buzzer_vs_organic?.risk_level === 'tinggi' ? 'bg-red-600' : 'bg-emerald-600'">
+              {{ (socialAiReport?.data?.buzzer_vs_organic?.risk_level || 'Rendah').toUpperCase() }}
+            </span>
+          </div>
+          <p class="text-slate-800 leading-snug">{{ socialAiReport?.data?.buzzer_vs_organic?.assessment || 'Percakapan didominasi netizen organik masyarakat.' }}</p>
+          <p class="text-slate-600 italic">{{ socialAiReport?.data?.buzzer_vs_organic?.risk_note || 'Tidak terdeteksi koordinasi terpusat tagar serempak.' }}</p>
+        </div>
+      </div>
+
+      <!-- Seksi III: Rekomendasi Cooling System Humas -->
+      <div class="mb-3 space-y-0.5">
+        <div class="text-[10px] font-black uppercase text-slate-900 border-b border-slate-300 pb-0.5">
+          II. Rekomendasi Cooling System &amp; Orkestrasi Tindakan Humas
+        </div>
+        <table class="w-full text-left text-[9px] border-collapse border border-slate-300">
+          <thead>
+            <tr class="bg-slate-100 text-slate-800">
+              <th class="border border-slate-300 px-1.5 py-0.5 w-6 text-center">No</th>
+              <th class="border border-slate-300 px-1.5 py-0.5">Langkah Taktis Komunikasi</th>
+              <th class="border border-slate-300 px-1.5 py-0.5 w-24">Saluran Target</th>
+              <th class="border border-slate-300 px-1.5 py-0.5 w-24">Waktu Eksekusi</th>
+              <th class="border border-slate-300 px-1.5 py-0.5 w-28">PIC Penanggung Jawab</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(cs, idx) in (socialAiReport?.data?.cooling_system || [])" :key="'print-cs-' + idx" class="even:bg-slate-50">
+              <td class="border border-slate-300 px-1.5 py-0.5 text-center font-bold">{{ idx + 1 }}</td>
+              <td class="border border-slate-300 px-1.5 py-0.5 font-semibold text-slate-900">{{ cs.action }}</td>
+              <td class="border border-slate-300 px-1.5 py-0.5 text-slate-600">{{ cs.channel }}</td>
+              <td class="border border-slate-300 px-1.5 py-0.5 text-slate-600">{{ cs.timing }}</td>
+              <td class="border border-slate-300 px-1.5 py-0.5 font-bold text-slate-800">{{ cs.pic || 'Tim Humas' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Seksi IV: Konter Opini & Narasi Tandingan -->
+      <div class="mb-4 space-y-1">
+        <div class="text-[10px] font-black uppercase text-slate-900 border-b border-slate-300 pb-0.5">
+          III. Draf Konter Opini &amp; Pesan Kunci Materi Edukasi Publik
+        </div>
+        <div class="p-2 border border-slate-300 rounded bg-slate-50 text-[9px] text-slate-800 leading-snug">
+          <strong class="text-slate-950 font-black block mb-0.5">DRAF KLARIFIKASI RESMI:</strong>
+          {{ socialAiReport?.data?.counter_narrative?.objective_clarification || 'Polri mengedepankan transparansi dan penegakan hukum profesional dalam menjaga ketertiban ruang siber.' }}
+        </div>
+      </div>
+
+      <!-- Kolom Tanda Tangan Resmi Pejabat Kehumasan -->
+      <div class="grid grid-cols-2 pt-2 text-[9.5px]">
+        <div class="text-slate-700">
+          <p class="font-bold">Catatan Pimpinan / Disposisi:</p>
+          <div class="h-14 border border-dashed border-slate-400 rounded mt-1 p-1 text-[8.5px] text-slate-400 italic">
+            [Ruang paraf &amp; arahan tindak lanjut Kapolda / PJU]
+          </div>
+        </div>
+        <div class="text-center">
+          <p class="text-slate-600">{{ (isNational ? 'Jakarta' : 'Mamuju') }}, {{ new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) }}</p>
+          <p class="font-black text-slate-950 uppercase mt-0.5">{{ isNational ? 'KEPALA DIVISI HUMAS POLRI' : 'KEPALA BIDANG HUMAS POLDA' }}</p>
+          <div class="h-12 flex items-center justify-center">
+            <span class="text-[8px] text-slate-400 italic">[Tertanda Sah Secara Digital Melalui SADEWA SIMOD]</span>
+          </div>
+          <p class="font-bold text-slate-900 underline">IRJEN POL. PEJABAT HUMAS POLRI</p>
+        </div>
       </div>
     </div>
   </EnterpriseLayout>

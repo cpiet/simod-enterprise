@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\Polda;
+use App\Models\Polres;
+use App\Models\SocialIntelligenceReport;
 use App\Models\SocialInvestigationCase;
 use App\Models\SocialPost;
 use App\Models\SocialSetting;
@@ -48,6 +50,12 @@ class SocialIntelligenceController extends Controller
 
         if (!$isNational && $selectedPolda) {
             $query->where('polda_id', $selectedPolda->id);
+            if ($satwil !== 'all') {
+                $query->where(function ($q) use ($satwil) {
+                    $q->where('content', 'like', "%{$satwil}%")
+                      ->orWhere('author_name', 'like', "%{$satwil}%");
+                });
+            }
         } elseif ($isNational && $satwil !== 'all') {
             $query->where('polda_id', $satwil);
         }
@@ -239,6 +247,65 @@ class SocialIntelligenceController extends Controller
             }
         }
 
+        // Satwil breakdown options (Polres for regional, Polda for national)
+        $satwils = [];
+        if (!$isNational && $selectedPolda) {
+            $satwils = Polres::where('polda_id', $selectedPolda->id)
+                ->orderBy('name')
+                ->get(['id', 'name', 'code'])
+                ->map(fn($p) => [
+                    'id'   => $p->name,
+                    'name' => $p->name,
+                ])
+                ->all();
+        } elseif ($isNational) {
+            $satwils = $allPoldas->map(fn($p) => [
+                'id'   => (string) $p->id,
+                'name' => $p->name,
+            ])->all();
+        }
+
+        // Persistence: Load latest SADEWA AI Report & Historical list
+        $latestReportModel = SocialIntelligenceReport::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))
+            ->orderByDesc('id')
+            ->first();
+
+        $latestReport = null;
+        if ($latestReportModel) {
+            $latestReport = [
+                'id'          => $latestReportModel->id,
+                'model_used'  => $latestReportModel->model_used,
+                'latency_ms'  => $latestReportModel->latency_ms,
+                'posts_count' => $latestReportModel->posts_count,
+                'created_at'  => $latestReportModel->created_at?->diffForHumans() ?? 'Baru saja',
+                'report_time' => $latestReportModel->report_time,
+                'data'        => [
+                    'executive_brief'    => $latestReportModel->executive_brief,
+                    'top_concern'        => $latestReportModel->top_concern,
+                    'sentiment_analysis' => $latestReportModel->sentiment_analysis,
+                    'buzzer_vs_organic'  => $latestReportModel->buzzer_vs_organic,
+                    'critical_accounts'  => $latestReportModel->critical_accounts,
+                    'cooling_system'     => $latestReportModel->cooling_system,
+                    'whatsapp_script'    => $latestReportModel->whatsapp_script,
+                    'counter_narrative'  => $latestReportModel->counter_narrative,
+                    'virality_forecast'  => $latestReportModel->virality_forecast,
+                ],
+            ];
+        }
+
+        $reportHistory = SocialIntelligenceReport::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))
+            ->orderByDesc('id')
+            ->limit(10)
+            ->get(['id', 'report_date', 'report_time', 'title', 'model_used', 'posts_count', 'created_at'])
+            ->map(fn($r) => [
+                'id'          => $r->id,
+                'label'       => ($r->report_date ? $r->report_date->format('d M Y') : '') . ', ' . $r->report_time . ' (' . $r->posts_count . ' post)',
+                'report_time' => $r->report_time,
+                'model_used'  => $r->model_used,
+                'posts_count' => $r->posts_count,
+            ])
+            ->all();
+
         return Inertia::render('SocialIntelligence/Index', [
             'allPoldas'           => $allPoldas,
             'selectedPolda'       => $selectedPolda,
@@ -260,6 +327,9 @@ class SocialIntelligenceController extends Controller
             'wordCloud'           => $this->getWordCloudData($poldaScope, $selectedPolda),
             'peakHours'           => $peakHours,
             'settings'            => $settings,
+            'latestReport'        => $latestReport,
+            'reportHistory'       => $reportHistory,
+            'satwils'             => $satwils,
             'filters'             => [
                 'platform'   => $platform,
                 'sentiment'  => $sentiment,
@@ -903,18 +973,41 @@ class SocialIntelligenceController extends Controller
             ], 503);
         }
 
+        // Persist report to database for history and PDF export
+        $tz = ($isNational || $selectedPolda->timezone === 'Asia/Jakarta') ? 'WIB' : 'WITA';
+        $report = SocialIntelligenceReport::create([
+            'polda_id'           => $selectedPolda->id,
+            'user_id'            => auth()->id(),
+            'report_date'        => now()->toDateString(),
+            'report_time'        => now()->format('H.i') . ' ' . $tz,
+            'title'              => 'LAPORAN INTELIJEN MEDIA SOSIAL & SENTIMEN — ' . strtoupper($selectedPolda->name),
+            'posts_count'        => count($posts),
+            'model_used'         => $result['model_used'] ?? 'SADEWA Social AI',
+            'latency_ms'         => $result['latency_ms'] ?? 0,
+            'executive_brief'    => $result['data']['executive_brief'] ?? null,
+            'top_concern'        => $result['data']['top_concern'] ?? null,
+            'sentiment_analysis' => $result['data']['sentiment_analysis'] ?? null,
+            'buzzer_vs_organic'  => $result['data']['buzzer_vs_organic'] ?? null,
+            'critical_accounts'  => $result['data']['critical_accounts'] ?? null,
+            'cooling_system'     => $result['data']['cooling_system'] ?? null,
+            'whatsapp_script'    => $result['data']['whatsapp_script'] ?? null,
+            'counter_narrative'  => $result['data']['counter_narrative'] ?? null,
+            'virality_forecast'  => $result['data']['virality_forecast'] ?? null,
+        ]);
+
         // Log audit
         AuditLog::create([
             'polda_id'     => $selectedPolda->id,
             'user_id'      => auth()->id(),
             'action'       => 'social_intelligence.ai_analysis',
             'subject_type' => 'social_post',
-            'subject_id'   => '0',
+            'subject_id'   => (string) $report->id,
             'ip_address'   => $request->ip() ?? '127.0.0.1',
             'user_agent'   => $request->userAgent() ?? 'SocialIntelligenceController',
             'metadata'     => [
                 'polda'       => $selectedCode,
                 'posts_count' => count($posts),
+                'report_id'   => $report->id,
                 'model_used'  => $result['model_used'] ?? 'unknown',
                 'latency_ms'  => $result['latency_ms'] ?? 0,
             ],
@@ -924,10 +1017,42 @@ class SocialIntelligenceController extends Controller
         return response()->json([
             'success'     => true,
             'polda'       => $selectedCode,
+            'report_id'   => $report->id,
             'data'        => $result['data'],
             'model_used'  => $result['model_used'] ?? 'SADEWA AI',
             'latency_ms'  => $result['latency_ms'] ?? 0,
             'posts_count' => count($posts),
+        ]);
+    }
+
+    /**
+     * Retrieve a specific historical social intelligence report.
+     */
+    public function getReport(Request $request, $id)
+    {
+        $report = SocialIntelligenceReport::findOrFail($id);
+
+        return response()->json([
+            'success' => true,
+            'report'  => [
+                'id'          => $report->id,
+                'model_used'  => $report->model_used,
+                'latency_ms'  => $report->latency_ms,
+                'posts_count' => $report->posts_count,
+                'created_at'  => $report->created_at?->diffForHumans() ?? 'Baru saja',
+                'report_time' => $report->report_time,
+                'data'        => [
+                    'executive_brief'    => $report->executive_brief,
+                    'top_concern'        => $report->top_concern,
+                    'sentiment_analysis' => $report->sentiment_analysis,
+                    'buzzer_vs_organic'  => $report->buzzer_vs_organic,
+                    'critical_accounts'  => $report->critical_accounts,
+                    'cooling_system'     => $report->cooling_system,
+                    'whatsapp_script'    => $report->whatsapp_script,
+                    'counter_narrative'  => $report->counter_narrative,
+                    'virality_forecast'  => $report->virality_forecast,
+                ],
+            ],
         ]);
     }
 

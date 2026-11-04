@@ -805,6 +805,20 @@ INSTRUKSI ANALISIS INTELIJEN SIBER (kembalikan HANYA JSON murni tanpa markdown, 
       "pic": "Unit Polri yang bertanggung jawab."
     }
   ],
+  "counter_narrative": {
+    "objective_clarification": "Draf pernyataan klarifikasi resmi / siaran pers berbasis fakta kronologis dan dasar hukum untuk mematahkan framing negatif warganet.",
+    "humanist_reply": "Template respon balasan komentar warganet (reply medsos) yang ramah, empatik, dan menenangkan keresahan publik.",
+    "infographic_key_messages": [
+      "Pesan kunci 1 untuk materi infografis / pamflet kewilayahan...",
+      "Pesan kunci 2...",
+      "Pesan kunci 3..."
+    ]
+  },
+  "virality_forecast": {
+    "risk_level": "Rendah|Sedang|Tinggi",
+    "forecast_summary": "Proyeksi dinamika opini warganet dalam 24 jam ke depan jika tidak ada intervensi Humas.",
+    "peak_window": "Estimasi jam puncak viralisasi berikutnya."
+  },
   "whatsapp_script": "Naskah WhatsApp format komando pimpinan, siap kirim ke Kapolri/Kapolda/PJU. Gunakan format baku dinas Polri (penomoran romawi, bullet points, penanda bold *teks*, baris baru \\n antar bagian). Panjang ideal 300-450 kata. Wajib mencakup: (1) Kepada Yth, (2) Ringkasan Situasi Medsos, (3) Komposisi Sentimen, (4) Isu Kritis & Potensi Risiko, (5) Rekomendasi Taktis Bertahap (0-2 jam, 2-6 jam, 24 jam), (6) Penutup hormat. Gunakan nama komandan: {$leaderTitle}."
 }
 PROMPT;
@@ -853,6 +867,29 @@ PROMPT;
                             // Enhance whatsapp_script if too short
                             if (empty($parsed['whatsapp_script']) || strlen($parsed['whatsapp_script']) < 400) {
                                 $parsed['whatsapp_script'] = $this->buildSocialWhatsAppScript($parsed, $polda, $totalPosts, $sentCounts);
+                            }
+
+                            // Ensure counter_narrative is structured
+                            if (empty($parsed['counter_narrative']) || !is_array($parsed['counter_narrative'])) {
+                                $parsed['counter_narrative'] = [
+                                    'objective_clarification' => "Polri menegaskan komitmen transparansi dan profesionalisme dalam menindaklanjuti setiap aduan masyarakat di ruang digital. Seluruh proses operasional kepolisian senantiasa berpedoman pada SOP yang presisi, akuntabel, dan mengutamakan rasa keadilan publik.",
+                                    'humanist_reply'          => "Terima kasih atas atensi dan masukannya Sobat Polri. Laporan dan saran rekan-rekan telah kami teruskan ke satuan kerja terkait untuk pendalaman objektif. Mari bersama ciptakan ruang digital yang sejuk, kondusif, dan saling menguatkan.",
+                                    'infographic_key_messages' => [
+                                        "Polri hadir menjaga kondusivitas kamtibmas dan melayani publik secara transparan.",
+                                        "Saring sebelum sharing: pastikan kebenaran informasi melalui sumber resmi kepolisian.",
+                                        "Gunakan saluran Dumas Presisi dan Halo Polisi 110 untuk pelaporan aduan cepat 24 jam.",
+                                    ],
+                                ];
+                            }
+
+                            // Ensure virality_forecast is structured
+                            if (empty($parsed['virality_forecast']) || !is_array($parsed['virality_forecast'])) {
+                                $negPct = $parsed['sentiment_analysis']['negatif'] ?? 30;
+                                $parsed['virality_forecast'] = [
+                                    'risk_level'       => $negPct > 45 ? 'Tinggi' : ($negPct > 20 ? 'Sedang' : 'Rendah'),
+                                    'forecast_summary' => "Dinamika opini diproyeksikan terkendali jika rilis klarifikasi dan edukasi humanis disebarkan sebelum jam puncak obrolan warganet malam hari.",
+                                    'peak_window'      => '19.00 – 21.30 ' . $tz,
+                                ];
                             }
 
                             return [
