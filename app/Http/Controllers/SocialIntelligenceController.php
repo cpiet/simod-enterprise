@@ -1016,7 +1016,32 @@ class SocialIntelligenceController extends Controller
             ], 422);
         }
 
+        // Hemat kuota: bila postingan yang dianalisis sama dengan analisis terakhir, jangan analisis ulang.
+        $sourceHash = sha1(json_encode(array_map(fn ($p) => [$p['author_handle'] ?? '', $p['content'] ?? ''], $posts)));
+        $quota = app(\App\Services\AiQuota::class);
+        $lastReport = SocialIntelligenceReport::where('polda_id', $selectedPolda->id)->latest()->first();
+
+        if (!$request->boolean('force') && $lastReport && $lastReport->source_hash === $sourceHash) {
+            $quota->log($request->user(), $selectedPolda->id, 'social', 'skipped');
+
+            return response()->json([
+                'success'    => true,
+                'skipped'    => true,
+                'message'    => 'Tidak ada postingan baru sejak analisis terakhir, jadi hasil yang ada dipakai (tanpa memakai kuota AI).',
+                'polda'      => $selectedCode,
+                'report_id'  => $lastReport->id,
+                'data'       => $lastReport->only(['executive_brief', 'top_concern', 'sentiment_analysis', 'buzzer_vs_organic', 'critical_accounts', 'cooling_system', 'whatsapp_script', 'counter_narrative', 'virality_forecast']),
+                'model_used' => $lastReport->model_used,
+                'latency_ms' => 0,
+            ]);
+        }
+
+        if ($denied = $quota->denial($request->user(), $selectedPolda->id)) {
+            return response()->json(['success' => false, 'status' => 'ai_limited', 'message' => $denied], 429);
+        }
+
         $result = $geminiService->analyzeSocialPosts($selectedPolda, $posts);
+        $quota->finish($request->user(), $selectedPolda->id, 'social', $result);
 
         if (!$result['success']) {
             return response()->json([
@@ -1045,6 +1070,7 @@ class SocialIntelligenceController extends Controller
             'whatsapp_script'    => $result['data']['whatsapp_script'] ?? null,
             'counter_narrative'  => $result['data']['counter_narrative'] ?? null,
             'virality_forecast'  => $result['data']['virality_forecast'] ?? null,
+            'source_hash'        => $sourceHash,
         ]);
 
         // Log audit

@@ -41,6 +41,7 @@ const isOpen = ref(false);
 const view = ref('chat'); // 'chat' | 'history'
 const menuOpen = ref(false);
 const meta = ref(null);
+const usage = ref(null); // { used, limit, remaining, blocked }
 const scope = ref('all');
 const messages = ref([]);
 const conversationId = ref(null);
@@ -59,6 +60,13 @@ let abortCtl = null;
 let lastQuery = null;
 
 const scopes = computed(() => meta.value?.scopes || []);
+const limitReached = computed(() => !!usage.value && usage.value.limit > 0 && usage.value.remaining === 0);
+const usageText = computed(() => {
+  const u = usage.value;
+  if (!u) return '';
+  if (u.limit > 0) return `Sisa ${u.remaining} dari ${u.limit} pertanyaan AI hari ini`;
+  return '';
+});
 const scopeOptions = computed(() => (scopes.value.length > 1 ? [{ key: 'all', label: 'Semua' }, ...scopes.value] : []));
 const scopeLabel = computed(() => {
   if (scope.value === 'all') return scopes.value.map((s) => s.label).join(' + ') || 'Data terkini';
@@ -117,6 +125,7 @@ const loadMeta = async () => {
   try {
     const res = await axios.get('/sadewa/meta');
     meta.value = res.data;
+    usage.value = res.data.usage || null;
   } catch (e) {
     meta.value = { scopes: [], stats: {} };
   }
@@ -217,6 +226,7 @@ const send = async (text = null) => {
 
     if (res.data?.success) {
       conversationId.value = res.data.conversation_id;
+      if (res.data.usage) usage.value = res.data.usage;
       messages.value.push({ role: 'assistant', text: res.data.reply, sources: res.data.sources || [], time: res.data.time });
       if (autoSpeak.value) speak(res.data.reply, messages.value.length - 1);
     } else {
@@ -227,6 +237,7 @@ const send = async (text = null) => {
       messages.value.pop(); // pertanyaan dibatalkan: kembalikan ke kolom input
       input.value = q;
     } else {
+      if (err.response?.data?.usage) usage.value = err.response.data.usage;
       pushError(err.response?.data?.message || 'Tidak dapat terhubung ke mesin analisis. Periksa konfigurasi AI lalu coba lagi.');
     }
   } finally {
@@ -567,15 +578,17 @@ const sourceTypeLabel = { media: 'Media', social: 'Medsos', issue: 'Isu', ews: '
                 v-model="input"
                 rows="1"
                 maxlength="1000"
-                :disabled="!scopes.length"
-                :placeholder="scopes.length ? 'Tanyakan sesuatu tentang data terkini…' : 'Tidak ada akses data'"
+                :disabled="!scopes.length || limitReached"
+                :placeholder="limitReached ? 'Batas pertanyaan AI hari ini tercapai' : scopes.length ? 'Tanyakan sesuatu tentang data terkini…' : 'Tidak ada akses data'"
                 @keydown.enter.exact.prevent="send()"
                 class="flex-1 resize-none max-h-28 rounded-xl px-3.5 py-2.5 text-xs bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 placeholder-slate-400 border border-slate-200 dark:border-slate-700 focus:outline-none focus:border-amber-400"
               ></textarea>
               <button v-if="thinking" type="button" @click="stopThinking" class="w-10 h-10 shrink-0 rounded-xl bg-slate-700 hover:bg-slate-600 text-white flex items-center justify-center cursor-pointer" title="Hentikan"><Square class="w-4 h-4" /></button>
-              <button v-else type="submit" :disabled="!input.trim() || !scopes.length" class="w-10 h-10 shrink-0 rounded-xl bg-amber-400 hover:bg-amber-300 disabled:opacity-40 text-slate-950 flex items-center justify-center cursor-pointer" title="Kirim (Enter)"><Send class="w-4 h-4" /></button>
+              <button v-else type="submit" :disabled="!input.trim() || !scopes.length || limitReached" class="w-10 h-10 shrink-0 rounded-xl bg-amber-400 hover:bg-amber-300 disabled:opacity-40 text-slate-950 flex items-center justify-center cursor-pointer" title="Kirim (Enter)"><Send class="w-4 h-4" /></button>
             </form>
-            <p class="text-[10px] text-slate-400 mt-1.5">Jawaban disusun dari data sistem; periksa sumbernya sebelum dipakai untuk keputusan.</p>
+            <p v-if="limitReached" class="text-[10.5px] font-bold text-rose-500 mt-1.5">Batas pertanyaan AI harian Anda tercapai. Coba lagi besok atau minta administrator menaikkan batas.</p>
+            <p v-else-if="usage?.blocked" class="text-[10.5px] font-bold text-amber-500 mt-1.5">Jatah AI dari Google sedang habis; permintaan ditahan beberapa menit.</p>
+            <p v-else class="text-[10px] text-slate-400 mt-1.5">{{ usageText ? usageText + ' · ' : '' }}Jawaban disusun dari data sistem; periksa sumbernya.</p>
           </footer>
         </template>
       </section>

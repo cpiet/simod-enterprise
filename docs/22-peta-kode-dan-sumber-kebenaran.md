@@ -1,6 +1,6 @@
 # 🧭 22. Peta Kode & Sumber Kebenaran (Source of Truth)
 
-Dokumen ini adalah **peta tunggal** antara dokumentasi dan kode SIMOD Enterprise. Seluruh angka di sini diverifikasi langsung dari repositori pada **5 November 2026** (baseline `php artisan test`: **142 tests, 853 assertions, PASS**).
+Dokumen ini adalah **peta tunggal** antara dokumentasi dan kode SIMOD Enterprise. Seluruh angka di sini diverifikasi langsung dari repositori pada **5 November 2026** (baseline `php artisan test`: **151 tests, 905 assertions, PASS**).
 
 > [!IMPORTANT]
 > **Aturan emas:** bila dokumen lain bertentangan dengan dokumen ini atau dengan kode, **kode yang benar**. Perbarui dokumennya, bukan sebaliknya. Dokumen berstatus *snapshot historis* (angka test/berita lama) ditandai eksplisit di dokumennya masing-masing.
@@ -210,7 +210,7 @@ Temuan saat menyelaraskan dokumen dengan kode (5 Nov 2026), beserta status perba
 
 `tests/Feature` memuat 22 berkas (plus `tests/Unit/ExampleTest.php`): `CommandCenterNationalMapAndKpiTest` (5 test), `DatabaseBackupTest`, `DivhumasNationalFeedsTest`, `DynamicMenuAndSecurityAuditTest`, `EndToEndAuditStressTest`, `EnterpriseFullSuiteTest`, `ExampleTest`, `GeminiMediaIntelligenceTest`, `InstagramAccountMonitoringTest` (2 test), `MediaTopicDossierTest`, `NewsCleanupTest`, `PersonaliaAuthorityTest` (6 test), `RolePermissionMatrixTest`, `RssSyncTest`, `SadewaChatTest` (7 test), `SecurityCenterTest`, `SocialIntelligenceTest` (12 test), `TenantSecurityTest` (3 test), `AdminSystemEnforcementTest` (4 test: lockout login, batas sesi, ganti kata sandi, halaman mock terhapus), `TenantOverrideProtectionTest` (4 test: tenant tidak dapat dialihkan klien), `AuthHardeningTest` (9 test: gerbang login, kredensial, simulasi peran, token ingest), `ModulePermissionEnforcementTest` (6 test: penegakan RBAC server-side).
 
-Baseline wajib sebelum dan sesudah perubahan: `php artisan test` → **142 passed (853 assertions)** dan `npm.cmd run build` tanpa galat. Helper test: `$this->actingAsSuperAdmin()` (`tests/TestCase.php`).
+Baseline wajib sebelum dan sesudah perubahan: `php artisan test` → **151 passed (905 assertions)** dan `npm.cmd run build` tanpa galat. Helper test: `$this->actingAsSuperAdmin()` (`tests/TestCase.php`).
 
 ---
 

@@ -37,7 +37,7 @@ Diverifikasi dengan tes: **model pilihan memang menjadi panggilan pertama** (med
 Catatan paket gratis (dibaca dari AI Studio): 3.5 Flash Lite 15 RPM / 500 RPD, 3.8 Flash 5 RPM / 20 RPD, model Pro tidak punya jatah. Langganan Google AI Pro (aplikasi Gemini) bukan penagihan API.
 
 ## 5. Pengujian
-`CommandCenterRefreshTest` (5 tes) dan `AiModelSelectionTest` (6 tes: model pilihan, suhu, rantai cadangan, retry 503) dan `GeminiQuotaFallbackTest` (2 tes: fallback model saat 429, pesan ringkas bila semua terbatas). Rinciannya `CommandCenterRefreshTest`: mode hemat melewati Apify saat data segar, memakai Apify saat data basi, sinkron biasa tetap memakai Apify, sinkron butuh izin, dan Dashboard memuat waktu laporan. Total **142 tests (853 assertions)**.
+`CommandCenterRefreshTest` (5 tes) dan `AiModelSelectionTest` (6 tes: model pilihan, suhu, rantai cadangan, retry 503) dan `GeminiQuotaFallbackTest` (2 tes: fallback model saat 429, pesan ringkas bila semua terbatas). Rinciannya `CommandCenterRefreshTest`: mode hemat melewati Apify saat data segar, memakai Apify saat data basi, sinkron biasa tetap memakai Apify, sinkron butuh izin, dan Dashboard memuat waktu laporan. Total **151 tests (905 assertions)**.
 
 ## 6. Belum dikerjakan
 - Penjadwalan otomatis (RSS otomatis + sinkron medsos otomatis + analisis AI setelahnya) agar Command Center selalu segar tanpa klik.

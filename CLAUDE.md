@@ -22,7 +22,7 @@ Dokumen ini adalah **instruksi sistem resmi** yang secara otomatis dibaca oleh A
 > Pada sistem operasi **Windows / Laragon PowerShell**, selalu gunakan `npm.cmd` (bukan `npm` polos) untuk menghindari hambatan `PSSecurityException`.
 
 ```bash
-# Menjalankan seluruh test suite otomatis (142 tests, 853 assertions)
+# Menjalankan seluruh test suite otomatis (151 tests, 905 assertions)
 php artisan test
 
 # Menjalankan spesifik test file

@@ -28,6 +28,7 @@ class SocialIntelligenceReport extends Model
         'whatsapp_script',
         'counter_narrative',
         'virality_forecast',
+        'source_hash',
     ];
 
     protected $casts = [

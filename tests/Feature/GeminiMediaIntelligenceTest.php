@@ -102,10 +102,7 @@ class GeminiMediaIntelligenceTest extends TestCase
         $response = $this->actingAs($user)->post('/settings/ai?polda=ALL', [
             'gemini_api_key'      => "AIzaSyMasterKey1234567890abcdef\nAIzaSyBackupKey9876543210zyxwvu",
             'gemini_model'        => 'gemini-3.5-flash-lite',
-            'is_auto_analyze'     => true,
-            'sync_mode'           => 'scheduled_times',
-            'interval_minutes'    => 180,
-            'scheduled_times'     => ['06:00', '12:00', '18:00', '22:00'],
+            'daily_user_limit'    => 25,
             'temperature'         => 0.20,
             'apply_to_all_poldas' => true,
         ]);
@@ -116,8 +113,7 @@ class GeminiMediaIntelligenceTest extends TestCase
         $this->assertNotNull($divSetting);
         $this->assertEquals('AIzaSyMasterKey1234567890abcdef', $divSetting->gemini_api_key);
         $this->assertCount(2, $divSetting->api_keys_pool);
-        $this->assertEquals('scheduled_times', $divSetting->sync_mode);
-        $this->assertEquals(['06:00', '12:00', '18:00', '22:00'], $divSetting->scheduled_times);
+        $this->assertEquals(25, $divSetting->daily_user_limit);
 
         $this->assertDatabaseHas('audit_logs', [
             'user_id' => $user->id,

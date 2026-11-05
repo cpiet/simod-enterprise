@@ -103,12 +103,7 @@ class AiSettingController extends Controller
                 'keys_detail'               => $keysDetail,
                 'total_keys'                => count($allKeys),
                 'gemini_model'              => $activeModel,
-                'is_auto_analyze'           => (bool) ($aiSetting->is_auto_analyze ?? true),
-                'sync_mode'                 => $aiSetting->sync_mode ?: 'after_rss',
-                'interval_minutes'          => (int) ($aiSetting->interval_minutes ?: 180),
-                'scheduled_times'           => is_array($aiSetting->scheduled_times) && !empty($aiSetting->scheduled_times)
-                    ? $aiSetting->scheduled_times
-                    : ['06:00', '12:00', '18:00', '22:00'],
+                'daily_user_limit'          => (int) ($aiSetting->daily_user_limit ?? \App\Services\AiQuota::DEFAULT_LIMIT),
                 'temperature'               => (float) ($aiSetting->temperature ?? 0.20),
                 'custom_prompt_template'    => $customPrompt,
                 'default_prompt_template'   => $defaultPrompt,
@@ -132,6 +127,7 @@ class AiSettingController extends Controller
                 'server_env_has_key' => !empty(config('services.gemini.api_key') ?: env('GEMINI_API_KEY')),
             ],
             'recentReports'  => $recentReports,
+            'usage'          => app(\App\Services\AiQuota::class)->todaySummary(),
         ]);
     }
 
@@ -144,10 +140,7 @@ class AiSettingController extends Controller
             'gemini_api_key'          => 'nullable|string',
             'api_keys_pool'           => 'nullable',
             'gemini_model'            => 'required|string|in:gemini-3.5-flash-lite,gemini-flash-lite-latest,gemini-3.8-flash,gemini-3.1-pro-preview,gemini-2.5-pro,gemini-1.5-pro,gemini-2.5-flash,gemini-1.5-flash',
-            'is_auto_analyze'         => 'nullable|boolean',
-            'sync_mode'               => 'nullable|string|in:manual,after_rss,interval,scheduled_times',
-            'interval_minutes'        => 'nullable|integer|min:15|max:1440',
-            'scheduled_times'         => 'nullable|array',
+            'daily_user_limit'        => 'nullable|integer|min:0|max:1000',
             'temperature'             => 'nullable|numeric|min:0.0|max:1.0',
             'custom_prompt_template'  => 'nullable|string',
             'reset_prompt_to_default' => 'nullable|boolean',
@@ -170,12 +163,7 @@ class AiSettingController extends Controller
 
         $updateData = [
             'gemini_model'     => $validated['gemini_model'],
-            'is_auto_analyze'  => (bool) ($validated['is_auto_analyze'] ?? true),
-            'sync_mode'        => $validated['sync_mode'] ?? 'after_rss',
-            'interval_minutes' => (int) ($validated['interval_minutes'] ?? 180),
-            'scheduled_times'  => is_array($validated['scheduled_times'] ?? null)
-                ? array_values(array_unique(array_filter($validated['scheduled_times'])))
-                : ['06:00', '12:00', '18:00', '22:00'],
+            'daily_user_limit' => (int) ($validated['daily_user_limit'] ?? \App\Services\AiQuota::DEFAULT_LIMIT),
             'temperature'      => (float) ($validated['temperature'] ?? 0.20),
         ];
 
@@ -216,10 +204,8 @@ class AiSettingController extends Controller
                 'polda_id'            => $selectedPolda->id,
                 'polda_code'          => $selectedPolda->code,
                 'gemini_model'        => $validated['gemini_model'],
-                'sync_mode'           => $updateData['sync_mode'],
-                'interval_minutes'    => $updateData['interval_minutes'],
+                'daily_user_limit'    => $updateData['daily_user_limit'],
                 'keys_count'          => $keysCount,
-                'is_auto_analyze'     => $updateData['is_auto_analyze'],
                 'has_custom_prompt'   => !empty($updateData['custom_prompt_template']),
                 'apply_to_all_poldas' => (bool) ($validated['apply_to_all_poldas'] ?? false),
             ]),

@@ -396,7 +396,29 @@ class MediaIntelligenceController extends Controller
         $promptTemplate = $this->generateDynamicPrompt($polda);
         $model = $geminiService->getModel($polda->id);
 
+        // Hemat kuota: bila 30 berita terbaru dan templat prompt sama dengan analisis terakhir, jangan analisis ulang.
+        $sourceHash = sha1(json_encode(array_map(fn ($a) => [$a['title'] ?? '', $a['link'] ?? ''], $articles)) . '|' . md5($promptTemplate));
+        $quota = app(\App\Services\AiQuota::class);
+        $latestReport = MediaIntelligenceReport::where('polda_id', $polda->id)->latest()->first();
+
+        if (!$request->boolean('force') && $latestReport && $latestReport->source_hash === $sourceHash) {
+            $quota->log($request->user(), $polda->id, 'media', 'skipped');
+            $skipMsg = ($shouldSync ? "Sinkronisasi {$syncedCount} berita selesai. " : '') . 'Tidak ada berita baru sejak analisis terakhir, jadi hasil yang ada dipakai (tanpa memakai kuota AI).';
+            if ($request->wantsJson()) {
+                return response()->json(['success' => true, 'skipped' => true, 'message' => $skipMsg, 'synced_count' => $syncedCount, 'report' => $latestReport, 'model' => null]);
+            }
+            return back()->with('success', $skipMsg);
+        }
+
+        if ($denied = $quota->denial($request->user(), $polda->id)) {
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'status' => 'ai_limited', 'message' => $denied], 429);
+            }
+            return back()->with('error', $denied);
+        }
+
         $result = $geminiService->analyzeMediaArticles($polda, $articles, $promptTemplate, $apiKey, $model);
+        $quota->finish($request->user(), $polda->id, 'media', $result);
 
         $aiSetting = AiSetting::forPolda($polda->id);
 
@@ -481,6 +503,7 @@ class MediaIntelligenceController extends Controller
             'recommendations'          => $parsed['recommendations'] ?? [],
             'suggested_topics'         => (!empty($parsed['suggested_topics']) && is_array($parsed['suggested_topics'])) ? $parsed['suggested_topics'] : static::getDefaultSuggestedTopics($polda),
             'raw_input'                => $rawText,
+            'source_hash'              => $sourceHash,
         ]);
 
         $aiSetting->update([
@@ -1428,7 +1451,36 @@ PROMPT;
             ], 422);
         }
 
+        // Hemat kuota: analisis topik yang sudah ada dipakai ulang bila tidak ada berita baru sejak analisis itu.
+        $quota = app(\App\Services\AiQuota::class);
+        $newestArticleAt = $matchingArticles->max('created_at');
+        if (!$request->boolean('force') && !empty($topic->ai_analysis) && $topic->ai_analyzed_at && $newestArticleAt && $newestArticleAt <= $topic->ai_analyzed_at) {
+            $quota->log($request->user(), $polda->id, 'topic', 'skipped');
+
+            return response()->json([
+                'success'        => true,
+                'skipped'        => true,
+                'message'        => 'Belum ada berita baru untuk topik ini sejak analisis terakhir, jadi hasil yang ada dipakai (tanpa memakai kuota AI).',
+                'topic'          => [
+                    'id' => $topic->id, 'title' => $topic->title, 'priority' => $topic->priority, 'keywords' => $topic->keywords,
+                    'description' => $topic->description, 'ai_analysis' => $topic->ai_analysis,
+                    'ai_analyzed_at' => $topic->ai_analyzed_at->toISOString(), 'ai_analyzed_at_humans' => $topic->ai_analyzed_at->diffForHumans(),
+                    'ai_articles_count' => $topic->ai_articles_count,
+                ],
+                'analysis'       => $topic->ai_analysis,
+                'articles_count' => $topic->ai_articles_count,
+                'sample_count'   => count($formattedArticles),
+                'model_used'     => null,
+                'latency_ms'     => 0,
+            ]);
+        }
+
+        if ($denied = $quota->denial($request->user(), $polda->id)) {
+            return response()->json(['success' => false, 'status' => 'ai_limited', 'message' => $denied], 429);
+        }
+
         $result = $geminiService->analyzeTopicDossier($polda, $topic, $formattedArticles, $apiKey, $model);
+        $quota->finish($request->user(), $polda->id, 'topic', $result);
 
         if (!$result['success']) {
             return response()->json($result, 500);

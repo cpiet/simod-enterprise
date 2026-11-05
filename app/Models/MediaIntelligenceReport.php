@@ -33,6 +33,7 @@ class MediaIntelligenceReport extends Model
         'recommendations',
         'suggested_topics',
         'raw_input',
+        'source_hash',
     ];
 
     protected $casts = [

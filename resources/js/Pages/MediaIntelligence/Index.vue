@@ -950,7 +950,7 @@ const copyText = (text, label = 'Teks') => {
 const isAnalyzingGemini = ref(false);
 const syncStepText = ref('');
 
-const triggerGeminiAnalysis = async (withSync = true) => {
+const triggerGeminiAnalysis = async (withSync = true, force = false) => {
   if (!props.aiSetting?.has_api_key) {
     showToastNotification('Kunci API Mesin AI belum dikonfigurasi. Hubungi Administrator di menu Keamanan & Pemeliharaan.');
     return;
@@ -969,7 +969,7 @@ const triggerGeminiAnalysis = async (withSync = true) => {
   }
 
   try {
-    const syncParam = withSync ? '?sync=1' : '';
+    const syncParam = (withSync ? '?sync=1' : '?') + (force ? (withSync ? '&force=1' : 'force=1') : '');
     const res = await axios.post(`/media-intelligence/analyze-gemini${syncParam}`);
     showToastNotification(`✓ ${res.data.message || 'Sinkronisasi berita dan analisis intelijen otomatis selesai!'}`);
     router.reload({ preserveScroll: true });
@@ -2772,7 +2772,7 @@ const submitIssue = () => {
           </div>
           <div class="flex items-center gap-2">
             <button
-              @click="triggerGeminiAnalysis(true)"
+              @click="triggerGeminiAnalysis(true, true)"
               :disabled="isAnalyzingGemini"
               class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 text-[11px] font-bold transition shadow-sm cursor-pointer disabled:opacity-50"
               title="Segarkan sinkronisasi berita dan analisis otomatis"

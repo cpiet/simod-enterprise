@@ -15,7 +15,7 @@ This document defines core coding standards, architecture constraints, and testi
 
 ## 2. Mandatory Rules for AI Agents
 1. **Never Modify `phpunit.xml`**: Database testing must stay SQLite in-memory (`DB_CONNECTION=sqlite`, `DB_DATABASE=:memory:`). Never switch testing to MySQL.
-2. **Always Run Tests**: Always run `php artisan test` and `npm.cmd run build` before completing tasks. All 142 tests must pass.
+2. **Always Run Tests**: Always run `php artisan test` and `npm.cmd run build` before completing tasks. All 151 tests must pass.
 3. **Multi-Tenant Scoping**: All operational queries (`MediaArticle`, `Issue`, `Task`, `EarlyWarning`, `MediaTopic`) must be scoped by `polda_id`.
 4. **Clean URLs (Zero `?polda=` query leaks)**: Never construct links with `?polda=...` query parameters. Use authenticated `POST /tenant/switch` with payload `code` (e.g. `SULBAR`, `ALL`) for secure session isolation.
 5. **National Scope Tenant Target**: When in national scope (`$isNational = true` or `selectedCode === 'ALL'`), queries for executive briefings (`latestMediaReport`, `latestSocialReport`) must explicitly target `polda_id` of Divisi Humas Polri (Mabes).

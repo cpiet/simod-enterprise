@@ -37,6 +37,7 @@ Dokumentasi ini memandu arsitektur, seluruh perintah CLI, modul operasional, int
 | **25** | [25. Peta, Grafik dan Pantauan Instagram](25-peta-grafik-dan-pantauan-instagram.md) | Peta OpenStreetMap, perhitungan grafik media sosial, pantauan akun Instagram manual, batasan data, dan deployment. |
 | **26** | [26. SADEWA AI Asisten Multi-Sumber](26-asisten-sadewa-multi-sumber-dan-riwayat-percakapan.md) | Chat SADEWA lintas Media Online, Media Sosial, dan Isu Internal; lingkup mengikuti RBAC, jawaban bersumber terverifikasi [M/S/I/E], dan riwayat privat per akun di server. |
 | **27** | [27. Perbarui Briefing Command Center](27-perbarui-briefing-command-center.md) | Satu aksi untuk menyegarkan Media Online dan Media Sosial dengan progres per jalur, mode hemat Apify, dan hak akses per langkah. |
+| **28** | [28. Batas Pemakaian AI & Penghematan Kuota](28-batas-pemakaian-ai-dan-penghematan-kuota.md) | Batas permintaan AI per pengguna per hari, penahanan saat kuota Google habis, analisis tidak diulang bila data sama, dan penghapusan pengaturan otomasi AI yang tidak berfungsi. |
 
 > **Konvensi:** bila ada perbedaan antara dokumen dan kode, rujukan yang berlaku adalah [doc 22](22-peta-kode-dan-sumber-kebenaran.md) dan kode itu sendiri. Dokumen bertanda *snapshot historis* (angka test/berita lama) tidak diperbarui otomatis.
 
@@ -57,7 +58,7 @@ php artisan migrate --seed
 # 4. Bangun aset frontend
 npm.cmd run build
 
-# 5. Jalankan automated test suite (142 tests, 853 assertions)
+# 5. Jalankan automated test suite (151 tests, 905 assertions)
 php artisan test
 
 # 6. Jalankan sinkronisasi berita RSS aman (dengan Mutex Lock)

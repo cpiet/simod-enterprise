@@ -78,4 +78,4 @@ Diuji secara komprehensif pada [`tests/Feature/SadewaChatTest.php`](../tests/Fea
 6. Lingkup medsos berhasil memuat postingan media sosial untuk pengguna yang berhak.
 7. Validasi masukan pesan kosong dan lingkup tidak dikenal (HTTP 422).
 
-Baseline pengujian sistem saat ini: **142 passed (853 assertions)**.
+Baseline pengujian sistem saat ini: **151 passed (905 assertions)**.

@@ -77,6 +77,7 @@ class SadewaController extends Controller
             'stats'    => $stats,
             'tenant'   => $selectedPolda?->name,
             'user'     => ['name' => $request->user()->name],
+            'usage'    => app(\App\Services\AiQuota::class)->snapshot($request->user(), $selectedPolda?->id),
         ]);
     }
 
@@ -155,6 +156,11 @@ class SadewaController extends Controller
         $history = collect($conversation?->messages ?? [])
             ->map(fn ($m) => ['role' => $m['role'] ?? 'user', 'content' => $m['text'] ?? ''])->all();
 
+        $quota = app(\App\Services\AiQuota::class);
+        if ($denied = $quota->denial($user, $selectedPolda?->id)) {
+            return response()->json(['success' => false, 'status' => 'ai_limited', 'message' => $denied, 'usage' => $quota->snapshot($user, $selectedPolda?->id)], 429);
+        }
+
         [$context, $sourceMap] = $this->buildContext($active, $selectedPolda, $isNational);
         $scopeLabel = implode(' + ', array_map(fn ($k) => $allowed[$k], $active));
 
@@ -167,8 +173,10 @@ class SadewaController extends Controller
             $request->input('subject')
         );
 
+        $quota->finish($user, $selectedPolda?->id, 'chat', $result);
+
         if (!$result['success']) {
-            return response()->json(['success' => false, 'message' => $result['message'] ?? 'Gagal memproses pesan AI'], 422);
+            return response()->json(['success' => false, 'message' => $result['message'] ?? 'Gagal memproses pesan AI', 'usage' => $quota->snapshot($user, $selectedPolda?->id)], 422);
         }
 
         $reply = $result['reply'];
@@ -209,6 +217,7 @@ class SadewaController extends Controller
             'conversation_id' => $conversation->id,
             'title'           => $conversation->title,
             'time'            => $now,
+            'usage'           => $quota->snapshot($user, $selectedPolda?->id),
         ]);
     }
 

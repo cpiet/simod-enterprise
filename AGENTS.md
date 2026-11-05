@@ -197,7 +197,7 @@ php artisan media:prune --days=90 --polda=SULBAR
 php artisan db:backup --force
 php artisan db:backup --type=scheduled
 
-# Menjalankan seluruh test suite otomatis (142 tests, 853 assertions)
+# Menjalankan seluruh test suite otomatis (151 tests, 905 assertions)
 php artisan test
 
 # Kompilasi aset Vite frontend
@@ -285,7 +285,7 @@ SIMOD Enterprise dirancang untuk didukung secara kolaboratif oleh berbagai model
 
 ### 8.2. Protokol Kolaborasi Antar-Agent (Cross-Agent Rules of Engagement)
 1. **Never Break the Test Suite**:
-   Sebelum menyatakan suatu tugas selesai, setiap agent **wajib** menjalankan `php artisan test` (memastikan seluruh 142 tests tetap hijau) dan `npm.cmd run build` (memastikan bundle Vite terkompilasi bersih).
+   Sebelum menyatakan suatu tugas selesai, setiap agent **wajib** menjalankan `php artisan test` (memastikan seluruh 151 tests tetap hijau) dan `npm.cmd run build` (memastikan bundle Vite terkompilasi bersih).
 2. **Never Touch Testing Database Engine**:
    Jangan pernah mengubah konfigurasi `phpunit.xml` dari `:memory:` ke database fisik lokal `mysql`.
 3. **Commit Cleanly**:

@@ -67,7 +67,9 @@ const runMedia = async () => {
   media.value = { state: 'running', text: 'Menarik berita dan menganalisis…' };
   try {
     const res = await axios.post('/media-intelligence/analyze-gemini?sync=1');
-    media.value = { state: 'done', text: res.data?.message || 'Berita ditarik dan dianalisis' };
+    media.value = res.data?.skipped
+      ? { state: 'skipped', text: res.data.message }
+      : { state: 'done', text: res.data?.message || 'Berita ditarik dan dianalisis' };
   } catch (e) {
     media.value = { state: 'error', text: errText(e, 'Gagal memperbarui media online') };
   }
@@ -90,8 +92,10 @@ const runSocial = async () => {
   }
   social.value = { state: 'running', text: `${pulled}; menganalisis…` };
   try {
-    await axios.post('/social-intelligence/analyze-ai', {});
-    social.value = { state: 'done', text: `${pulled}; analisis selesai` };
+    const an = await axios.post('/social-intelligence/analyze-ai', {});
+    social.value = an.data?.skipped
+      ? { state: 'skipped', text: `${pulled}; analisis dilewati (data sama, tanpa kuota AI)` }
+      : { state: 'done', text: `${pulled}; analisis selesai` };
   } catch (e) {
     social.value = { state: 'error', text: `${pulled}; analisis gagal: ${errText(e, 'periksa konfigurasi AI')}` };
   }

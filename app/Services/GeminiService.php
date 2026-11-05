@@ -613,7 +613,7 @@ PROMPT;
 
         return [
             'success' => false,
-            'message' => "Analisis kasus Gemini gagal: {$lastError}",
+            'message' => 'Analisis kasus gagal. ' . $this->friendlyAiError($lastError),
         ];
     }
 
@@ -1145,7 +1145,7 @@ PROMPT;
         return [
             'success' => false,
             'status'  => 'error',
-            'message' => $lastError,
+            'message' => $this->friendlyAiError($lastError),
         ];
     }
 }

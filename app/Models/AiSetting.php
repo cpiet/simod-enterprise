@@ -22,6 +22,7 @@ class AiSetting extends Model
         'interval_minutes',
         'scheduled_times',
         'temperature',
+        'daily_user_limit',
         'custom_prompt_template',
         'last_analyzed_at',
         'last_status',
@@ -34,6 +35,7 @@ class AiSetting extends Model
         'interval_minutes' => 'integer',
         'is_auto_analyze'  => 'boolean',
         'temperature'      => 'float',
+        'daily_user_limit' => 'integer',
         'last_analyzed_at' => 'datetime',
     ];
 
