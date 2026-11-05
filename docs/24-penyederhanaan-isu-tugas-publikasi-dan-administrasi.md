@@ -81,7 +81,7 @@ Sebelumnya "Ganti Kata Sandi" dan "PIN Dinas" hanya menampilkan notifikasi tanpa
 ---
 
 ## 4. Pengujian
-`php artisan test` → **116 passed (710 assertions)**; `npm.cmd run build` tanpa galat. Berkas baru: `AdminSystemEnforcementTest` (lockout, idle timeout, ganti kata sandi, halaman terhapus).
+`php artisan test` → **142 passed (853 assertions)**; `npm.cmd run build` tanpa galat. Berkas baru: `AdminSystemEnforcementTest` (lockout, idle timeout, ganti kata sandi, halaman terhapus).
 
 ## 5. Belum dikerjakan / keputusan
 - Halaman **Personalia, Pengaturan Satwil, Backup, Pembersihan Berita, Sinkron RSS, Hak Akses, Manajemen Menu, Mesin AI** berfungsi penuh dan dipertahankan; header masing-masing belum diseragamkan ke pola baru (hanya bar sub-modul yang seragam).

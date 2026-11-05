@@ -60,6 +60,7 @@ Aplikasi memiliki mesin tema ganda bawaan yang terpasang pada tingkat root `<htm
 - **Mode Gelap (Command Center Dark)**: Menggunakan kelas `.dark` pada `<html>`. Latar belakang `#070d1d`, kartu `#0b1426`, teks slate terang dengan aksen gold/amber `#f59e0b`.
 - **Mode Terang (Executive Light)**: Menggunakan kelas `.light` pada `<html>`. Latar belakang `#f1f5f9`, kartu `#ffffff`, border `#e2e8f0`, teks kontras tinggi `#0f172a`.
 - **Anti-Flash Script**: Dijalankan secara sinkron di `<head>` pada [`resources/views/app.blade.php`](file:///d:/laragon/www/simod-enterprise/resources/views/app.blade.php) membaca `localStorage.getItem('simod_theme')` sebelum Vue ter-mount.
+- **Proteksi Halaman Login (`/login`)**: Halaman login adalah portal komando siber yang dirancang eksklusif dalam estetika gelap (*Command Center Dark*). Script `app.blade.php`, hook `onMounted` di [`Login.vue`](file:///d:/laragon/www/simod-enterprise/resources/js/Pages/Auth/Login.vue), dan isolasi scoped `.login-page` di [`resources/css/app.css`](file:///d:/laragon/www/simod-enterprise/resources/css/app.css) menjamin seluruh teks judul, subjudul, label form, dan placeholder selalu berkontras tinggi (putih/slate terang) kebal terhadap mode terang.
 - **PENTING UNTUK AGENT**: Jangan membuat class styling baru yang meng-hardcode warna teks hitam pekat pada dark mode. Manfaatkan token Tailwind yang sudah dipetakan di [`resources/css/app.css`](file:///d:/laragon/www/simod-enterprise/resources/css/app.css).
 
 ---
@@ -196,7 +197,7 @@ php artisan media:prune --days=90 --polda=SULBAR
 php artisan db:backup --force
 php artisan db:backup --type=scheduled
 
-# Menjalankan seluruh test suite otomatis (116 tests, 710 assertions)
+# Menjalankan seluruh test suite otomatis (142 tests, 853 assertions)
 php artisan test
 
 # Kompilasi aset Vite frontend
@@ -284,7 +285,7 @@ SIMOD Enterprise dirancang untuk didukung secara kolaboratif oleh berbagai model
 
 ### 8.2. Protokol Kolaborasi Antar-Agent (Cross-Agent Rules of Engagement)
 1. **Never Break the Test Suite**:
-   Sebelum menyatakan suatu tugas selesai, setiap agent **wajib** menjalankan `php artisan test` (memastikan seluruh 116 tests tetap hijau) dan `npm.cmd run build` (memastikan bundle Vite terkompilasi bersih).
+   Sebelum menyatakan suatu tugas selesai, setiap agent **wajib** menjalankan `php artisan test` (memastikan seluruh 142 tests tetap hijau) dan `npm.cmd run build` (memastikan bundle Vite terkompilasi bersih).
 2. **Never Touch Testing Database Engine**:
    Jangan pernah mengubah konfigurasi `phpunit.xml` dari `:memory:` ke database fisik lokal `mysql`.
 3. **Commit Cleanly**:

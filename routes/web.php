@@ -6,6 +6,7 @@ use App\Http\Controllers\IssueController;
 use App\Http\Controllers\MediaIntelligenceController;
 use App\Http\Controllers\MenuManagementController;
 use App\Http\Controllers\PressReleaseController;
+use App\Http\Controllers\SadewaController;
 use App\Http\Controllers\PublicationController;
 use App\Http\Controllers\SocialIntelligenceController;
 use App\Http\Controllers\SystemModuleController;
@@ -35,8 +36,15 @@ Route::get('/media-intelligence', [MediaIntelligenceController::class, 'index'])
 Route::get('/monitoring-media-online', [MediaIntelligenceController::class, 'index'])->middleware('module:media_intelligence_view')->name('monitoring-media-online');
 Route::post('/media-intelligence/articles/{id}/bookmark', [MediaIntelligenceController::class, 'toggleBookmark'])->middleware('module:media_intelligence_view')->name('media-intelligence.bookmark');
 Route::post('/media-intelligence/articles/bookmarks/import', [MediaIntelligenceController::class, 'importBookmarks'])->middleware('module:media_intelligence_view')->name('media-intelligence.bookmark.import');
-Route::post('/media-intelligence/analyze-gemini', [MediaIntelligenceController::class, 'analyzeGemini'])->middleware('module:media_intelligence_ai')->name('media-intelligence.analyze.gemini');
-Route::post('/media-intelligence/chat', [MediaIntelligenceController::class, 'chat'])->middleware('module:media_intelligence_view')->name('media-intelligence.chat');
+Route::post('/media-intelligence/analyze-gemini', [MediaIntelligenceController::class, 'analyzeGemini'])->middleware(['module:media_intelligence_ai', 'throttle:10,1'])->name('media-intelligence.analyze.gemini');
+Route::middleware('module:media_intelligence_view|social_intelligence_view|issues_view')->prefix('sadewa')->name('sadewa.')->group(function () {
+    Route::get('/meta', [SadewaController::class, 'meta'])->name('meta');
+    Route::get('/conversations', [SadewaController::class, 'conversations'])->name('conversations');
+    Route::get('/conversations/{id}', [SadewaController::class, 'show'])->whereNumber('id')->name('show');
+    Route::delete('/conversations/{id}', [SadewaController::class, 'destroy'])->whereNumber('id')->name('destroy');
+    Route::delete('/conversations', [SadewaController::class, 'destroyAll'])->name('destroy-all');
+    Route::post('/chat', [SadewaController::class, 'chat'])->middleware('throttle:20,1')->name('chat');
+});
 Route::post('/media-intelligence/gemini-settings', [MediaIntelligenceController::class, 'updateGeminiSettings'])->middleware('module:media_intelligence_ai')->name('media-intelligence.gemini.settings');
 Route::post('/media-intelligence/gemini-test', [MediaIntelligenceController::class, 'testGeminiConnection'])->middleware('module:media_intelligence_ai')->name('media-intelligence.gemini.test');
 
@@ -53,13 +61,13 @@ Route::post('/media-intelligence/topics/dismiss-suggestion', [MediaIntelligenceC
 // Social Media Intelligence Radar
 Route::get('/social-intelligence', [SocialIntelligenceController::class, 'index'])->middleware('module:social_intelligence_view')->name('social-intelligence.index');
 Route::post('/social-intelligence/{id}/bookmark', [SocialIntelligenceController::class, 'toggleBookmark'])->middleware('module:social_intelligence_view')->name('social-intelligence.bookmark');
-Route::post('/social-intelligence/sync', [SocialIntelligenceController::class, 'sync'])->middleware('module:social_intelligence_sync')->name('social-intelligence.sync');
+Route::post('/social-intelligence/sync', [SocialIntelligenceController::class, 'sync'])->middleware(['module:social_intelligence_sync', 'throttle:10,1'])->name('social-intelligence.sync');
 Route::post('/social-intelligence/instagram-accounts', [SocialIntelligenceController::class, 'addInstagramAccount'])->middleware(['module:social_intelligence_sync', 'throttle:10,1']);
 Route::post('/social-intelligence/instagram-accounts/{id}/sync', [SocialIntelligenceController::class, 'syncInstagramAccount'])->middleware(['module:social_intelligence_sync', 'throttle:10,1']);
 Route::delete('/social-intelligence/instagram-accounts/{id}', [SocialIntelligenceController::class, 'deleteInstagramAccount'])->middleware('module:social_intelligence_sync');
 Route::post('/social-intelligence/sync-trends', [SocialIntelligenceController::class, 'syncTrends'])->middleware('module:social_intelligence_sync')->name('social-intelligence.sync-trends');
 Route::post('/social-intelligence/track-keyword', [SocialIntelligenceController::class, 'trackKeyword'])->middleware('module:social_intelligence_sync')->name('social-intelligence.track-keyword');
-Route::post('/social-intelligence/analyze-ai', [SocialIntelligenceController::class, 'analyzeAI'])->middleware('module:social_intelligence_view')->name('social-intelligence.analyze-ai');
+Route::post('/social-intelligence/analyze-ai', [SocialIntelligenceController::class, 'analyzeAI'])->middleware(['module:social_intelligence_view', 'throttle:10,1'])->name('social-intelligence.analyze-ai');
 Route::get('/social-intelligence/reports/{id}', [SocialIntelligenceController::class, 'getReport'])->middleware('module:social_intelligence_view')->name('social-intelligence.reports.show');
 Route::post('/social-intelligence/cases/{id}/close', [SocialIntelligenceController::class, 'closeCase'])->middleware('module:social_intelligence_view')->name('social-intelligence.cases.close');
 Route::post('/social-intelligence/cases/{id}/refresh', [SocialIntelligenceController::class, 'refreshCase'])->middleware('module:social_intelligence_sync')->name('social-intelligence.cases.refresh');

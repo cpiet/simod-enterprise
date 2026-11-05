@@ -66,7 +66,7 @@ Setiap AI agent yang masuk ke repositori ini **wajib mematuhi 3 aturan non-negot
   php artisan test
   npm.cmd run build
   ```
-- Seluruh **116 tests (710 assertions)** harus berstatus **PASS (100% hijau)**. Jika ada test yang gagal, perbaiki kode sebelum melapor ke pengguna.
+- Seluruh **142 tests (853 assertions)** harus berstatus **PASS (100% hijau)**. Jika ada test yang gagal, perbaiki kode sebelum melapor ke pengguna.
 
 ---
 
@@ -114,7 +114,7 @@ Ketika Anda beralih dari satu model AI ke model AI lainnya (misal: Antigravity &
    ```bash
    php artisan test
    ```
-   Pastikan 116 tests lulus sempurna sebagai *baseline* sebelum melakukan perubahan baru.
+   Pastikan 142 tests lulus sempurna sebagai *baseline* sebelum melakukan perubahan baru.
 3. **Langkah 3: Lakukan Perubahan & Dokumentasikan**
    Lakukan penambahan fitur atau perbaikan kode sesuai instruksi di [`AGENTS.md`](../AGENTS.md) atau [`CLAUDE.md`](../CLAUDE.md).
 4. **Langkah 4: Kompilasi & Verifikasi Ulang**

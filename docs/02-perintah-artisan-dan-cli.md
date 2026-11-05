@@ -92,7 +92,7 @@ Untuk operasional harian gunakan `rss:sync` (bagian 2.1) yang dilengkapi mutex l
 
 Pengujian fitur aplikasi menggunakan PHPUnit dengan basis data SQLite in-memory (aman, cepat, dan tidak menghapus database MySQL lokal):
 ```powershell
-# Menjalankan seluruh test suite (116 tests, 710 assertions)
+# Menjalankan seluruh test suite (142 tests, 853 assertions)
 php artisan test
 
 # Menjalankan spesifik modul DatabaseBackupTest

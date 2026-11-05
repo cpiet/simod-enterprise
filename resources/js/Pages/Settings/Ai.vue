@@ -767,14 +767,14 @@ const submitSettings = () => {
                   v-model="form.gemini_model"
                   class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-400 cursor-pointer"
                 >
-                  <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite (Rekomendasi Utama &bull; ~800ms &bull; Kuota Bebas)</option>
-                  <option value="gemini-flash-lite-latest">gemini-flash-lite-latest (Stabil &bull; Cepat)</option>
-                  <option value="gemini-3.8-flash">gemini-3.8-flash (Generasi Terkini)</option>
-                  <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview (Nalar Intelijen Mendalam &bull; Pro)</option>
-                  <option value="gemini-2.5-pro">gemini-2.5-pro (Tier Khusus)</option>
+                  <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite (Rekomendasi &bull; cepat &bull; tersedia di paket gratis)</option>
+                  <option value="gemini-flash-lite-latest">gemini-flash-lite-latest (alias terbaru &bull; cepat)</option>
+                  <option value="gemini-3.8-flash">gemini-3.8-flash (lebih mutakhir &bull; paket gratis hanya ~20 permintaan/hari)</option>
+                  <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview (Pro &bull; wajib penagihan aktif)</option>
+                  <option value="gemini-2.5-pro">gemini-2.5-pro (Pro &bull; wajib penagihan aktif)</option>
                 </select>
                 <p class="text-[11px] text-slate-400 mt-1">
-                  Sistem otomatis melakukan fallback model jika model pilihan mengalami kendala jaringan.
+                  Model ini dicoba lebih dulu. Jika gagal (kuota habis, model tidak tersedia, atau server Google sibuk), sistem mencoba gemini-3.5-flash-lite lalu gemini-3.8-flash. Model Pro hanya berfungsi bila akun Google Anda memakai penagihan aktif (bukan paket gratis).
                 </p>
               </div>
 

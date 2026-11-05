@@ -4,6 +4,7 @@ import { router, Link, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
 import {
+  Bot,
   Shield,
   Building2,
   AlertTriangle,
@@ -759,6 +760,8 @@ const getPublicPlatformBadge = (platform) => {
   }
 };
 
+const openSadewa = (subject = '') => window.dispatchEvent(new CustomEvent('open-sadewa-copilot', { detail: { scope: 'social', subject } }));
+
 // ─── SADEWA SOCIAL AI SYNTHESIS & PERSISTENCE ─────────────────────────────────
 const isAnalyzingAI = ref(false);
 const socialAiReport = ref(props.latestReport || null);
@@ -922,6 +925,16 @@ const getBuzzerRiskClass = (level) => {
         >
           <Sparkles class="w-4 h-4 text-sky-500" />
           <span class="hidden sm:inline">Lacak Topik</span>
+        </button>
+
+        <button
+          type="button"
+          @click="openSadewa()"
+          class="px-3.5 py-2.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white border border-slate-700 hover:border-amber-400/60 flex items-center gap-2 cursor-pointer transition select-none"
+          title="Tanya SADEWA AI tentang percakapan media sosial"
+        >
+          <Bot class="w-4 h-4 text-amber-400" />
+          <span class="hidden sm:inline">SADEWA AI</span>
         </button>
 
         <div v-if="canSync || canCreateIssue" class="relative">

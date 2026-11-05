@@ -251,7 +251,7 @@ class GeminiMediaIntelligenceTest extends TestCase
     {
         $user = User::factory()->create(['role' => 'super_admin_mabes']);
 
-        $response = $this->actingAs($user)->postJson('/media-intelligence/chat', []);
+        $response = $this->actingAs($user)->postJson('/sadewa/chat', []);
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['message']);
     }
@@ -281,7 +281,7 @@ class GeminiMediaIntelligenceTest extends TestCase
             ], 200),
         ]);
 
-        $response = $this->actingAs($user)->postJson('/media-intelligence/chat', [
+        $response = $this->actingAs($user)->postJson('/sadewa/chat', [
             'message'  => 'Bagaimana situasi isu hari ini?',
             'polda_id' => $divhumas->id,
         ]);

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
 import SituationMap from '@/Components/SituationMap.vue';
+import BriefingRefresh from '@/Components/BriefingRefresh.vue';
 import {
   Shield,
   Radio,
@@ -140,7 +141,7 @@ const getPlatformBadge = (platform) => {
                 'bg-emerald-400': overallSituation?.color === 'emerald',
               }"
             ></span>
-            {{ overallSituation?.text || 'SITUASI KONDUSIF & TERKENDALI' }}
+            {{ overallSituation?.text || 'BELUM ADA PENILAIAN SITUASI' }}
           </span>
 
           <div>
@@ -321,10 +322,11 @@ const getPlatformBadge = (platform) => {
           <h2 class="text-lg md:text-2xl font-black text-white tracking-tight flex items-center gap-2 flex-wrap">
             <span>Briefing Intelijen Pimpinan</span>
           </h2>
+          <BriefingRefresh class="pt-1.5" :media-updated-at="latestMediaReport?.updated_at" :social-updated-at="latestSocialReport?.updated_at" />
         </div>
 
         <!-- Engine Switcher Tab Bar -->
-        <div class="inline-flex rounded-2xl bg-slate-900/95 border border-slate-800 p-1 text-xs font-bold shrink-0 self-start lg:self-auto shadow-inner">
+        <div class="intelligence-tabs inline-flex rounded-2xl bg-slate-900/95 border border-slate-800 p-1 text-xs font-bold shrink-0 self-start lg:self-auto shadow-inner">
           <button
             type="button"
             @click="activeIntelligenceTab = 'media'"
@@ -377,14 +379,14 @@ const getPlatformBadge = (platform) => {
             </span>
           </div>
           <p class="text-xs md:text-sm font-bold text-white leading-relaxed">
-            {{ latestMediaReport?.top_concern || 'Situasi pemberitaan media siber nasional dan daerah terpantau kondusif, didominasi publikasi kegiatan harkamtibmas, pelayanan publik, dan penegakan hukum humanis.' }}
+            {{ latestMediaReport?.top_concern || 'Belum ada analisis media online. Tekan "Perbarui Briefing" untuk menyusun briefing terbaru.' }}
           </p>
         </div>
 
         <!-- 2-Column Grid: Executive Briefing & Sentimen + Isu Strategis -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
           <!-- Left: Executive Briefing & Core Decision (Col 7) -->
-          <div class="lg:col-span-7 rounded-2xl bg-slate-950/60 border border-slate-800/80 p-5 space-y-4 flex flex-col justify-between">
+          <div class="lg:col-span-7 briefing-panel rounded-2xl bg-slate-950/60 border border-slate-800/80 p-5 space-y-4 flex flex-col justify-between">
             <div class="space-y-3">
               <div class="flex items-center justify-between border-b border-slate-800/80 pb-2.5 flex-wrap gap-2">
                 <h4 class="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
@@ -406,12 +408,12 @@ const getPlatformBadge = (platform) => {
                 </div>
               </div>
               <p class="text-xs text-slate-200 leading-relaxed whitespace-pre-line">
-                {{ latestMediaReport?.executive_brief || 'Analisis agregasi 29 portal media menunjukkan stabilitas opini publik terjaga dengan baik. Kemitraan media pers dan siaran Tribratanews berjalan efektif mengimbangi narasi minor di ruang siber.' }}
+                {{ latestMediaReport?.executive_brief || 'Belum ada analisis media online. Tekan "Perbarui Briefing" untuk menyusun briefing terbaru.' }}
               </p>
             </div>
 
             <!-- Keputusan / Arahan Inti Pimpinan (if present) -->
-            <div v-if="latestMediaReport?.core_decision" class="mt-3 p-3 rounded-xl bg-amber-500/10 border-l-4 border-amber-400 text-xs text-amber-100 space-y-1">
+            <div v-if="latestMediaReport?.core_decision" class="briefing-directive mt-3 p-3 rounded-xl bg-amber-500/10 border-l-4 border-amber-400 text-xs text-amber-100 space-y-1">
               <span class="text-[10px] font-black uppercase tracking-wider text-amber-300 block">Arahan Taktis Komando:</span>
               <p class="italic leading-relaxed">"{{ latestMediaReport.core_decision }}"</p>
             </div>
@@ -432,7 +434,7 @@ const getPlatformBadge = (platform) => {
           </div>
 
           <!-- Right: Barometer Sentimen & Isu Strategis (Col 5) -->
-          <div class="lg:col-span-5 rounded-2xl bg-slate-950/60 border border-slate-800/80 p-5 space-y-4">
+          <div class="lg:col-span-5 briefing-panel rounded-2xl bg-slate-950/60 border border-slate-800/80 p-5 space-y-4">
             <!-- Sentiment Breakdown Bar -->
             <div class="space-y-2">
               <div class="flex items-center justify-between text-xs">
@@ -514,7 +516,7 @@ const getPlatformBadge = (platform) => {
         <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800/80 text-xs">
           <div class="flex items-center gap-2 text-slate-400 text-[11px]">
             <Radio class="w-3.5 h-3.5 text-sky-400" />
-            <span>Pemantauan aktif 29/33 portal media nasional &amp; daerah ({{ kpi?.total_articles || 0 }} berita tersinkron)</span>
+            <span>Pemantauan media nasional &amp; daerah ({{ kpi?.total_articles || 0 }} berita tersimpan)</span>
           </div>
           <div class="flex items-center gap-2.5">
             <Link
@@ -542,14 +544,14 @@ const getPlatformBadge = (platform) => {
             </span>
           </div>
           <p class="text-xs md:text-sm font-bold text-white leading-relaxed">
-            {{ latestSocialReport?.top_concern || 'Percakapan publik di media sosial terpantau stabil, didominasi apresiasi penanganan kamtibmas cepat dan interaksi netizen pada konten edukasi humas.' }}
+            {{ latestSocialReport?.top_concern || 'Belum ada analisis media sosial. Tekan "Perbarui Briefing" untuk menyusun briefing terbaru.' }}
           </p>
         </div>
 
         <!-- 2-Column Grid: Social Briefing & Polarisasi Buzzer + KOL -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
           <!-- Left: Executive Social Briefing & Buzzer vs Organic Assessment (Col 7) -->
-          <div class="lg:col-span-7 rounded-2xl bg-slate-950/60 border border-slate-800/80 p-5 space-y-4 flex flex-col justify-between">
+          <div class="lg:col-span-7 briefing-panel rounded-2xl bg-slate-950/60 border border-slate-800/80 p-5 space-y-4 flex flex-col justify-between">
             <div class="space-y-3">
               <div class="flex items-center justify-between border-b border-slate-800/80 pb-2.5 flex-wrap gap-2">
                 <h4 class="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
@@ -571,7 +573,7 @@ const getPlatformBadge = (platform) => {
                 </div>
               </div>
               <p class="text-xs text-slate-200 leading-relaxed whitespace-pre-line">
-                {{ latestSocialReport?.executive_brief || 'Pemantauan lintas platform media sosial mengindikasikan narasi warganet didominasi respon positif dan netral terhadap program kepolisian presisi.' }}
+                {{ latestSocialReport?.executive_brief || 'Belum ada analisis media sosial. Tekan "Perbarui Briefing" untuk menyusun briefing terbaru.' }}
               </p>
             </div>
 
@@ -610,7 +612,7 @@ const getPlatformBadge = (platform) => {
           </div>
 
           <!-- Right: Barometer Medsos & Akun Kritis (Col 5) -->
-          <div class="lg:col-span-5 rounded-2xl bg-slate-950/60 border border-slate-800/80 p-5 space-y-4">
+          <div class="lg:col-span-5 briefing-panel rounded-2xl bg-slate-950/60 border border-slate-800/80 p-5 space-y-4">
             <!-- Sentiment Breakdown Medsos -->
             <div class="space-y-2">
               <div class="flex items-center justify-between text-xs">

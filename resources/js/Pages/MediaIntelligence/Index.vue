@@ -334,7 +334,7 @@ const redZoneCount = computed(() => {
 // Tahap 2: AI Copilot Chatbot (SADEWA AI - Global Dispatch)
 const openSadewaGlobal = (query = null) => {
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('open-sadewa-copilot', { detail: { query } }));
+    window.dispatchEvent(new CustomEvent('open-sadewa-copilot', { detail: { query, scope: 'media' } }));
   }
 };
 
@@ -1696,7 +1696,7 @@ const submitIssue = () => {
               v-if="localSuggestedTopics.length > 0"
               @click="showSuggestedTopicsTray = !showSuggestedTopicsTray"
               type="button"
-              class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer select-none border"
+              class="suggestion-toggle flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer select-none border"
               :class="showSuggestedTopicsTray
                 ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-md font-black'
                 : 'bg-violet-950/40 hover:bg-violet-900/50 text-cyan-300 border-violet-500/40 hover:border-cyan-400/60'"
@@ -2440,7 +2440,7 @@ const submitIssue = () => {
             class="rounded-3xl bg-[#0b1426] border border-slate-800/90 hover:border-amber-400/50 transition-all duration-300 flex flex-col justify-between overflow-hidden shadow-xl group hover:shadow-2xl hover:shadow-amber-400/5 h-[435px]"
           >
             <!-- Top Cover Image Area (h-48) -->
-            <div class="h-48 w-full bg-slate-950 relative overflow-hidden shrink-0 border-b border-slate-800/80">
+            <div class="article-cover h-48 w-full bg-slate-950 relative overflow-hidden shrink-0 border-b border-slate-800/80">
               <!-- Top Left: Source Name Badge & Top Right: Time Ago -->
               <div class="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 z-10 pointer-events-none">
                 <!-- Source Name -->

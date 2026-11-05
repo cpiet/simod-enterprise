@@ -1,6 +1,6 @@
 # 🧭 22. Peta Kode & Sumber Kebenaran (Source of Truth)
 
-Dokumen ini adalah **peta tunggal** antara dokumentasi dan kode SIMOD Enterprise. Seluruh angka di sini diverifikasi langsung dari repositori pada **5 November 2026** (baseline `php artisan test`: **116 tests, 710 assertions, PASS**).
+Dokumen ini adalah **peta tunggal** antara dokumentasi dan kode SIMOD Enterprise. Seluruh angka di sini diverifikasi langsung dari repositori pada **5 November 2026** (baseline `php artisan test`: **142 tests, 853 assertions, PASS**).
 
 > [!IMPORTANT]
 > **Aturan emas:** bila dokumen lain bertentangan dengan dokumen ini atau dengan kode, **kode yang benar**. Perbarui dokumennya, bukan sebaliknya. Dokumen berstatus *snapshot historis* (angka test/berita lama) ditandai eksplisit di dokumennya masing-masing.
@@ -55,7 +55,7 @@ Dokumen ini adalah **peta tunggal** antara dokumentasi dan kode SIMOD Enterprise
 
 ---
 
-## 4. Peta Rute (112 rute aplikasi: 108 web + 4 API)
+## 4. Peta Rute (117 rute aplikasi: 113 web + 4 API)
 
 > Seluruh rute web (kecuali `/login` dan `/logout`) berada di grup `Route::middleware('auth')`. Setiap rute modul juga memakai `->middleware('module:kunci')` (lihat bagian 7). `POST /login` dibatasi `throttle:10,1`.
 
@@ -79,7 +79,7 @@ Dokumen ini adalah **peta tunggal** antara dokumentasi dan kode SIMOD Enterprise
 | Mesin AI | `/settings/ai` (+`test`, `reset-prompt`, `apify`, `test-apify`) | `AiSettingController` |
 | Menu dinamis | `/settings/menus` (+`toggle`, `move`, `reset`, PUT/DELETE `{id}`) | `MenuManagementController` |
 
-Rute tambahan setelah perapihan alur: `POST /issues/{id}/submit` (draf → verifikasi), `POST /publications/{id}/approve|reject`, `POST /profile/password`. Halaman `/settings/mail` dan `/maintenance` **sudah dihapus** ([doc 24](24-penyederhanaan-isu-tugas-publikasi-dan-administrasi.md)).
+Rute tambahan setelah perapihan alur: `POST /issues/{id}/submit` (draf → verifikasi), `POST /publications/{id}/approve|reject`, `POST /profile/password`, serta grup `/sadewa/*` (meta, conversations, chat) untuk SADEWA AI ([doc 26](26-asisten-sadewa-multi-sumber-dan-riwayat-percakapan.md)); `POST /media-intelligence/chat` dihapus. Halaman `/settings/mail` dan `/maintenance` **sudah dihapus** ([doc 24](24-penyederhanaan-isu-tugas-publikasi-dan-administrasi.md)).
 
 ### 4.2. API (`routes/api.php`, prefiks `/api`)
 
@@ -127,15 +127,15 @@ Endpoint bertanda *(token)* memakai middleware `ingest.token`: header `Authoriza
 
 ---
 
-## 6. Basis Data (36 tabel = 29 domain + 7 infrastruktur Laravel)
+## 6. Basis Data (38 tabel = 31 domain + 7 infrastruktur Laravel)
 
 | Kelompok | Tabel |
 |:---|:---|
 | Wilayah & pengguna | `poldas`, `polres`, `users` |
 | Media online | `media_feeds`, `media_articles`, `media_topics`, `media_article_topic`, `media_intelligence_reports`, `early_warnings`, `rss_sync_settings`, `rss_sync_logs` |
-| Media sosial | `social_posts`, `social_settings`, `social_investigation_cases`, `social_intelligence_reports` |
+| Media sosial | `social_posts`, `social_settings`, `social_investigation_cases`, `social_intelligence_reports`, `monitored_instagram_accounts` |
 | Isu, rilis & tugas | `issues`, `issue_status_history`, `press_releases`, `tasks`, `task_updates`, `publications`, `media_files` |
-| Keamanan & sistem | `audit_logs`, `security_settings`, `role_permissions`, `menu_items`, `ai_settings`, `backup_settings`, `backup_records` |
+| Keamanan, AI & sistem | `audit_logs`, `security_settings`, `role_permissions`, `menu_items`, `ai_settings`, `sadewa_conversations`, `backup_settings`, `backup_records` |
 | Infrastruktur Laravel | `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`, `sessions`, `password_reset_tokens` |
 
 ---
@@ -208,9 +208,9 @@ Temuan saat menyelaraskan dokumen dengan kode (5 Nov 2026), beserta status perba
 
 ## 10. Pengujian
 
-`tests/Feature` memuat 20 berkas (plus `tests/Unit/ExampleTest.php`): `CommandCenterNationalMapAndKpiTest`, `DatabaseBackupTest`, `DivhumasNationalFeedsTest`, `DynamicMenuAndSecurityAuditTest`, `EndToEndAuditStressTest`, `EnterpriseFullSuiteTest`, `ExampleTest`, `GeminiMediaIntelligenceTest`, `MediaTopicDossierTest`, `NewsCleanupTest`, `PersonaliaAuthorityTest` (6 test), `RolePermissionMatrixTest`, `RssSyncTest`, `SecurityCenterTest`, `SocialIntelligenceTest` (10 test), `TenantSecurityTest` (3 test), `AdminSystemEnforcementTest` (4 test: lockout login, batas sesi, ganti kata sandi, halaman mock terhapus), `TenantOverrideProtectionTest` (4 test: tenant tidak dapat dialihkan klien), `AuthHardeningTest` (9 test: gerbang login, kredensial, simulasi peran, token ingest), `ModulePermissionEnforcementTest` (6 test: penegakan RBAC server-side).
+`tests/Feature` memuat 22 berkas (plus `tests/Unit/ExampleTest.php`): `CommandCenterNationalMapAndKpiTest` (5 test), `DatabaseBackupTest`, `DivhumasNationalFeedsTest`, `DynamicMenuAndSecurityAuditTest`, `EndToEndAuditStressTest`, `EnterpriseFullSuiteTest`, `ExampleTest`, `GeminiMediaIntelligenceTest`, `InstagramAccountMonitoringTest` (2 test), `MediaTopicDossierTest`, `NewsCleanupTest`, `PersonaliaAuthorityTest` (6 test), `RolePermissionMatrixTest`, `RssSyncTest`, `SadewaChatTest` (7 test), `SecurityCenterTest`, `SocialIntelligenceTest` (12 test), `TenantSecurityTest` (3 test), `AdminSystemEnforcementTest` (4 test: lockout login, batas sesi, ganti kata sandi, halaman mock terhapus), `TenantOverrideProtectionTest` (4 test: tenant tidak dapat dialihkan klien), `AuthHardeningTest` (9 test: gerbang login, kredensial, simulasi peran, token ingest), `ModulePermissionEnforcementTest` (6 test: penegakan RBAC server-side).
 
-Baseline wajib sebelum dan sesudah perubahan: `php artisan test` → **116 passed (710 assertions)** dan `npm.cmd run build` tanpa galat. Helper test: `$this->actingAsSuperAdmin()` (`tests/TestCase.php`).
+Baseline wajib sebelum dan sesudah perubahan: `php artisan test` → **142 passed (853 assertions)** dan `npm.cmd run build` tanpa galat. Helper test: `$this->actingAsSuperAdmin()` (`tests/TestCase.php`).
 
 ---
 

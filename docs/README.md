@@ -35,6 +35,8 @@ Dokumentasi ini memandu arsitektur, seluruh perintah CLI, modul operasional, int
 | **23** | [23. Optimalisasi Performa & UX (Radar Media, Medsos, Command Center)](23-optimalisasi-performa-dan-ux-radar-media-online.md) | Diagnosis lambatnya pindah menu (DevTools, query bersama, peta), cache versi, prefetch, serta Tahap A penyederhanaan UX per peran. |
 | **24** | [24. Penyederhanaan Isu & Tugas, Publikasi, Administrasi](24-penyederhanaan-isu-tugas-publikasi-dan-administrasi.md) | Alur isu resmi tunggal dan bug alur yang diperbaiki, persetujuan publikasi, unggah galeri nyata, keamanan yang benar-benar diterapkan, serta halaman mock yang dihapus. |
 | **25** | [25. Peta, Grafik dan Pantauan Instagram](25-peta-grafik-dan-pantauan-instagram.md) | Peta OpenStreetMap, perhitungan grafik media sosial, pantauan akun Instagram manual, batasan data, dan deployment. |
+| **26** | [26. SADEWA AI Asisten Multi-Sumber](26-asisten-sadewa-multi-sumber-dan-riwayat-percakapan.md) | Chat SADEWA lintas Media Online, Media Sosial, dan Isu Internal; lingkup mengikuti RBAC, jawaban bersumber terverifikasi [M/S/I/E], dan riwayat privat per akun di server. |
+| **27** | [27. Perbarui Briefing Command Center](27-perbarui-briefing-command-center.md) | Satu aksi untuk menyegarkan Media Online dan Media Sosial dengan progres per jalur, mode hemat Apify, dan hak akses per langkah. |
 
 > **Konvensi:** bila ada perbedaan antara dokumen dan kode, rujukan yang berlaku adalah [doc 22](22-peta-kode-dan-sumber-kebenaran.md) dan kode itu sendiri. Dokumen bertanda *snapshot historis* (angka test/berita lama) tidak diperbarui otomatis.
 
@@ -55,7 +57,7 @@ php artisan migrate --seed
 # 4. Bangun aset frontend
 npm.cmd run build
 
-# 5. Jalankan automated test suite (116 tests, 710 assertions)
+# 5. Jalankan automated test suite (142 tests, 853 assertions)
 php artisan test
 
 # 6. Jalankan sinkronisasi berita RSS aman (dengan Mutex Lock)

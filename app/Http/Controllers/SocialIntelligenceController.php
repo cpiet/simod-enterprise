@@ -475,15 +475,30 @@ class SocialIntelligenceController extends Controller
                 ?: 1;
         }
 
-        // Try Tier 1: Zero-cost syndication first
+        // Tier 1: sindikasi publik tanpa biaya.
         $result = $syndicationService->syncRadarForPolda($poldaId);
 
-        // If syndication yielded zero posts AND Apify token available, try Apify as Tier 2
-        if (($result['new_posts'] ?? 0) === 0) {
+        // Mode hemat (dipakai Command Center): Apify berbayar hanya bila sindikasi kosong DAN data medsos
+        // sudah lebih tua dari 60 menit. Pemanggilan dari halaman Radar Media Sosial tetap seperti semula.
+        $economy = $request->boolean('economy');
+        $lastPost = SocialPost::where('polda_id', $poldaId)->max('created_at');
+        $dataIsFresh = $lastPost && abs(now()->diffInMinutes(\Illuminate\Support\Carbon::parse($lastPost))) < 60;
+        $skipApify = $economy && $dataIsFresh;
+
+        if (($result['new_posts'] ?? 0) === 0 && !$skipApify) {
             $apifyResult = $apifyService->syncPolda($poldaId);
             if ($apifyResult['success'] && ($apifyResult['new_posts'] ?? 0) > 0) {
                 $result = $apifyResult;
             }
+        }
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success'    => (bool) $result['success'],
+                'new_posts'  => (int) ($result['new_posts'] ?? 0),
+                'apify_used' => isset($apifyResult),
+                'message'    => $result['message'] ?? '',
+            ], $result['success'] ? 200 : 422);
         }
 
         if (!$result['success']) {

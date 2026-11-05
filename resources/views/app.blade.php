@@ -10,6 +10,11 @@
     <script>
         (function() {
             try {
+                if (window.location.pathname.startsWith('/login')) {
+                    document.documentElement.classList.add('dark');
+                    document.documentElement.classList.remove('light');
+                    return;
+                }
                 const saved = localStorage.getItem('simod_theme');
                 if (saved === 'light') {
                     document.documentElement.classList.remove('dark');

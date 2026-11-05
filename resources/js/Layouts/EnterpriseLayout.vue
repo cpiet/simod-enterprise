@@ -495,7 +495,7 @@ const switchRole = (newRole) => {
           <!-- Section Heading -->
           <div
             v-if="!isDesktopSidebarCollapsed"
-            class="px-3 pb-1.5 text-[10px] font-black uppercase tracking-wider text-slate-300/80"
+            class="px-3 pb-1.5 nav-section-heading text-[10px] font-black uppercase tracking-wider text-slate-300/80"
           >
             {{ group.name }}
           </div>
@@ -641,7 +641,7 @@ const switchRole = (newRole) => {
       <!-- Mobile Navigation Scroll -->
       <div class="flex-1 overflow-y-auto px-3 py-4 space-y-6">
         <div v-for="group in visibleNavigationGroups" :key="group.name" class="space-y-1">
-          <div class="px-3 pb-1 text-[10px] font-black uppercase tracking-wider text-slate-300/80">
+          <div class="px-3 pb-1 nav-section-heading text-[10px] font-black uppercase tracking-wider text-slate-300/80">
             {{ group.name }}
           </div>
           <div v-for="item in group.items" :key="item.id || item.name" class="space-y-1">

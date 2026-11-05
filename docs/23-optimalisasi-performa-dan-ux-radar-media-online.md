@@ -106,7 +106,7 @@ Hindari donat/gauge dan 3 garis saling silang; jangan hanya mengandalkan merah-h
 ---
 
 ## 4. Pengujian
-- `php artisan test` → 116 passed (710 assertions); `npm.cmd run build` tanpa galat.
+- `php artisan test` → 142 passed (853 assertions); `npm.cmd run build` tanpa galat.
 - Belum tercakup otomatis: perilaku visual/interaksi menu `⋯`, panel Filter, dan Dossier. Periksa manual di browser pada tema Dark dan Light, lebar desktop dan ponsel.
 
 ## Peta situasi geografis

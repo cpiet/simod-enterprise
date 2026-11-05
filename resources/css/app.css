@@ -172,25 +172,25 @@ html:not(.dark) .border-slate-900 {
 }
 
 /* Typography Overrides for General Text */
-html.light .text-white,
-html:not(.dark) .text-white {
+html.light .text-white:not(.login-page *),
+html:not(.dark) .text-white:not(.login-page *) {
     color: #0f172a !important;
 }
 
-html.light .text-slate-100,
-html:not(.dark) .text-slate-100,
-html.light .text-slate-200,
-html:not(.dark) .text-slate-200 {
+html.light .text-slate-100:not(.login-page *),
+html:not(.dark) .text-slate-100:not(.login-page *),
+html.light .text-slate-200:not(.login-page *),
+html:not(.dark) .text-slate-200:not(.login-page *) {
     color: #1e293b !important;
 }
 
-html.light .text-slate-300,
-html:not(.dark) .text-slate-300 {
+html.light .text-slate-300:not(.login-page *),
+html:not(.dark) .text-slate-300:not(.login-page *) {
     color: #334155 !important;
 }
 
-html.light .text-slate-400,
-html:not(.dark) .text-slate-400 {
+html.light .text-slate-400:not(.login-page *),
+html:not(.dark) .text-slate-400:not(.login-page *) {
     color: #64748b !important;
 }
 
@@ -377,4 +377,150 @@ html:not(.dark) .shadow-2xl {
 /* Smooth Transitions for Theme Toggle */
 body, aside, header, main, footer, .rounded-3xl, .rounded-2xl {
     transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+}
+
+/* Light mode: keep each surface and its text readable as a pair. */
+html.light .nav-section-heading, html:not(.dark) .nav-section-heading { color: #475569 !important; }
+html.light .intelligence-tabs, html:not(.dark) .intelligence-tabs,
+html.light .briefing-panel, html:not(.dark) .briefing-panel { background-color: #f1f5f9 !important; }
+html.light .briefing-directive, html:not(.dark) .briefing-directive { color: #78350f !important; }
+html.light .suggestion-toggle:not(.bg-cyan-500), html:not(.dark) .suggestion-toggle:not(.bg-cyan-500) { background-color: #ede9fe !important; color: #5b21b6 !important; border-color: #c4b5fd !important; }
+html.light .suggestion-toggle:not(.bg-cyan-500) svg, html:not(.dark) .suggestion-toggle:not(.bg-cyan-500) svg { color: #6d28d9 !important; }
+/* Article covers remain dark in both themes, including text over photos. */
+html.light .article-cover .text-white, html:not(.dark) .article-cover .text-white { color: #fff !important; }
+html.light .article-cover .text-slate-200, html:not(.dark) .article-cover .text-slate-200 { color: #e2e8f0 !important; }
+html.light .article-cover .text-amber-400, html:not(.dark) .article-cover .text-amber-400 { color: #fbbf24 !important; }
+
+/* Light-theme surface and text pairs used across operational pages and dialogs.
+   Keep photo covers and modal backdrops dark. */
+html.light :is(.bg-slate-950\/40, .bg-slate-950\/60, .bg-slate-950\/80, .bg-slate-900\/50, .bg-slate-900\/70, .bg-slate-900\/95, .bg-\[\#070d19\]\/80):not(.fixed):not(.article-cover *),
+html:not(.dark) :is(.bg-slate-950\/40, .bg-slate-950\/60, .bg-slate-950\/80, .bg-slate-900\/50, .bg-slate-900\/70, .bg-slate-900\/95, .bg-\[\#070d19\]\/80):not(.fixed):not(.article-cover *) {
+    background-color: #f1f5f9 !important;
+}
+html.light :is(.bg-\[\#18111e\], .bg-rose-950\/30, .bg-rose-950\/40, .bg-rose-950\/60):not(.article-cover *),
+html:not(.dark) :is(.bg-\[\#18111e\], .bg-rose-950\/30, .bg-rose-950\/40, .bg-rose-950\/60):not(.article-cover *) {
+    background-color: #fff1f2 !important;
+}
+html.light :is(.text-amber-100, .text-amber-100\/90, .text-amber-200, .text-amber-300\/90):not(.article-cover *):not([class*="bg-black/"]):not(:not(.fixed)[class*="bg-black/"] *),
+html:not(.dark) :is(.text-amber-100, .text-amber-100\/90, .text-amber-200, .text-amber-300\/90):not(.article-cover *):not([class*="bg-black/"]):not(:not(.fixed)[class*="bg-black/"] *) { color: #92400e !important; }
+html.light :is(.text-rose-100, .text-rose-200, .text-rose-300, .text-red-200, .text-red-300):not(.article-cover *):not([class*="bg-black/"]):not(:not(.fixed)[class*="bg-black/"] *),
+html:not(.dark) :is(.text-rose-100, .text-rose-200, .text-rose-300, .text-red-200, .text-red-300):not(.article-cover *):not([class*="bg-black/"]):not(:not(.fixed)[class*="bg-black/"] *) { color: #be123c !important; }
+html.light :is(.text-emerald-100, .text-emerald-200, .text-emerald-300, .text-emerald-300\/90):not(.article-cover *):not([class*="bg-black/"]):not(:not(.fixed)[class*="bg-black/"] *),
+html:not(.dark) :is(.text-emerald-100, .text-emerald-200, .text-emerald-300, .text-emerald-300\/90):not(.article-cover *):not([class*="bg-black/"]):not(:not(.fixed)[class*="bg-black/"] *) { color: #047857 !important; }
+html.light :is(.text-cyan-300, .text-sky-300, .text-blue-300):not(.article-cover *):not([class*="bg-black/"]):not(:not(.fixed)[class*="bg-black/"] *),
+html:not(.dark) :is(.text-cyan-300, .text-sky-300, .text-blue-300):not(.article-cover *):not([class*="bg-black/"]):not(:not(.fixed)[class*="bg-black/"] *) { color: #0369a1 !important; }
+html.light :is(.text-purple-300, .text-violet-300):not(.article-cover *),
+html:not(.dark) :is(.text-purple-300, .text-violet-300):not(.article-cover *) { color: #6d28d9 !important; }
+html.light .text-slate-300\/80:not(.article-cover *),
+html:not(.dark) .text-slate-300\/80:not(.article-cover *) { color: #475569 !important; }
+
+/* ==========================================================================
+   LOGIN PAGE / COMMAND CENTER PORTAL DARK INTEGRITY
+   Guarantees /login remains crisp, high-contrast, and dark regardless of
+   global theme classes or localStorage state.
+   ========================================================================== */
+.login-page,
+html.light .login-page,
+html:not(.dark) .login-page {
+    background: linear-gradient(to bottom right, #050b14, #091322, #040810) !important;
+    color: #f1f5f9 !important;
+}
+
+.login-page .login-card,
+html.light .login-page .login-card,
+html:not(.dark) .login-page .login-card {
+    background-color: rgba(11, 20, 38, 0.95) !important;
+    border-color: rgba(51, 65, 85, 0.8) !important;
+}
+
+.login-page :is(.text-white, h1, h2, h3, span.text-white),
+html.light .login-page :is(.text-white, h1, h2, h3, span.text-white),
+html:not(.dark) .login-page :is(.text-white, h1, h2, h3, span.text-white) {
+    color: #ffffff !important;
+}
+
+.login-page :is(.text-slate-100, label),
+html.light .login-page :is(.text-slate-100, label),
+html:not(.dark) .login-page :is(.text-slate-100, label) {
+    color: #f1f5f9 !important;
+}
+
+.login-page .text-slate-200,
+html.light .login-page .text-slate-200,
+html:not(.dark) .login-page .text-slate-200 {
+    color: #e2e8f0 !important;
+}
+
+.login-page :is(.text-slate-300, p.text-slate-300),
+html.light .login-page :is(.text-slate-300, p.text-slate-300),
+html:not(.dark) .login-page :is(.text-slate-300, p.text-slate-300) {
+    color: #cbd5e1 !important;
+}
+
+.login-page :is(.text-slate-400, p.text-slate-400, div.text-slate-400),
+html.light .login-page :is(.text-slate-400, p.text-slate-400, div.text-slate-400),
+html:not(.dark) .login-page :is(.text-slate-400, p.text-slate-400, div.text-slate-400) {
+    color: #94a3b8 !important;
+}
+
+.login-page .text-amber-300,
+html.light .login-page .text-amber-300,
+html:not(.dark) .login-page .text-amber-300 {
+    color: #fcd34d !important;
+}
+
+.login-page .text-amber-400,
+html.light .login-page .text-amber-400,
+html:not(.dark) .login-page .text-amber-400 {
+    color: #fbbf24 !important;
+}
+
+.login-page .text-emerald-400,
+html.light .login-page .text-emerald-400,
+html:not(.dark) .login-page .text-emerald-400 {
+    color: #34d399 !important;
+}
+
+.login-page :is(input, .bg-slate-900\/90),
+html.light .login-page :is(input, .bg-slate-900\/90),
+html:not(.dark) .login-page :is(input, .bg-slate-900\/90) {
+    background-color: rgba(15, 23, 42, 0.9) !important;
+    color: #ffffff !important;
+    border-color: #334155 !important;
+}
+
+.login-page input::placeholder,
+html.light .login-page input::placeholder,
+html:not(.dark) .login-page input::placeholder {
+    color: #94a3b8 !important;
+}
+
+.login-page :is(.bg-slate-900, .bg-slate-900\/60),
+html.light .login-page :is(.bg-slate-900, .bg-slate-900\/60),
+html:not(.dark) .login-page :is(.bg-slate-900, .bg-slate-900\/60) {
+    background-color: #0f172a !important;
+    border-color: #334155 !important;
+}
+
+.login-page select,
+html.light .login-page select,
+html:not(.dark) .login-page select {
+    color: #fcd34d !important;
+    background-color: transparent !important;
+}
+
+.login-page select option,
+html.light .login-page select option,
+html:not(.dark) .login-page select option {
+    background-color: #0f172a !important;
+    color: #ffffff !important;
+}
+
+.login-page .border-slate-700,
+html.light .login-page .border-slate-700,
+html:not(.dark) .login-page .border-slate-700,
+.login-page .border-slate-800,
+html.light .login-page .border-slate-800,
+html:not(.dark) .login-page .border-slate-800 {
+    border-color: #334155 !important;
 }

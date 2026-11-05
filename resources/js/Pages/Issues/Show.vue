@@ -36,7 +36,10 @@ import {
   Ellipsis,
   Archive,
   Send,
+  Bot,
 } from 'lucide-vue-next';
+
+const askSadewa = () => window.dispatchEvent(new CustomEvent('open-sadewa-copilot', { detail: { scope: 'issues', subject: props.issue?.title || '' } }));
 
 const props = defineProps({
   allPoldas: Array,
@@ -334,6 +337,16 @@ const formatWita = (dateStr) => {
           >
             <component :is="actionPlan.secondary.icon" class="w-4 h-4 text-sky-400" />
             <span>{{ actionPlan.secondary.label }}</span>
+          </button>
+
+          <button
+            type="button"
+            @click="askSadewa"
+            class="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition cursor-pointer"
+            title="Tanya SADEWA AI tentang laporan ini"
+          >
+            <Bot class="w-4 h-4 text-amber-400" />
+            <span class="hidden sm:inline">SADEWA</span>
           </button>
 
           <div v-if="actionPlan.menu.length" class="relative">

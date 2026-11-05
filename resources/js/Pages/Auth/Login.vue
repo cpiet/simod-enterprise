@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { router } from '@inertiajs/vue3';
 import {
   Shield,
@@ -13,6 +13,11 @@ import {
   AlertCircle,
   Fingerprint,
 } from 'lucide-vue-next';
+
+onMounted(() => {
+  document.documentElement.classList.add('dark');
+  document.documentElement.classList.remove('light');
+});
 
 const props = defineProps({
   poldas: Array,
@@ -59,7 +64,7 @@ const handleLogin = () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-[#050b14] via-[#091322] to-[#040810] text-slate-100 flex flex-col justify-between p-4 selection:bg-amber-400 selection:text-slate-950 font-sans">
+  <div class="login-page min-h-screen bg-gradient-to-br from-[#050b14] via-[#091322] to-[#040810] text-slate-100 flex flex-col justify-between p-4 selection:bg-amber-400 selection:text-slate-950 font-sans">
     <!-- Header Ambient Light -->
     <div class="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-96 bg-amber-500/10 rounded-full blur-[120px] pointer-events-none"></div>
 
@@ -83,7 +88,7 @@ const handleLogin = () => {
 
     <!-- Main Login Card Container -->
     <div class="max-w-md w-full mx-auto my-auto relative z-10 py-6">
-      <div class="rounded-3xl bg-[#0b1426]/95 border border-slate-700/80 shadow-[0_20px_50px_rgba(0,0,0,0.6)] backdrop-blur-2xl p-7 sm:p-9 space-y-6">
+      <div class="login-card rounded-3xl bg-[#0b1426]/95 border border-slate-700/80 shadow-[0_20px_50px_rgba(0,0,0,0.6)] backdrop-blur-2xl p-7 sm:p-9 space-y-6">
         <!-- Logo & Title -->
         <div class="text-center space-y-2">
           <div class="w-16 h-16 mx-auto rounded-2xl bg-amber-400/15 border border-amber-400/40 flex items-center justify-center text-amber-400 shadow-xl shadow-amber-400/10 mb-3">
