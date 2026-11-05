@@ -94,7 +94,10 @@ php artisan serve
 Dokumentasi lengkap sistem SIMOD Enterprise terpusat pada direktori [`docs/`](./docs/README.md) dan panduan arsitektur khusus untuk AI Agents:
 
 - **[🏠 PANDUAN LENGKAP SETUP DI LAPTOP / KOMPUTER RUMAH](./docs/PANDUAN_SETUP_KOMPUTER_RUMAH.md)**: Panduan langkah demi langkah menjalankan proyek di komputer rumah/laptop lain tanpa file `.sql` mentah, lengkap dengan panduan VirtualHost Laragon & troubleshooting.
-- **[AGENTS.md](./AGENTS.md)**: Panduan instruksi, arsitektur 4 pilar, dual-theme engine, aturan kuota RSS 29 portal, dan protokol pengembangan untuk AI Coding Agents (Codex, Claude, Gemini, Antigravity).
+- **[AGENTS.md](./AGENTS.md)**: Panduan instruksi, arsitektur 4 pilar, dual-theme engine, aturan kuota RSS 29 portal, dan protokol pengembangan universal untuk AI Coding Agents (Codex, Claude, Gemini, Antigravity).
+- **[CLAUDE.md](./CLAUDE.md)**: Panduan instruksi sistem resmi untuk Anthropic Claude Code & Claude AI.
+- **[Copilot / Codex Instructions](./.github/copilot-instructions.md)**: Panduan instruksi sistem untuk GitHub Copilot, OpenAI Codex, dan Cursor AI.
+- **[21. Standarisasi Multi-Agent & Sinkronisasi Lintas Model](./docs/21-standarisasi-multi-agent-dan-sinkronisasi-lintas-model.md)**: Panduan teknis lengkap interoperabilitas multi-agent, pemetaan berkas konfigurasi, 3 aturan non-negotiable, dan alur serah terima pekerjaan (agent hand-off).
 - **[Katalog Lengkap Modul](./docs/09-katalog-lengkap-19-modul-simod-enterprise.md)**: Daftar seluruh modul operasional, hak akses, dan rute navigasi.
 - **[Peta Situasi Kamtibmas Nusantara & Integritas KPI](./docs/16-peta-nusantara-dan-integritas-kpi-command-center.md)**: Peta Indonesia interaktif berbasis berita database (11 sentra), dual-scope map toggle, dan eliminasi KPI *gimmick*.
 - **[Perbaikan Navigasi Tab, Kontras Keamanan & Otomasi Sinkron Topik Atensi](./docs/17-perbaikan-kontras-keamanan-dan-penarikan-otomatis-topik-atensi.md)**: Redesain tab 2 baris 5 kolom anti-truncate, pembersihan gambar stok Unsplash, default placeholder teks berita, dan otomasi sinkron Google News saat adopsi Topik Atensi.

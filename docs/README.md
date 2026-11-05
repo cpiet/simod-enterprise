@@ -9,7 +9,7 @@ Dokumentasi ini memandu arsitektur, seluruh perintah CLI, modul operasional, int
 
 | No | Dokumen | Ringkasan Pembahasan |
 |:---|:---|:---|
-| **🤖** | [AGENTS.md](../AGENTS.md) | **Instruksi Khusus AI Coding Agents (Codex, Claude, Gemini)**: Arsitektur, konvensi, aturan multi-tenant, dan panduan testing. |
+| **🤖** | [AGENTS.md](../AGENTS.md) / [CLAUDE.md](../CLAUDE.md) / [Copilot](../.github/copilot-instructions.md) | **Instruksi Khusus AI Coding Agents (Codex, Claude, Gemini, Copilot)**: Arsitektur, konvensi, aturan multi-tenant, dan panduan testing. |
 | **01** | [01. Arsitektur & Multi-Tenant](01-arsitektur-dan-multi-tenant.md) | Hierarki Mabes Polri &rarr; Polda &rarr; Polres, skema basis data, dan isolasi tenant. |
 | **02** | [02. Daftar Perintah Artisan & CLI](02-perintah-artisan-dan-cli.md) | Seluruh command Artisan: migrasi, seed, server, automated test suite, dan CLI scheduler. |
 | **03** | [03. Media Intelligence & RSS Feeds](03-modul-media-intelligence-dan-rss.md) | Mesin agregator paralel `curl_multi`, 29 portal berita Sulbar & nasional, fair quota, live sync. |
@@ -30,6 +30,7 @@ Dokumentasi ini memandu arsitektur, seluruh perintah CLI, modul operasional, int
 | **18** | [18. Optimalisasi UX Dossier & Arsitektur 4 Pilar Media Intelligence](18-optimalisasi-ux-dossier-dan-arsitektur-4-pilar-media-intelligence.md) | Eliminasi redundansi tab kuno, layout 2-kolom Smart Dossier, baki collapsible rekomendasi tren AI, command bar 1-baris, dan asisten intelijen SADEWA AI Copilot. |
 | **19** | [19. Optimalisasi Radar Medsos & Sintesis AI SADEWA](19-optimalisasi-radar-media-sosial-dan-sintesis-ai-sadewa.md) | Multi-Tier Autonomous Ingestion Engine (zero-cost syndication), SADEWA Social AI Synthesis, restrukturisasi 4 pilar tab, dan sentralisasi token Apify di admin. |
 | **20** | [20. Audit, Refactoring, AppSec & Portabilitas Multi-Domain](20-audit-refactoring-appsec-dan-pembersihan-kode.md) | Pembersihan kode mati, kanonikalisasi rute anti-tampering, sistem notifikasi toast reaktif global, proteksi IDOR, dan panduan multi-hosting. |
+| **21** | [21. Standarisasi Multi-Agent & Sinkronisasi Lintas Model](21-standarisasi-multi-agent-dan-sinkronisasi-lintas-model.md) | Panduan interoperabilitas multi-agent (Codex, Claude, Gemini, Copilot), mapping file konfigurasi, 3 aturan baku, dan protokol hand-off. |
 
 ---
 
@@ -48,7 +49,7 @@ php artisan migrate --seed
 # 4. Bangun aset frontend
 npm run build
 
-# 5. Jalankan automated test suite (72 tests, 381 assertions)
+# 5. Jalankan automated test suite (93 tests, 538 assertions)
 php artisan test
 
 # 6. Jalankan sinkronisasi berita RSS aman (dengan Mutex Lock)

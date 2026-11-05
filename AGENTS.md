@@ -257,3 +257,37 @@ Saat Anda (Agent) diminta memodifikasi kode ini:
     - **Proteksi IDOR & Parameter Tampering**: Seluruh aksi mutasi data (`POST /issues`, `POST /tasks`, `POST /publications`, `POST /gallery`) secara ketat menegakkan `$validated['polda_id'] = $request->user()->polda_id` bagi personel wilayah, mencegah pemalsuan `polda_id` via payload request.
     - **Global Floating Toast Feedback**: Komponen floating toast reaktif terpasang global di [`EnterpriseLayout.vue`](file:///d:/Foto/laragon/www/simod-enterprise/resources/js/Layouts/EnterpriseLayout.vue) memantau `page.props.flash` backend dengan auto-dismiss 4.5 detik dan event listener `window.addEventListener('simod-toast')`.
     - **Session Hardening & Logout**: Aksi logout menghapus cookie sesi, recaller cookie, menginvalider session token, dan disokong header HTTP `PreventBackHistory` (`no-cache, no-store, max-age=0, must-revalidate`).
+
+12. **Penyelarasan Tenant-Scoping Executive Briefing Command Center (`/`)**:
+    - **Penargetan Eksplisit Tenant Divhumas Mabes**: Pada [`DashboardController.php`](file:///d:/laragon/www/simod-enterprise/app/Http/Controllers/DashboardController.php), saat sesi berada dalam cakupan Nasional (`$isNational = true` atau `selectedCode === 'ALL'`), query laporan intelijen eksekutif (`latestMediaReport` dan `latestSocialReport`) **secara eksplisit menargetkan `polda_id` milik Divisi Humas Polri (Mabes)**. Ini mengeliminasi bug di mana laporan daerah (seperti Polda Sulbar) terambil secara keliru akibat klausa `when(!$isNational, ...)` tanpa filter tenant.
+    - **Tautan Langsung Interaktif ke Berita Asli & Lembar Briefing**:
+      - Kartu *Executive Briefing Situasi Pemberitaan (24 Jam Terakhir)* dilengkapi tombol aksi cepat `[ Buka Lembar Briefing & Berita ↗ ]` menuju Radar Media Online Tab 02.
+      - Seluruh kartu pada *Isu Strategis Terdeteksi* menggunakan tag tautan aktif (`<a>` link dengan atribut `target="_blank"`) yang langsung membuka URL berita asli di portal penerbitnya saat diklik, lengkap dengan metadata nama portal media dan timestamp publikasi.
+      - Footer kartu menyediakan tautan cepat untuk akses instan ke Format Naskah WhatsApp Komando Pimpinan dan Cetak A4 Resmi.
+
+13. **100% UI Data Parity Dropdown Reaktif di Vue (`MediaIntelligence/Index.vue`)**:
+    - Opsi portal media dihitung secara dinamis (`availablePortals` computed property) langsung dari memori artikel aktif di browser (`props.sampleArticles`).
+    - Hal ini menjamin 100% konsistensi: jika pada dropdown tertulis `ANTARA HUKUM & PERADILAN (20)`, maka saat portal tersebut dipilih, layar pasti menampilkan tepat 20 kartu artikel berita (mencegah desinkronisasi tampilan *"0 dari 0"*).
+    - Dilengkapi tombol aksi `[ 🔄 Sinkron Berita Terkini ]` langsung di dalam kartu empty state jika suatu filter portal belum memiliki artikel di database.
+
+---
+
+## 🤖 8. Standarisasi Multi-Agent Interoperability (Claude, Codex, Gemini, Antigravity)
+
+SIMOD Enterprise dirancang untuk didukung secara kolaboratif oleh berbagai model Coding Agent canggih tanpa menimbulkan konflik arsitektur, inkonsistensi sintaks, atau perusakan basis data:
+
+### 8.1. Pemetaan File Konfigurasi Khusus Setiap Agent
+| Agentic AI Platform | File Rujukan Utama | Perilaku & Tanggung Jawab |
+|:---|:---|:---|
+| **Anthropic Claude Code / Claude AI** | [`CLAUDE.md`](file:///d:/laragon/www/simod-enterprise/CLAUDE.md) | Mematuhi perintah eksekusi Windows Laragon (`npm.cmd`), menjalankan automated test suite in-memory, dan menjaga integritas Inertia Composition API. |
+| **OpenAI Codex / GitHub Copilot / Cursor** | [`.github/copilot-instructions.md`](file:///d:/laragon/www/simod-enterprise/.github/copilot-instructions.md) & [`AGENTS.md`](file:///d:/laragon/www/simod-enterprise/AGENTS.md) | Menjaga konvensi kode PHP 8.2+, typed properties, prepared statements, serta mengikuti format Conventional Commits. |
+| **Google Gemini / Antigravity** | [`AGENTS.md`](file:///d:/laragon/www/simod-enterprise/AGENTS.md) & Directives | Memanfaatkan 5 dedicated MCP servers (SSH, Chrome DevTools, Filesystem, Memory, Puppeteer) untuk audit visual, linter, dan eksekusi komando end-to-end. |
+| **DeepSeek / Open-Source LLMs** | [`AGENTS.md`](file:///d:/laragon/www/simod-enterprise/AGENTS.md) | Membaca batasan testing SQLite, struktur multi-tenant, dan arsitektur 4 pilar navigasi. |
+
+### 8.2. Protokol Kolaborasi Antar-Agent (Cross-Agent Rules of Engagement)
+1. **Never Break the Test Suite**:
+   Sebelum menyatakan suatu tugas selesai, setiap agent **wajib** menjalankan `php artisan test` (memastikan seluruh 93 tests tetap hijau) dan `npm.cmd run build` (memastikan bundle Vite terkompilasi bersih).
+2. **Never Touch Testing Database Engine**:
+   Jangan pernah mengubah konfigurasi `phpunit.xml` dari `:memory:` ke database fisik lokal `mysql`.
+3. **Commit Cleanly**:
+   Gunakan format Conventional Commits (`feat(...)`, `fix(...)`, `refactor(...)`, `docs(...)`) agar riwayat git tetap terstruktur dan mudah diaudit oleh agent berikutnya.
