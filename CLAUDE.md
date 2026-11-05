@@ -140,3 +140,4 @@ Sidebar navigasi di [`resources/js/Layouts/EnterpriseLayout.vue`](file:///d:/lar
 
 ---
 *Dokumen ini disinkronkan bersama `AGENTS.md` dan `.github/copilot-instructions.md` untuk menjamin kompatibilitas penuh antar AI Agents (Claude, Codex, Gemini, Antigravity).*
+

@@ -130,3 +130,4 @@ Ketika Anda beralih dari satu model AI ke model AI lainnya (misal: Antigravity &
    ```
 
 Dengan protokol ini, setiap AI coding agent dapat melanjutkan pekerjaan agent sebelumnya secara mulus tanpa *knowledge loss* atau regresi arsitektur.
+

@@ -29,3 +29,4 @@ This document defines core coding standards, architecture constraints, and testi
 - Always verify PHP syntax after editing with `php -l <file>`.
 
 For comprehensive system documentation, refer to `AGENTS.md` and `CLAUDE.md`.
+
