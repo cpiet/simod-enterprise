@@ -13,6 +13,26 @@ abstract class Controller
      *
      * @return array{0: string, 1: ?Polda, 2: ?int} [$selectedCode, $selectedPolda, $poldaId]
      */
+    /**
+     * Apakah kode tenant aktif berarti agregasi seluruh Polda? Secara bawaan TIDAK: Divhumas (kode ALL) hanya melihat data
+     * tenant Divhumas sendiri; agregasi nasional hanya bila `simod.national_aggregate` diaktifkan.
+     */
+    protected function aggregatesNational(?string $selectedCode): bool
+    {
+        return $selectedCode === 'ALL' && (bool) config('simod.national_aggregate', false);
+    }
+
+    /**
+     * Pengguna berwenang melihat telemetri teknis AI (nama model, jalur kunci)? Hanya pemegang izin Keamanan & Pemeliharaan.
+     * Selain itu antarmuka hanya menampilkan label netral ("Analisis AI", "SADEWA AI").
+     */
+    protected function isAiAdmin(): bool
+    {
+        $user = request()->user();
+
+        return (bool) ($user && ($user->isSuperAdmin() || $user->hasPermission('security_center')));
+    }
+
     protected function resolveActiveTenant(Request $request): array
     {
         $user = $request->user();
@@ -106,5 +126,27 @@ abstract class Controller
                 abort(403, 'Akses Ditolak: Anda tidak memiliki otoritas untuk mengakses atau memodifikasi data milik satuan wilayah lain.');
             }
         }
+    }
+
+    /**
+     * Data dasar layout (daftar Polda, tenant aktif, metrik sidebar) untuk halaman modul sistem.
+     *
+     * @return array{0: \Illuminate\Support\Collection, 1: ?\App\Models\Polda, 2: string, 3: array<string, mixed>}
+     */
+    protected function getBaseData(Request $request): array
+    {
+        $allPoldas = \App\Models\Polda::withCount('polres')->where('is_active', true)->get();
+        [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
+        $isNational = $this->aggregatesNational($selectedCode);
+
+        $metrics = [
+            'total_issues'       => \App\Models\Issue::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
+            'pending_verify'     => \App\Models\Issue::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->whereIn('status', ['monitoring', 'investigasi'])->count(),
+            'active_tasks'       => \App\Models\Task::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('status', 'in_progress')->count(),
+            'total_publications' => \App\Models\Publication::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
+            'server_wita'        => now()->setTimezone($selectedPolda->timezone ?? 'Asia/Makassar')->format('d M Y, H:i:s') . ($isNational ? ' WIB' : ' WITA'),
+        ];
+
+        return [$allPoldas, $selectedPolda, $selectedCode, $metrics];
     }
 }

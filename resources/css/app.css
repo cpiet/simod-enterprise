@@ -524,3 +524,37 @@ html.light .login-page .border-slate-800,
 html:not(.dark) .login-page .border-slate-800 {
     border-color: #334155 !important;
 }
+
+/* ===== Perbaikan kontras Mode Terang (hasil audit pra-unggah, WCAG AA 4.5:1) ===== */
+html.light .text-slate-400:not(.login-page *),
+html.light .text-slate-500:not(.login-page *),
+html.light th.text-slate-400:not(.login-page *) { color: #526077 !important; }
+
+html.light .text-amber-600:not(.login-page *),
+html.light .text-amber-500:not(.login-page *),
+html.light .text-amber-400:not([class*="bg-black"]):not([class*="bg-slate-9"]):not(.login-page *),
+html.light [class*="text-amber-400/"]:not(.login-page *) { color: #b45309 !important; }
+
+html.light .text-emerald-600:not(.login-page *),
+html.light .text-emerald-500:not(.login-page *),
+html.light .text-emerald-400:not(.login-page *),
+html.light [class*="text-emerald-400/"]:not(.login-page *) { color: #047857 !important; }
+
+html.light .text-cyan-400:not(.login-page *),
+html.light .text-cyan-500:not(.login-page *) { color: #0e7490 !important; }
+
+html.light .text-rose-500:not(.login-page *),
+html.light .text-rose-400:not(.login-page *) { color: #be123c !important; }
+
+/* Lencana berlatar solid: pastikan teks putih terbaca */
+html.light .bg-rose-500.text-white:not(.login-page *) { background-color: #be123c !important; color: #fff !important; }
+html.light .bg-pink-50.text-pink-500:not(.login-page *),
+html.light .bg-pink-500\/10:not(.login-page *) { color: #9d174d !important; }
+
+/* Lencana/label berlatar gelap atau warna solid: pertahankan teks terang di Mode Terang */
+html.light [class*="bg-black"].text-white:not(.login-page *),
+html.light .bg-red-600.text-white:not(.login-page *),
+html.light .bg-blue-600.text-white:not(.login-page *),
+html.light .bg-pink-600.text-white:not(.login-page *) { color: #fff !important; }
+html.light [class*="bg-black"][class*="text-amber-400"]:not(.login-page *),
+html.light [class*="bg-slate-950"][class*="text-amber-400"]:not(.login-page *) { color: #fbbf24 !important; }

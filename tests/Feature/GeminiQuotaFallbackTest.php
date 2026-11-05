@@ -52,7 +52,7 @@ class GeminiQuotaFallbackTest extends TestCase
         $result = (new GeminiService())->analyzeMediaArticles($this->polda, $this->articles(), 'Prompt dasar', 'AIzaSyFakeKeyForQuotaFallback12345');
 
         $this->assertFalse($result['success']);
-        $this->assertStringContainsString('Kuota API Gemini', $result['message']);
+        $this->assertStringContainsString('Kuota layanan analisis AI', $result['message']);
         $this->assertLessThan(400, strlen($result['message']));
         $this->assertStringNotContainsString('generativelanguage', $result['message']);
     }

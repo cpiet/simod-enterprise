@@ -369,7 +369,7 @@ const executeReset = () => {
             <Sparkles class="w-4 h-4 text-sky-400" />
           </div>
           <p class="text-2xl font-black text-white font-mono">
-            {{ stats.pillars_count || 4 }} <span class="text-xs font-sans text-slate-400">Pilar</span> &bull; {{ stats.tabs_count || 10 }} <span class="text-xs font-sans text-slate-400">Tab</span>
+            {{ stats.pillars_count ?? 0 }} <span class="text-xs font-sans text-slate-400">Pilar</span> &bull; {{ stats.tabs_count ?? 0 }} <span class="text-xs font-sans text-slate-400">Tab</span>
           </p>
           <p class="text-[11px] text-slate-400">Mendukung hierarki parent-child</p>
         </div>

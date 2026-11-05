@@ -10,8 +10,8 @@ Aplikasi SIMOD Enterprise menerapkan sistem pembagian peran (*role-based access 
 
 | Kode Role | Nama Jabatan Kedinasan | Tingkat Otoritas | Cakupan Akses | Modul Aktif |
 |:---|:---|:---|:---|:---:|
-| `kadiv_humas` | **Kadiv Humas Polri** | Pimpinan Tertinggi Mabes | Nasional (Seluruh Polda & Satwil) | 21 / 20 |
-| `super_admin_mabes` | **Super Admin Mabes** | Administrator Sistem Pusat | Nasional (Sistem & Keamanan Penuh) | 21 / 20 |
+| `kadiv_humas` | **Kadiv Humas Polri** | Pimpinan Tertinggi Mabes | Nasional (Seluruh Polda & Satwil) | 20 / 20 |
+| `super_admin_mabes` | **Super Admin Mabes** | Administrator Sistem Pusat | Nasional (Sistem & Keamanan Penuh) | 20 / 20 |
 | `polda_leader` | **Kabid Humas Polda** | Pimpinan Satwil Daerah | Regional Polda & Seluruh Polres Jajaran | 16 / 20 |
 | `verifikator` | **Kasubbid / Verifikator** | Validator Konten & Fakta | Regional Polda (Verifikasi Isu & Rilis) | 12 / 20 |
 | `analis` | **Analis Intelijen Media** | Pengolah Data & Opini | Regional / Nasional (Radar & Analisis AI) | 8 / 20 |

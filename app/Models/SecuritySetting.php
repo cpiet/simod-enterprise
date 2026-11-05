@@ -17,6 +17,7 @@ class SecuritySetting extends Model
         'enable_pin',
         'pin_expiry_days',
         'session_timeout_minutes',
+        'audit_retention_days',
         'private_media_storage',
         'ip_whitelist',
         'updated_by',
@@ -30,6 +31,7 @@ class SecuritySetting extends Model
         'lockout_minutes'         => 'integer',
         'pin_expiry_days'         => 'integer',
         'session_timeout_minutes' => 'integer',
+        'audit_retention_days'    => 'integer',
     ];
 
     public function polda(): BelongsTo

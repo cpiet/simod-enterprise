@@ -16,10 +16,13 @@ class DatabaseSeeder extends Seeder
             EnterpriseDatabaseSeeder::class,
             MultiTenantPoldasSeeder::class,
             DivhumasNationalRssFeedsSeeder::class,
-            MultiPoldaArticlesHistoricalSeeder::class,
-            CommandCenterDynamicSeeder::class,
-            SocialIntelligenceSeeder::class,
+            CommandCenterDynamicSeeder::class,   // koordinat Polres (+ data contoh bila SIMOD_SEED_SAMPLE=true)
+            SocialIntelligenceSeeder::class,     // pengaturan medsos (+ postingan contoh bila SIMOD_SEED_SAMPLE=true)
         ]);
+
+        if (config('simod.seed_sample_data')) {
+            $this->call(MultiPoldaArticlesHistoricalSeeder::class);   // berita historis contoh
+        }
 
         // Ensure 4 Pillars & Dynamic Menu Navigation are seeded
         MenuItem::ensureDefaultMenusSeeded();

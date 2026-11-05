@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { Link, usePage } from '@inertiajs/vue3';
+import { Link, usePage, router } from '@inertiajs/vue3';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
 import SituationMap from '@/Components/SituationMap.vue';
 import BriefingRefresh from '@/Components/BriefingRefresh.vue';
@@ -53,6 +53,7 @@ const props = defineProps({
   topViralSocialPosts: Array,
   liveSocialPosts: Array,
   polresStatuses: Array,
+  satwilMatrix: { type: Array, default: () => [] },
   overallSituation: Object,
   topIssues: Array,
   sentiment7Days: Array,
@@ -67,11 +68,56 @@ const props = defineProps({
 const page = usePage();
 const canCreateIssue = computed(() => !!page.props.auth?.permissions?.issues_create);
 const canExportReports = computed(() => !!page.props.auth?.permissions?.reports_export);
+// Matriks Satwil hanya bermakna pada tenant yang punya Polres (Polda) atau pada mode agregasi nasional.
+const showMatrix = computed(() => props.isNational || props.selectedCode !== 'ALL');
+const canManagePolda = computed(() => !!page.props.auth?.permissions?.polda_settings);
 
 // Tabs for Trending & Live Stream
 const activeTrendingTab = ref('social'); // 'social' | 'issues'
 const activeStreamTab = ref('social'); // 'social' | 'media'
 const activeIntelligenceTab = ref('media'); // 'media' | 'social' | 'matrix'
+
+// ---- Sentimen dari laporan AI / data nyata. Tanpa angka bawaan: bila belum ada, hasilnya null dan UI menampilkan "belum ada data". ----
+const num = (v) => {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+
+  return Number.isNaN(n) ? null : n;
+};
+const sentimentOf = (src) => {
+  if (!src) return null;
+  const positif = num(src.positif);
+  const netral = num(src.netral);
+  const negatif = num(src.negatif);
+  if (positif === null && netral === null && negatif === null) return null;
+
+  return { positif: positif ?? 0, netral: netral ?? 0, negatif: negatif ?? 0 };
+};
+const mediaSentiment = computed(() => {
+  const r = props.latestMediaReport || {};
+  const national = sentimentOf(r.sentiment_national);
+  const local = sentimentOf(r.sentiment_satwil) || sentimentOf(r.sentiment_sulbar);
+
+  return props.isNational ? (national || local) : (local || national);
+});
+const socialSentiment = computed(() => sentimentOf(props.latestSocialReport?.sentiment_analysis)
+  || ((props.socialStats?.total_posts || 0) > 0 ? sentimentOf(props.socialStats?.sentiment) : null));
+const reportIssues = computed(() => props.latestMediaReport?.national_issues || props.latestMediaReport?.sulbar_issues || []);
+
+// ---- Matriks Kondusifitas Satwil ----
+const statusLabel = (status) => (status === 'BELUM ADA DATA' ? 'BELUM ADA LAPORAN' : status);
+const statusDot = (status) => ({
+  ATENSI: 'bg-rose-500', WASPADA: 'bg-amber-400', KONDUSIF: 'bg-emerald-400',
+}[status] || 'bg-slate-500');
+const statusBadge = (status) => ({
+  ATENSI: 'bg-rose-500/20 text-rose-300 border border-rose-500/30',
+  WASPADA: 'bg-amber-400/20 text-amber-300 border border-amber-400/30',
+  KONDUSIF: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
+}[status] || 'bg-slate-700/40 text-slate-300 border border-slate-600/50');
+// Mode Nasional: klik baris membuka Command Center Polda tersebut (pergantian tenant aman lewat POST).
+const openSatwil = (row) => {
+  if (row?.switch_code) router.post('/tenant/switch', { code: row.switch_code });
+};
 
 // Helper formatters
 const formatNumber = (num) => {
@@ -131,6 +177,7 @@ const getPlatformBadge = (platform) => {
               'bg-rose-500/20 text-rose-300 border-rose-500/40': overallSituation?.color === 'rose',
               'bg-amber-400/20 text-amber-300 border-amber-400/40': overallSituation?.color === 'amber',
               'bg-emerald-500/20 text-emerald-300 border-emerald-500/40': overallSituation?.color === 'emerald',
+              'bg-slate-700/40 text-slate-300 border-slate-600/60': overallSituation?.color === 'slate',
             }"
           >
             <span
@@ -139,6 +186,7 @@ const getPlatformBadge = (platform) => {
                 'bg-rose-400 animate-ping': overallSituation?.color === 'rose',
                 'bg-amber-400 animate-ping': overallSituation?.color === 'amber',
                 'bg-emerald-400': overallSituation?.color === 'emerald',
+                'bg-slate-400': overallSituation?.color === 'slate',
               }"
             ></span>
             {{ overallSituation?.text || 'BELUM ADA PENILAIAN SITUASI' }}
@@ -178,8 +226,13 @@ const getPlatformBadge = (platform) => {
           <span class="text-[10px] font-black uppercase tracking-wider text-slate-400">Indeks Citra Publik</span>
           <div class="flex items-baseline gap-2">
             <span class="text-5xl font-black text-amber-400 tracking-tight">{{ publicIndex?.score != null ? publicIndex.score + '%' : '—' }}</span>
-            <span v-if="publicIndex?.change" class="text-xs font-bold text-emerald-400 flex items-center">
-              <TrendingUp class="w-3.5 h-3.5 mr-0.5" /> {{ publicIndex.change }}
+            <span
+              v-if="publicIndex?.change"
+              class="text-xs font-bold flex items-center"
+              :class="publicIndex.trend === 'up' ? 'text-emerald-400' : (publicIndex.trend === 'down' ? 'text-rose-400' : 'text-slate-400')"
+              title="Selisih dibanding 7 hari sebelumnya"
+            >
+              <TrendingUp class="w-3.5 h-3.5 mr-0.5" :class="publicIndex.trend === 'down' ? 'rotate-180' : ''" /> {{ publicIndex.change }}
             </span>
           </div>
           <span
@@ -193,7 +246,9 @@ const getPlatformBadge = (platform) => {
           >
             {{ publicIndex.status }}
           </span>
-          <p class="text-[10px] text-slate-400 font-medium">Media Online + Medsos (7 Hari)</p>
+          <p class="text-[10px] text-slate-400 font-medium max-w-[15rem]" title="Positif ÷ (Positif + Negatif) pada berita, postingan medsos, dan laporan isu 7 hari terakhir; selisih dibanding 7 hari sebelumnya.">
+            {{ publicIndex?.score != null ? 'Dari ' + publicIndex.sample + ' berita, postingan & laporan bersentimen (7 hari)' : 'Belum ada data bersentimen dalam 7 hari terakhir' }}
+          </p>
         </div>
       </div>
     </div>
@@ -214,10 +269,10 @@ const getPlatformBadge = (platform) => {
         <div class="flex items-baseline justify-between">
           <p class="text-2xl md:text-3xl font-black text-white">{{ kpi?.total_articles || 0 }}</p>
           <span class="text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-            {{ kpi?.active_feeds_count || 29 }} Portal
+            {{ kpi?.active_feeds_count ?? 0 }} Portal
           </span>
         </div>
-        <p class="text-[11px] text-slate-400">Agregasi Berimbang Fair Quota</p>
+        <p class="text-[11px] text-slate-400">{{ kpi?.articles_24h ?? 0 }} berita dalam 24 jam terakhir</p>
       </Link>
 
       <!-- 2. Radar Media Sosial -->
@@ -232,7 +287,7 @@ const getPlatformBadge = (platform) => {
         <div class="flex items-baseline justify-between">
           <p class="text-2xl md:text-3xl font-black text-amber-400">{{ socialStats?.total_posts || 0 }}</p>
           <span class="text-[10px] font-black text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-            4 Platform
+            {{ socialStats?.platform_count ?? 0 }} Platform
           </span>
         </div>
         <div class="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
@@ -259,9 +314,9 @@ const getPlatformBadge = (platform) => {
           <p class="text-2xl md:text-3xl font-black text-rose-400">{{ kpi?.priority_issues || 0 }}</p>
           <span
             class="px-2 py-0.5 rounded text-[10px] font-black"
-            :class="kpi?.priority_issues > 0 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'"
+            :class="kpi?.priority_issues > 0 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : (kpi?.field_reports > 0 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-slate-700/40 text-slate-300 border border-slate-600/50')"
           >
-            {{ kpi?.priority_issues > 0 ? 'Siaga' : 'Terkendali' }}
+            {{ kpi?.priority_issues > 0 ? 'Siaga' : (kpi?.field_reports > 0 ? 'Tidak ada prioritas' : 'Belum ada laporan') }}
           </span>
         </div>
         <p class="text-[11px] text-slate-400">Perlu Respon & Klarifikasi</p>
@@ -280,7 +335,7 @@ const getPlatformBadge = (platform) => {
           <p class="text-2xl md:text-3xl font-black text-white">{{ kpi?.field_reports || 0 }}</p>
           <span class="text-xs font-bold text-amber-300">{{ kpi?.pending_verify || 0 }} pending</span>
         </div>
-        <p class="text-[11px] text-slate-400">Dumas & Kamtibmas 6 Polres</p>
+        <p class="text-[11px] text-slate-400">{{ kpi?.polres_count > 0 ? 'Dumas & Kamtibmas ' + kpi.polres_count + ' Polres' : 'Dumas & Kamtibmas' }}</p>
       </Link>
 
       <!-- 5. Tindak Lanjut Selesai -->
@@ -294,7 +349,7 @@ const getPlatformBadge = (platform) => {
         </div>
         <div class="flex items-baseline justify-between">
           <p class="text-2xl md:text-3xl font-black text-emerald-400">{{ kpi?.tasks_resolved || 0 }}</p>
-          <span class="text-xs font-bold text-emerald-300">{{ kpi?.task_completion_rate || 100 }}% Selesai</span>
+          <span class="text-xs font-bold" :class="kpi?.task_completion_rate != null ? 'text-emerald-300' : 'text-slate-400'">{{ kpi?.task_completion_rate != null ? kpi.task_completion_rate + '% Selesai' : 'Belum ada tugas' }}</span>
         </div>
         <p class="text-[11px] text-slate-400">Disposisi & Klarifikasi Media</p>
       </Link>
@@ -435,49 +490,43 @@ const getPlatformBadge = (platform) => {
 
           <!-- Right: Barometer Sentimen & Isu Strategis (Col 5) -->
           <div class="lg:col-span-5 briefing-panel rounded-2xl bg-slate-950/60 border border-slate-800/80 p-5 space-y-4">
-            <!-- Sentiment Breakdown Bar -->
+            <!-- Barometer: nilai dari analisis AI terakhir; bila belum ada tampil "Belum ada analisis" -->
             <div class="space-y-2">
               <div class="flex items-center justify-between text-xs">
                 <span class="font-black text-white uppercase text-[11px] tracking-wider">Barometer Sentimen Media</span>
-                <span class="text-[10px] font-mono text-emerald-400 font-bold">
-                  {{ (latestMediaReport?.sentiment_national?.positif || latestMediaReport?.sentiment_sulbar?.positif || avgPositivePct || 80) }}% Positif
+                <span class="text-[10px] font-mono font-bold" :class="mediaSentiment ? 'text-emerald-400' : 'text-slate-400'">
+                  {{ mediaSentiment ? mediaSentiment.positif + '% Positif' : 'Belum ada analisis' }}
                 </span>
               </div>
               <div class="h-3 rounded-full bg-slate-900 overflow-hidden flex shadow-inner">
-                <div
-                  class="bg-emerald-500 transition-all duration-300"
-                  :style="{ width: (latestMediaReport?.sentiment_national?.positif || latestMediaReport?.sentiment_sulbar?.positif || avgPositivePct || 80) + '%' }"
-                  :title="`Positif: ${(latestMediaReport?.sentiment_national?.positif || latestMediaReport?.sentiment_sulbar?.positif || avgPositivePct || 80)}%`"
-                ></div>
-                <div
-                  class="bg-slate-600 transition-all duration-300"
-                  :style="{ width: (latestMediaReport?.sentiment_national?.netral || latestMediaReport?.sentiment_sulbar?.netral || 15) + '%' }"
-                  :title="`Netral: ${(latestMediaReport?.sentiment_national?.netral || latestMediaReport?.sentiment_sulbar?.netral || 15)}%`"
-                ></div>
-                <div
-                  class="bg-rose-500 transition-all duration-300"
-                  :style="{ width: (latestMediaReport?.sentiment_national?.negatif || latestMediaReport?.sentiment_sulbar?.negatif || 5) + '%' }"
-                  :title="`Negatif: ${(latestMediaReport?.sentiment_national?.negatif || latestMediaReport?.sentiment_sulbar?.negatif || 5)}%`"
-                ></div>
+                <template v-if="mediaSentiment">
+                  <div class="bg-emerald-500 transition-all duration-300" :style="{ width: mediaSentiment.positif + '%' }" :title="`Positif: ${mediaSentiment.positif}%`"></div>
+                  <div class="bg-slate-600 transition-all duration-300" :style="{ width: mediaSentiment.netral + '%' }" :title="`Netral: ${mediaSentiment.netral}%`"></div>
+                  <div class="bg-rose-500 transition-all duration-300" :style="{ width: mediaSentiment.negatif + '%' }" :title="`Negatif: ${mediaSentiment.negatif}%`"></div>
+                </template>
               </div>
-              <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono">
-                <span class="text-emerald-400 font-bold">● Positif {{ (latestMediaReport?.sentiment_national?.positif || latestMediaReport?.sentiment_sulbar?.positif || avgPositivePct || 80) }}%</span>
-                <span class="text-slate-400 font-bold">● Netral {{ (latestMediaReport?.sentiment_national?.netral || latestMediaReport?.sentiment_sulbar?.netral || 15) }}%</span>
-                <span class="text-rose-400 font-bold">● Negatif {{ (latestMediaReport?.sentiment_national?.negatif || latestMediaReport?.sentiment_sulbar?.negatif || 5) }}%</span>
+              <div v-if="mediaSentiment" class="flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                <span class="text-emerald-400 font-bold">● Positif {{ mediaSentiment.positif }}%</span>
+                <span class="text-slate-400 font-bold">● Netral {{ mediaSentiment.netral }}%</span>
+                <span class="text-rose-400 font-bold">● Negatif {{ mediaSentiment.negatif }}%</span>
               </div>
+              <p v-else class="text-[11px] text-slate-400">Tekan "Perbarui Briefing" untuk menganalisis berita terbaru.</p>
             </div>
 
             <!-- Isu Strategis Media Terdeteksi -->
             <div class="space-y-2 pt-2 border-t border-slate-800/80">
               <div class="flex items-center justify-between">
                 <span class="text-[11px] font-black text-slate-300 uppercase tracking-wider block">
-                  Isu Strategis Terdeteksi ({{ (latestMediaReport?.national_issues || latestMediaReport?.sulbar_issues || []).length || 3 }} Isu)
+                  Isu Strategis Terdeteksi ({{ reportIssues.length }} Isu)
                 </span>
                 <span class="text-[9px] text-slate-400 font-mono italic">Klik kartu untuk membuka berita</span>
               </div>
+              <p v-if="!reportIssues.length" class="text-[11px] text-slate-400 rounded-xl bg-slate-900/60 border border-slate-800 px-3 py-2.5">
+                Belum ada isu strategis dalam analisis terakhir. Isu muncul setelah analisis AI dijalankan.
+              </p>
               <div class="space-y-2">
                 <a
-                  v-for="(iss, idx) in (latestMediaReport?.national_issues || latestMediaReport?.sulbar_issues || []).slice(0, 3)"
+                  v-for="(iss, idx) in reportIssues.slice(0, 3)"
                   :key="iss.title || idx"
                   :href="iss.url || `/media-intelligence?q=${encodeURIComponent(iss.title || '')}`"
                   target="_blank"
@@ -613,33 +662,27 @@ const getPlatformBadge = (platform) => {
 
           <!-- Right: Barometer Medsos & Akun Kritis (Col 5) -->
           <div class="lg:col-span-5 briefing-panel rounded-2xl bg-slate-950/60 border border-slate-800/80 p-5 space-y-4">
-            <!-- Sentiment Breakdown Medsos -->
+            <!-- Barometer medsos: laporan AI terakhir, atau hitungan postingan nyata; tanpa angka bawaan -->
             <div class="space-y-2">
               <div class="flex items-center justify-between text-xs">
                 <span class="font-black text-white uppercase text-[11px] tracking-wider">Barometer Sentimen Medsos</span>
-                <span class="text-[10px] font-mono text-cyan-400 font-bold">
-                  {{ (latestSocialReport?.sentiment_analysis?.positif || socialStats?.sentiment?.positif || 65) }}% Positif
+                <span class="text-[10px] font-mono font-bold" :class="socialSentiment ? 'text-cyan-400' : 'text-slate-400'">
+                  {{ socialSentiment ? socialSentiment.positif + '% Positif' : 'Belum ada postingan' }}
                 </span>
               </div>
               <div class="h-3 rounded-full bg-slate-900 overflow-hidden flex shadow-inner">
-                <div
-                  class="bg-emerald-500 transition-all duration-300"
-                  :style="{ width: (latestSocialReport?.sentiment_analysis?.positif || socialStats?.sentiment?.positif || 65) + '%' }"
-                ></div>
-                <div
-                  class="bg-slate-600 transition-all duration-300"
-                  :style="{ width: (latestSocialReport?.sentiment_analysis?.netral || socialStats?.sentiment?.netral || 20) + '%' }"
-                ></div>
-                <div
-                  class="bg-rose-500 transition-all duration-300"
-                  :style="{ width: (latestSocialReport?.sentiment_analysis?.negatif || socialStats?.sentiment?.negatif || 15) + '%' }"
-                ></div>
+                <template v-if="socialSentiment">
+                  <div class="bg-emerald-500 transition-all duration-300" :style="{ width: socialSentiment.positif + '%' }"></div>
+                  <div class="bg-slate-600 transition-all duration-300" :style="{ width: socialSentiment.netral + '%' }"></div>
+                  <div class="bg-rose-500 transition-all duration-300" :style="{ width: socialSentiment.negatif + '%' }"></div>
+                </template>
               </div>
-              <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono">
-                <span class="text-emerald-400 font-bold">● Positif {{ (latestSocialReport?.sentiment_analysis?.positif || socialStats?.sentiment?.positif || 65) }}%</span>
-                <span class="text-slate-400 font-bold">● Netral {{ (latestSocialReport?.sentiment_analysis?.netral || socialStats?.sentiment?.netral || 20) }}%</span>
-                <span class="text-rose-400 font-bold">● Negatif {{ (latestSocialReport?.sentiment_analysis?.negatif || socialStats?.sentiment?.negatif || 15) }}%</span>
+              <div v-if="socialSentiment" class="flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                <span class="text-emerald-400 font-bold">● Positif {{ socialSentiment.positif }}%</span>
+                <span class="text-slate-400 font-bold">● Netral {{ socialSentiment.netral }}%</span>
+                <span class="text-rose-400 font-bold">● Negatif {{ socialSentiment.negatif }}%</span>
               </div>
+              <p v-else class="text-[11px] text-slate-400">Belum ada postingan medsos yang terkumpul. Jalankan sinkron di Radar Media Sosial.</p>
             </div>
 
             <!-- Akun Kritis / KOL Terpantau -->
@@ -753,22 +796,28 @@ const getPlatformBadge = (platform) => {
               <h3 class="text-xs font-black text-white uppercase tracking-wider">Tren Sentimen Publik (7 Hari)</h3>
               <p class="text-[10px] text-slate-400">Agregasi Media Online & Medsos</p>
             </div>
-            <span class="text-[10px] font-bold text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-              {{ avgPositivePct || 84 }}% Rata-rata Positif
+            <span
+              class="text-[10px] font-bold font-mono px-2 py-0.5 rounded border"
+              :class="avgPositivePct != null ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : 'text-slate-400 bg-slate-800/60 border-slate-700'"
+            >
+              {{ avgPositivePct != null ? avgPositivePct + '% positif (7 hari)' : 'Belum ada data' }}
             </span>
           </div>
 
           <!-- Bar Visualizer -->
           <div class="space-y-2 text-xs">
-            <div v-for="t in sentiment7Days" :key="t.day" class="space-y-1">
+            <div v-for="t in sentiment7Days" :key="t.date" class="space-y-1">
               <div class="flex items-center justify-between text-[11px]">
                 <span class="font-bold text-slate-300">{{ t.day }}</span>
-                <span class="font-mono text-emerald-400">{{ t.positif }}% Positif</span>
+                <span v-if="t.total > 0" class="font-mono text-emerald-400">{{ t.positif }}% Positif <span class="text-slate-500">({{ t.total }})</span></span>
+                <span v-else class="font-mono text-slate-500">Tidak ada data</span>
               </div>
-              <div class="h-2 rounded-full bg-slate-900 overflow-hidden flex" :title="`+${t.positif}% | ~${t.netral}% | -${t.negatif}%`">
-                <div class="bg-emerald-400 transition-all duration-300" :style="{ width: t.positif + '%' }"></div>
-                <div class="bg-slate-600 transition-all duration-300" :style="{ width: t.netral + '%' }"></div>
-                <div class="bg-rose-500 transition-all duration-300" :style="{ width: t.negatif + '%' }"></div>
+              <div class="h-2 rounded-full bg-slate-900 overflow-hidden flex" :title="t.total > 0 ? `+${t.positif}% | ~${t.netral}% | -${t.negatif}% dari ${t.total} data` : 'Tidak ada berita, postingan, atau laporan pada hari ini'">
+                <template v-if="t.total > 0">
+                  <div class="bg-emerald-400 transition-all duration-300" :style="{ width: t.positif + '%' }"></div>
+                  <div class="bg-slate-600 transition-all duration-300" :style="{ width: t.netral + '%' }"></div>
+                  <div class="bg-rose-500 transition-all duration-300" :style="{ width: t.negatif + '%' }"></div>
+                </template>
               </div>
             </div>
           </div>
@@ -893,64 +942,92 @@ const getPlatformBadge = (platform) => {
     <!-- ========================================================================= -->
     <!-- 4. BOTTOM GRID: MATRIKS OPINI 6 POLRES & INTELLIGENCE LIVE STREAM         -->
     <!-- ========================================================================= -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- Left: Matriks Kondusifitas Opini 6 Polres & Bar Sentimen Medsos -->
-      <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-2xl space-y-4 flex flex-col justify-between">
+    <div class="grid grid-cols-1 gap-6 items-start" :class="showMatrix ? 'lg:grid-cols-2' : 'lg:grid-cols-1'">
+      <!-- Matriks Kondusifitas Satwil: laporan isu aktif + berita 7 hari (seluruhnya data nyata) -->
+      <div v-if="showMatrix" class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-2xl space-y-4 flex flex-col justify-between">
         <div>
-          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
             <h3 class="text-sm font-black text-white uppercase tracking-wider">
-              {{ selectedCode === 'ALL' ? 'Matriks Kondusifitas Satwil & Jajaran Polda' : 'Matriks Kondusifitas Opini 6 Polres Jajaran' }}
+              {{ selectedCode === 'ALL' ? 'Matriks Kondusifitas Satwil & Jajaran Polda' : 'Matriks Kondusifitas Satwil Jajaran' }}
             </h3>
             <span class="text-xs text-slate-400">
-              {{ selectedCode === 'ALL' ? 'Divhumas Polri (Orkestrasi Nasional)' : (selectedPolda?.name || 'Polda Sulbar') }}
+              {{ selectedCode === 'ALL' ? 'Divhumas Polri (Nasional)' : (selectedPolda?.name || '') }}
             </span>
           </div>
 
-          <div class="overflow-x-auto mt-3">
+          <details class="mt-3 text-[11px] rounded-xl bg-[#070d19] border border-slate-800 px-3.5 py-2.5">
+            <summary class="cursor-pointer font-bold text-slate-200">Cara membaca matriks ini</summary>
+            <ul class="mt-2 space-y-1 text-slate-400 leading-relaxed list-disc pl-4">
+              <li><b class="text-rose-300">ATENSI</b>: ada laporan isu aktif berprioritas tinggi/kritis.</li>
+              <li><b class="text-amber-300">WASPADA</b>: ada laporan isu aktif (prioritas lain).</li>
+              <li><b class="text-emerald-300">KONDUSIF</b>: ada laporan, dan seluruhnya sudah selesai/arsip.</li>
+              <li><b class="text-slate-300">BELUM ADA LAPORAN</b>: belum ada laporan sama sekali. Ini bukan berarti aman.</li>
+              <li>Status hanya dihitung dari laporan di modul Manajemen Isu &amp; Tugas. Kolom berita 7 hari adalah informasi pendamping dan tidak memengaruhi status.</li>
+              <li v-if="selectedCode !== 'ALL'">Berita per Polres dicocokkan dari nama wilayah pada judul/ringkasan, sehingga bersifat perkiraan.</li>
+              <li v-else>Klik sebuah baris untuk membuka Command Center Polda tersebut.</li>
+            </ul>
+          </details>
+
+          <div v-if="satwilMatrix.length" class="overflow-x-auto mt-3">
             <table class="w-full text-left border-collapse text-xs">
               <thead>
                 <tr class="border-b border-slate-800 text-[10px] font-black uppercase text-slate-400">
-                  <th class="py-2.5">Satwil</th>
-                  <th class="py-2.5">Skor Opini</th>
-                  <th class="py-2.5">Status</th>
-                  <th class="py-2.5 text-right">Isu Aktif</th>
+                  <th class="py-2.5 pr-2">Satwil</th>
+                  <th class="py-2.5 pr-2">Status</th>
+                  <th class="py-2.5 pr-2">Laporan aktif</th>
+                  <th class="py-2.5 text-right">Berita 7 hari</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-800/60">
                 <tr
-                  v-for="p in polresStatuses"
-                  :key="p.id"
-                  @click="selectPolresPin(p); viewMode = 'map'"
-                  class="hover:bg-slate-900/40 transition cursor-pointer"
+                  v-for="r in satwilMatrix"
+                  :key="r.id"
+                  @click="openSatwil(r)"
+                  class="transition align-top"
+                  :class="r.switch_code ? 'hover:bg-slate-900/40 cursor-pointer' : ''"
+                  :title="r.switch_code ? 'Buka Command Center ' + r.name : ''"
                 >
-                  <td class="py-3 font-bold text-white flex items-center gap-2">
-                    <span
-                      class="w-2 h-2 rounded-full"
-                      :class="{
-                        'bg-rose-500': p.status === 'ATENSI',
-                        'bg-amber-400': p.status === 'WASPADA',
-                        'bg-emerald-400': p.status === 'KONDUSIF',
-                      }"
-                    ></span>
-                    <span>{{ p.name }}</span>
+                  <td class="py-3 pr-2">
+                    <div class="flex items-center gap-2 font-bold text-white">
+                      <span class="w-2 h-2 rounded-full shrink-0" :class="statusDot(r.status)"></span>
+                      <span>{{ r.name }}</span>
+                      <ChevronRight v-if="r.switch_code" class="w-3.5 h-3.5 text-slate-500" />
+                    </div>
+                    <p class="text-[10px] text-slate-400 mt-0.5 ml-4 line-clamp-1" :title="r.summary">{{ r.summary }}</p>
                   </td>
-                  <td class="py-3 font-mono font-bold text-emerald-400">{{ p.score }}</td>
-                  <td class="py-3">
-                    <span
-                      class="px-2 py-0.5 rounded text-[9px] font-black uppercase"
-                      :class="{
-                        'bg-rose-500/20 text-rose-300 border border-rose-500/30': p.status === 'ATENSI',
-                        'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30': p.status === 'KONDUSIF',
-                        'bg-amber-400/20 text-amber-300 border border-amber-400/30': p.status === 'WASPADA',
-                      }"
-                    >
-                      {{ p.status }}
-                    </span>
+                  <td class="py-3 pr-2">
+                    <span class="px-2 py-0.5 rounded text-[9px] font-black uppercase whitespace-nowrap" :class="statusBadge(r.status)">{{ statusLabel(r.status) }}</span>
                   </td>
-                  <td class="py-3 text-right font-bold text-amber-400">{{ p.issues_count }} Isu</td>
+                  <td class="py-3 pr-2 whitespace-nowrap">
+                    <span class="font-bold" :class="r.issues_count > 0 ? 'text-amber-400' : 'text-slate-300'">{{ r.issues_count }} aktif</span>
+                    <span v-if="r.priority_count > 0" class="ml-1 text-[10px] font-bold text-rose-300">({{ r.priority_count }} prioritas)</span>
+                    <p class="text-[10px] text-slate-500">dari {{ r.total_issues }} laporan</p>
+                  </td>
+                  <td class="py-3 text-right whitespace-nowrap">
+                    <template v-if="r.media_7d !== null">
+                      <span class="font-bold text-white">{{ r.media_7d }}</span>
+                      <p class="text-[10px]" :class="r.media_negative_7d > 0 ? 'text-rose-300 font-bold' : 'text-slate-500'">{{ r.media_negative_7d }} negatif</p>
+                    </template>
+                    <span v-else class="text-slate-500" title="Nama wilayah terlalu singkat untuk dicocokkan dengan berita">&mdash;</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <div v-else class="mt-3 rounded-2xl border border-dashed border-slate-700 p-6 text-center space-y-2">
+            <p class="text-sm font-bold text-white">
+              {{ selectedCode === 'ALL' ? 'Belum ada Polda aktif yang terdaftar.' : 'Belum ada Polres aktif yang terdaftar untuk wilayah ini.' }}
+            </p>
+            <p class="text-xs text-slate-400">Matriks terisi otomatis setelah satuan wilayah terdaftar dan laporan lapangan masuk.</p>
+            <Link
+              v-if="canManagePolda"
+              href="/settings/polda"
+              class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-400 text-slate-950 text-xs font-black hover:bg-amber-300 transition"
+            >
+              <span>Buka Pengaturan Satwil</span>
+              <ArrowRight class="w-3.5 h-3.5" />
+            </Link>
           </div>
         </div>
 
@@ -969,17 +1046,17 @@ const getPlatformBadge = (platform) => {
           <div class="h-2.5 rounded-full bg-slate-900 overflow-hidden flex">
             <div
               class="bg-emerald-500 transition-all duration-300"
-              :style="{ width: (socialStats?.sentiment?.positif || 60) + '%' }"
+              :style="{ width: (socialStats?.sentiment?.positif ?? 0) + '%' }"
               :title="`Positif: ${socialStats?.sentiment?.positif || 0}%`"
             ></div>
             <div
               class="bg-slate-600 transition-all duration-300"
-              :style="{ width: (socialStats?.sentiment?.netral || 25) + '%' }"
+              :style="{ width: (socialStats?.sentiment?.netral ?? 0) + '%' }"
               :title="`Netral: ${socialStats?.sentiment?.netral || 0}%`"
             ></div>
             <div
               class="bg-rose-500 transition-all duration-300"
-              :style="{ width: (socialStats?.sentiment?.negatif || 15) + '%' }"
+              :style="{ width: (socialStats?.sentiment?.negatif ?? 0) + '%' }"
               :title="`Negatif: ${socialStats?.sentiment?.negatif || 0}%`"
             ></div>
           </div>

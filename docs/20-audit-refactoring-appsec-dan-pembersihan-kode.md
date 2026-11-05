@@ -140,14 +140,14 @@ SESSION_SECURE_COOKIE=true
 ## 🎨 5. Sistem Feedback Visual & Ergonomi UI/UX
 
 1. **Floating Global Toast Notification**:
-   - Terintegrasi di [`EnterpriseLayout.vue`](file:///d:/laragon/www/simod-enterprise/resources/js/Layouts/EnterpriseLayout.vue) pada posisi `fixed bottom-6 right-6 z-[9999]`.
+   - Terintegrasi di [`EnterpriseLayout.vue`](../resources/js/Layouts/EnterpriseLayout.vue) pada posisi `fixed bottom-6 right-6 z-[9999]`.
    - Menangkap otomatis pesan flash dari backend (`page.props.flash.success` dan `page.props.flash.error`).
    - Mendukung penembakan event custom dari JavaScript komponen: `window.dispatchEvent(new CustomEvent('simod-toast', { detail: { message: '...', type: 'success'|'error' } }))`.
    - Menggunakan transisi halus, indikator warna tematik (hijau zamrud untuk sukses, merah mawar untuk error), dan auto-dismiss 4.5 detik.
 
 2. **Pencegahan Double-Submit & Spinner Loading**:
    - Seluruh tombol simpan/kirim dilengkapi status `:disabled="isSubmitting"` dan teks dinamis (misal: `Mengirim...`, `Memproses...`).
-   - Formulir pembuatan laporan di [`Create.vue`](file:///d:/laragon/www/simod-enterprise/resources/js/Pages/Issues/Create.vue) dilengkapi banner validasi reaktif sebelum data diunggah ke server.
+   - Formulir pembuatan laporan di [`Create.vue`](../resources/js/Pages/Issues/Create.vue) dilengkapi banner validasi reaktif sebelum data diunggah ke server.
 
 ---
 
@@ -173,7 +173,7 @@ SESSION_SECURE_COOKIE=true
 
 Seluruh test suite otomatis berhasil dijalankan dengan hasil **100% lulus tanpa regresi**:
 ```text
-  Tests:    93 passed (538 assertions)   # snapshot historis; baseline terkini 108 passed (680 assertions)
+  Tests:    93 passed (538 assertions)   # snapshot historis; baseline terkini: lihat doc 22 §10
   Duration: 11.33s
 ```
 Aplikasi memenuhi seluruh standar keamanan, integritas data, dan arsitektur Presisi Divisi Humas Polri.

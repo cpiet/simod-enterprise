@@ -37,7 +37,7 @@ class IngestController extends Controller
         }
 
         // Check duplicate by URL
-        $existing = MediaArticle::where('url', $validated['url'])->first();
+        $existing = MediaArticle::where('polda_id', $polda->id)->where('url', $validated['url'])->first();
         if ($existing) {
             $existing->update([
                 'virality_score' => $validated['virality_score'] ?? $existing->virality_score,
@@ -60,7 +60,7 @@ class IngestController extends Controller
             'summary'         => $validated['summary'] ?? Str::limit($validated['content'] ?? '', 200),
             'content'         => $validated['content'] ?? null,
             'category'        => $validated['category'] ?? 'Harkamtibmas',
-            'sentiment'       => $validated['sentiment'] ?? 'netral',
+            'sentiment'       => $validated['sentiment'] ?? \App\Support\NewsSentiment::detect($validated['title'], $validated['summary'] ?? null),
             'sentiment_score' => $validated['sentiment_score'] ?? 0.00,
             'virality_score'  => $validated['virality_score'] ?? rand(30, 80),
             'pub_date'        => now(),
@@ -86,14 +86,14 @@ class IngestController extends Controller
             if (! $polda) continue;
 
             MediaArticle::updateOrCreate(
-                ['url' => $item['url']],
+                ['polda_id' => $polda->id, 'url' => $item['url']],
                 [
                     'polda_id'        => $polda->id,
                     'title'           => $item['title'],
                     'source_name'     => $item['source_name'] ?? 'Media Online',
                     'summary'         => $item['summary'] ?? '',
                     'category'        => $item['category'] ?? 'Harkamtibmas',
-                    'sentiment'       => $item['sentiment'] ?? 'netral',
+                    'sentiment'       => $item['sentiment'] ?? \App\Support\NewsSentiment::detect($item['title'] ?? '', $item['summary'] ?? null),
                     'sentiment_score' => $item['sentiment_score'] ?? 0.00,
                     'virality_score'  => $item['virality_score'] ?? rand(40, 75),
                     'pub_date'        => now(),

@@ -52,9 +52,9 @@ Peran bawaan sistem (`RolePermission::defaultRoles()`; detail matriks 20 modul d
 1. **Kadivhumas Polri (Mabes Komando Nasional)** (`kadiv_humas`):
    - Pimpinan tertinggi komando kehumasan Polri: **Irjen Pol. Johnny Eddizon Isir, S.I.K., M.T.C.P.**
    - Otoritas tertinggi dan pengawasan terpusat atas seluruh Polda dan Biro/Bagian Divhumas Polri (`polda_id = null`).
-   - Akses penuh (21/20 modul) ke seluruh modul intelijen, siaran pers pimpinan, penugasan nasional, dan pengawasan satwil.
+   - Akses penuh (20/20 modul) ke seluruh modul intelijen, siaran pers pimpinan, penugasan nasional, dan pengawasan satwil.
 2. **Super Admin Mabes Polri** (`super_admin_mabes`):
-   - Akses administratif teknis penuh lintas seluruh Polda (21/20 modul, bypass kunci tenant).
+   - Akses administratif teknis penuh lintas seluruh Polda (20/20 modul, bypass kunci tenant).
    - Menambah, mengubah status, mengelola konfigurasi multi-tenant, dan mengaudit seluruh Polda.
 3. **Pimpinan Polda / Kabid Humas** (`polda_leader`):
    - Otoritas tertinggi pada satu wilayah hukum Polda (`polda_id` terkunci).
@@ -71,5 +71,5 @@ Peran dengan `polda_id` terisi (selain `kadiv_humas`/`super_admin_mabes`/`supera
 
 ## 4. Referensi Silang
 
-- Daftar lengkap 36 tabel basis data, 110 rute, services, dan perintah CLI: [doc 22](22-peta-kode-dan-sumber-kebenaran.md).
+- Daftar lengkap 39 tabel basis data, 120 rute, services, dan perintah CLI: [doc 22](22-peta-kode-dan-sumber-kebenaran.md).
 - Cakupan "34 Polda" adalah **target arsitektur**; data awal yang di-seed saat ini adalah Divhumas Polri (Mabes) + 5 Polda (Sulbar, Gorontalo, Sulsel, Sultra, Kaltim).

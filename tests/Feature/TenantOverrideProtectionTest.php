@@ -90,6 +90,10 @@ class TenantOverrideProtectionTest extends TestCase
 
     public function test_analyze_gemini_uses_session_tenant_not_query_param(): void
     {
+        config(['services.gemini.api_key' => null]);
+        putenv('GEMINI_API_KEY=');
+        unset($_ENV['GEMINI_API_KEY'], $_SERVER['GEMINI_API_KEY']);
+
         $leader = $this->user('polda_leader', $this->sulbar->id);
 
         // Tanpa kunci API -> 422, tetapi tenant yang dipakai harus Sulbar walaupun query meminta Gorontalo.

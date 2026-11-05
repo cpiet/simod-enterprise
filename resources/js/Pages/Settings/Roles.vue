@@ -311,7 +311,7 @@ const getRoleColor = (roleKey) => {
       >
         <div>
           <div class="flex items-center justify-between gap-1 mb-1.5">
-            <span class="text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md bg-black/40 border border-current">
+            <span class="text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md bg-white/70 dark:bg-black/40 border border-current">
               {{ r.badge || 'ROLE' }}
             </span>
             <span class="text-[10px] font-mono font-black text-white">

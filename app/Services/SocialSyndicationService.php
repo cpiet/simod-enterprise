@@ -91,8 +91,11 @@ class SocialSyndicationService
             $pulledCount += $this->ingestFromGoogleNewsGeneric($cleanKeyword, $platforms, $poldaId, $caseId, $perPlatform);
         }
 
-        // --- TIER 3: Smart Local Synthetic Fallback (guaranteed non-zero result) ---
-        if ($pulledCount === 0) {
+        $isRealPull = $pulledCount > 0;
+
+        // --- TIER 3: fallback sintetis (DATA BUATAN). Nonaktif secara bawaan (simod.social_synthetic_fallback):
+        // radar hanya berisi percakapan nyata dari sindikasi publik atau Apify. ---
+        if ($pulledCount === 0 && config('simod.social_synthetic_fallback')) {
             $pulledCount = $this->generateSyntheticFallback($cleanKeyword, $platforms, $poldaId, $caseId);
         }
 
@@ -113,7 +116,7 @@ class SocialSyndicationService
                 'keyword'    => $cleanKeyword,
                 'platforms'  => $platforms,
                 'new_posts'  => $pulledCount,
-                'tier'       => $pulledCount > 0 ? 'live_syndication' : 'synthetic',
+                'tier'       => $pulledCount > 0 ? (config('simod.social_synthetic_fallback') && ! $isRealPull ? 'synthetic' : 'live_syndication') : 'no_results',
             ],
             'created_at'   => now(),
         ]);
@@ -122,13 +125,13 @@ class SocialSyndicationService
 
         return [
             'success'   => true,
-            'mode'      => $isLive ? 'live_syndication' : 'synthetic_fallback',
+            'mode'      => $isLive ? ($isRealPull ? 'live_syndication' : 'synthetic_fallback') : 'no_results',
             'new_posts' => $pulledCount,
             'case_id'   => $caseId,
             'case_title' => $case?->title ?? $cleanKeyword,
             'message'   => $isLive
                 ? "✓ Berhasil mengumpulkan {$pulledCount} percakapan warganet tentang \"{$cleanKeyword}\" dari sindikasi publik lintas platform (tanpa token Apify)."
-                : "Radar aktif dalam mode analitik lokal. Data intelijen dasar telah disiapkan untuk \"{$cleanKeyword}\".",
+                : "Belum ada percakapan publik yang ditemukan untuk \"{$cleanKeyword}\" di sumber sindikasi. Tidak ada data buatan yang ditambahkan; coba kata kunci lain atau pasang token Apify untuk cakupan yang lebih luas.",
         ];
     }
 

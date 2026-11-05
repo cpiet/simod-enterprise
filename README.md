@@ -60,7 +60,7 @@ DB_PASSWORD=
 
 ### 4. Migrasi & Seeding Database (Arsitektur Modern Laravel)
 > [!TIP]
-> **Tidak membutuhkan file `.sql` mentah!** Seluruh 24 tabel, 51 feed RSS, 103 postingan patroli siber aktual, akun pimpinan, menu navigasi, dan peran RBAC dibangun secara otomatis & instan melalui migrasi dan seeder resmi Laravel:
+> **Tidak membutuhkan file `.sql` mentah!** Seluruh 39 tabel, 62 feed RSS (29 Sulbar + 33 nasional Divhumas), 103 postingan patroli siber aktual, akun pimpinan, menu navigasi, dan peran RBAC dibangun secara otomatis & instan melalui migrasi dan seeder resmi Laravel:
 
 ```bash
 php artisan migrate:fresh --seed
@@ -80,12 +80,14 @@ php artisan serve
 
 ## 🔑 Kredensial Akun Login Bawaan
 
-| Peran | Username / Email | Password Dinas | Cakupan Otoritas |
-|:---|:---|:---|:---|
-| **Super Admin Mabes** | `superadmin` / `superadmin@polri.go.id` | `MabesPolri#2026` | Akses penuh 34 Polda, Keamanan, Backup, AI & Audit Log |
-| **Kadivhumas Polri** | `kadivhumas` / `kadivhumas@polri.go.id` | `DivhumasPolri#2026` | Pucuk Pimpinan Tertinggi, Command Center Nasional |
-| **Akun Developer (Tech)** | `cpiet` / `alumnidarus@gmail.com` | `T0p1s@y@bund@r` | Superadmin Mabes & Pengembang Sistem |
-| **Pimpinan Polda Sulbar** | `kabid_sulbar` / `kabid.sulbar@polri.go.id` | `SulbarHumas#2026` | Komando Kehumasan Wilayah Sulawesi Barat |
+| Peran | Username / Email | Cakupan Otoritas |
+|:---|:---|:---|
+| **Super Admin Mabes** | `superadmin` / `superadmin@polri.go.id` | Akses penuh 34 Polda, Keamanan, Backup, AI & Audit Log |
+| **Kadivhumas Polri** | `kadivhumas` / `kadivhumas@polri.go.id` | Pucuk Pimpinan Tertinggi, Command Center Nasional |
+| **Akun Developer (Tech)** | `cpiet` / `alumnidarus@gmail.com` | Superadmin Mabes & Pengembang Sistem |
+| **Pimpinan Polda Sulbar** | `kabid_sulbar` / `kabid.sulbar@polri.go.id` | Komando Kehumasan Wilayah Sulawesi Barat |
+
+> Kata sandi awal tidak dicantumkan di dokumen. Untuk pengembangan lokal, lihat seeder `EnterpriseDatabaseSeeder.php`. Di lingkungan non-lokal, ganti semua kata sandi seed segera setelah `migrate --seed`.
 
 ---
 
@@ -94,7 +96,7 @@ php artisan serve
 Dokumentasi lengkap sistem SIMOD Enterprise terpusat pada direktori [`docs/`](./docs/README.md) dan panduan arsitektur khusus untuk AI Agents:
 
 - **[🏠 PANDUAN LENGKAP SETUP DI LAPTOP / KOMPUTER RUMAH](./docs/PANDUAN_SETUP_KOMPUTER_RUMAH.md)**: Panduan langkah demi langkah menjalankan proyek di komputer rumah/laptop lain tanpa file `.sql` mentah, lengkap dengan panduan VirtualHost Laragon & troubleshooting.
-- **[AGENTS.md](./AGENTS.md)**: Panduan instruksi, arsitektur 4 pilar, dual-theme engine, aturan kuota RSS 29 portal, dan protokol pengembangan universal untuk AI Coding Agents (Codex, Claude, Gemini, Antigravity).
+- **[AGENTS.md](./AGENTS.md)**: Panduan instruksi, arsitektur 4 pilar, dual-theme engine, aturan kuota RSS 29 portal, dan protokol pengembangan universal untuk AI Coding Agents (Codex, Claude, Gemini, Antigravity). Sumber aturan tunggal; `CLAUDE.md` dan `GEMINI.md` mengimpornya.
 - **[CLAUDE.md](./CLAUDE.md)**: Panduan instruksi sistem resmi untuk Anthropic Claude Code & Claude AI.
 - **[Copilot / Codex Instructions](./.github/copilot-instructions.md)**: Panduan instruksi sistem untuk GitHub Copilot, OpenAI Codex, dan Cursor AI.
 - **[21. Standarisasi Multi-Agent & Sinkronisasi Lintas Model](./docs/21-standarisasi-multi-agent-dan-sinkronisasi-lintas-model.md)**: Panduan teknis lengkap interoperabilitas multi-agent, pemetaan berkas konfigurasi, 3 aturan non-negotiable, dan alur serah terima pekerjaan (agent hand-off).

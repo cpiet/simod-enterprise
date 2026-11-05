@@ -1,292 +1,230 @@
-# 🤖 AGENTS.md — Panduan Arsitektur & Instruksi Operasional untuk AI Coding Agents (Codex, Claude, Gemini, Antigravity)
+# AGENTS.md — Panduan Induk untuk Semua AI Coding Agent
 
-Dokumen ini adalah **panduan rujukan resmi sistem** yang dirancang khusus untuk Agentic AI (OpenAI Codex, Claude 3.5 Sonnet, Google Gemini, DeepSeek, Antigravity, GitHub Copilot) saat membaca, menganalisis, merancang fitur, atau memodifikasi basis kode **SIMOD Enterprise**.
+Berkas ini adalah **satu-satunya sumber aturan** bagi AI coding agent (Claude Code, OpenAI Codex, Gemini CLI / Antigravity, GitHub Copilot, Cursor, DeepSeek, dan lainnya) yang bekerja di repositori **SIMOD Enterprise**.
 
----
+- `CLAUDE.md` dan `GEMINI.md` hanya mengimpor berkas ini (`@AGENTS.md`), jadi isinya tidak perlu disalin.
+- `.github/copilot-instructions.md` berisi ringkasan aturan wajib dan merujuk ke sini.
+- Angka dan peta kode yang lengkap ada di [`docs/22-peta-kode-dan-sumber-kebenaran.md`](docs/22-peta-kode-dan-sumber-kebenaran.md).
+- **Bila dokumen bertentangan dengan kode, kode yang benar.** Perbaiki dokumennya dalam commit yang sama.
 
-## 🏛️ 1. Ikhtisar Sistem & Core Tech Stack
-
-- **Nama Platform**: SIMOD Enterprise (Sistem Monitoring dan Opini Publik Digital POLRI v2.0)
-- **Tujuan**: Platform Command Center intelijen media siber, pemantauan opini publik, Early Warning System (EWS), agregasi 29 RSS multi-portal, orkestrasi rilis pers, dan manajemen operasional tugas kehumasan berstandar Divisi Humas Polri & Polda Jajaran.
-- **Arsitektur Utama**:
-  - **Backend**: Laravel 11 / 12 (PHP 8.2+) dengan arsitektur MVC & Service Repository.
-  - **Frontend**: Vue 3 (Composition API dengan `<script setup>`), Inertia.js v2 (tanpa Blade view SPA tradisional).
-  - **Styling**: Tailwind CSS v4 (`@tailwindcss/vite` tanpa `tailwind.config.js`). Konfigurasi token tema tersentralisasi di [`resources/css/app.css`](file:///d:/laragon/www/simod-enterprise/resources/css/app.css).
-  - **Basis Data**: MySQL 8.x / MariaDB (produksi lokal Laragon) + SQLite in-memory (khusus automated testing).
-  - **Icons**: `lucide-vue-next`.
+Bahasa kerja proyek: **Bahasa Indonesia** (UI, pesan galat, komentar, dokumentasi, pesan commit).
 
 ---
 
-## 🗺️ 2. Peta 4 Pilar Navigasi & Modul Terpadu
+## 1. Ringkasan Sistem
 
-Sidebar navigasi di [`EnterpriseLayout.vue`](file:///d:/laragon/www/simod-enterprise/resources/js/Layouts/EnterpriseLayout.vue) distrukturkan secara tegas ke dalam 4 pilar hierarkis:
+**SIMOD Enterprise** (Sistem Monitoring dan Opini Publik Digital Polri) adalah platform pemantauan media dan opini publik untuk Divisi Humas Polri dan Polda jajaran. Fungsinya: agregasi berita RSS, radar media sosial, analisis AI (Gemini), manajemen isu dan peringatan dini (EWS), disposisi tugas, publikasi, serta administrasi.
 
-```
-├── 1. KOMANDO & INTELIJEN
-│   ├── Command Center               [/] -> Ringkasan Eksekutif, Peta Situasi & EWS
-│   ├── Radar Media Online           [/media-intelligence] -> Radar 29 RSS, Executive Briefing, Naskah WA
-│   └── Radar Media Sosial           [/social-intelligence] -> Pantauan 𝕏, TikTok, IG, YT, KOL & Apify
-│
-├── 2. MANAJEMEN ISU & TUGAS
-│   ├── Laporan Polres & Isu         [/issues] -> Pemantauan daftar isu & eskalasi sentimen
-│   ├── Input Laporan Baru           [/issues/create] -> Formulir laporan lapangan & bukti foto
-│   ├── Antrean Verifikasi           [/verification-queue] -> Validasi fakta & klarifikasi hoaks
-│   └── Disposisi Tugas              [/tasks] -> Surat perintah penugasan anggota & rekap hasil
-│
-├── 3. PUBLIKASI & DOKUMENTASI
-│   ├── Publikasi Multi-Kanal        [/publications] -> Tribratanews, Instagram, TikTok, Facebook, X
-│   ├── Galeri Media Aman            [/gallery] -> Arsip foto/video bukti terenkripsi
-│   └── Laporan & Anev               [/reports] -> Rekapitulasi kinerja kehumasan & ekspor CSV/PDF
-│
-└── 4. ADMINISTRASI & SISTEM
-    ├── Personalia & Petugas         [/personalia] -> Manajemen akun personel & Satker
-    ├── Pengaturan Satwil            [/settings/polda] -> Konfigurasi Polda & Polres jajaran
-    ├── Keamanan & Pemeliharaan      [/security] -> Pintu masuk 8 sub-modul pemeliharaan terpadu:
-    │   ├── Keamanan Siber           [/security]
-    │   ├── Hak Akses (RBAC)         [/roles]
-    │   ├── Audit Log                [/audit-logs]
-    │   ├── Backup Basis Data        [/database/backup]
-    │   ├── Pembersihan Berita       [/maintenance/news-cleanup]
-    │   ├── Otomasi Sinkron RSS      [/maintenance/rss-sync]
-    │   └── Mesin Intelijen AI (LLM) [/settings/ai]
-    └── Profil Saya                  [/profile] -> Kredensial dinas & PIN Cepat
-```
+| Lapisan | Teknologi |
+|:---|:---|
+| Backend | PHP 8.2, Laravel 12, `inertiajs/inertia-laravel` 3.x; pola Controller + Service (`app/Services`) |
+| Frontend | Vue 3.5 (`<script setup>`, Composition API), `@inertiajs/vue3` 3.x, Vite 6 |
+| Styling | Tailwind CSS v4 lewat `@tailwindcss/vite` (**tanpa** `tailwind.config.js`); token tema di `resources/css/app.css` |
+| Ikon / Markdown | `lucide-vue-next`, `marked` |
+| Basis data | MySQL/MariaDB `simod_enterprise` (Laragon); **SQLite in-memory** khusus test |
+| Sesi / cache / antrean | Driver `database` |
+| AI | Google Gemini (`app/Services/GeminiService.php`), dibatasi `app/Services/AiQuota.php` |
+| Scraper eksternal | Apify (`ApifySyncService`), worker Python `scraper/` → `POST /api/v1/ingest/*` |
+
+Lingkungan lokal: Windows 11 + Laragon, vhost `http://simod-enterprise.test`. Folder proyek bisa berbeda antar komputer (mis. `D:\Foto\laragon\www\simod-enterprise` atau `D:\laragon\www\simod-enterprise`); jangan menulis path absolut di kode maupun di tautan dokumen. Gunakan path relatif.
 
 ---
 
-## 🌓 3. Dual-Theme Engine (Mode Gelap & Mode Terang)
-
-Aplikasi memiliki mesin tema ganda bawaan yang terpasang pada tingkat root `<html>`:
-- **Mode Gelap (Command Center Dark)**: Menggunakan kelas `.dark` pada `<html>`. Latar belakang `#070d1d`, kartu `#0b1426`, teks slate terang dengan aksen gold/amber `#f59e0b`.
-- **Mode Terang (Executive Light)**: Menggunakan kelas `.light` pada `<html>`. Latar belakang `#f1f5f9`, kartu `#ffffff`, border `#e2e8f0`, teks kontras tinggi `#0f172a`.
-- **Anti-Flash Script**: Dijalankan secara sinkron di `<head>` pada [`resources/views/app.blade.php`](file:///d:/laragon/www/simod-enterprise/resources/views/app.blade.php) membaca `localStorage.getItem('simod_theme')` sebelum Vue ter-mount.
-- **Proteksi Halaman Login (`/login`)**: Halaman login adalah portal komando siber yang dirancang eksklusif dalam estetika gelap (*Command Center Dark*). Script `app.blade.php`, hook `onMounted` di [`Login.vue`](file:///d:/laragon/www/simod-enterprise/resources/js/Pages/Auth/Login.vue), dan isolasi scoped `.login-page` di [`resources/css/app.css`](file:///d:/laragon/www/simod-enterprise/resources/css/app.css) menjamin seluruh teks judul, subjudul, label form, dan placeholder selalu berkontras tinggi (putih/slate terang) kebal terhadap mode terang.
-- **PENTING UNTUK AGENT**: Jangan membuat class styling baru yang meng-hardcode warna teks hitam pekat pada dark mode. Manfaatkan token Tailwind yang sudah dipetakan di [`resources/css/app.css`](file:///d:/laragon/www/simod-enterprise/resources/css/app.css).
-
----
-
-## 📡 4. Mesin Agregasi Media Online (29 RSS Feeds) & Auto-Sync
-
-### 4.1. Daftar 29 Portal Resmi Sulbar
-Seluruh 29 portal media dikonfigurasi melalui seeder [`SulbarRssFeedsSeeder.php`](file:///d:/laragon/www/simod-enterprise/database/seeders/SulbarRssFeedsSeeder.php):
-- **Regional Sulselbar (20)**: Detik Sulsel, Tribun Sulbar, ANTARA Makassar (Terkini, Top News, Daerah, Lintas Daerah), Mesakada, Mekora, Globalsulbar, Radar Sulbar, Sulbar Express, Mamuju Pos, Katinting, Kabar Sulbar, Suwarta, Sulbar Terkini, Malaqbi, Rakyat Sulbar, Bugis Pos, Bacasaja.id.
-- **Nasional & Umum (4)**: Antara News Terkini, CNN Indonesia Nasional, Tribunnews (Nasional), ANTARA Makassar (Politik).
-- **Hukum & Kriminal (3)**: Detikcom Hukum & Kriminal, ANTARA Makassar (Hukum), Polisiku.co.id.
-- **Google News RSS (2)**: iNews Mamuju (Keyword Search), Google News - iNews Mamuju (Site Search).
-
-### 4.2. Aturan Kritis Penarikan & Kuota Adil (*Fair Quota*)
-> [!IMPORTANT]
-> Media nasional (Detik, CNN, Antara) memproduksi ratusan berita harian. **DILARANG** melakukan `array_slice()` global setelah pengurutan timestamp!
-- **Wajib menggunakan pengelompokan per sumber (*per-source grouping*)**: Setiap feed diberi kuota simpan adil (default 25–30 berita per feed). Hal ini menjamin portal daerah (Katinting, Malaqbi, Antara Hukum/Politik) tidak terdesak menjadi 0 berita.
-- **Bypass Cloudflare & Permalinks Rusak**: Portal dengan proteksi Cloudflare (seperti `Bacasaja.id`) atau struktur tautan bermasalah (`Malaqbi.com`) disindikasikan secara aman melalui Google News RSS (`site:domain.com`).
-
-### 4.3. Fitur Keamanan & Kestabilan di Balik Layar
-- **Mutex Atomic Lock**: `Cache::lock('rss_sync_engine_lock', 600)`. Jika proses sinkronisasi sedang berlangsung, cron berikutnya akan dilewati (*skipped_locked*) untuk mencegah *server overload*.
-- **Auto-Capping Berimbang**: Jika kapasitas berita non-bookmark melebihi ambang batas (`max_retained_articles_per_polda`), pemangkasan dilakukan berimbang per-sumber (`autoCapArticles` di `RssSyncService`), bukan menghapus portal daerah yang terbit berkala.
-- **Bookmark Permanen**: Kolom `is_bookmarked` pada tabel `media_articles` bersifat kebal dari pemangkasan otomatis (*never pruned*).
-
-### 4.4. Radar Media Sosial & Social Listening (𝕏, TikTok, Instagram, YouTube, Facebook)
-- **Tabel Basis Data**: `social_posts` (data postingan, metrik views/likes/shares/comments, virality_score 0-100, is_kol, sentiment, `case_id`), `social_investigation_cases` (berkas kasus atensi pimpinan, keywords, platforms, posts_count, sentiment_breakdown, status active/archived), dan `social_settings` (konfigurasi Apify token, kata kunci pantau, frekuensi sinkronisasi per Polda).
-- **Multi-Tier Autonomous Ingestion Engine**:
-  - *Tier 1 (Zero-Cost Syndication)*: Penarikan otomatis live dari internet menggunakan sindikasi Google News Social RSS (`site:x.com`, `site:tiktok.com`, `site:instagram.com`, dll.) tanpa kuota API pihak ketiga via `SocialSyndicationService`.
-  - *Tier 2 (Apify Cloud Fallback)*: Beroperasi otomatis jika kuota dan token Apify tersedia.
-  - *Tier 3 (Smart Synthetic Fallback)*: Pola interaksi realistis warganet daerah untuk menjamin ketersediaan sistem 24/7 saat offline.
-- **SADEWA Social AI Synthesis (`POST /social-intelligence/analyze-ai`)**:
-  - Memproses percakapan warganet menggunakan `GeminiService::analyzeSocialPosts()`.
-  - Menghasilkan: Executive Brief Situasi Medsos, Isu Kritis Prioritas Pimpinan (*Top Concern*), Komposisi & Stabilitas Sentimen, Deteksi Polarisasi Buzzer vs Netizen Organik, Akun Kritis Terdeteksi, Rekomendasi Cooling System Humas, dan Naskah WhatsApp Komando Pimpinan (siap salin 1-klik).
-- **Tab Navigasi Utama (4 Pilar Terpadu)**:
-  - *Tab 01 (Radar Percakapan)*: Smart Dossier Topik Atensi, feed multi-platform, Spike Timeline 7 Hari, Semantic Word Cloud, dan tombol `🚨 Eskalasi Jadi Isu`.
-  - *Tab 02 (Executive Briefing & Naskah WA)*: Command bar sintesis 1-klik SADEWA AI, visualisasi polarisasi buzzer, matriks cooling system, dan naskah dinas WA pimpinan.
-  - *Tab 03 (Radar KOL & Akun Kritis)*: Direktori tokoh berpengaruh, pengamat hukum, LSM/LBH, dan riwayat postingan.
-  - *Tab 04 (Tren Tagar & Kerawanan Siber)*: Dual-mode lens (Lensa Kamtibmas Polri & Lensa Tren Publik Medsos Indonesia WOEID 23424846).
-- **Sentralisasi Kredensial Apify**:
-  - Pengaturan API Token Apify dan pool failover telah dipindahkan dari operator radar ke panel Administrator: **Keamanan & Pemeliharaan &rarr; Mesin Intelijen AI (`/settings/ai`) &rarr; Tab Mesin Scraper Patroli Siber (Apify Cloud)**.
-- **Direct One-Click Escalation**: Tombol `🚨 Eskalasi Jadi Isu` pada setiap kartu postingan medsos dan kartu tren publik otomatis mengarahkan ke formulir `/issues/create` dengan pra-isi judul, kategori (`📱 Isu Medsos & Opini Publik`), URL sumber, tingkat prioritas, dan ringkasan.
-
-### 4.5. Radar Media Online Divhumas Polri (33 Feed Nasional Terverifikasi & Sindikasi Google News)
-- **Tenant Scope**: Kode `DIVHUMAS` (ID `10`) (alias sesi `ALL`, dipilih via `POST /tenant/switch` dengan payload `code`).
-- **Daftar 33 Feed Resmi Aktif**:
-  1. ANTARA News Terkini (`https://www.antaranews.com/rss/terkini.xml`)
-  2. ANTARA Top News (`https://www.antaranews.com/rss/top-news.xml`)
-  3. ANTARA Politik & Pemerintahan (`https://www.antaranews.com/rss/politik.xml`)
-  4. ANTARA Hukum & Peradilan (`https://www.antaranews.com/rss/hukum.xml`)
-  5. ANTARA Metro Kriminalitas (`https://www.antaranews.com/rss/metro-kriminalitas.xml`)
-  6. ANTARA Metro Ibukota (`https://www.antaranews.com/rss/metro.xml`)
-  7. ANTARA Ekonomi & Bisnis (`https://www.antaranews.com/rss/ekonomi.xml`)
-  8. Detikcom Berita Nasional (`https://news.detik.com/berita/rss`)
-  9. Detikcom Finance (`https://finance.detik.com/rss`)
-  10. Detikcom Inet & Siber (`https://inet.detik.com/rss`)
-  11. CNN Indonesia Nasional (`https://www.cnnindonesia.com/nasional/rss`)
-  12. CNN Indonesia Ekonomi (`https://www.cnnindonesia.com/ekonomi/rss`)
-  13. CNN Indonesia Teknologi & Siber (`https://www.cnnindonesia.com/teknologi/rss`)
-  14. CNBC Indonesia News (`https://www.cnbcindonesia.com/news/rss`)
-  15. CNBC Indonesia Market & Finansial (`https://www.cnbcindonesia.com/market/rss`)
-  16. Republika Terkini (`https://www.republika.co.id/rss`)
-  17. Liputan6 News & Peristiwa (`https://feed.liputan6.com/rss/news`)
-  18. SINDOnews Nasional (`https://nasional.sindonews.com/rss`)
-  19. SINDOnews Daerah & Satwil (`https://daerah.sindonews.com/rss`)
-  20. JPNN Berita Terkini (`https://www.jpnn.com/rss`)
-  21. Kumparan News (`https://lapi.kumparan.com/v2.0/rss/`)
-  22. BBC News Indonesia (`https://feeds.bbci.co.uk/indonesia/rss.xml`)
-  23. Tempo.co Utama (`https://rss.tempo.co/`)
-  24. Tempo.co Nasional (`https://rss.tempo.co/nasional`)
-  25. CNN Indonesia Utama (`https://www.cnnindonesia.com/rss`)
-  26. CNBC Indonesia Terkini (`https://www.cnbcindonesia.com/rss`)
-  27. Google News - Berita Utama (`https://news.google.com/rss?hl=id&gl=ID&ceid=ID:id`)
-  28. Google News - Bisnis & Ekonomi (`https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=id&gl=ID&ceid=ID:id`)
-  29. Google News - Teknologi & Siber (`https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=id&gl=ID&ceid=ID:id`)
-  30. Google News - Hiburan & Budaya (`https://news.google.com/rss/headlines/section/topic/ENTERTAINMENT?hl=id&gl=ID&ceid=ID:id`)
-  31. Google News - Olahraga (`https://news.google.com/rss/headlines/section/topic/SPORTS?hl=id&gl=ID&ceid=ID:id`)
-  32. Google News - Sains & Lingkungan (`https://news.google.com/rss/headlines/section/topic/SCIENCE?hl=id&gl=ID&ceid=ID:id`)
-  33. Google News - Kesehatan (`https://news.google.com/rss/headlines/section/topic/HEALTH?hl=id&gl=ID&ceid=ID:id`)
-- **Verifikasi Kualitas Feed**: Portal media arus utama membawa gambar dan konten lengkap, sementara Google News RSS menyediakan agregasi sebaran topik publik yang luas.
-- **Sinkronisasi CLI**: `php artisan rss:sync --polda=ALL` otomatis memetakan ke tenant Divhumas Polri.
-
-### 4.6. Smart Dossier Topik Atensi, Caching AI & Mesin Ingesti Live Google News
-- **Smart Dossier & Caching Analisis AI**:
-  - Kolom basis data `media_topics`: `ai_analysis` (JSON terstruktur hasil Gemini AI), `ai_analyzed_at` (timestamp analisis terakhir), dan `ai_articles_count` (jumlah total artikel saat analisis dijalankan).
-  - **Efisiensi Token & Akses Instan**: Hasil analisis tersimpan permanen. Pengguna dapat membuka kembali modal analisis (`👁️ Lihat Hasil Analisis AI`) kapan saja tanpa memanggil API Gemini ulang.
-  - **Detektor Kebaruan Dinamis (*Freshness Detector*)**: Membandingkan jumlah artikel terkini yang cocok dengan kata kunci topik terhadap `ai_articles_count`. Jika ada berita baru masuk, badge amber `⚠️ Ada +X Berita Baru Sejak Analisis Terakhir` muncul dengan tombol `🔄 Perbarui Analisis`. Jika data sinkron, tampil badge hijau `✓ Data Terkini (Up-to-Date)`.
-- **Mesin Ingesti Live On-Demand (`GoogleNewsCrawlerService`)**:
-  - **Endpoint Backend**: `POST /media-intelligence/topics/{id}/crawl-live` memanggil `GoogleNewsCrawlerService::crawlForTopic()`.
-  - **Penarikan Cepat Lintas Internet**: Mengunduh Google News RSS (`https://news.google.com/rss/search?q=...`) untuk topik baru atau saat pimpinan membutuhkan cakupan sebaran nasional yang lebih luas.
-  - **Ekstraksi & Penyimpanan Permanen**: Mengekstrak nama sumber asli dari tag `<source>` (contoh: *Tribratanews Polda Sumsel*, *Antara News*), mengklasifikasikan kategori kepolisian (*Harkamtibmas*, *Gakkum*, dll.), mendeteksi sentimen, dan menyimpannya secara permanen ke tabel `media_articles` terhubung ke topik.
-  - **Pengelompokan Portal**: Berita hasil crawling internet otomatis dikelompokkan dalam filter portal `🌐 SEBARAN INTERNET (GOOGLE NEWS)`.
-  - **Standar Visual Card Grid Simetris & Default Placeholder Resmi**: Grid kartu berita dikunci pada tinggi seragam `h-[435px]` dengan batas 2 baris untuk judul (`h-10 md:h-11`) dan ringkasan (`h-9`). Jika artikel berita tidak membawa foto asli atau gambar gagal dimuat, sistem menampilkan placeholder default resmi yang elegan `Tidak Ada Gambar Ditampilkan` disertai keterangan dokumentasi berita teks dan nama portal, **tanpa memaksakan gambar stok berulang** yang tidak relevan dengan isu.
-  - **Ergonomi Smart Dossier 4-Tier**: Kotak detail topik atensi aktif ditata ulang dalam 4 tingkat hierarkis simetris:
-    1. *Header Bar*: Judul kasus, tingkat urgensi (`🚨 SANGAT MENDESAK` / `⭐ PRIORITAS TINGGI`), badge hitungan berita terkait, dan tombol utilitas (`Edit Kata Kunci`, `Hapus Topik`, `Tutup`).
-    2. *Directive & Keywords Cloud*: Kutipan arahan pimpinan dan awan tag kata kunci pantau (#tags) yang membentang horizontal secara penuh (*full-width flex-wrap*).
-    3. *Command Toolbar*: Pengelompokan seimbang tombol AI (`👁️ Lihat Hasil Analisis AI`, `🔄 Perbarui Analisis +X Baru`) dan Ingesti Media (`🌐 Tarik Berita Internet`, `📱 Salin Naskah WA`).
-    4. *AI Summary & Polarisasi Sentimen*: Ringkasan eksekutif intelijen, deteksi akurat persentase sentimen (`positif`, `netral`, `negatif`), dan *visual multi-color proportional progress bar*.
-  - **Adopsi Sugesti Tren & Sinkronisasi Berita Instan**: Tombol 1-klik `✓ Pantau` pada baris Sugesti AI seketika mengeksekusi penarikan berita langsung dari Google News dengan sanitasi kata kunci otomatis (membersihkan tanda `#` dan tanda baca), mengaitkan artikel portal lokal yang relevan di basis data, dan langsung menyisipkan seluruh berita terkait di baris teratas feed artikel tanpa jeda reload.
-
----
-
-## 🤖 5. Alur Analisis Intelijen AI (Pipeline Seamless 1-Klik)
-
-### 5.1. Pipeline 2-in-1: Sinkron Berita & Analisis Otomatis
-1. **Tombol Utama `⚡ Sinkron & Analisis Otomatis`**: Terletak pada top-command bar di Radar Media Online. Memanggil API backend `POST /media-intelligence/analyze-gemini?sync=1`.
-2. **Eksekusi 2-in-1 Simultan**:
-   - **Tahap 1 (Penarikan Berita Terkini)**: Menarik feed RSS dari 22/29 portal media secara paralel (`curl_multi`) dan menyimpan artikel terbaru secara adil (*fair quota* 25 berita/portal).
-   - **Tahap 2 (Analisis Intelijen AI)**: 30 artikel paling segar seketika diumpankan ke mesin AI (`gemini-2.5-pro` dengan fallback otomatis ke `gemini-1.5-pro`).
-   - Menerima keluaran JSON terstruktur dan menyimpannya permanen ke tabel `media_intelligence_reports`.
-3. **Penyajian Cepat Tanpa Klik Ganda (Arsitektur 4 Pilar Terpadu)**:
-   - Mengisi seketika 4 pilar analisis komprehensif tanpa redundansi: **Tab 01** (Radar Berita Online & Smart Dossier), **Tab 02** (Executive Briefing & Sentimen Terpadu + Format WA Resmi), **Tab 03** (Early Warning System / EWS), dan **Tab 04** (Strategi Humas, Kontra-Opini & Orkestrasi Satwil). Menghilangkan duplikasi kuno naskah WA dan pemisahan sentimen yang terfragmentasi.
-4. **Sentralisasi Admin & Kebijakan Hak Akses (/roles)**:
-   - Pengaturan sumber RSS XML dipusatkan di menu Admin **Keamanan & Pemeliharaan -> Otomasi Sinkron RSS** (`/maintenance/rss-sync`). Dilengkapi tab khusus **Daftar & Manajemen Sumber Feed RSS** (22 portal nasional / 29 portal daerah) dengan fitur penambahan feed baru, uji validasi XML realtime (latensi & artikel terdeteksi), toggle on/off, dan hapus portal.
-   - Tombol manual kuno (*Salin Prompt*, *Lihat Prompt*, *Tempel Ringkasan AI*) serta tombol *Kelola Sumber RSS* telah dibersihkan dari antarmuka operasional radar.
-   - Hak akses operasional `media_intelligence_ai` di `/roles` terdefinisi sebagai *Sinkronisasi Berita & Analisis Otomatis AI*.
-   - **Sentralisasi Kredensial Apify**: Pengaturan Personal API Token Apify dipindahkan dari tampilan operator `/social-intelligence` ke panel admin **Keamanan & Pemeliharaan -> Mesin Intelijen AI** (`/settings/ai`) di bawah tab *Mesin Scraper Patroli Siber (Apify Cloud)* dengan dukungan Multi-Token Failover Pool dan proteksi dari akses langsung operator.
-   - **Studio Editor Template Prompt AI Dinamis**: Pengaturan naskah prompt intelijen AI dipusatkan di panel admin `/settings/ai` pada tab **Template Prompt Intelijen (Editor Dinamis)**. Administrator dapat meninjau, mengedit naskah prompt secara mandiri tanpa menyentuh kode PHP, menyisipkan variabel dinamis (`[Tempelkan teks berita...]`, `{COMMAND_NAME}`, `{LEADER_TITLE}`, `{TIMEZONE}`, `{POLRES_LIST}`), mereset kembali ke template standar resmi Polri dalam 1-klik (`POST /settings/ai/reset-prompt`), dan menerapkan template kustom secara nasional ke 34 Polda Jajaran. Sistem otomatis memprioritaskan template kustom di tabel `ai_settings` (`custom_prompt_template`) di atas default bawaan sistem.
-
----
-
-## ⌨️ 6. Perintah CLI & Otomasi Scheduler
+## 2. Perintah Penting
 
 ```bash
-# Sinkronisasi berita RSS secara aman (didukung Mutex Lock)
-php artisan rss:sync --polda=SULBAR
+php artisan test                         # seluruh test (SQLite in-memory); wajib hijau
+php artisan test tests/Feature/NamaTest.php
+npm.cmd run build                        # build Vite (di PowerShell pakai npm.cmd, bukan npm)
+npm.cmd run dev                          # dev server dengan HMR
 
-# Sinkronisasi seluruh 34 Polda (Konsolidasi Nasional)
-php artisan rss:sync
-
-# Pemangkasan retensi berita lama (menjaga bookmark)
-php artisan media:prune --days=90 --polda=SULBAR
-
-# Pencadangan basis data snapshot terkompresi & pembersihan retensi berkas
-php artisan db:backup --force
-php artisan db:backup --type=scheduled
-
-# Menjalankan seluruh test suite otomatis (151 tests, 905 assertions)
-php artisan test
-
-# Kompilasi aset Vite frontend
-npm.cmd run build
-
-# Menjalankan tunnel Ngrok publik untuk live demo & presentasi pimpinan
-ngrok http --domain=humped-obvious-blatantly.ngrok-free.dev --host-header=simod-enterprise.test 80
+php artisan migrate --seed               # skema + data awal (DatabaseSeeder)
+php artisan rss:sync --polda=SULBAR      # sinkron RSS satu Polda (mutex lock)
+php artisan rss:sync --polda=ALL         # sinkron feed nasional Divhumas
+php artisan rss:sync                     # semua Polda aktif
+php artisan media:prune --days=90        # pangkas berita lama (bookmark aman)
+php artisan db:backup --force            # snapshot basis data
+php artisan route:list                   # daftar rute
 ```
 
----
+Catatan Windows:
+- PowerShell dapat memblokir `npm` (execution policy). Selalu pakai `npm.cmd`.
+- `php` Laragon ada di `<laragon>\bin\php\php-8.2.x\php.exe`. Bila `php` tidak dikenal di terminal, pakai terminal Laragon.
 
-## ⚠️ 7. Protokol Pengembangan untuk AI Agents
-
-Saat Anda (Agent) diminta memodifikasi kode ini:
-1. **Verifikasi Database Testing**: File `phpunit.xml` telah dikonfigurasi menggunakan SQLite in-memory (`DB_CONNECTION=sqlite`, `DB_DATABASE=:memory:`). Jangan mengganti konfigurasi ini agar database MySQL pengembangan lokal tidak ter-wipe saat testing.
-2. **Jalankan Testing Sebelum Selesai**: Selalu jalankan `php artisan test` dan `npm.cmd run build` sebelum menyelesaikan tugas.
-3. **Multi-Tenant Scoping**: Setiap query data operasional (`MediaArticle`, `Issue`, `Task`, `EarlyWarning`) **wajib** menyertakan filter `polda_id`.
-4. **Preserve Docstrings**: Pertahankan semua dokumentasi, komentar PHPDoc, dan struktur kode yang ada.
-5. **Otomasi Live Demo Tunnel (Ngrok)**:
-   - Jika pengguna meminta *"jalankan ngrok"*, *"start ngrok"*, atau *"buka tunnel demo"*:
-     Jalankan perintah berikut sebagai background process daemon:
-     `ngrok http --domain=humped-obvious-blatantly.ngrok-free.dev --host-header=simod-enterprise.test 80`
-   - Tunnel ini mengarahkan domain publik tetap `https://humped-obvious-blatantly.ngrok-free.dev` ke vhost Laragon Apache `simod-enterprise.test:80`.
-   - Konfigurasi `trustProxies` dan `URL::forceScheme('https')` di Laravel menjamin seluruh CSS/JS Vite dan form Inertia bekerja secara mulus di internet publik tanpa mixed-content block.
-6. **Keamanan URL Tenant (Anti-Tampering)**:
-   - Dilarang membuat link atau tombol yang mengoper parameter query plaintext `?polda=...`.
-   - Selalu gunakan endpoint POST terotentikasi `POST /tenant/switch` dengan payload `code` (kode Polda, mis. `SULBAR` atau `ALL`) untuk isolasi sesi yang aman dan kebal manipulasi URL.
-7. **Integritas Personalia & Proteksi Akun Master**:
-   - Akun master sistem (`id: 1`, `kadivhumas`, `superadmin`, `cpiet`) berstatus kebal dari penghapusan (`deleteUser`) dan deaktivasi (`toggleUserStatus`).
-   - Sesi pengguna aktif dilarang menghapus akunnya sendiri (*anti-self deletion*) atau mencabut status aktifnya sendiri (*anti-self lockout*).
-   - Otoritas personel terhubung erat ke matriks 20 modul pada 4 pilar di `/roles`.
-8. **Smart Dossier / Topik Atensi Pimpinan, Ingesti Live & Sugesti Tren Cerdas**:
-   - Fitur atensi khusus kasus sensitif pimpinan di `/media-intelligence` untuk pemantauan instan dan konteks laporan khusus pada mesin Gemini AI.
-   - Dilengkapi sistem caching analisis AI permanen (`ai_analysis`, `ai_analyzed_at`, `ai_articles_count`) untuk menghemat kuota token AI dan akses modal tanpa jeda.
-   - Didukung mesin penarikan berita langsung `GoogleNewsCrawlerService` untuk menangkap liputan internet secara real-time dan disimpan permanen pada basis data.
-   - **Sugesti Tren Potensial AI (Google News)**: Mesin AI mendeteksi dan mengembalikan array `suggested_topics` (title, priority, velocity, keywords, rationale) dari pemberitaan terkini. Ditampilkan pada baris interaktif tepat di dalam kotak Smart Dossier dengan tombol 1-klik `✓ Pantau` (`POST /media-intelligence/topics/adopt-suggestion`) yang otomatis mengadopsinya menjadi Topik Atensi, menarik sebaran berita Google News instan, serta tombol `✕` (`POST /media-intelligence/topics/dismiss-suggestion`) untuk mengabaikan.
-9. **Arsitektur 4 Pilar Terpadu, SADEWA AI Copilot & Desain Anti-Gimmick Media Intelligence**:
-   - Tab radar media online dikonsolidasikan secara ketat ke dalam **4 Pilar**:
-     1. `01. Berita Online (Live RSS)`: Feed real-time, filter Zona Merah, dan Smart Dossier Atensi Pimpinan.
-     2. `02. Executive Briefing & Sentimen`: Mengintegrasikan briefing eksekutif, barometer sentimen (Nasional & Wilayah), top concern, matriks respons taktis bertahap (0-2h, 2-6h, 24h), isu strategis, dan terminal format naskah WhatsApp pimpinan siap kirim (menghilangkan duplikasi Tab 07 lama).
-     3. `03. Early Warning System (EWS)`: Deteksi kerawanan kritis (Level Merah/Kuning), unmitigated risk 6-24 jam, dan protokol darurat 3-tahap.
-     4. `04. Strategi Humas & Aksi`: Ide konten kreatif medsos (Tribratanews, IG, TikTok, X), rekomendasi komunikasi publik juru bicara, dan orkestrasi 34 Polda / Polres jajaran.
-   - **SADEWA AI Copilot** (*Sistem Analisis Digital & Evaluasi Wacana Aktual*): Asisten AI percakapan cerdas bertenaga LLM yang mampu menganalisis arsip pemberitaan 24 jam secara real-time, menjawab pertanyaan pimpinan, dan terhubung melalui event dispatcher global `open-sadewa-copilot`.
-   - **Tata Letak Ergonomis (2-Kolom Dossier & Collapsible AI Tray)**: Dossier detail kasus atensi menggunakan layout 2-kolom responsif (menghemat ruang vertikal 45%), baki rekomendasi tren Google News AI dapat dilipat (*collapsible*), dan tombol status cepat (Semua Berita, Zona Merah, Tersimpan) terintegrasi pada Command Bar 1-baris.
-
-
-10. **Presisi Command Intelligence Hub di Command Center Utama (`/`)**:
-    - **Anti-Gimmick & 100% Dinamis**: Menghapus kartu ringkasan statis pimpinan dan menggantinya dengan **Presisi Command Intelligence Hub** 3-tab terpadu tepat di atas peta situasi nusantara pada [`Dashboard.vue`](file:///d:/laragon/www/simod-enterprise/resources/js/Pages/Dashboard.vue):
-      1. `📰 Media Online`: Membaca langsung laporan intelijen AI terkini (`latestMediaReport` dari `media_intelligence_reports`), menyajikan *Top Concern* pimpinan, *Executive Briefing 24 Jam*, *Arahan Inti Komando (Core Decision)*, proporsi sentimen media online (positif/netral/negatif), dan daftar isu strategis terdeteksi dengan tombol 1-klik menuju radar media.
-      2. `📱 Media Sosial`: Membaca laporan intelijen AI medsos (`latestSocialReport` dari `social_intelligence_reports`), menyajikan *Top Concern Percakapan Warganet*, *Executive Social Briefing*, analisis polarisasi *Buzzer vs Netizen Organik* beserta tingkat risikonya, komposisi sentimen warganet, dan daftar *Akun Kritis / KOL* berisiko tinggi.
-      3. `🛡️ Respon & Cooling System`: Matriks taktis penyejuk suasana Polri berjenjang (0-2 Jam, 2-6 Jam, 24 Jam) lengkap dengan Satker Pelaksana (PIC), Kanal Distribusi publikasi, dan aksi kehumasan terarah.
-    - **Sinkronisasi Dropdown & Payload Berita**: Kuota payload berita radar ditingkatkan ke `->limit(3000)` dan daftar kuota portal `$portalsList` dihitung langsung dari array `$articles` yang dikirim ke frontend, menjamin sinkronisasi 100% angka dropdown dengan jumlah kartu artikel yang ditampilkan (mencegah isu *Menampilkan 0 dari 0*).
-
-11. **AppSec Hardening, Rute Kanonikal Anti-Tampering, & Global Toast Feedback Engine**:
-    - **100% Rute Kanonikal (Zero `?polda=...` URL Leaks)**: Seluruh tautan navigasi internal (`/issues`, `/issues/create`, `/issues/{id}`, `/reports/export/csv`, dll.) dibersihkan dari parameter query plaintext. Isolasi tenant multi-satwil sepenuhnya dikendalikan oleh session server-side dan endpoint otentikasi `POST /tenant/switch`.
-    - **Proteksi IDOR & Parameter Tampering**: Seluruh aksi mutasi data (`POST /issues`, `POST /tasks`, `POST /publications`, `POST /gallery`) secara ketat menegakkan `$validated['polda_id'] = $request->user()->polda_id` bagi personel wilayah, mencegah pemalsuan `polda_id` via payload request.
-    - **Global Floating Toast Feedback**: Komponen floating toast reaktif terpasang global di [`EnterpriseLayout.vue`](file:///d:/laragon/www/simod-enterprise/resources/js/Layouts/EnterpriseLayout.vue) memantau `page.props.flash` backend dengan auto-dismiss 4.5 detik dan event listener `window.addEventListener('simod-toast')`.
-    - **Session Hardening & Logout**: Aksi logout menghapus cookie sesi, recaller cookie, menginvalider session token, dan disokong header HTTP `PreventBackHistory` (`no-cache, no-store, max-age=0, must-revalidate`).
-
-12. **Penyelarasan Tenant-Scoping Executive Briefing Command Center (`/`)**:
-    - **Penargetan Eksplisit Tenant Divhumas Mabes**: Pada [`DashboardController.php`](file:///d:/laragon/www/simod-enterprise/app/Http/Controllers/DashboardController.php), saat sesi berada dalam cakupan Nasional (`$isNational = true` atau `selectedCode === 'ALL'`), query laporan intelijen eksekutif (`latestMediaReport` dan `latestSocialReport`) **secara eksplisit menargetkan `polda_id` milik Divisi Humas Polri (Mabes)**. Ini mengeliminasi bug di mana laporan daerah (seperti Polda Sulbar) terambil secara keliru akibat klausa `when(!$isNational, ...)` tanpa filter tenant.
-    - **Tautan Langsung Interaktif ke Berita Asli & Lembar Briefing**:
-      - Kartu *Executive Briefing Situasi Pemberitaan (24 Jam Terakhir)* dilengkapi tombol aksi cepat `[ Buka Lembar Briefing & Berita ↗ ]` menuju Radar Media Online Tab 02.
-      - Seluruh kartu pada *Isu Strategis Terdeteksi* menggunakan tag tautan aktif (`<a>` link dengan atribut `target="_blank"`) yang langsung membuka URL berita asli di portal penerbitnya saat diklik, lengkap dengan metadata nama portal media dan timestamp publikasi.
-      - Footer kartu menyediakan tautan cepat untuk akses instan ke Format Naskah WhatsApp Komando Pimpinan.
-
-13. **100% UI Data Parity Dropdown Reaktif di Vue (`MediaIntelligence/Index.vue`)**:
-    - Opsi portal media dihitung secara dinamis (`availablePortals` computed property) langsung dari memori artikel aktif di browser (`props.sampleArticles`).
-    - Hal ini menjamin 100% konsistensi: jika pada dropdown tertulis `ANTARA HUKUM & PERADILAN (20)`, maka saat portal tersebut dipilih, layar pasti menampilkan tepat 20 kartu artikel berita (mencegah desinkronisasi tampilan *"0 dari 0"*).
-    - Dilengkapi tombol aksi `[ 🔄 Sinkron Berita Terkini ]` langsung di dalam kartu empty state jika suatu filter portal belum memiliki artikel di database.
+Scheduler (`routes/console.php`): `rss:sync --scheduled` tiap menit, `db:backup --type=scheduled` tiap 10 menit, `media:prune` harian 02:00 (bila `MEDIA_RETENTION_DAYS > 0`). **Tidak ada** penjadwalan otomatis untuk analisis AI maupun sinkron Apify.
 
 ---
 
-## 🤖 8. Standarisasi Multi-Agent Interoperability (Claude, Codex, Gemini, Antigravity)
+## 3. Aturan Wajib (Non-Negotiable)
 
-SIMOD Enterprise dirancang untuk didukung secara kolaboratif oleh berbagai model Coding Agent canggih tanpa menimbulkan konflik arsitektur, inkonsistensi sintaks, atau perusakan basis data:
+### 3.1. Testing
+1. **Jangan mengubah `phpunit.xml`.** Test memakai `DB_CONNECTION=sqlite`, `DB_DATABASE=:memory:`. Bila diarahkan ke MySQL, basis data lokal akan terhapus.
+2. Sebelum menyatakan tugas selesai, jalankan `php artisan test` **dan** `npm.cmd run build`. Semua test harus lulus. Angka baseline terakhir tercatat di doc 22 §10.
+3. Fitur atau perbaikan baru disertai test di `tests/Feature`. Gunakan helper `$this->actingAsSuperAdmin()` (`tests/TestCase.php`) atau buat user dengan peran yang sesuai.
+4. Test tidak boleh memanggil API sungguhan (Gemini, Apify, Google News). Gunakan `Http::fake()` dan kosongkan kunci API di config/env bila perlu.
 
-### 8.1. Pemetaan File Konfigurasi Khusus Setiap Agent
-| Agentic AI Platform | File Rujukan Utama | Perilaku & Tanggung Jawab |
-|:---|:---|:---|
-| **Anthropic Claude Code / Claude AI** | [`CLAUDE.md`](file:///d:/laragon/www/simod-enterprise/CLAUDE.md) | Mematuhi perintah eksekusi Windows Laragon (`npm.cmd`), menjalankan automated test suite in-memory, dan menjaga integritas Inertia Composition API. |
-| **OpenAI Codex / GitHub Copilot / Cursor** | [`.github/copilot-instructions.md`](file:///d:/laragon/www/simod-enterprise/.github/copilot-instructions.md) & [`AGENTS.md`](file:///d:/laragon/www/simod-enterprise/AGENTS.md) | Menjaga konvensi kode PHP 8.2+, typed properties, prepared statements, serta mengikuti format Conventional Commits. |
-| **Google Gemini / Antigravity** | [`AGENTS.md`](file:///d:/laragon/www/simod-enterprise/AGENTS.md) & Directives | Memanfaatkan 5 dedicated MCP servers (SSH, Chrome DevTools, Filesystem, Memory, Puppeteer) untuk audit visual, linter, dan eksekusi komando end-to-end. |
-| **DeepSeek / Open-Source LLMs** | [`AGENTS.md`](file:///d:/laragon/www/simod-enterprise/AGENTS.md) | Membaca batasan testing SQLite, struktur multi-tenant, dan arsitektur 4 pilar navigasi. |
+### 3.2. Multi-tenant (Mabes → Polda → Polres)
+1. Setiap query data operasional (`MediaArticle`, `MediaTopic`, `Issue`, `Task`, `EarlyWarning`, `Publication`, `SocialPost`, dsb.) **wajib** difilter `polda_id`.
+2. Tenant aktif **selalu** diambil dari sesi:
+   ```php
+   [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
+   ```
+   Jangan membaca `polda`, `polda_id`, atau `polda_code` dari input klien. Override tenant hanya lewat `requestedPoldaOverride()` / `scopedPoldaId()`, dan keduanya hanya berlaku untuk Super Admin (`app/Http/Controllers/Controller.php`).
+3. Personel daerah (`polda_id` terisi dan bukan `kadiv_humas`/`super_admin_mabes`/`superadmin`) **terkunci** ke Polda-nya.
+4. Pergantian tenant hanya lewat `POST /tenant/switch` dengan payload `{ "code": "SULBAR" }`. Kode `ALL`/`DIVHUMAS` berarti lingkup nasional (tenant Divhumas Polri). **Jangan pernah** membuat tautan atau tombol dengan `?polda=...`. Server hanya menghormatinya di `APP_ENV=local|testing` untuk kompatibilitas test.
+5. Pada aksi mutasi (store/update/destroy), verifikasi kepemilikan dengan `$this->authorizeTenantRecord($request, $record)` dan paksa tenant milik pengguna daerah:
+   ```php
+   if (!$request->user()->isSuperAdmin() && $request->user()->polda_id) {
+       $validated['polda_id'] = $request->user()->polda_id;
+   }
+   ```
+6. Pada lingkup nasional, laporan eksekutif (`latestMediaReport`, `latestSocialReport`) harus menargetkan `polda_id` milik Polda berkode `DIVHUMAS` secara eksplisit, jangan query tanpa filter.
 
-### 8.2. Protokol Kolaborasi Antar-Agent (Cross-Agent Rules of Engagement)
-1. **Never Break the Test Suite**:
-   Sebelum menyatakan suatu tugas selesai, setiap agent **wajib** menjalankan `php artisan test` (memastikan seluruh 151 tests tetap hijau) dan `npm.cmd run build` (memastikan bundle Vite terkompilasi bersih).
-2. **Never Touch Testing Database Engine**:
-   Jangan pernah mengubah konfigurasi `phpunit.xml` dari `:memory:` ke database fisik lokal `mysql`.
-3. **Commit Cleanly**:
-   Gunakan format Conventional Commits (`feat(...)`, `fix(...)`, `refactor(...)`, `docs(...)`) agar riwayat git tetap terstruktur dan mudah diaudit oleh agent berikutnya.
+### 3.3. Autentikasi & otorisasi
+1. Semua rute web berada di grup `Route::middleware(['auth', 'idle'])`, kecuali `/login` dan `/logout`. `idle` adalah batas sesi tidak aktif.
+2. Setiap rute modul **wajib** memakai `->middleware('module:kunci_modul')`. Beberapa kunci dipisahkan `|`, cukup salah satu yang dimiliki. Kunci yang sah ada di `RolePermission::defaultModules()`. Rute baru tanpa `module:` dianggap bug keamanan.
+3. API ingest (`/api/v1/ingest/*`, `/api/v1/poldas`) memakai middleware `ingest.token` (`INGEST_API_TOKEN`; bila kosong → 503).
+4. Akun yang kebal hapus/nonaktif **di kode**: `id = 1`, username `kadivhumas`, dan `superadmin` (`SystemModuleController`). Pengguna tidak boleh menghapus atau menonaktifkan akunnya sendiri.
+5. Jangan menulis kata sandi, token API, atau isi `.env` ke kode, dokumen, maupun commit.
+
+### 3.4. Frontend
+1. Hanya `<script setup>` (tanpa Options API). Navigasi internal pakai `<Link>` dari `@inertiajs/vue3`. Tautan eksternal pakai `<a target="_blank" rel="noopener noreferrer">`.
+2. **Dua tema**: kelas `.dark` / `.light` pada `<html>`, disimpan di `localStorage('simod_theme')`, dengan skrip anti-flash di `resources/views/app.blade.php`. Selalu sediakan varian terang dan gelap. Jangan meng-hardcode teks hitam yang tidak terbaca di mode gelap (atau sebaliknya). Pakai token di `resources/css/app.css`.
+3. **Paritas angka UI**: angka pada dropdown atau filter (mis. `availablePortals`) dihitung dengan `computed()` dari data yang benar-benar dimuat, supaya angka di dropdown selalu sama dengan jumlah kartu yang tampil.
+4. **Tanpa angka karangan**: bila data kosong, tampilkan `—` atau pesan jujur. Jangan memakai nilai bawaan palsu, gambar stok, atau klaim seperti "SITUASI KONDUSIF". Di backend kembalikan `null` (bukan 0/100/78) untuk nilai yang belum dapat dihitung. Di Vue dilarang pola `x || 29` / `x || 80` untuk angka; gunakan `??` atau `null` + teks "Belum ada data" (`||` juga mengubah nilai nyata 0 menjadi angka bawaan). Setiap label statistik (mis. "6 Polres", "4 Platform") harus dihitung dari data. Status/matriks harus punya definisi tertulis yang dapat dibaca pengguna (lihat doc 29 §6.1).
+5. Notifikasi: flash dari backend (`success`/`error`) atau `window.dispatchEvent(new CustomEvent('simod-toast', { detail: { message, type: 'success'|'error' } }))`. Tombol aksi diberi status `disabled` dan teks proses untuk mencegah klik ganda.
+6. SADEWA AI dibuka lewat `window.dispatchEvent(new CustomEvent('open-sadewa-copilot', { detail: { scope, subject } }))`.
+
+### 3.5. Performa
+- Biarkan `INERTIA_DEVTOOLS_ENABLED=false`.
+- Data bersama di `HandleInertiaRequests::share()` dicache dengan kunci versi `simod.shell_version`. Model baru yang memengaruhi data bersama (menu, Polda, peran) harus memakai trait `App\Models\Concerns\BumpsShellCache`.
+- Pada daftar ribuan baris, hindari `Carbon::diffForHumans()`/`format()` per baris. Gunakan `App\Support\FastTime`.
+
+### 3.6. AI (Gemini) & kuota
+- Semua aksi AI yang dipicu pengguna harus melewati `AiQuota` (batas harian per pengguna `ai_settings.daily_user_limit`, penahanan 10 menit saat Google membalas 429, log di `ai_usage_logs`).
+- Analisis tidak diulang bila data sama (`source_hash` pada laporan media/medsos; `ai_analyzed_at` pada topik). Analisis paksa hanya dengan `force=1`.
+- Rantai model: model pilihan admin → `gemini-3.5-flash-lite` → `gemini-3.1-flash-lite` → `gemini-3-flash-preview` → `gemini-3.8-flash` (`GeminiService::modelChain()`). Templat prompt kustom ada di `ai_settings.custom_prompt_template`.
+- Pesan galat AI ke pengguna diringkas lewat `friendlyAiError()`. Detail teknis hanya masuk log.
+
+### 3.7. RSS & berita
+- **Kuota adil per sumber.** Jangan memotong secara global (`array_slice` setelah pengurutan waktu), karena portal daerah bisa hilang. Pemangkasan berimbang ada di `RssSyncService`.
+- Sinkron memakai `Cache::lock('rss_sync_engine_lock', 600)`. Artikel `is_bookmarked = true` tidak pernah dipangkas.
+- Portal yang diblokir Cloudflare atau bertautan rusak diambil lewat Google News RSS (`site:domain`).
+- Artikel tanpa gambar memakai `image_url = null` dan placeholder "Tidak Ada Gambar Ditampilkan", bukan gambar stok.
+
+### 3.8. Daftar berita Radar Media Online
+- Pencarian, filter, penggabungan berita ganda, dan paginasi dilakukan di server lewat `App\Services\MediaArticleListing`; jangan mengirim ribuan artikel ke browser. Facet dihitung dengan semua filter aktif kecuali dirinya sendiri (paritas angka dropdown = jumlah kartu).
+- Sentimen berita ditentukan `App\Support\NewsSentiment` (konteks Polri), pencarian oleh `App\Support\NewsSearch`. Jangan menulis ulang aturan sentimen di tempat lain. Setelah mengubah aturan, jalankan `php artisan media:reindex`.
+- Aksi pada berita/topik (bookmark, topik, tag, analisis, crawl) wajib memanggil `authorizeTenantRecord()`.
+
+### 3.9. Audit Log, Laporan Isu, dan data yang dihapus
+- Audit Log boleh dibersihkan (manual/retensi), tetapi `audit.purged` dan `audit.auto_pruned` (`AuditLog::PROTECTED_ACTIONS`) tidak pernah ikut terhapus dan setiap pembersihan harus meninggalkan catatan baru. Jangan menambah jalur penghapusan log yang melewati `AuditLogController`/`audit:prune`.
+- Tampilan Audit Log wajib memakai `AuditLog::scopeVisibleTo()` (tenant). Metadata sensitif disamarkan lewat `AuditLog::redact()`; jangan menampilkan atau mengekspor metadata mentah.
+- Hapus `Issue` = hapus lunak (Sampah, dapat dipulihkan). Hapus permanen hanya dari Sampah dengan konfirmasi `HAPUS`. Relasi dari entitas lain ke `Issue` memakai `withTrashed()`. Tindakan arsip/hapus/pulihkan/massal selalu memeriksa tenant dan mencatat ke Audit Log dan riwayat status.
+
+### 3.10. Isolasi tenant demo & data nyata
+- Penentuan agregasi nasional **hanya** lewat `$this->aggregatesNational($selectedCode)`; jangan menulis ulang `$selectedCode === 'ALL'` untuk memutuskan cakupan data. Divhumas (`ALL`) hanya melihat data Divhumas kecuali `SIMOD_NATIONAL_AGGREGATE=true`.
+- Penyimpanan berita selalu berkunci `(polda_id, url)`; jangan `updateOrCreate(['url' => ...])` saja.
+- Jangan menambah data buatan di UI atau seeder bawaan. Data contoh hanya bila `SIMOD_SEED_SAMPLE=true`; fallback medsos buatan hanya bila `SIMOD_SOCIAL_SYNTHETIC=true`. Persiapan demo: `php artisan simod:demo-prepare` (doc 31).
+
+### 3.11. Kode & dokumentasi
+- Pertahankan PHPDoc dan komentar yang ada. Hapus kode mati alih-alih menyembunyikannya.
+- Fitur yang tidak benar-benar berfungsi (mock, tombol yang hanya menampilkan notifikasi, pengaturan yang tidak ditegakkan) **jangan ditampilkan**. Bangun penegakannya atau hapus.
+- Setiap perubahan perilaku: perbarui doc modul terkait dan doc 22 dalam commit yang sama. Untuk perubahan besar, tambahkan dokumen baru `docs/NN-judul.md` dan daftarkan di `docs/README.md`.
+- Commit memakai Conventional Commits dalam Bahasa Indonesia, mis. `fix(media-intelligence): ...`.
+
+---
+
+## 4. Peta Navigasi (4 Pilar)
+
+Sumber: `app/Models/MenuItem.php` (`seedDefaults`) + tabel `menu_items`, dapat diubah admin di `/settings/menus`. Kunci RBAC di kolom kanan.
+
+```
+1. KOMANDO & INTELIJEN
+   Command Center            /                         dashboard_view
+   Radar Media Online        /media-intelligence       media_intelligence_view (AI: media_intelligence_ai)
+   Radar Media Sosial        /social-intelligence      social_intelligence_view (sync: social_intelligence_sync)
+2. MANAJEMEN ISU & TUGAS
+   Laporan Polres & Isu      /issues                   issues_view
+   Input Laporan Baru        /issues/create            issues_create
+   Antrean Verifikasi        /verification-queue       issues_view (aksi: issues_verify)
+   Disposisi Tugas           /tasks                    tasks_execute | tasks_disposition
+3. PUBLIKASI & DOKUMENTASI
+   Publikasi Multi-Kanal     /publications             publications_manage
+   Galeri Media Aman         /gallery                  gallery_access
+   Laporan & Anev            /reports                  reports_export
+4. ADMINISTRASI & SISTEM
+   Personalia & Petugas      /personalia               personalia_manage
+   Pengaturan Satwil & Mabes /settings/polda           polda_settings
+   Keamanan & Pemeliharaan   8 sub-tab (komponen SecurityMaintenanceTabs.vue):
+     Keamanan                /security                 security_center
+     Hak Akses               /roles                    roles_matrix_manage
+     Manajemen Menu          /settings/menus           roles_matrix_manage
+     Audit Log               /audit-logs               security_center
+     Backup Data             /database/backup          database_backup
+     Pembersihan Berita      /maintenance/news-cleanup maintenance_ops
+     Otomasi Sinkron RSS     /maintenance/rss-sync     maintenance_ops
+     Mesin Intelijen AI      /settings/ai              security_center
+   Profil Saya               /profile                  (cukup login)
+```
+
+Halaman yang **sudah dihapus** dan jangan dibuat ulang tanpa penegakan nyata: `/settings/mail` (SMTP), `/maintenance` (mode pemeliharaan), PIN dinas/PIN cepat.
+
+**RBAC:** 20 kunci modul dan 6 peran bawaan (`kadiv_humas`, `super_admin_mabes` = semua modul; `polda_leader` 16; `verifikator` 12; `analis` 8; `operator` 7). Matriks dapat diubah per Polda di `/roles` (tabel `role_permissions`). `User::isSuperAdmin()` bernilai benar untuk `super_admin_mabes`, `kadiv_humas`, `superadmin`, dan peran ini selalu lolos `module:*`.
+
+---
+
+## 5. Peta Kode Singkat
+
+| Area | Lokasi |
+|:---|:---|
+| Resolusi tenant & otorisasi rekaman | `app/Http/Controllers/Controller.php` |
+| Props bersama Inertia | `app/Http/Middleware/HandleInertiaRequests.php` |
+| Middleware | `EnsureModulePermission` (`module`), `EnforceSessionTimeout` (`idle`), `EnsureIngestToken` (`ingest.token`), `PreventBackHistory`; didaftarkan di `bootstrap/app.php` |
+| Controller utama | `DashboardController`, `MediaIntelligenceController`, `SocialIntelligenceController`, `IssueController`, `TaskController`, `PublicationController`, `PressReleaseController`, `SadewaController`, `SystemModuleController`, `AiSettingController`, `RssSyncController`, `DatabaseBackupController`, `NewsCleanupController`, `MenuManagementController`, `TenantController` |
+| Services | `RssFeedService`, `RssSyncService`, `GoogleNewsCrawlerService`, `SocialSyndicationService`, `ApifySyncService`, `InstagramAccountMonitoringService`, `GeminiService`, `AiQuota`, `DatabaseBackupService`, `NewsCleanupService` |
+| RBAC & menu | `app/Models/RolePermission.php`, `app/Models/MenuItem.php` |
+| Alur status isu | backend `Issue::STATUS_GROUPS`; frontend `resources/js/utils/issueFlow.js` (`draft → monitoring → investigasi → klarifikasi → selesai → arsip`) |
+| Layout & komponen | `resources/js/Layouts/EnterpriseLayout.vue`; `resources/js/Components/` (`SadewaCopilot`, `BriefingRefresh`, `SituationMap`, `IssueStepper`, `SecurityMaintenanceTabs`) |
+| Halaman | `resources/js/Pages/**` (halaman terbesar: `MediaIntelligence/Index.vue`, `SocialIntelligence/Index.vue`, `Dashboard.vue`) |
+| Rute | `routes/web.php`, `routes/api.php`, `routes/console.php` |
+| Data awal | `database/seeders/DatabaseSeeder.php` (Divhumas + 5 Polda; 29 feed Sulbar; 33 feed nasional) |
+
+---
+
+## 6. Alur Kerja Agent
+
+1. **Awal sesi:** `git status` (jangan menimpa perubahan orang lain yang belum di-commit), baca berkas ini dan doc 22, lalu jalankan `php artisan test` untuk baseline.
+2. **Saat mengubah:** ikuti aturan §3, tambah atau ubah test, dan perbarui dokumen terkait.
+3. **Sebelum selesai:** `php artisan test` + `npm.cmd run build` harus bersih. Laporkan apa yang belum dicek, mis. tampilan di browser.
+4. **Commit/push** hanya bila diminta pengguna.
+
+### Demo publik (ngrok)
+Bila pengguna meminta "jalankan ngrok" / "buka tunnel demo", jalankan sebagai proses latar:
+```bash
+ngrok http --domain=humped-obvious-blatantly.ngrok-free.dev --host-header=simod-enterprise.test 80
+```
+`trustProxies` dan deteksi HTTPS di `AppServiceProvider` sudah menangani aset dan form melalui tunnel.
+
+---
+
+## 7. Indeks Dokumentasi
+
+Daftar lengkap ada di [`docs/README.md`](docs/README.md). Yang paling sering dibutuhkan:
+
+| Kebutuhan | Dokumen |
+|:---|:---|
+| Angka, rute, tabel, RBAC, temuan audit | [22. Peta Kode & Sumber Kebenaran](docs/22-peta-kode-dan-sumber-kebenaran.md) |
+| Tenant & arsitektur | [01](docs/01-arsitektur-dan-multi-tenant.md), [13](docs/13-keamanan-tenant-dan-mesin-intelijen-ai.md) |
+| Pencarian server, kesegaran data, matriks Satwil, Command Center data nyata | [29](docs/29-radar-media-pencarian-server-dan-command-center-data-nyata.md) |
+| Audit Log, keamanan, kesiapan hosting, arsip/hapus laporan | [30](docs/30-audit-log-keamanan-hosting-dan-arsip-hapus-laporan.md) |
+| Demo Divhumas + Sulbar, deploy Hostinger | [31](docs/31-demo-divhumas-sulbar-dan-panduan-deploy-hostinger.md) |
+| Radar Media Online, RSS, Topik Atensi | [03](docs/03-modul-media-intelligence-dan-rss.md), [10](docs/10-daftar-rss-feed-resmi-sulbar.md), [14](docs/14-katalog-rss-media-online-nasional.md), [18](docs/18-optimalisasi-ux-dossier-dan-arsitektur-4-pilar-media-intelligence.md), [23](docs/23-optimalisasi-performa-dan-ux-radar-media-online.md) |
+| Radar Media Sosial | [11](docs/11-modul-radar-media-sosial-apify.md), [19](docs/19-optimalisasi-radar-media-sosial-dan-sintesis-ai-sadewa.md), [25](docs/25-peta-grafik-dan-pantauan-instagram.md) |
+| Isu, tugas, publikasi, administrasi | [24](docs/24-penyederhanaan-isu-tugas-publikasi-dan-administrasi.md), [04](docs/04-modul-manajemen-isu-dan-ews.md), [05](docs/05-modul-publikasi-dan-siaran-pers.md), [06](docs/06-modul-disposisi-tugas-dan-audit-trail.md) |
+| AI: SADEWA, briefing, kuota | [26](docs/26-asisten-sadewa-multi-sumber-dan-riwayat-percakapan.md), [27](docs/27-perbarui-briefing-command-center.md), [28](docs/28-batas-pemakaian-ai-dan-penghematan-kuota.md) |
+| RBAC & personalia | [12](docs/12-modul-personalia-dan-rbac-roles.md) |
+| Setup & deployment | [PANDUAN_SETUP](docs/PANDUAN_SETUP_KOMPUTER_RUMAH.md), [08](docs/08-panduan-deployment-dan-virtual-host.md), [02](docs/02-perintah-artisan-dan-cli.md) |
+| Konvensi multi-agent | [21](docs/21-standarisasi-multi-agent-dan-sinkronisasi-lintas-model.md) |
+
+Dokumen bernomor lama (≤ 21) sebagian berisi **catatan sejarah perubahan**. Angka test atau fitur di dalamnya bisa jadi snapshot masa lalu; yang berlaku adalah doc 22 dan kode.

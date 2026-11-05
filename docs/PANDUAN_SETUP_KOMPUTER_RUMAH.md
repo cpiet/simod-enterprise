@@ -8,7 +8,7 @@ Dokumen ini disusun sebagai panduan langkah demi langkah bagi pengembang atau pe
 ## 🏛️ 1. Mengapa Tidak Memerlukan File `.sql` Mentah?
 
 Dalam standar industri arsitektur modern Laravel:
-1. **Reproducible Database**: Seluruh struktur tabel (36 tabel), data satwil (Divhumas Mabes + 5 Polda beserta Polres jajaran), 62 portal RSS feeds (33 Divhumas Mabes + 29 Sulbar), 103 postingan patroli siber multi-platform (Instagram, TikTok, 𝕏, YouTube), 4 pilar menu navigasi dinamis, dan matriks hak akses RBAC dibangun secara otomatis melalui **Migration & Seeders**.
+1. **Reproducible Database**: Seluruh struktur tabel (39 tabel), data satwil (Divhumas Mabes + 5 Polda beserta Polres jajaran), 62 portal RSS feeds (33 Divhumas Mabes + 29 Sulbar), 103 postingan patroli siber multi-platform (Instagram, TikTok, 𝕏, YouTube), 4 pilar menu navigasi dinamis, dan matriks hak akses RBAC dibangun secara otomatis melalui **Migration & Seeders**.
 2. **Bersih & Aman dari Konflik Git**: File `.sql` besar rentan memicu merge conflict di GitHub dan mengekspos kredensial sensitif. Seluruh file cadangan `.sql` telah dimasukkan ke dalam `.gitignore`.
 3. **Satu Perintah untuk Semua**: Cukup jalankan satu perintah `php artisan migrate:fresh --seed`, seluruh basis data akan terisi lengkap dan siap digunakan dalam hitungan detik.
 
@@ -91,7 +91,7 @@ DB_PASSWORD=
    php artisan migrate:fresh --seed
    ```
    > 💡 **Apa yang terjadi saat perintah ini berjalan?**
-   > - Membuat seluruh 36 tabel sistem.
+   > - Membuat seluruh 39 tabel sistem.
    > - Membangun akun pimpinan (Kadivhumas, Superadmin Mabes, Kabid Humas Sulbar, akun developer `cpiet`).
    > - Memasukkan 33 feed resmi nasional Divhumas Mabes dan 29 portal media Sulbar.
    > - Memasukkan 103 postingan radar media sosial riil lengkap dengan metrik views, likes, shares, virality, dan tagar aktual.
@@ -145,6 +145,19 @@ Buka browser dan akses: `http://simod-enterprise.test/login`
 | 4 | **Pimpinan Polda Sulbar** | `kabid_sulbar` / `kabid.sulbar@polri.go.id` | Komando Kehumasan Wilayah Sulawesi Barat |
 
 > **Kata sandi awal tidak lagi dicantumkan di dokumen.** Kata sandi akun awal untuk **lingkungan pengembangan lokal** ditetapkan di seeder [`EnterpriseDatabaseSeeder.php`](../database/seeders/EnterpriseDatabaseSeeder.php) (dan `PersonaliaSeeder.php`). Login kini **wajib username + kata sandi yang valid**; tidak ada lagi bypass, kata sandi demo, maupun mode PIN di halaman login. Pada deployment non-lokal, **ganti seluruh kata sandi seed** lewat menu Personalia → *Reset Password* segera setelah `migrate --seed`.
+
+### 🔑 Lupa kata sandi (lingkungan lokal)
+
+Kata sandi **sengaja tidak ditulis di dokumen** karena repositori ini terhubung ke GitHub. Pilih salah satu cara:
+
+1. **Atur ulang lewat terminal** (ganti `NAMA_PENGGUNA` dan kata sandi barunya, minimal 10 karakter):
+   ```bash
+   php artisan tinker --execute="$u = App\Models\User::where('username','NAMA_PENGGUNA')->first(); $u->password = 'KataSandiBaru#2026'; $u->is_active = true; $u->save();"
+   ```
+2. **Dari aplikasi:** login dengan akun Super Admin lain, buka **Personalia & Petugas**, pilih akun, lalu **Reset Password**.
+3. **Kata sandi awal seeder** (hanya data awal lokal) ada di `database/seeders/EnterpriseDatabaseSeeder.php` dan `PersonaliaSeeder.php`. Bila basis data sudah pernah diubah, gunakan cara 1.
+
+Setelah masuk, ganti kata sandi di menu **Profil Saya**. Di server selain lokal, ganti seluruh kata sandi seed segera setelah `migrate --seed`.
 
 ---
 

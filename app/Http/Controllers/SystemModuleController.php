@@ -22,23 +22,6 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SystemModuleController extends Controller
 {
-    protected function getBaseData(Request $request): array
-    {
-        $allPoldas = Polda::withCount('polres')->where('is_active', true)->get();
-        [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
-        $isNational = ($selectedCode === 'ALL');
-
-        $metrics = [
-            'total_issues'       => Issue::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
-            'pending_verify'     => Issue::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->whereIn('status', ['monitoring', 'investigasi'])->count(),
-            'active_tasks'       => Task::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('status', 'in_progress')->count(),
-            'total_publications' => Publication::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
-            'server_wita'        => now()->setTimezone($selectedPolda->timezone ?? 'Asia/Makassar')->format('d M Y, H:i:s') . ($isNational ? ' WIB' : ' WITA'),
-        ];
-
-        return [$allPoldas, $selectedPolda, $selectedCode, $metrics];
-    }
-
     /**
      * Antrean Verifikasi Laporan & Isu (Parity with SIMOD-HUMAS VerificationQueueView)
      */
@@ -49,7 +32,7 @@ class SystemModuleController extends Controller
         $tab = $request->query('tab', 'all'); // 'all', 'polres', 'polda'
         $priorityFilter = $request->query('priority', 'all');
 
-        $isNational = ($selectedCode === 'ALL');
+        $isNational = $this->aggregatesNational($selectedCode);
         $baseQuery = Issue::with(['polres', 'creator', 'mediaFiles'])
             ->when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))
             ->whereIn('status', ['monitoring', 'investigasi']);
@@ -96,7 +79,7 @@ class SystemModuleController extends Controller
     public function gallery(Request $request): Response
     {
         [$allPoldas, $selectedPolda, $selectedCode, $metrics] = $this->getBaseData($request);
-        $isNational = ($selectedCode === 'ALL');
+        $isNational = $this->aggregatesNational($selectedCode);
 
         $format = $request->query('format', 'all'); // 'all', 'photo', 'video', 'document'
         $polresCode = $request->query('polres', 'all');
@@ -209,7 +192,7 @@ class SystemModuleController extends Controller
     public function reports(Request $request): Response
     {
         [$allPoldas, $selectedPolda, $selectedCode, $metrics] = $this->getBaseData($request);
-        $isNational = ($selectedCode === 'ALL');
+        $isNational = $this->aggregatesNational($selectedCode);
 
         $categoryFilter = $request->query('category', 'all');
         $statusFilter = $request->query('status', 'all');
@@ -300,7 +283,7 @@ class SystemModuleController extends Controller
     public function exportReportsCsv(Request $request): StreamedResponse
     {
         [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
-        $isNational = ($selectedCode === 'ALL');
+        $isNational = $this->aggregatesNational($selectedCode);
 
         $issues = Issue::with(['polres', 'creator'])
             ->when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))
@@ -371,7 +354,7 @@ class SystemModuleController extends Controller
         $polresFilter = $request->query('polres', 'all');
         $statusFilter = $request->query('status', 'all');
         $search = $request->query('q', '');
-        $isNational = ($selectedCode === 'ALL');
+        $isNational = $this->aggregatesNational($selectedCode);
 
         $query = User::with(['polres', 'polda']);
 
@@ -737,60 +720,6 @@ class SystemModuleController extends Controller
     }
 
     /**
-     * Audit Logs & Observabilitas Sistem (Parity with SIMOD-HUMAS AuditLogsView)
-     */
-    public function auditLogs(Request $request): Response
-    {
-        [$allPoldas, $selectedPolda, $selectedCode, $metrics] = $this->getBaseData($request);
-
-        $actionFilter = $request->query('action', 'all');
-        $search = $request->query('q', '');
-
-        $query = AuditLog::with('user')
-            ->when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id)->orWhereNull('polda_id'));
-
-        if ($actionFilter !== 'all') {
-            $query->where('action', $actionFilter);
-        }
-
-        if (!empty($search)) {
-            $query->where(function($q) use ($search) {
-                $q->where('action', 'like', "%{$search}%")
-                  ->orWhere('ip_address', 'like', "%{$search}%")
-                  ->orWhere('subject_type', 'like', "%{$search}%");
-            });
-        }
-
-        $logs = $query->latest()->paginate(20)->withQueryString();
-
-        // Server Health telemetry data
-        $serverHealth = [
-            'php_version'    => PHP_VERSION,
-            'laravel_ver'    => app()->version(),
-            'database'       => 'MySQL 8.0 (InnoDB utf8mb4)',
-            'db_status'      => 'CONNECTED (Normal)',
-            'server_wita'    => now()->setTimezone($selectedPolda->timezone ?? 'Asia/Makassar')->format('d M Y, H:i:s') . ' WITA',
-            'memory_usage'   => round(memory_get_usage(true) / 1024 / 1024, 2) . ' MB',
-            'disk_free_gb'   => round(disk_free_space(base_path()) / 1024 / 1024 / 1024, 1) . ' GB',
-            'response_time'  => '14.8 ms',
-            'environment'    => app()->environment(),
-        ];
-
-        return Inertia::render('AuditLogs/Index', [
-            'allPoldas'     => $allPoldas,
-            'selectedPolda' => $selectedPolda,
-            'selectedCode'  => $selectedCode,
-            'logs'          => $logs,
-            'serverHealth'  => $serverHealth,
-            'filters'       => [
-                'action' => $actionFilter,
-                'q'      => $search,
-            ],
-            'metrics'       => $metrics,
-        ]);
-    }
-
-    /**
      * Profil Pengguna & PIN Cepat
      */
     public function profile(Request $request): Response
@@ -950,28 +879,50 @@ class SystemModuleController extends Controller
     }
 
     /**
-     * Pusat Keamanan (Security Center)
+     * Pusat Keamanan (Security Center): parameter keamanan yang benar-benar ditegakkan + aktivitas keamanan nyata.
      */
     public function securityCenter(Request $request): Response
     {
         [$allPoldas, $selectedPolda, $selectedCode, $metrics] = $this->getBaseData($request);
 
         $setting = SecuritySetting::current($selectedPolda?->id);
+        $tz = $selectedCode === 'ALL' ? 'Asia/Jakarta' : ($selectedPolda->timezone ?? 'Asia/Makassar');
+        $tzLabel = ['Asia/Jakarta' => 'WIB', 'Asia/Makassar' => 'WITA', 'Asia/Jayapura' => 'WIT'][$tz] ?? $tz;
 
-        // Peristiwa autentikasi & keamanan nyata dari audit log.
-        $recentSecurityLogs = AuditLog::with('user')
-            ->whereIn('action', ['security.update', 'auth.login', 'auth.login_failed', 'auth.logout', 'auth.password_changed', 'user.created', 'polda.update'])
-            ->latest('created_at')
-            ->limit(10)
-            ->get()
-            ->map(fn ($log) => [
-                'id'         => $log->id,
-                'action'     => $log->action,
-                'user'       => $log->user ? $log->user->name : (($log->metadata['username'] ?? null) ?: 'Tidak dikenal'),
-                'ip'         => $log->ip_address ?: '-',
-                'time_ago'   => $log->created_at ? $log->created_at->diffForHumans() : '-',
-                'created_at' => $log->created_at ? $log->created_at->format('d M Y, H:i') : '-',
+        // Hanya peristiwa keamanan yang boleh dilihat pengguna ini (personel daerah: Polda-nya sendiri).
+        $visible = fn () => AuditLog::query()->visibleTo($request->user(), $selectedCode, $selectedPolda)->securityEvents();
+
+        $show = in_array($request->query('tampil'), ['semua', 'gagal', 'masuk', 'perubahan'], true) ? $request->query('tampil') : 'semua';
+        $limit = in_array((int) $request->query('limit'), [15, 50, 100], true) ? (int) $request->query('limit') : 15;
+
+        $list = $visible();
+        match ($show) {
+            'gagal'     => $list->failures(),
+            'masuk'     => $list->where('audit_logs.action', 'auth.login'),
+            'perubahan' => $list->where('audit_logs.action', 'not like', 'auth.%'),
+            default     => null,
+        };
+        $matching = (clone $list)->count();
+
+        $logs = $list->with('user:id,name,username')->latest('audit_logs.created_at')->latest('audit_logs.id')->limit($limit)->get()
+            ->map(fn (AuditLog $log) => [
+                'id'       => $log->id,
+                'action'   => $log->action,
+                'label'    => AuditLog::labelFor($log->action),
+                'failed'   => AuditLog::isFailure($log->action),
+                'user'     => $log->user?->name ?? (($log->metadata['username'] ?? null) ? $log->metadata['username'] . ' (tidak dikenal)' : 'Tidak dikenal'),
+                'ip'       => $log->ip_address ?: '-',
+                'time_ago' => \App\Support\FastTime::ago($log->getRawOriginal('created_at')),
+                'created_at' => $log->created_at ? $log->created_at->copy()->setTimezone($tz)->format('d M Y, H:i') . ' ' . $tzLabel : '-',
             ]);
+
+        $day = now()->subDay()->format('Y-m-d H:i:s');
+        $stats = [
+            'total'        => $visible()->count(),
+            'failed24'     => $visible()->failures()->where('audit_logs.created_at', '>=', $day)->count(),
+            'login24'      => $visible()->where('audit_logs.action', 'auth.login')->where('audit_logs.created_at', '>=', $day)->count(),
+            'changes24'    => $visible()->where('audit_logs.action', 'not like', 'auth.%')->where('audit_logs.created_at', '>=', $day)->count(),
+        ];
 
         return Inertia::render('Settings/Security', [
             'allPoldas'     => $allPoldas,
@@ -983,7 +934,9 @@ class SystemModuleController extends Controller
                 'lockout_minutes'         => (int) $setting->lockout_minutes,
                 'session_timeout_minutes' => (int) $setting->session_timeout_minutes,
             ],
-            'securityLogs'  => $recentSecurityLogs,
+            'securityLogs'  => $logs,
+            'securityStats' => $stats,
+            'securityView'  => ['show' => $show, 'limit' => $limit, 'matching' => $matching],
         ]);
     }
 
@@ -1052,18 +1005,21 @@ class SystemModuleController extends Controller
             'polda_id'             => 'nullable|integer',
         ]);
 
-        $targetPoldaId = $this->scopedPoldaId($request, $validated['polda_id'] ?? null);
-        $selectedCode = $request->session()->get('active_polda_code', $request->query('polda', 'ALL'));
-        if (!$targetPoldaId && $selectedCode !== 'ALL') {
-            $targetPoldaId = Polda::where('code', $selectedCode)->value('id');
-        } elseif (!$targetPoldaId && $selectedCode === 'ALL') {
-            $targetPoldaId = Polda::where('code', 'DIVHUMAS')->value('id');
-        }
+        // Tenant dari sesi server (bukan query/klien); override hanya untuk Super Admin.
+        [, , $sessionPoldaId] = $this->resolveActiveTenant($request);
+        $targetPoldaId = $this->scopedPoldaId($request, $validated['polda_id'] ?? null) ?: $sessionPoldaId;
+
+        // Hanya peran dan kunci modul yang dikenal sistem yang diterima; nilai dipaksa boolean.
+        $knownRoles = array_column(RolePermission::defaultRoles(), 'role_key');
+        $knownModules = array_column(RolePermission::defaultModules(), 'key');
 
         $rolesCount = 0;
         foreach ($validated['matrix'] as $row) {
             $roleKey = $row['role_key'];
-            $perms = $row['permissions'];
+            if (! in_array($roleKey, $knownRoles, true)) {
+                abort(422, "Peran tidak dikenal: {$roleKey}");
+            }
+            $perms = collect($row['permissions'])->only($knownModules)->map(fn ($v) => filter_var($v, FILTER_VALIDATE_BOOLEAN))->all();
 
             RolePermission::updateOrCreate(
                 [
@@ -1103,15 +1059,8 @@ class SystemModuleController extends Controller
      */
     public function resetRolesMatrix(Request $request): RedirectResponse
     {
-        $targetPoldaId = $this->scopedPoldaId($request, $request->input('polda_id'));
-        $selectedCode = $request->session()->get('active_polda_code', $request->query('polda', 'ALL'));
-        if (!$targetPoldaId) {
-            if ($selectedCode === 'ALL') {
-                $targetPoldaId = Polda::where('code', 'DIVHUMAS')->value('id');
-            } else {
-                $targetPoldaId = Polda::where('code', $selectedCode)->value('id');
-            }
-        }
+        [, , $sessionPoldaId] = $this->resolveActiveTenant($request);
+        $targetPoldaId = $this->scopedPoldaId($request, $request->input('polda_id')) ?: $sessionPoldaId;
 
         RolePermission::where('polda_id', $targetPoldaId)->delete();
         RolePermission::getMatrixForPolda($targetPoldaId);

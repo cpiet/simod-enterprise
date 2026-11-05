@@ -27,7 +27,7 @@ class SocialIntelligenceController extends Controller
     {
         $allPoldas = Polda::withCount('polres')->where('is_active', true)->get();
         [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
-        $isNational = ($selectedCode === 'ALL');
+        $isNational = $this->aggregatesNational($selectedCode);
 
         $platform = $request->query('platform', 'all');
         $sentiment = $request->query('sentiment', 'all');
@@ -283,7 +283,7 @@ class SocialIntelligenceController extends Controller
         if ($latestReportModel) {
             $latestReport = [
                 'id'          => $latestReportModel->id,
-                'model_used'  => $latestReportModel->model_used,
+                'model_used'  => $this->isAiAdmin() ? $latestReportModel->model_used : null,
                 'latency_ms'  => $latestReportModel->latency_ms,
                 'posts_count' => $latestReportModel->posts_count,
                 'created_at'  => $latestReportModel->created_at?->diffForHumans() ?? 'Baru saja',
@@ -310,7 +310,7 @@ class SocialIntelligenceController extends Controller
                 'id'          => $r->id,
                 'label'       => ($r->report_date ? $r->report_date->format('d M Y') : '') . ', ' . $r->report_time . ' (' . $r->posts_count . ' post)',
                 'report_time' => $r->report_time,
-                'model_used'  => $r->model_used,
+                'model_used'  => $this->isAiAdmin() ? $r->model_used : null,
                 'posts_count' => $r->posts_count,
             ])
             ->all();
@@ -516,7 +516,9 @@ class SocialIntelligenceController extends Controller
         $token = $request->input('apify_api_token');
         $result = $service->syncPublicTrends($token);
 
-        return redirect()->back()->with('success', '✓ ' . $result['message']);
+        $ok = (bool) ($result['success'] ?? true);
+
+        return redirect()->back()->with($ok ? 'success' : 'error', ($ok ? '✓ ' : '') . $result['message']);
     }
 
     /**
@@ -985,7 +987,7 @@ class SocialIntelligenceController extends Controller
             ], 422);
         }
 
-        $isNational = ($selectedCode === 'ALL');
+        $isNational = $this->aggregatesNational($selectedCode);
 
         // Gather top 40 recent posts for AI context
         $postsQuery = SocialPost::when(!$isNational, fn($q) => $q->where('polda_id', $selectedPolda->id))
@@ -1031,7 +1033,7 @@ class SocialIntelligenceController extends Controller
                 'polda'      => $selectedCode,
                 'report_id'  => $lastReport->id,
                 'data'       => $lastReport->only(['executive_brief', 'top_concern', 'sentiment_analysis', 'buzzer_vs_organic', 'critical_accounts', 'cooling_system', 'whatsapp_script', 'counter_narrative', 'virality_forecast']),
-                'model_used' => $lastReport->model_used,
+                'model_used' => $this->isAiAdmin() ? $lastReport->model_used : null,
                 'latency_ms' => 0,
             ]);
         }
@@ -1046,7 +1048,7 @@ class SocialIntelligenceController extends Controller
         if (!$result['success']) {
             return response()->json([
                 'success' => false,
-                'message' => $result['message'] ?? 'Analisis AI gagal. Pastikan Gemini API Key sudah dikonfigurasi di menu Pengaturan AI.',
+                'message' => $result['message'] ?? 'Analisis AI gagal. Pastikan kunci API Mesin AI sudah dikonfigurasi di menu Pengaturan AI.',
             ], 503);
         }
 

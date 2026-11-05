@@ -1,0 +1,87 @@
+# 🚀 31. Demo Divhumas + Polda Sulbar (Data Nyata) & Panduan Deploy ke Hostinger
+
+Dokumen ini menjelaskan konfigurasi demo **Divhumas Polri** dan **Polda percontohan Sulawesi Barat**, cara membersihkan data contoh, dan langkah deploy ke **Hostinger**. Baseline: **235 tests (1850 assertions)**, 129 rute.
+
+---
+
+## 1. Prinsip demo
+
+1. **Dua tenant saja:** Divhumas (Mabes) dan Sulbar. Polda lain nonaktif (data intinya tetap, hanya disembunyikan).
+2. **Terisolasi:** tampilan Divhumas **hanya** berisi data Divhumas; pengguna Sulbar hanya melihat data Sulbar dan tidak pernah melihat Divhumas. RSS, medsos, isu, tugas, dan laporan AI dipisah per Polda (`polda_id`).
+3. **Data nyata saja:** tidak ada data contoh dan tidak ada fallback buatan.
+4. Kadivhumas/Super Admin dapat berpindah ke tenant Sulbar lewat pemilih wilayah (`POST /tenant/switch`) untuk meninjau; Sulbar tidak dapat berpindah ke Divhumas.
+
+### 1.1. Tiga saklar konfigurasi (`config/simod.php`, env)
+
+| Env | Bawaan | Arti |
+|:---|:---|:---|
+| `SIMOD_NATIONAL_AGGREGATE` | `false` | Mode Nasional (`ALL`) hanya Divhumas. `true` = kembali ke gabungan seluruh Polda aktif (untuk peluncuran nasional kelak). |
+| `SIMOD_SEED_SAMPLE` | `false` | `db:seed` hanya mengisi data inti (Polda, Polres + koordinat, akun, feed RSS, menu, hak akses, pengaturan medsos). `true` = juga isu, tugas, publikasi, berita historis, postingan, topik contoh. |
+| `SIMOD_SOCIAL_SYNTHETIC` | `false` | Mematikan seluruh pembangkit data medsos buatan: postingan sintetis, templat "mock", dan **daftar tren publik statis** (sebelumnya "#TOKEN50RBCUMA40RB" dst. ditampilkan sebagai tren realtime, padahal bukan hasil penarikan data). |
+
+Aturan penerapan: helper `Controller::aggregatesNational()` menggantikan penentuan agregasi nasional di semua controller data. Peta Command Center pada tenant Divhumas menampilkan pin Mabes dan wilayah yang dihitung dari kata kunci pada **pemberitaan Divhumas sendiri**, tanpa pin tenant Polda.
+
+### 1.2. RSS terpisah per Polda
+- Sulbar: 29 feed (daftar sama dengan yang Anda tempel; Malaqbi dan Bacasaja ditarik lewat Google News `site:` karena `/feed` langsungnya diblokir Cloudflare atau rusak). Divhumas: feed nasional sendiri.
+- **Perbaikan penting:** tiga feed ada di dua Polda (Antara Terkini, CNN Nasional, Detik Berita). Sebelumnya berita disimpan berdasarkan URL saja, sehingga sinkron terakhir "mengambil" berita itu dari Polda lain. Kini kuncinya **(polda_id, url)** di semua jalur penyimpanan (sinkron terjadwal, refresh manual, perintah lama, API ingest, crawler Google News). Diuji di `DivhumasIsolationTest`.
+
+### 1.3. Medsos tanpa data buatan
+- Tanpa token Apify: radar memakai sindikasi publik (Google News) saja. Bila tidak ada hasil, tampil pesan jujur ("Belum ada percakapan publik yang ditemukan… tidak ada data buatan yang ditambahkan"), bukan postingan karangan.
+- Tab Tren Publik menampilkan keterangan "Sumber data tren publik belum dihubungkan" dan jumlah 0 sampai ada sumber nyata. Tombol refresh tren melaporkan galat yang sama.
+
+---
+
+## 2. Menyiapkan demo: `php artisan simod:demo-prepare`
+
+```bash
+php artisan simod:demo-prepare            # DRY-RUN: hanya melaporkan apa yang akan dihapus
+php artisan simod:demo-prepare --force    # jalankan
+php artisan simod:demo-prepare --force --sync          # lalu sinkron RSS Divhumas dan Sulbar
+php artisan simod:demo-prepare --force --keep-articles # pertahankan berita yang ada
+```
+
+- **Dibersihkan:** isu (+riwayat, bukti), tugas, publikasi, siaran pers, peringatan dini, topik atensi (+tag), laporan analisis AI media/medsos, postingan dan kasus medsos, riwayat chat SADEWA, catatan pemakaian AI, dan **berita non-bookmark** (diisi ulang dari RSS nyata).
+- **Dipertahankan:** akun, Polda, Polres, feed RSS, pengaturan, menu, hak akses, berita ber-bookmark, log audit.
+- Hanya Divhumas dan Sulbar yang diaktifkan; waktu "sinkron terakhir" medsos bawaan seeder (angka karangan) dikosongkan.
+- Tercatat di Audit Log sebagai `demo.prepare`. Tanpa `--force` tidak ada yang berubah.
+- Pada basis data lokal pengembang saat dokumen ini ditulis, dry-run melaporkan antara lain 16 isu, 296 postingan medsos, 14 laporan AI, dan 2.584 berita.
+
+---
+
+## 3. Deploy ke Hostinger (Web/Cloud Hosting, PHP + MySQL)
+
+### 3.1. Prasyarat
+- Paket dengan **PHP 8.2 atau lebih baru**, **MySQL**, dan idealnya **akses SSH** (agar `artisan` dan cron mudah). Tanpa SSH, jalankan perintah lewat Terminal di hPanel bila tersedia.
+- Domain/subdomain dengan **SSL** aktif (hPanel → SSL) dan paksa HTTPS.
+- Di hPanel → PHP Configuration: pilih PHP **8.2+**, aktifkan ekstensi `mbstring`, `openssl`, `curl`, `fileinfo`, `zlib`, `xml`, `ctype`, `tokenizer`, `pdo_mysql`; atur `max_execution_time` **120+**, `memory_limit` **256M+**, `upload_max_filesize` 20M, `post_max_size` 25M.
+
+### 3.2. Langkah
+1. **Buat basis data** (hPanel → Databases → MySQL): catat nama database, pengguna, dan kata sandi.
+2. **Unggah kode.** Pilihan: (a) Git di hPanel dari repositori Anda, atau (b) unggah ZIP lewat File Manager/SFTP. Letakkan proyek di **luar** `public_html` bila memungkinkan (mis. `~/simod`).
+3. **Dokumen akar harus `public/`.** Atur domain agar menunjuk ke folder `public` proyek. Bila hosting hanya memakai `public_html`: pindahkan isi folder `public/` ke `public_html/`, ubah dua jalur di `index.php` (`require __DIR__.'/../simod/vendor/autoload.php'` dan `bootstrap/app.php`), atau buat symlink `public_html` → `~/simod/public` lewat SSH.
+4. **Dependensi PHP:** `composer install --no-dev --optimize-autoloader` (SSH). Tanpa Composer di server: jalankan perintah itu di komputer dengan PHP 8.2 lalu unggah folder `vendor/`.
+5. **Aset frontend:** `public/build` **tidak** disimpan di Git. Jalankan `npm.cmd run build` di komputer Anda lalu unggah isi `public/build/`.
+6. **`.env`:** salin `.env.hostinger.example` menjadi `.env` di server dan isi nilai bertanda `<...>`. Lalu:
+   ```bash
+   php artisan key:generate --force
+   php artisan migrate --force
+   php artisan db:seed --force         # data inti saja (SIMOD_SEED_SAMPLE=false)
+   php artisan storage:link
+   chmod -R 775 storage bootstrap/cache
+   php artisan config:cache && php artisan route:cache && php artisan view:cache
+   ```
+7. **Cron (wajib)**: hPanel → Advanced → **Cron Jobs**, tambah tiap menit:
+   ```
+   * * * * * /usr/bin/php /home/<user>/<jalur-proyek>/artisan schedule:run >> /dev/null 2>&1
+   ```
+   Pastikan jalur `php` adalah versi 8.2+ (cek `php -v` di SSH; bila perlu pakai jalur PHP spesifik versi dari hPanel). Perintah yang sama tersedia siap-salin di **Audit Log → Penjadwal**.
+8. **Persiapan demo:** `php artisan simod:demo-prepare` (dry-run), lalu `--force --sync`. Atau sinkron manual: `php artisan rss:sync --polda=ALL --force && php artisan rss:sync --polda=SULBAR --force`.
+9. **Akun:** ganti **seluruh kata sandi bawaan seeder** lewat Personalia → Reset Password (atau perintah `tinker`, lihat PANDUAN_SETUP). Jangan memakai kata sandi lokal di server publik.
+10. **Pemeriksaan akhir:** buka **Audit Log → Kesehatan server & kesiapan hosting** dan **Penjadwal**. Targetnya: HTTPS, `APP_DEBUG`, `APP_ENV`, versi PHP, batas PHP, folder tulis, ekstensi, dan penjadwal semuanya hijau.
+
+### 3.3. Catatan
+- **Kunci API (Gemini/Apify)** diisi dari menu Mesin Intelijen AI dan tersimpan apa adanya di basis data (lihat temuan terbuka doc 30 §6): batasi akses Super Admin dan jaga `.env` serta cadangan basis data.
+- **Worker Python** (`scraper/`) tidak dijalankan di shared hosting; tidak diperlukan karena RSS ditarik langsung oleh aplikasi.
+- **Tile peta** memakai OpenStreetMap publik; untuk penggunaan operasional gunakan penyedia berizin (`VITE_MAP_TILE_URL` pada build).
+- **Pembaruan berikutnya:** unggah kode, `composer install --no-dev`, unggah `public/build` baru, `php artisan migrate --force`, lalu `php artisan config:cache route:cache view:cache` dan `php artisan optimize:clear` bila tampilan tidak berubah.
+- **Rollback:** pulihkan cadangan dari menu Backup Data (jadwal cadangan memerlukan cron aktif).

@@ -58,7 +58,7 @@ class GoogleNewsCrawlerService
             }
 
             // Gunakan updateOrCreate berbasis URL unik
-            $article = MediaArticle::where('url', $item['url'])->first();
+            $article = MediaArticle::where('polda_id', $poldaId)->where('url', $item['url'])->first();
             if (!$article) {
                 $article = MediaArticle::create([
                     'polda_id'      => $poldaId,
@@ -180,7 +180,7 @@ class GoogleNewsCrawlerService
             CURLOPT_MAXREDIRS      => 4,
             CURLOPT_TIMEOUT        => 10,
             CURLOPT_CONNECTTIMEOUT => 5,
-            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYPEER => ! app()->environment(['local', 'testing']),
             CURLOPT_SSL_VERIFYHOST => false,
             CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 (compatible; SIMOD-Enterprise/2.0)',
             CURLOPT_HTTPHEADER     => ['Accept: application/rss+xml, application/xml, text/xml, */*'],
@@ -236,8 +236,8 @@ class GoogleNewsCrawlerService
             $pubDateStr = (string) ($item->pubDate ?? '');
             $pubDate = !empty($pubDateStr) ? date('Y-m-d H:i:s', strtotime($pubDateStr)) : now()->format('Y-m-d H:i:s');
 
-            // Analisis sentimen berbasis leksikal kepolisian
-            $sentiment = $this->detectSentiment($cleanTitle . ' ' . $cleanSummary);
+            // Analisis sentimen berbasis aturan konteks kehumasan Polri (judul diprioritaskan)
+            $sentiment = \App\Support\NewsSentiment::detect($cleanTitle, $cleanSummary);
 
             // Kategori dinamis
             $category = $this->detectCategory($cleanTitle . ' ' . $cleanSummary);
@@ -311,35 +311,7 @@ class GoogleNewsCrawlerService
      */
     protected function detectSentiment(string $text): string
     {
-        $lower = mb_strtolower($text);
-
-        $negativeWords = [
-            'korupsi', 'tangkap', 'tersangka', 'tewas', 'meninggal', 'pembunuhan',
-            'aniaya', 'perkosa', 'judi', 'narkoba', 'bentrok', 'ricuh', 'unjuk rasa',
-            'demo', 'pungli', 'protes', 'kritik', 'pelanggaran', 'sop', 'ditahan',
-            'kecelakaan', 'laka maut', 'begal', 'curat', 'curas', 'densus', 'teror'
-        ];
-
-        $positiveWords = [
-            'apresiasi', 'penghargaan', 'prestasi', 'sukses', 'humanis', 'baksos',
-            'bakti sosial', 'donor darah', 'bantuan', 'tertib', 'aman', 'kondusif',
-            'wujudkan', 'tingkatkan', 'dukung', 'hut', 'syukuran', 'kolaborasi',
-            'terpercaya', 'transparan', 'inovasi', 'keberhasilan', 'meriah'
-        ];
-
-        foreach ($negativeWords as $w) {
-            if (str_contains($lower, $w)) {
-                return 'negatif';
-            }
-        }
-
-        foreach ($positiveWords as $w) {
-            if (str_contains($lower, $w)) {
-                return 'positif';
-            }
-        }
-
-        return 'netral';
+        return \App\Support\NewsSentiment::detect($text);
     }
 
     /**

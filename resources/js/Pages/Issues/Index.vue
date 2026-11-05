@@ -1,8 +1,9 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { router, Link, usePage } from '@inertiajs/vue3';
 import { ISSUE_GROUPS, statusMeta, priorityMeta } from '@/utils/issueFlow';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
+import ConfirmDialog from '@/Components/ConfirmDialog.vue';
 import {
   Shield,
   Building2,
@@ -30,6 +31,10 @@ import {
   Calendar,
   Ellipsis,
   SlidersHorizontal,
+  Archive,
+  ArchiveRestore,
+  Trash2,
+  ArrowUpDown,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -42,6 +47,7 @@ const props = defineProps({
   metrics: Object,
   groupCounts: { type: Object, default: () => ({}) },
   categoryOptions: { type: Array, default: () => [] },
+  canManage: { type: Boolean, default: false },
 });
 
 const searchQuery = ref(props.filters?.q || '');
@@ -49,15 +55,20 @@ const selectedStatus = ref(props.filters?.status || 'all');
 const selectedPriority = ref(props.filters?.priority || 'all');
 const selectedCategory = ref(props.filters?.category || 'all');
 const selectedPolres = ref(props.filters?.polres || 'all');
+const selectedSort = ref(props.filters?.sort || 'terbaru');
+const selectedPerPage = ref(props.filters?.per_page || 15);
 
 const handleFilter = () => {
-  router.get('/issues', {
+  const params = {
     status: selectedStatus.value,
     priority: selectedPriority.value,
     category: selectedCategory.value,
     polres: selectedPolres.value,
     q: searchQuery.value,
-  }, { preserveState: true, preserveScroll: true });
+  };
+  if (selectedSort.value !== 'terbaru') params.sort = selectedSort.value;
+  if (Number(selectedPerPage.value) !== 15) params.per_page = selectedPerPage.value;
+  router.get('/issues', params, { preserveState: true, preserveScroll: true });
 };
 
 const resetFilter = () => {
@@ -66,6 +77,8 @@ const resetFilter = () => {
   selectedPriority.value = 'all';
   selectedCategory.value = 'all';
   selectedPolres.value = 'all';
+  selectedSort.value = 'terbaru';
+  selectedPerPage.value = 15;
   router.get('/issues', {}, { preserveState: true, preserveScroll: true });
 };
 
@@ -158,6 +171,53 @@ const exportUrl = computed(() => {
 });
 
 const countOf = (key) => props.groupCounts?.[key] ?? 0;
+
+// ---- Seleksi & aksi massal: arsipkan, pulihkan, hapus (ke Sampah), hapus permanen, ubah prioritas ----
+const inTrash = computed(() => selectedStatus.value === 'trash');
+const inArchive = computed(() => selectedStatus.value === 'archived');
+const isClosed = (issue) => ['arsip'].includes(issue.status);
+const hasMenu = (issue) => issue.can_archive || issue.can_restore || issue.can_delete || issue.can_force_delete || (props.canManage && !isClosed(issue) && !inTrash.value);
+
+const selected = ref(new Set());
+const pageIds = computed(() => (props.issues?.data || []).map((i) => i.id));
+const selectedCount = computed(() => selected.value.size);
+const allOnPage = computed(() => pageIds.value.length > 0 && pageIds.value.every((id) => selected.value.has(id)));
+const toggleOne = (id) => {
+  const next = new Set(selected.value);
+  if (next.has(id)) next.delete(id); else next.add(id);
+  selected.value = next;
+};
+const toggleAll = () => { selected.value = allOnPage.value ? new Set() : new Set(pageIds.value); };
+const clearSelection = () => { selected.value = new Set(); };
+// Berpindah halaman/filter: hanya pertahankan pilihan yang masih tampil.
+watch(pageIds, (ids) => { selected.value = new Set([...selected.value].filter((id) => ids.includes(id))); });
+
+const busy = ref(false);
+const dialog = ref({ open: false, kind: '', ids: [] });
+const DIALOGS = {
+  archive: (n) => ({ title: `Arsipkan ${n} laporan?`, message: 'Laporan pindah ke tab Arsip dan tidak lagi muncul di daftar kerja. Dapat dipulihkan ke tahap semula kapan saja.', confirmLabel: 'Arsipkan', tone: 'primary', withReason: true }),
+  delete: (n) => ({ title: `Pindahkan ${n} laporan ke Sampah?`, message: 'Laporan hilang dari daftar, tetapi tidak dihapus permanen: Anda dapat memulihkannya dari tab Sampah.', confirmLabel: 'Pindahkan ke Sampah', tone: 'danger', withReason: true }),
+  delete_permanent: (n) => ({ title: `Hapus permanen ${n} laporan?`, message: 'Laporan beserta foto buktinya dihapus selamanya dan TIDAK dapat dipulihkan.', confirmLabel: 'Hapus permanen', tone: 'danger', requireText: 'HAPUS' }),
+};
+const dialogProps = computed(() => (dialog.value.open ? DIALOGS[dialog.value.kind](dialog.value.ids.length) : { title: '' }));
+
+const send = (action, ids, extra = {}) => {
+  busy.value = true;
+  router.post('/issues-bulk', { action, ids, ...extra }, {
+    preserveScroll: true,
+    onSuccess: () => { dialog.value.open = false; clearSelection(); },
+    onFinish: () => { busy.value = false; },
+  });
+};
+const ask = (kind, ids) => { dialog.value = { open: true, kind, ids }; };
+const confirmDialog = ({ reason, confirm }) => send(dialog.value.kind, dialog.value.ids, { reason, confirm });
+const restore = (ids) => send('restore', ids);
+const setPriority = (ids, priority) => { if (priority) send('priority', ids, { priority }); };
+
+const emptyTitle = computed(() => (inTrash.value ? 'Sampah kosong' : inArchive.value ? 'Belum ada laporan di arsip' : 'Tidak ada laporan pada tampilan ini'));
+const emptyHint = computed(() => (inTrash.value
+  ? 'Laporan yang dihapus akan muncul di sini dan dapat dipulihkan.'
+  : inArchive.value ? 'Laporan yang diarsipkan dapat dipulihkan dari sini.' : null));
 </script>
 
 <template>
@@ -240,12 +300,22 @@ const countOf = (key) => props.groupCounts?.[key] ?? 0;
       >Draf ({{ countOf('draft') }})</button>
 
       <button
-        v-if="countOf('archived') > 0"
         type="button"
         @click="setGroup('archived')"
         class="px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer select-none whitespace-nowrap border"
         :class="selectedStatus === 'archived' ? 'bg-amber-400 text-slate-950 font-black border-amber-300' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'"
       >Arsip ({{ countOf('archived') }})</button>
+
+      <button
+        v-if="canManage"
+        type="button"
+        @click="setGroup('trash')"
+        class="px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer select-none whitespace-nowrap border flex items-center gap-1.5"
+        :class="selectedStatus === 'trash' ? 'bg-rose-600 text-white font-black border-rose-500 shadow-md' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'"
+      >
+        <Trash2 class="w-3.5 h-3.5" />
+        <span>Sampah ({{ countOf('trash') }})</span>
+      </button>
 
       <span class="h-5 w-px bg-slate-300 dark:bg-slate-700 shrink-0"></span>
 
@@ -323,6 +393,25 @@ const countOf = (key) => props.groupCounts?.[key] ?? 0;
             </select>
           </label>
 
+          <label class="block space-y-1">
+            <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1"><ArrowUpDown class="w-3.5 h-3.5" /> Urutan</span>
+            <select v-model="selectedSort" @change="handleFilter" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:border-amber-400 cursor-pointer">
+              <option value="terbaru">Terbaru dibuat</option>
+              <option value="terlama">Terlama dibuat</option>
+              <option value="prioritas">Prioritas tertinggi dulu</option>
+              <option value="diperbarui">Terakhir diperbarui</option>
+            </select>
+          </label>
+
+          <label class="block space-y-1">
+            <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">Laporan per halaman</span>
+            <select v-model.number="selectedPerPage" @change="handleFilter" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:border-amber-400 cursor-pointer">
+              <option :value="15">15</option>
+              <option :value="30">30</option>
+              <option :value="50">50</option>
+            </select>
+          </label>
+
           <div class="flex items-center justify-between pt-1">
             <button type="button" @click="resetFilter(); showFilterPanel = false" class="text-[11px] font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white cursor-pointer">Atur ulang semua</button>
             <button type="button" @click="showFilterPanel = false" class="px-3 py-1.5 rounded-lg bg-amber-400 text-slate-950 text-xs font-black cursor-pointer">Selesai</button>
@@ -341,8 +430,8 @@ const countOf = (key) => props.groupCounts?.[key] ?? 0;
         <div class="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-400/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
           <FileText class="w-7 h-7" />
         </div>
-        <h3 class="text-base font-black text-slate-900 dark:text-white">Tidak ada laporan pada tampilan ini</h3>
-        <p class="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">Ubah kata kunci atau filter{{ canCreate ? ', atau buat laporan lapangan baru.' : '.' }}</p>
+        <h3 class="text-base font-black text-slate-900 dark:text-white">{{ emptyTitle }}</h3>
+        <p class="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">{{ emptyHint || ('Ubah kata kunci atau filter' + (canCreate ? ', atau buat laporan lapangan baru.' : '.')) }}</p>
         <div class="flex items-center justify-center gap-2 pt-1">
           <button type="button" @click="resetFilter" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 cursor-pointer">Atur ulang filter</button>
           <Link v-if="canCreate" href="/issues/create" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-400 text-slate-950 font-black text-xs hover:bg-amber-300 shadow-md transition">
@@ -352,6 +441,39 @@ const countOf = (key) => props.groupCounts?.[key] ?? 0;
         </div>
       </div>
 
+      <!-- Info tab Arsip / Sampah -->
+      <p v-if="inArchive" class="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-300 flex items-center gap-2"><Archive class="w-4 h-4 text-slate-500 shrink-0" /> Laporan arsip tidak tampil di tab Semua. Pulihkan untuk mengembalikannya ke tahap semula.</p>
+      <p v-if="inTrash" class="px-4 py-2.5 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 text-[11px] text-rose-700 dark:text-rose-300 flex items-center gap-2"><Trash2 class="w-4 h-4 shrink-0" /> Laporan di Sampah tersembunyi dari semua daftar dan KPI. Pulihkan bila keliru, atau hapus permanen.</p>
+
+      <!-- Pilih semua + bilah aksi massal (muncul saat ada yang dipilih) -->
+      <div v-if="canManage && issues?.data?.length" class="sticky top-2 z-20 flex flex-wrap items-center gap-2 px-4 py-2.5 rounded-2xl border shadow-sm transition" :class="selectedCount ? 'bg-amber-50 dark:bg-[#10182c] border-amber-300 dark:border-amber-400/50 shadow-lg' : 'bg-white dark:bg-[#0b1426] border-slate-200 dark:border-slate-800'">
+        <label class="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer select-none">
+          <input type="checkbox" :checked="allOnPage" @change="toggleAll" class="w-4 h-4 accent-amber-500" aria-label="Pilih semua laporan di halaman ini" />
+          <span>{{ selectedCount ? selectedCount + ' dipilih' : 'Pilih semua di halaman ini' }}</span>
+        </label>
+
+        <template v-if="selectedCount">
+          <span class="h-5 w-px bg-slate-300 dark:bg-slate-700"></span>
+          <template v-if="!inTrash && !inArchive">
+            <button type="button" @click="ask('archive', [...selected])" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-800 dark:hover:bg-slate-700 cursor-pointer"><Archive class="w-3.5 h-3.5" /> Arsipkan</button>
+            <label class="flex items-center gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-300">
+              <span>Prioritas:</span>
+              <select @change="setPriority([...selected], $event.target.value); $event.target.value = ''" class="px-2 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold cursor-pointer" aria-label="Ubah prioritas laporan terpilih">
+                <option value="">Ubah ke...</option>
+                <option value="critical">Kritis</option>
+                <option value="high">Tinggi</option>
+                <option value="medium">Sedang</option>
+                <option value="low">Rendah</option>
+              </select>
+            </label>
+          </template>
+          <button v-if="inTrash || inArchive" type="button" @click="restore([...selected])" :disabled="busy" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer disabled:opacity-50"><ArchiveRestore class="w-3.5 h-3.5" /> Pulihkan</button>
+          <button v-if="!inTrash" type="button" @click="ask('delete', [...selected])" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black bg-rose-600 hover:bg-rose-500 text-white cursor-pointer"><Trash2 class="w-3.5 h-3.5" /> Hapus</button>
+          <button v-else type="button" @click="ask('delete_permanent', [...selected])" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black bg-rose-700 hover:bg-rose-600 text-white cursor-pointer"><Trash2 class="w-3.5 h-3.5" /> Hapus permanen</button>
+          <button type="button" @click="clearSelection" class="ml-auto text-xs font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white cursor-pointer">Batal pilih</button>
+        </template>
+      </div>
+
       <!-- Kartu laporan -->
       <div
         v-for="issue in issues.data"
@@ -359,6 +481,14 @@ const countOf = (key) => props.groupCounts?.[key] ?? 0;
         class="rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800/90 p-4 md:p-5 shadow-sm hover:border-slate-400 dark:hover:border-slate-700 transition space-y-2.5"
       >
         <div class="flex flex-wrap items-center gap-2">
+          <input
+            v-if="canManage"
+            type="checkbox"
+            :checked="selected.has(issue.id)"
+            @change="toggleOne(issue.id)"
+            class="w-4 h-4 accent-amber-500 cursor-pointer"
+            :aria-label="'Pilih laporan ' + (issue.report_code || issue.id)"
+          />
           <button
             @click="copyCode(issue.report_code || 'SIM-' + issue.id)"
             type="button"
@@ -378,6 +508,7 @@ const countOf = (key) => props.groupCounts?.[key] ?? 0;
             {{ statusMeta(issue.status).label }}
           </span>
 
+          <span v-if="issue.deleted_at" class="px-2 py-0.5 rounded-lg text-[10px] font-black bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-500/40 flex items-center gap-1"><Trash2 class="w-3 h-3" /> DI SAMPAH</span>
           <span v-if="issue.is_hoax" class="px-2 py-0.5 rounded-lg text-[10px] font-black bg-rose-600 text-white flex items-center gap-1">
             <XCircle class="w-3 h-3" /> HOAKS
           </span>
@@ -412,7 +543,7 @@ const countOf = (key) => props.groupCounts?.[key] ?? 0;
               <ChevronRight class="w-3.5 h-3.5" />
             </Link>
 
-            <div v-if="canVerify" class="relative">
+            <div v-if="hasMenu(issue)" class="relative">
               <button
                 type="button"
                 @click.stop="openMenu = openMenu === 'card-' + issue.id ? null : 'card-' + issue.id"
@@ -428,11 +559,28 @@ const countOf = (key) => props.groupCounts?.[key] ?? 0;
               >
                 <button
                   type="button"
+                  v-if="canVerify && !isClosed(issue) && !issue.deleted_at"
                   @click="openClarifyModal(issue); openMenu = null"
                   class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 transition cursor-pointer text-left"
                 >
                   <Sparkles class="w-4 h-4 text-amber-500" />
                   <span>Klarifikasi cepat</span>
+                </button>
+                <button v-if="issue.can_archive" type="button" @click="ask('archive', [issue.id]); openMenu = null" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 transition cursor-pointer text-left">
+                  <Archive class="w-4 h-4 text-slate-500" />
+                  <span>Arsipkan</span>
+                </button>
+                <button v-if="issue.can_restore" type="button" @click="restore([issue.id]); openMenu = null" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10 transition cursor-pointer text-left">
+                  <ArchiveRestore class="w-4 h-4" />
+                  <span>Pulihkan</span>
+                </button>
+                <button v-if="issue.can_delete" type="button" @click="ask('delete', [issue.id]); openMenu = null" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10 transition cursor-pointer text-left">
+                  <Trash2 class="w-4 h-4" />
+                  <span>Hapus (ke Sampah)</span>
+                </button>
+                <button v-if="issue.can_force_delete" type="button" @click="ask('delete_permanent', [issue.id]); openMenu = null" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10 transition cursor-pointer text-left">
+                  <Trash2 class="w-4 h-4" />
+                  <span>Hapus permanen</span>
                 </button>
               </div>
             </div>
@@ -564,5 +712,12 @@ const countOf = (key) => props.groupCounts?.[key] ?? 0;
         </form>
       </div>
     </div>
+    <ConfirmDialog
+      :open="dialog.open"
+      :busy="busy"
+      v-bind="dialogProps"
+      @confirm="confirmDialog"
+      @cancel="dialog.open = false"
+    />
   </EnterpriseLayout>
 </template>

@@ -19,7 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->trustProxies(
-            at: '*',
+            at: env('TRUSTED_PROXIES', '*') === '*' ? '*' : array_map('trim', explode(',', (string) env('TRUSTED_PROXIES'))),
             headers: Request::HEADER_X_FORWARDED_FOR |
                      Request::HEADER_X_FORWARDED_HOST |
                      Request::HEADER_X_FORWARDED_PORT |
@@ -36,17 +36,20 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectGuestsTo('/login');
         $middleware->redirectUsersTo('/');
 
-        $middleware->validateCsrfTokens(except: [
-            'social-intelligence/test-connection',
-            'media-intelligence/gemini-test',
-            'settings/ai/test',
-        ]);
-
         $middleware->web(append: [
             HandleInertiaRequests::class,
             PreventBackHistory::class,
+            \App\Http\Middleware\SecurityHeaders::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // Halaman galat resmi (Inertia) bila debug mati (produksi); saat debug tetap halaman diagnosa Laravel.
+        $exceptions->respond(function (\Symfony\Component\HttpFoundation\Response $response, \Throwable $e, \Illuminate\Http\Request $request) {
+            $status = $response->getStatusCode();
+            if (config('app.debug') || ! in_array($status, [403, 404, 419, 429, 500, 503], true) || $request->expectsJson() || $request->is('api/*')) {
+                return $response;
+            }
+
+            return \Inertia\Inertia::render('Error', ['status' => $status])->toResponse($request)->setStatusCode($status);
+        });
     })->create();

@@ -152,7 +152,7 @@ class AiQuotaAndSavingsTest extends TestCase
         $this->fakeGemini(429);
 
         $first = $this->actingAs($leader)->postJson('/sadewa/chat', ['message' => 'satu'])->assertStatus(422);
-        $this->assertStringContainsString('Kuota API Gemini', $first->json('message'));
+        $this->assertStringContainsString('Kuota layanan analisis AI', $first->json('message'));
         $callsAfterFirst = $this->geminiCalls;
         $this->assertGreaterThan(0, $callsAfterFirst);
 

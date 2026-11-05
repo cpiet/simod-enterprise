@@ -7,6 +7,14 @@ use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 
 abstract class TestCase extends BaseTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Jeda coba ulang 503 Gemini dinolkan agar test tidak menunggu (produksi: 3 dtk lalu 6 dtk).
+        config(['services.gemini.retry_delays' => [0, 0]]);
+    }
+
     /**
      * Login sebagai Super Admin Mabes (tanpa kunci tenant) untuk pengujian rute yang kini wajib autentikasi.
      */

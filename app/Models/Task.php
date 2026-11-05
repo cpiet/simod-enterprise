@@ -43,7 +43,7 @@ class Task extends Model
 
     public function issue(): BelongsTo
     {
-        return $this->belongsTo(Issue::class);
+        return $this->belongsTo(Issue::class)->withTrashed();
     }
 
     public function updates(): HasMany

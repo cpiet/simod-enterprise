@@ -148,7 +148,7 @@ class ApifySyncService
             return [
                 'success'   => true,
                 'mode'      => 'simulation',
-                'message'   => 'Radar berjalan dalam mode simulasi lokal. Masukkan Personal API Token Apify di tab pengaturan untuk menarik data live langsung dari internet.',
+                'message'   => 'Token Apify belum diisi: radar hanya memakai sindikasi publik (Google News). Tidak ada data buatan yang ditampilkan. Masukkan Personal API Token Apify di Pengaturan Mesin AI untuk cakupan lebih luas.',
                 'new_posts' => 0,
             ];
         }
@@ -650,8 +650,9 @@ class ApifySyncService
             }
         }
 
-        // Fallback generator if live failed or no token to guarantee immediate results for the user
-        if ($pulledCount === 0) {
+        // Fallback pembangkit postingan BUATAN: hanya bila diaktifkan eksplisit (simod.social_synthetic_fallback).
+        // Secara bawaan nonaktif sehingga radar tidak pernah menampilkan percakapan yang tidak nyata.
+        if ($pulledCount === 0 && config('simod.social_synthetic_fallback')) {
             $templates = [
                 [
                     'platform'  => 'x',
@@ -745,7 +746,19 @@ class ApifySyncService
             'created_at'   => now(),
         ]);
 
-        $modeLabel = $liveSuccess ? "Live Apify Scraper" : "Smart Multi-Platform Ingestion";
+        $modeLabel = $liveSuccess ? "Live Apify Scraper" : "Multi-Platform Ingestion";
+        if ($pulledCount === 0) {
+            return [
+                'success'         => true,
+                'keyword'         => $cleanKeyword,
+                'case_id'         => $case?->id,
+                'case_title'      => $case?->title,
+                'new_posts'       => 0,
+                'platform_counts' => $platformCounts,
+                'message'         => "Belum ada postingan nyata yang ditemukan untuk \"{$cleanKeyword}\". Tidak ada data buatan yang ditambahkan; periksa token Apify atau coba kata kunci lain.",
+            ];
+        }
+
         return [
             'success'         => true,
             'keyword'         => $cleanKeyword,
@@ -916,6 +929,22 @@ class ApifySyncService
      */
     public function getPublicTrendsData(): array
     {
+        // Daftar tren di bawah ini adalah CONTOH STATIS (bukan hasil penarikan data). Secara bawaan tidak ditampilkan.
+        if (! config('simod.social_synthetic_fallback')) {
+            return [
+                'meta' => [
+                    'last_updated' => null,
+                    'available'    => false,
+                    'note'         => 'Sumber data tren publik belum dihubungkan. Data contoh dimatikan agar tidak menampilkan tren yang tidak nyata.',
+                    'region'       => 'Indonesia (Nasional)',
+                    'woeid'        => '23424846',
+                    'platforms'    => ['𝕏 (Twitter)', 'YouTube', 'Instagram', 'TikTok', 'Facebook'],
+                ],
+                'platforms' => ['all' => [], 'x' => [], 'youtube' => [], 'instagram' => [], 'tiktok' => [], 'facebook' => []],
+                'summary'   => ['total_trends' => 0, 'security_relevant_count' => 0],
+            ];
+        }
+
         $xTrends = [
             [
                 'rank'                 => 1,
@@ -1689,6 +1718,14 @@ class ApifySyncService
             ],
             'created_at'   => now(),
         ]);
+
+        if (($trendsData['meta']['available'] ?? true) === false) {
+            return [
+                'success' => false,
+                'message' => 'Tren publik belum tersedia: belum ada sumber data nyata yang dihubungkan.',
+                'data'    => $trendsData,
+            ];
+        }
 
         return [
             'success' => true,

@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { router, useForm, Link } from '@inertiajs/vue3';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
 import SecurityMaintenanceTabs from '@/Components/SecurityMaintenanceTabs.vue';
@@ -37,6 +37,10 @@ const props = defineProps({
   auditLogs: Array,
   flash: Object,
 });
+
+// Hitungan nyata berkas cadangan yang memiliki checksum tercatat
+const backupList = computed(() => (Array.isArray(props.backups) ? props.backups : (props.backups?.data || [])));
+const checksumCount = computed(() => backupList.value.filter((b) => b.checksum || b.checksum_full).length);
 
 // Loading states
 const isBackingUp = ref(false);
@@ -272,8 +276,8 @@ const saveScheduleSettings = () => {
           <span class="text-[11px] font-black uppercase text-slate-400">Ukuran Basis Data</span>
           <Database class="w-4 h-4 text-amber-400" />
         </div>
-        <div class="text-2xl lg:text-3xl font-black text-white tracking-tight">{{ stats?.size_mb || '1.86 MB' }}</div>
-        <p class="text-[11px] text-slate-400">{{ stats?.engine || 'InnoDB MySQL 8.x' }}</p>
+        <div class="text-2xl lg:text-3xl font-black text-white tracking-tight">{{ stats?.size_mb || '—' }}</div>
+        <p class="text-[11px] text-slate-400">{{ stats?.engine || 'Mesin basis data' }}</p>
       </div>
 
       <div class="p-5 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
@@ -281,8 +285,8 @@ const saveScheduleSettings = () => {
           <span class="text-[11px] font-black uppercase text-slate-400">Tabel Multi-Tenant</span>
           <Layers class="w-4 h-4 text-emerald-400" />
         </div>
-        <div class="text-2xl lg:text-3xl font-black text-emerald-400 tracking-tight">{{ stats?.table_count || 28 }} Tabel</div>
-        <p class="text-[11px] text-slate-400">Relasi & Foreign Key Aktif</p>
+        <div class="text-2xl lg:text-3xl font-black text-emerald-400 tracking-tight">{{ stats?.table_count ?? '—' }} Tabel</div>
+        <p class="text-[11px] text-slate-400">Dihitung dari basis data</p>
       </div>
 
       <div class="p-5 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
@@ -303,8 +307,8 @@ const saveScheduleSettings = () => {
           <span class="text-[11px] font-black uppercase text-slate-400">Integritas Berkas</span>
           <ShieldCheck class="w-4 h-4 text-cyan-400" />
         </div>
-        <div class="text-2xl lg:text-3xl font-black text-cyan-400 tracking-tight">SHA-256 Valid</div>
-        <p class="text-[11px] text-slate-400">Kompresi Gzip Terenkripsi</p>
+        <div class="text-2xl lg:text-3xl font-black text-cyan-400 tracking-tight">{{ checksumCount }} / {{ backupList.length }}</div>
+        <p class="text-[11px] text-slate-400">berkas punya checksum SHA-256 tercatat (gzip tidak mengenkripsi)</p>
       </div>
     </div>
 
@@ -446,7 +450,7 @@ const saveScheduleSettings = () => {
             Riwayat Berkas Cadangan Basis Data
           </h3>
           <span class="text-xs text-slate-400">
-            Tersimpan aman di storage server dengan verifikasi integritas SHA-256.
+            Tersimpan di storage server. Checksum SHA-256 dicatat untuk setiap berkas.
           </span>
         </div>
         <span class="text-xs font-bold text-amber-400">
@@ -495,7 +499,7 @@ const saveScheduleSettings = () => {
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex items-center gap-1.5" :title="b.checksum_full">
                   <CheckCircle2 class="w-3.5 h-3.5 text-emerald-400" />
-                  <span class="font-mono text-[11px] text-slate-400">{{ b.checksum || 'SHA-256 Valid' }}</span>
+                  <span class="font-mono text-[11px] text-slate-400">{{ b.checksum || '—' }}</span>
                 </div>
               </td>
               <td class="px-6 py-4 text-right whitespace-nowrap">

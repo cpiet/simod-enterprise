@@ -18,6 +18,7 @@ class MediaTopicDossierTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        config(['simod.seed_sample_data' => true]);   // butuh topik atensi contoh
         $this->seed(EnterpriseDatabaseSeeder::class);
     }
 

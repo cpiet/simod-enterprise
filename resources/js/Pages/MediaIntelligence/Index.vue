@@ -1,8 +1,10 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import axios from 'axios';
+import AiQuotaBadge from '../../Components/AiQuotaBadge.vue';
 import { router, usePage } from '@inertiajs/vue3';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
+import MediaSituationCard from '@/Components/MediaSituationCard.vue';
 import {
   Shield,
   Building2,
@@ -68,8 +70,15 @@ const props = defineProps({
   mediaFeeds: Array,
   sampleArticles: Array,
   topics: { type: Array, default: () => [] },
-  portalsList: Array,
-  categoriesList: Array,
+  articlesMeta: { type: Object, default: () => ({ total: 0, page: 1, last_page: 1, per_page: 15, from: 0, to: 0 }) },
+  searchTerms: { type: Array, default: () => [] },
+  filters: { type: Object, default: () => ({}) },
+  facets: { type: Object, default: () => ({ all: 0, portals: [], internet: 0, categories: [], sentiments: { positif: 0, netral: 0, negatif: 0 }, bookmarks: 0, wilayah: [] }) },
+  stats: { type: Object, default: () => ({}) },
+  freshness: { type: Object, default: () => ({}) },
+  situation: { type: Object, default: null },
+  isNational: { type: Boolean, default: false },
+  myArea: { type: Object, default: null },
   report: Object,
   aiPromptTemplate: String,
   aiSetting: Object,
@@ -99,7 +108,12 @@ const isOperator = computed(() => authRole.value === 'operator');
 const activeTab = ref(['kadiv_humas', 'polda_leader'].includes(page.props.auth?.role) ? '02' : '01');
 
 // Menu melayang (header, filter, aksi kartu) -- hanya satu terbuka pada satu waktu
-const activeFilterCount = computed(() => (selectedPortal.value !== 'Semua Portal' ? 1 : 0) + (selectedCategory.value !== 'all' ? 1 : 0));
+const activeFilterCount = computed(() => (selectedPortal.value !== 'Semua Portal' ? 1 : 0)
+  + (selectedCategory.value !== 'all' ? 1 : 0)
+  + (periodFilter.value !== 'all' ? 1 : 0)
+  + (selectedSentiment.value !== 'all' ? 1 : 0)
+  + (wilayahFilter.value ? 1 : 0)
+  + (!groupDuplicates.value ? 1 : 0));
 const openMenu = ref(null);
 const showFilterPanel = ref(false);
 const dossierOpen = ref(false);
@@ -129,59 +143,105 @@ const deltaLabel = (key) => {
   return (v > 0 ? '\u25B2 +' : '\u25BC ') + v + ' vs kemarin';
 };
 
-const tabs = computed(() => [
-  { id: '01', name: '01. Berita Online (Live RSS)', badge: 'LIVE', icon: Radio },
+const allTabs = [
+  { id: '01', name: '01. Berita Online', icon: Radio },
   { id: '02', name: '02. Executive Briefing & Sentimen', badge: 'ANALISIS', icon: Newspaper },
   { id: '03', name: '03. Early Warning System (EWS)', badge: 'EWS', icon: Shield },
   { id: '04', name: '04. Strategi Humas & Aksi', badge: 'AKSI', icon: Award },
-]);
+];
 
-// Dynamic Categories from Server/Articles
-const availableCategories = computed(() => {
-  if (props.categoriesList && props.categoriesList.length > 0) {
-    return props.categoriesList.filter((c) => c.name && c.name !== 'Semua Kategori');
-  }
-  return [];
+// Operator (tanpa izin analisis AI) hanya memerlukan daftar berita; tab analisis disembunyikan.
+const isLeader = computed(() => ['kadiv_humas', 'polda_leader'].includes(authRole.value));
+const canManageTopics = computed(() => !!page.props.auth?.permissions?.media_intelligence_manage);
+const showAnalysisTabs = computed(() => canRunAi.value || isLeader.value);
+
+const tabs = computed(() => {
+  const list = showAnalysisTabs.value ? allTabs : [allTabs[0]];
+  const badge = freshState.value.level === 'green' ? 'LIVE' : (freshState.value.level === 'yellow' ? 'TERTUNDA' : 'BASI');
+
+  return list.map((t) => (t.id === '01' ? { ...t, badge } : t));
 });
 
-// Dynamic Portals Computed directly from loaded articles to guarantee 100% parity with UI view
+watch(activeTab, (v) => {
+  if (!tabs.value.some((t) => t.id === v)) activeTab.value = '01';
+});
+
+// Kesegaran data: hijau < 1 jam, kuning < 6 jam, merah lebih lama / belum pernah sinkron.
+const nowTick = ref(Date.now());
+let nowTimer = null;
+onMounted(() => {
+  nowTimer = setInterval(() => { nowTick.value = Date.now(); }, 30000);
+});
+onUnmounted(() => clearInterval(nowTimer));
+
+const agoLabel = (minutes) => {
+  if (minutes < 1) return 'baru saja';
+  if (minutes < 60) return minutes + ' menit lalu';
+  if (minutes < 1440) return Math.floor(minutes / 60) + ' jam lalu';
+  return Math.floor(minutes / 1440) + ' hari lalu';
+};
+
+const freshState = computed(() => {
+  const at = props.freshness?.updated_at ? Date.parse(props.freshness.updated_at) : NaN;
+  if (Number.isNaN(at)) {
+    return { level: 'red', label: 'Belum pernah disinkronkan', hint: 'Tekan "Sinkron Berita"' };
+  }
+  const minutes = Math.max(0, Math.floor((nowTick.value - at) / 60000));
+  const level = minutes < 60 ? 'green' : (minutes < 360 ? 'yellow' : 'red');
+  const newest = props.freshness?.newest_article_ago;
+  const hint = level === 'yellow'
+    ? (newest ? 'Berita terbaru terbit ' + newest : 'Sinkron belum terbaru')
+    : 'Data tertinggal: tekan "Sinkron Berita" atau periksa penjadwal';
+
+  return { level, minutes, label: 'Diperbarui ' + agoLabel(minutes), hint };
+});
+
+const freshClass = computed(() => ({
+  green: { text: 'text-emerald-400', dot: 'bg-emerald-400' },
+  yellow: { text: 'text-amber-300', dot: 'bg-amber-400' },
+  red: { text: 'text-rose-400', dot: 'bg-rose-500' },
+}[freshState.value.level]));
+
+const portalsActive = computed(() => props.stats?.portals_active ?? props.mediaFeeds?.length ?? 0);
+
+const deltaText = (cur, prev) => {
+  const c = Number(cur) || 0;
+  const p = Number(prev) || 0;
+  if (!c && !p) return 'belum ada berita';
+  if (!p) return 'tanpa pembanding';
+  const d = c - p;
+  if (d === 0) return '\u2014 sama dengan 24 jam sebelumnya';
+  return (d > 0 ? '\u25B2 +' : '\u25BC ') + d + ' vs 24 jam sebelumnya';
+};
+
+// Opsi dropdown berasal dari facet server: setiap angka dihitung dengan seluruh filter aktif kecuali dirinya sendiri,
+// sehingga angka di dropdown = jumlah kartu yang tampil saat opsi itu dipilih (paritas UI 100%).
+const availableCategories = computed(() => props.facets?.categories || []);
+const categoryTotal = computed(() => availableCategories.value.reduce((n, c) => n + (c.count || 0), 0));
+
 const availablePortals = computed(() => {
-  const articles = props.sampleArticles || [];
-  const counts = {};
-  let liveCrawlCount = 0;
-
-  for (const a of articles) {
-    const src = (a.source_name || '').trim().toUpperCase();
-    if (src) {
-      counts[src] = (counts[src] || 0) + 1;
-    }
-    if (!a.feed_id || a.source_id === 0 || (a.link && a.link.includes('news.google.com'))) {
-      liveCrawlCount++;
-    }
+  const list = [...(props.facets?.portals || [])];
+  if ((props.facets?.internet || 0) > 0) {
+    list.unshift({ name: '🌐 SEBARAN INTERNET (GOOGLE NEWS)', count: props.facets.internet });
   }
+  return list;
+});
 
-  const baseList = props.portalsList || [];
-  if (baseList.length > 0) {
-    return baseList
-      .filter((p) => p.name !== 'Semua Portal')
-      .map((p) => {
-        if (p.name.includes('SEBARAN INTERNET')) {
-          return { name: p.name, count: liveCrawlCount };
-        }
-        const upper = p.name.trim().toUpperCase();
-        return { name: p.name, count: counts[upper] || 0 };
-      });
-  }
-
-  const feeds = props.mediaFeeds || [];
-  return feeds.map((f) => {
-    const upper = f.name.trim().toUpperCase();
-    return { name: upper, count: counts[upper] || 0 };
-  });
+const allCount = computed(() => {
+  const s = props.facets?.sentiments || {};
+  return (s.positif || 0) + (s.netral || 0) + (s.negatif || 0);
 });
 
 // Bookmark disimpan di database (tidak ikut dibersihkan oleh Pembersihan Berita)
-const bookmarkedIds = ref((props.sampleArticles || []).filter((a) => a.is_bookmarked).map((a) => String(a.id)));
+const bookmarkedIds = ref([]);
+// Setiap halaman hasil dari server menyelaraskan status bookmark artikel yang tampil.
+watch(() => props.sampleArticles, (list) => {
+  const set = new Set(bookmarkedIds.value);
+  for (const a of list || []) {
+    if (a.is_bookmarked) set.add(String(a.id)); else set.delete(String(a.id));
+  }
+  bookmarkedIds.value = [...set];
+}, { immediate: true });
 const isBookmarked = (id) => bookmarkedIds.value.includes(String(id));
 
 // Impor sekali bookmark lama dari localStorage perangkat ini
@@ -210,6 +270,7 @@ const toggleBookmark = async (id) => {
   bookmarkedIds.value = wasOn ? bookmarkedIds.value.filter((i) => i !== key) : [...bookmarkedIds.value, key];
   try {
     await axios.post(`/media-intelligence/articles/${key}/bookmark`);
+    router.reload({ only: ['stats', 'facets'], preserveScroll: true });
     showToastNotification(wasOn ? 'Berita dihapus dari Bookmark Tersimpan' : 'Berita disimpan ke Bookmark (aman dari pembersihan)');
   } catch (e) {
     bookmarkedIds.value = wasOn ? [...bookmarkedIds.value, key] : bookmarkedIds.value.filter((i) => i !== key);
@@ -236,6 +297,7 @@ const perPage = computed(() => {
   return num * 3;
 });
 const handleSearch = () => {
+  searchQuery.value = searchInput.value.trim();
   currentPage.value = 1;
 };
 
@@ -318,18 +380,110 @@ const getThematicCover = (article) => {
   };
 };
 
-// Filter States
-const selectedPortal = ref('Semua Portal');
-const selectedCategory = ref('all');
-const showBookmarksOnly = ref(false);
-const showRedZoneOnly = ref(false);
-const selectedSentiment = ref('all');
-const searchQuery = ref('');
+// Filter States: pencarian & penyaringan dijalankan di server atas seluruh arsip; state awal dibaca dari URL (props.filters).
+const initialFilters = props.filters || {};
+const selectedPortal = ref(initialFilters.portal || 'Semua Portal');
+const selectedCategory = ref(initialFilters.category || 'all');
+const showBookmarksOnly = ref(!!initialFilters.bookmarks);
+const showRedZoneOnly = ref(initialFilters.sentiment === 'negatif');
+const selectedSentiment = ref(['positif', 'netral'].includes(initialFilters.sentiment) ? initialFilters.sentiment : 'all');
+const searchQuery = ref(initialFilters.q || '');
+const searchInput = ref(initialFilters.q || '');
+const periodFilter = ref(initialFilters.period || 'all');
+const dateFrom = ref(initialFilters.from || '');
+const dateTo = ref(initialFilters.to || '');
+const sortMode = ref(initialFilters.sort || 'newest');
+const wilayahFilter = ref(initialFilters.wilayah || 0);
+const groupDuplicates = ref(initialFilters.group !== false);
 const toastMessage = ref('');
 
-const redZoneCount = computed(() => {
-  return (props.sampleArticles || []).filter((a) => (a.sentiment || '').toLowerCase() === 'negatif').length;
+// Jumlah berita negatif dalam konteks filter aktif (facet server) = isi tombol "Zona Merah".
+const redZoneCount = computed(() => props.facets?.sentiments?.negatif ?? 0);
+
+// Tampilan daftar: kartu (visual) atau daftar ringkas (analis memindai banyak judul sekaligus).
+const viewMode = ref((() => {
+  try { return localStorage.getItem('simod_news_view') === 'list' ? 'list' : 'cards'; } catch (e) { return 'cards'; }
+})());
+watch(viewMode, (v) => {
+  try { localStorage.setItem('simod_news_view', v); } catch (e) { /* penyimpanan peramban tidak tersedia */ }
+  if (v === 'list' && selectedRows.value < 10) {
+    selectedRows.value = 10;
+    onRowsChange();
+  }
 });
+
+const resetAllFilters = () => {
+  selectedPortal.value = 'Semua Portal';
+  selectedCategory.value = 'all';
+  showBookmarksOnly.value = false;
+  showRedZoneOnly.value = false;
+  selectedSentiment.value = 'all';
+  searchQuery.value = '';
+  searchInput.value = '';
+  selectedTopicId.value = null;
+  periodFilter.value = 'all';
+  dateFrom.value = '';
+  dateTo.value = '';
+  sortMode.value = 'newest';
+  wilayahFilter.value = 0;
+  groupDuplicates.value = true;
+  currentPage.value = 1;
+};
+
+const resetPanelFilters = () => {
+  selectedPortal.value = 'Semua Portal';
+  selectedCategory.value = 'all';
+  selectedSentiment.value = 'all';
+  periodFilter.value = 'all';
+  dateFrom.value = '';
+  dateTo.value = '';
+  sortMode.value = 'newest';
+  wilayahFilter.value = 0;
+  groupDuplicates.value = true;
+  currentPage.value = 1;
+};
+
+const periodLabel = computed(() => ({ today: 'Hari ini', '24h': '24 jam', '7d': '7 hari', '30d': '30 hari', custom: 'Rentang tanggal' }[periodFilter.value] || ''));
+const setPeriod = (p) => {
+  periodFilter.value = p;
+  if (p !== 'custom') { dateFrom.value = ''; dateTo.value = ''; }
+};
+
+// Pintasan "Wilayah Saya" (Polres milik pengguna) memakai nama wilayah sebagai kata kunci pencarian.
+const isMyAreaActive = computed(() => !!props.myArea && searchQuery.value.trim().toLowerCase() === props.myArea.keyword.toLowerCase());
+const toggleMyArea = () => {
+  if (!props.myArea) return;
+  const next = isMyAreaActive.value ? '' : props.myArea.keyword;
+  searchInput.value = next;
+  searchQuery.value = next;
+  currentPage.value = 1;
+};
+
+// Pencarian aktif dapat dijadikan Topik Atensi dalam satu klik (hanya untuk yang berhak mengelola topik).
+const saveSearchAsTopic = () => {
+  const terms = props.searchTerms || [];
+  if (!terms.length) return;
+  topicForm.value = {
+    id: null,
+    title: searchQuery.value.trim().slice(0, 80),
+    keywords: terms.join(', '),
+    description: '',
+    priority: 'high',
+    crawl_live: true,
+  };
+  isEditingTopic.value = false;
+  showTopicModal.value = true;
+};
+
+// Sorot kata yang dicari tanpa v-html (aman dari XSS): teks dipecah menjadi potongan biasa & potongan sorot.
+const highlightParts = (text) => {
+  const value = String(text ?? '');
+  const terms = (props.searchTerms || []).filter(Boolean);
+  if (!terms.length || !value) return [{ t: value, hit: false }];
+  const re = new RegExp('(' + terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')', 'gi');
+
+  return value.split(re).map((t, i) => ({ t, hit: i % 2 === 1 })).filter((p) => p.t !== '');
+};
 
 // Tahap 2: AI Copilot Chatbot (SADEWA AI - Global Dispatch)
 const openSadewaGlobal = (query = null) => {
@@ -339,9 +493,65 @@ const openSadewaGlobal = (query = null) => {
 };
 
 // Smart Dossier & Topik Atensi Pimpinan States
-const selectedTopicId = ref(null);
+const selectedTopicId = ref(props.filters?.topic || null);
 watch(selectedTopicId, (v) => {
   if (v) dossierOpen.value = true;
+});
+
+// ---- Sinkron filter ke server (router.get parsial; URL ikut berubah sehingga tautan/refresh memulihkan filter) ----
+const isListLoading = ref(false);
+const queryParams = computed(() => {
+  const p = {};
+  const q = searchQuery.value.trim();
+  if (q) p.q = q;
+  if (periodFilter.value !== 'all') {
+    p.period = periodFilter.value;
+    if (periodFilter.value === 'custom') {
+      if (dateFrom.value) p.from = dateFrom.value;
+      if (dateTo.value) p.to = dateTo.value;
+    }
+  }
+  if (sortMode.value === 'relevance' && q) p.sort = 'relevance';
+  if (selectedPortal.value !== 'Semua Portal') p.portal = selectedPortal.value;
+  if (selectedCategory.value !== 'all') p.category = selectedCategory.value;
+  if (showRedZoneOnly.value) p.sentiment = 'negatif';
+  else if (selectedSentiment.value !== 'all') p.sentiment = selectedSentiment.value;
+  if (showBookmarksOnly.value) p.bookmarks = 1;
+  if (selectedTopicId.value) p.topic = selectedTopicId.value;
+  if (wilayahFilter.value) p.wilayah = wilayahFilter.value;
+  if (!groupDuplicates.value) p.group = 0;
+  if (currentPage.value > 1) p.page = currentPage.value;
+  if (perPage.value !== 15) p.per_page = perPage.value;
+
+  return p;
+});
+
+const LISTING_PROPS = ['sampleArticles', 'articlesMeta', 'searchTerms', 'filters', 'facets', 'stats', 'trend7', 'topics', 'freshness'];
+const fetchListing = () => {
+  isListLoading.value = true;
+  router.get('/media-intelligence', queryParams.value, {
+    preserveState: true,
+    preserveScroll: true,
+    replace: true,
+    only: LISTING_PROPS,
+    onFinish: () => { isListLoading.value = false; },
+  });
+};
+
+// Ganti filter apa pun -> kembali ke halaman 1 (urutan: reset halaman dahulu, lalu satu permintaan).
+watch(
+  [searchQuery, periodFilter, dateFrom, dateTo, sortMode, selectedPortal, selectedCategory, showRedZoneOnly,
+    selectedSentiment, showBookmarksOnly, selectedTopicId, wilayahFilter, groupDuplicates, selectedRows],
+  () => { currentPage.value = 1; }
+);
+watch(queryParams, () => fetchListing(), { flush: 'post' });
+// Server memangkas halaman di luar jangkauan; selaraskan penunjuk halaman.
+watch(() => props.articlesMeta?.page, (p) => {
+  if (p && p !== currentPage.value) currentPage.value = p;
+});
+onMounted(() => {
+  // Jumlah baris tersimpan di peramban dapat berbeda dari bawaan server (15).
+  if (perPage.value !== (props.filters?.per_page ?? 15)) fetchListing();
 });
 const showTopicModal = ref(false);
 const isEditingTopic = ref(false);
@@ -479,27 +689,22 @@ const adoptSuggestion = async (item) => {
         selectedTopicId.value = res.data.topic.id;
       }
 
-      // Masukkan artikel hasil crawling Google News & hasil pencocokan langsung ke feed teratas
-      if (res.data.articles && res.data.articles.length > 0) {
-        const existingUrls = new Set((props.sampleArticles || []).map((a) => a.link));
-        const newArticles = res.data.articles.filter((a) => !existingUrls.has(a.link));
-        if (newArticles.length > 0) {
-          props.sampleArticles.unshift(...newArticles);
-        }
-      }
 
       // Reset filter agar seluruh berita hasil topik atensi langsung tampil utuh
       selectedPortal.value = 'Semua Portal';
       selectedCategory.value = 'all';
       showBookmarksOnly.value = false;
+      showRedZoneOnly.value = false;
       selectedSentiment.value = 'all';
       searchQuery.value = '';
+      searchInput.value = '';
+      periodFilter.value = 'all';
       currentPage.value = 1;
 
       localSuggestedTopics.value = localSuggestedTopics.value.filter(s => s.title !== item.title);
 
       // Sinkronkan state Inertia di latar belakang secara halus
-      router.reload({ preserveScroll: true, only: ['sampleArticles', 'topics'] });
+      fetchListing();
     }
   } catch (err) {
     showToastNotification(err.response?.data?.message || 'Gagal mengadopsi topik, coba lagi.');
@@ -574,13 +779,7 @@ const executeLiveCrawl = async () => {
         pTopic.articles_count = totalCount;
       }
 
-      if (res.data.articles && res.data.articles.length > 0) {
-        const existingUrls = new Set((props.sampleArticles || []).map((a) => a.link));
-        const newArticles = res.data.articles.filter((a) => !existingUrls.has(a.link));
-        if (newArticles.length > 0) {
-          props.sampleArticles.unshift(...newArticles);
-        }
-      }
+      fetchListing();
 
       showLiveCrawlModal.value = false;
       showToastNotification(`Berhasil menarik ${fetchedCount} sebaran berita internet untuk kasus ini!`);
@@ -804,7 +1003,7 @@ const runTopicAiAnalysis = async (topic, forceRefresh = false) => {
       topicAiError.value = res.data?.message || 'Gagal memproses analisis AI kasus ini.';
     }
   } catch (err) {
-    topicAiError.value = err.response?.data?.message || 'Terjadi kendala saat menghubungi Google Gemini API.';
+    topicAiError.value = err.response?.data?.message || 'Terjadi kendala saat menghubungi layanan analisis AI.';
   } finally {
     isAnalyzingTopic.value = false;
   }
@@ -1291,8 +1490,10 @@ const whatsappReportText = computed(() => {
 const isRefreshingRss = ref(false);
 const refreshRssFeeds = () => {
   isRefreshingRss.value = true;
-  router.get('/media-intelligence', { refresh: 1 }, {
+  router.get('/media-intelligence', { ...queryParams.value, refresh: 1 }, {
     preserveScroll: true,
+    preserveState: true,
+    replace: true,
     onFinish: () => {
       isRefreshingRss.value = false;
       toastMessage.value = 'Sinkronisasi berita RSS selesai!';
@@ -1303,70 +1504,10 @@ const refreshRssFeeds = () => {
   });
 };
 
-// Filtered Articles Computed
-const filteredArticles = computed(() => {
-  let list = props.sampleArticles || [];
-
-  // Filter Portal
-  if (selectedPortal.value !== 'Semua Portal') {
-    if (selectedPortal.value.includes('SEBARAN INTERNET')) {
-      list = list.filter((a) => !a.feed_id || a.source_id === 0 || (a.link && a.link.includes('news.google.com')));
-    } else {
-      const target = selectedPortal.value.trim().toLowerCase();
-      list = list.filter((a) => (a.source_name || '').trim().toLowerCase() === target);
-    }
-  }
-
-  // Filter Kategori
-  if (showBookmarksOnly.value) {
-    list = list.filter((a) => bookmarkedIds.value.includes(a.id));
-  }
-  if (selectedCategory.value !== 'all') {
-    list = list.filter((a) => a.category.toLowerCase() === selectedCategory.value.toLowerCase());
-  }
-
-  // Filter Sentimen
-  if (selectedSentiment.value !== 'all') {
-    list = list.filter((a) => (a.sentiment || 'netral').toLowerCase() === selectedSentiment.value.toLowerCase());
-  }
-
-  // Tahap 1: Filter Cepat Isu Negatif/Sensitif Saja (Zona Merah)
-  if (showRedZoneOnly.value) {
-    list = list.filter((a) => (a.sentiment || '').toLowerCase() === 'negatif');
-  }
-
-  // Filter Search
-  if (searchQuery.value.trim()) {
-    const q = searchQuery.value.toLowerCase();
-    list = list.filter((a) => (a.title && a.title.toLowerCase().includes(q)) || (a.summary && a.summary.toLowerCase().includes(q)));
-  }
-
-  // Filter Topik Atensi Pimpinan (Smart Dossier)
-  if (selectedTopicId.value) {
-    const curTopic = (props.topics || []).find((t) => t.id === selectedTopicId.value);
-    const kws = (curTopic?.keywords_array || [])
-      .map((k) => k.replace(/^[#]/, '').trim().toLowerCase())
-      .filter((k) => k.length >= 3);
-
-    list = list.filter((a) => {
-      if ((a.matched_topic_ids || []).includes(selectedTopicId.value)) return true;
-      if ((a.manual_topic_ids || []).includes(selectedTopicId.value)) return true;
-      if (kws.length > 0) {
-        const text = ((a.title || '') + ' ' + (a.summary || '')).toLowerCase();
-        return kws.some((k) => text.includes(k));
-      }
-      return false;
-    });
-  }
-
-  return list;
-});
-
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredArticles.value.length / perPage.value)));
-const paginatedArticles = computed(() => {
-  const start = (currentPage.value - 1) * perPage.value;
-  return filteredArticles.value.slice(start, start + perPage.value);
-});
+// Daftar sudah difilter, digabung (berita ganda), diurutkan & dipaginasi oleh server.
+const filteredArticles = computed(() => props.sampleArticles || []);
+const paginatedArticles = filteredArticles;
+const totalPages = computed(() => Math.max(1, props.articlesMeta?.last_page || 1));
 
 // Smart page window generator (e.g. [1, 2, 3, 4, 5, '...', 9])
 const visiblePages = computed(() => {
@@ -1491,9 +1632,14 @@ const submitIssue = () => {
     <!-- Header ringkas: 1 aksi utama + SADEWA + menu lainnya -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 md:p-5 rounded-3xl bg-gradient-to-r from-[#0d182e] via-[#0b1426] to-[#070d1d] border border-slate-800 shadow-xl relative">
       <div class="space-y-1 min-w-0">
-        <div class="flex items-center gap-2 text-[11px] font-bold text-emerald-400">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-          <span>Live &bull; {{ mediaFeeds?.length || 0 }} portal aktif</span>
+        <div class="flex items-center gap-2 text-[11px] font-bold flex-wrap" :class="freshClass.text" role="status">
+          <span class="relative flex h-2 w-2">
+            <span v-if="freshState.level === 'green'" class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" :class="freshClass.dot"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2" :class="freshClass.dot"></span>
+          </span>
+          <span>{{ freshState.label }}</span>
+          <span class="text-slate-400 font-semibold">&bull; {{ portalsActive }} portal aktif</span>
+          <span v-if="freshState.level !== 'green'" class="text-slate-300 font-semibold">&bull; {{ freshState.hint }}</span>
         </div>
         <h1 class="text-xl md:text-2xl font-extrabold text-white tracking-tight">Radar Media Online</h1>
         <p class="text-xs text-slate-400 truncate">
@@ -1526,7 +1672,7 @@ const submitIssue = () => {
         </button>
 
         <!-- Menu lainnya -->
-        <div class="relative">
+        <div v-if="showAnalysisTabs" class="relative">
           <button
             type="button"
             @click.stop="openMenu = openMenu === 'more' ? null : 'more'"
@@ -1556,30 +1702,30 @@ const submitIssue = () => {
     <!-- KPI strip: angka + sparkline 7 hari + selisih vs kemarin -->
     <div class="rounded-2xl bg-[#0b1426] border border-slate-800 shadow-lg grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-slate-800 overflow-hidden">
       <div class="p-4 space-y-1.5">
-        <p class="text-[11px] font-bold text-slate-400 flex items-center gap-1.5"><Newspaper class="w-3.5 h-3.5 text-sky-400" /> Berita Tersimpan</p>
+        <p class="text-[11px] font-bold text-slate-400 flex items-center gap-1.5"><Newspaper class="w-3.5 h-3.5 text-sky-400" /> Berita 24 Jam</p>
         <div class="flex items-end justify-between gap-2">
-          <p class="text-2xl font-black text-white leading-none">{{ sampleArticles?.length || 0 }}</p>
+          <p class="text-2xl font-black text-white leading-none">{{ stats?.last24 ?? 0 }}</p>
           <svg v-if="trend7.length > 1" viewBox="0 0 100 28" preserveAspectRatio="none" class="w-20 h-7 text-sky-400" aria-hidden="true">
             <polyline :points="sparkPoints('total')" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
           </svg>
         </div>
-        <p class="text-[11px] text-slate-400">{{ deltaLabel('total') || '7 hari terakhir' }}</p>
+        <p class="text-[11px] text-slate-400">{{ deltaText(stats?.last24, stats?.prev24) }} &bull; arsip {{ stats?.total ?? 0 }}</p>
       </div>
 
       <button
         type="button"
-        @click="activeTab = '01'; showRedZoneOnly = true; showBookmarksOnly = false; currentPage = 1"
+        @click="activeTab = '01'; showBookmarksOnly = false; selectedTopicId = null; periodFilter = '24h'; showRedZoneOnly = true; currentPage = 1"
         class="p-4 space-y-1.5 text-left hover:bg-slate-800/40 transition cursor-pointer"
-        title="Lihat berita Zona Merah"
+        title="Lihat berita Zona Merah 24 jam terakhir"
       >
-        <p class="text-[11px] font-bold text-slate-400 flex items-center gap-1.5"><AlertTriangle class="w-3.5 h-3.5 text-rose-400" /> Zona Merah</p>
+        <p class="text-[11px] font-bold text-slate-400 flex items-center gap-1.5"><AlertTriangle class="w-3.5 h-3.5 text-rose-400" /> Zona Merah 24 Jam</p>
         <div class="flex items-end justify-between gap-2">
-          <p class="text-2xl font-black leading-none" :class="redZoneCount > 0 ? 'text-rose-400' : 'text-white'">{{ redZoneCount }}</p>
+          <p class="text-2xl font-black leading-none" :class="(stats?.negative24 || 0) > 0 ? 'text-rose-400' : 'text-white'">{{ stats?.negative24 ?? 0 }}</p>
           <svg v-if="trend7.length > 1" viewBox="0 0 100 28" preserveAspectRatio="none" class="w-20 h-7 text-rose-400" aria-hidden="true">
             <polyline :points="sparkPoints('negatif')" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
           </svg>
         </div>
-        <p class="text-[11px]" :class="trendDelta('negatif') > 0 ? 'text-rose-300 font-bold' : 'text-slate-400'">{{ deltaLabel('negatif') || 'berita negatif' }}</p>
+        <p class="text-[11px]" :class="(stats?.negative24 || 0) > (stats?.negative_prev24 || 0) ? 'text-rose-300 font-bold' : 'text-slate-400'">{{ deltaText(stats?.negative24, stats?.negative_prev24) }}</p>
       </button>
 
       <button
@@ -1600,8 +1746,8 @@ const submitIssue = () => {
       </div>
     </div>
 
-    <!-- Navigation Tabs Bar (4 Pilar Terpadu 01 - 04) -->
-    <div class="p-2 rounded-2xl bg-[#08101e] border border-slate-800 shadow-xl">
+    <!-- Navigation Tabs Bar (4 Pilar Terpadu 01 - 04; operator hanya melihat tab Berita) -->
+    <div v-if="tabs.length > 1" class="p-2 rounded-2xl bg-[#08101e] border border-slate-800 shadow-xl">
       <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
         <button
           v-for="t in tabs"
@@ -1632,7 +1778,7 @@ const submitIssue = () => {
             class="px-2 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase ml-0.5"
             :class="[
               t.id === '01'
-                ? 'bg-rose-500 text-white animate-pulse'
+                ? (freshState.level === 'green' ? 'bg-emerald-500 text-white animate-pulse' : (freshState.level === 'yellow' ? 'bg-amber-400 text-slate-950' : 'bg-rose-600 text-white'))
                 : t.id === '03'
                   ? 'bg-rose-500 text-white shadow-sm'
                   : t.id === '04'
@@ -1668,7 +1814,7 @@ const submitIssue = () => {
       </div>
 
       <!-- SMART DOSSIER: TOPIK ATENSI & REQUEST PIMPINAN (EXECUTIVE DOSSIER HUB) -->
-      <div class="rounded-3xl bg-[#0b1426] border border-amber-500/30 p-5 shadow-2xl space-y-4">
+      <div v-if="canManageTopics || (topics || []).length > 0" class="rounded-3xl bg-[#0b1426] border border-amber-500/30 p-5 shadow-2xl space-y-4">
         <!-- Top Bar: Title, Count Badge & Actions -->
         <div class="flex items-center justify-between gap-3 flex-wrap" :class="dossierOpen ? 'pb-3 border-b border-slate-800' : ''">
           <div class="space-y-0.5">
@@ -2222,7 +2368,7 @@ const submitIssue = () => {
                 ? 'bg-slate-950 text-amber-300 font-black'
                 : 'bg-slate-800 text-slate-300 font-bold'"
             >
-              {{ props.sampleArticles?.length || 0 }}
+              {{ allCount }}
             </span>
           </button>
 
@@ -2266,7 +2412,7 @@ const submitIssue = () => {
               class="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold"
               :class="showBookmarksOnly ? 'bg-slate-950 text-amber-300' : 'bg-amber-400/20 text-amber-300'"
             >
-              {{ bookmarkedIds.length }}
+              {{ facets?.bookmarks ?? 0 }}
             </span>
           </button>
 
@@ -2301,7 +2447,7 @@ const submitIssue = () => {
                   @change="selectedTopicId = null; currentPage = 1"
                   class="w-full px-2.5 py-2 rounded-xl text-xs font-bold bg-[#070d19] border border-slate-700 text-white focus:outline-none focus:border-amber-400 cursor-pointer"
                 >
-                  <option value="Semua Portal">Semua Portal ({{ availablePortals.length || 29 }})</option>
+                  <option value="Semua Portal">Semua Portal ({{ facets?.all ?? 0 }})</option>
                   <option v-for="p in availablePortals" :key="p.name" :value="p.name">{{ p.name }} ({{ p.count }})</option>
                 </select>
               </label>
@@ -2313,9 +2459,41 @@ const submitIssue = () => {
                   @change="currentPage = 1"
                   class="w-full px-2.5 py-2 rounded-xl text-xs font-bold bg-[#070d19] border border-slate-700 text-white focus:outline-none focus:border-amber-400 cursor-pointer"
                 >
-                  <option value="all">Semua ({{ sampleArticles?.length || 0 }})</option>
+                  <option value="all">Semua ({{ categoryTotal }})</option>
                   <option v-for="cat in availableCategories" :key="cat.name" :value="cat.name">{{ cat.name }} ({{ cat.count }})</option>
                 </select>
+              </label>
+
+              <label class="block space-y-1">
+                <span class="text-[11px] font-bold text-slate-400">Sentimen</span>
+                <select
+                  v-model="selectedSentiment"
+                  @change="showRedZoneOnly = false"
+                  class="w-full px-2.5 py-2 rounded-xl text-xs font-bold bg-[#070d19] border border-slate-700 text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+                >
+                  <option value="all">Semua ({{ allCount }})</option>
+                  <option value="positif">Positif ({{ facets?.sentiments?.positif ?? 0 }})</option>
+                  <option value="netral">Netral ({{ facets?.sentiments?.netral ?? 0 }})</option>
+                  <option value="negatif">Negatif ({{ facets?.sentiments?.negatif ?? 0 }})</option>
+                </select>
+              </label>
+
+              <label v-if="isNational && (facets?.wilayah || []).length" class="block space-y-1">
+                <span class="text-[11px] font-bold text-slate-400">Wilayah (Polda)</span>
+                <select
+                  v-model.number="wilayahFilter"
+                  class="w-full px-2.5 py-2 rounded-xl text-xs font-bold bg-[#070d19] border border-slate-700 text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+                >
+                  <option :value="0">Seluruh wilayah ({{ facets?.all ?? 0 }})</option>
+                  <option v-for="w in facets.wilayah" :key="w.id" :value="w.id">{{ w.name }} ({{ w.count }})</option>
+                </select>
+              </label>
+
+              <label class="flex items-start gap-2 cursor-pointer select-none">
+                <input v-model="groupDuplicates" type="checkbox" class="mt-0.5 accent-amber-400" />
+                <span class="text-[11px] font-bold text-slate-300">Gabungkan berita ganda lintas portal
+                  <span class="block font-medium text-slate-500">Satu kartu untuk berita berjudul sama; portal lain ditampilkan di menu kartu.</span>
+                </span>
               </label>
 
               <label class="block space-y-1">
@@ -2335,7 +2513,7 @@ const submitIssue = () => {
               </label>
 
               <div class="flex items-center justify-between pt-1">
-                <button type="button" @click="selectedPortal = 'Semua Portal'; selectedCategory = 'all'; currentPage = 1" class="text-[11px] font-bold text-slate-400 hover:text-white cursor-pointer">Atur ulang</button>
+                <button type="button" @click="resetPanelFilters()" class="text-[11px] font-bold text-slate-400 hover:text-white cursor-pointer">Atur ulang</button>
                 <button type="button" @click="showFilterPanel = false" class="px-3 py-1.5 rounded-lg bg-amber-400 text-slate-950 text-xs font-black cursor-pointer">Selesai</button>
               </div>
             </div>
@@ -2348,15 +2526,17 @@ const submitIssue = () => {
           <div class="relative flex-1 max-w-xs">
             <Search class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
-              v-model="searchQuery"
+              v-model="searchInput"
               @keyup.enter="handleSearch"
               type="text"
-              placeholder="Cari berita (tekan Enter)..."
+              maxlength="200"
+              placeholder='Cari: kata, "frasa", -kecualikan (Enter)'
+              title='Contoh: kapolri "jenderal bintang 4" -hoaks &#10;Semua kata harus ada. Tanda kutip = frasa persis. Awalan minus = kecualikan.'
               class="w-full pl-9 pr-8 py-2 rounded-xl bg-[#070d19] border border-slate-700 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-amber-400"
             />
             <button
-              v-if="searchQuery"
-              @click="searchQuery = ''; currentPage = 1"
+              v-if="searchInput"
+              @click="searchInput = ''; searchQuery = ''; currentPage = 1"
               type="button"
               class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
               title="Bersihkan pencarian"
@@ -2377,10 +2557,63 @@ const submitIssue = () => {
           <!-- Count Indicator -->
           <div class="text-xs text-slate-400 shrink-0 whitespace-nowrap hidden lg:flex items-center gap-1.5 pl-2 border-l border-slate-800">
             <span>Menampilkan</span>
-            <strong class="text-amber-400 font-extrabold">{{ paginatedArticles.length }}</strong>
+            <strong class="text-amber-400 font-extrabold">{{ articlesMeta?.from ?? 0 }}&ndash;{{ articlesMeta?.to ?? 0 }}</strong>
             <span>dari</span>
-            <strong class="text-white font-extrabold">{{ filteredArticles.length }}</strong>
+            <strong class="text-white font-extrabold">{{ articlesMeta?.total ?? 0 }}</strong>
           </div>
+        </div>
+      </div>
+
+      <!-- Baris kendali: periode, urutan, tampilan, pintasan -->
+      <div class="flex flex-wrap items-center gap-2 -mt-2">
+        <div class="flex items-center gap-1 p-1 rounded-xl bg-[#070d19] border border-slate-800" role="group" aria-label="Periode berita">
+          <button
+            v-for="p in [{ id: 'today', l: 'Hari ini' }, { id: '24h', l: '24 jam' }, { id: '7d', l: '7 hari' }, { id: '30d', l: '30 hari' }, { id: 'all', l: 'Semua' }, { id: 'custom', l: 'Tanggal' }]"
+            :key="p.id"
+            type="button"
+            @click="setPeriod(p.id)"
+            class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer"
+            :class="periodFilter === p.id ? 'bg-amber-400 text-slate-950' : 'text-slate-300 hover:text-white hover:bg-slate-800'"
+          >{{ p.l }}</button>
+        </div>
+
+        <div v-if="periodFilter === 'custom'" class="flex items-center gap-1.5 text-[11px] text-slate-300">
+          <input v-model="dateFrom" type="date" aria-label="Dari tanggal" class="px-2 py-1 rounded-lg bg-[#070d19] border border-slate-700 text-white text-[11px] focus:outline-none focus:border-amber-400" />
+          <span>s.d.</span>
+          <input v-model="dateTo" type="date" aria-label="Sampai tanggal" class="px-2 py-1 rounded-lg bg-[#070d19] border border-slate-700 text-white text-[11px] focus:outline-none focus:border-amber-400" />
+        </div>
+
+        <div v-if="searchQuery" class="flex items-center gap-1 p-1 rounded-xl bg-[#070d19] border border-slate-800" role="group" aria-label="Urutan">
+          <button type="button" @click="sortMode = 'newest'" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer" :class="sortMode === 'newest' ? 'bg-amber-400 text-slate-950' : 'text-slate-300 hover:text-white hover:bg-slate-800'">Terbaru</button>
+          <button type="button" @click="sortMode = 'relevance'" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer" :class="sortMode === 'relevance' ? 'bg-amber-400 text-slate-950' : 'text-slate-300 hover:text-white hover:bg-slate-800'">Paling relevan</button>
+        </div>
+
+        <button
+          v-if="myArea"
+          type="button"
+          @click="toggleMyArea"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black transition cursor-pointer border"
+          :class="isMyAreaActive ? 'bg-amber-400 text-slate-950 border-amber-300' : 'bg-[#070d19] text-amber-300 border-amber-400/40 hover:border-amber-400'"
+          :title="'Cari berita yang menyebut ' + myArea.keyword"
+        >
+          <MapPin class="w-3.5 h-3.5" />
+          <span>Wilayah Saya: {{ myArea.keyword }}</span>
+        </button>
+
+        <button
+          v-if="canManageTopics && searchQuery && (searchTerms || []).length"
+          type="button"
+          @click="saveSearchAsTopic"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black bg-[#070d19] text-amber-300 border border-amber-400/40 hover:border-amber-400 transition cursor-pointer"
+          title="Jadikan pencarian ini Topik Atensi pimpinan"
+        >
+          <Pin class="w-3.5 h-3.5" />
+          <span>Simpan pencarian jadi Topik Atensi</span>
+        </button>
+
+        <div class="ml-auto flex items-center gap-1 p-1 rounded-xl bg-[#070d19] border border-slate-800" role="group" aria-label="Tampilan daftar">
+          <button type="button" @click="viewMode = 'cards'" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer" :class="viewMode === 'cards' ? 'bg-amber-400 text-slate-950' : 'text-slate-300 hover:text-white hover:bg-slate-800'">Kartu</button>
+          <button type="button" @click="viewMode = 'list'" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer" :class="viewMode === 'list' ? 'bg-amber-400 text-slate-950' : 'text-slate-300 hover:text-white hover:bg-slate-800'">Daftar</button>
         </div>
       </div>
 
@@ -2403,6 +2636,38 @@ const submitIssue = () => {
         >
           Kategori: {{ selectedCategory }} <X class="w-3 h-3" />
         </button>
+        <button
+          v-if="periodFilter !== 'all'"
+          type="button"
+          @click="setPeriod('all')"
+          class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-900 border border-slate-700 text-slate-200 hover:border-amber-400 cursor-pointer"
+        >
+          Periode: {{ periodLabel }} <X class="w-3 h-3" />
+        </button>
+        <button
+          v-if="selectedSentiment !== 'all'"
+          type="button"
+          @click="selectedSentiment = 'all'; currentPage = 1"
+          class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-900 border border-slate-700 text-slate-200 hover:border-amber-400 cursor-pointer"
+        >
+          Sentimen: {{ selectedSentiment }} <X class="w-3 h-3" />
+        </button>
+        <button
+          v-if="wilayahFilter"
+          type="button"
+          @click="wilayahFilter = 0; currentPage = 1"
+          class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-900 border border-slate-700 text-slate-200 hover:border-amber-400 cursor-pointer"
+        >
+          Wilayah: {{ (facets?.wilayah || []).find((w) => w.id === wilayahFilter)?.name || wilayahFilter }} <X class="w-3 h-3" />
+        </button>
+        <button
+          v-if="!groupDuplicates"
+          type="button"
+          @click="groupDuplicates = true"
+          class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-900 border border-slate-700 text-slate-200 hover:border-amber-400 cursor-pointer"
+        >
+          Berita ganda ditampilkan <X class="w-3 h-3" />
+        </button>
       </div>
 
       <!-- Alert Banner Mode Zona Merah Aktif -->
@@ -2417,7 +2682,7 @@ const submitIssue = () => {
               <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white animate-pulse">ATENSI KERAWANAN</span>
             </div>
             <p class="text-slate-300 text-[11px] mt-0.5">
-              Menyaring secara khusus <strong>{{ filteredArticles.length }}</strong> berita bersentimen negatif dari total <strong>{{ props.sampleArticles?.length || 0 }}</strong> pemantauan media siber untuk respons cepat piket intelijen.
+              Menyaring secara khusus <strong>{{ articlesMeta?.total ?? 0 }}</strong> berita bersentimen negatif dari total <strong>{{ allCount }}</strong> pemantauan media siber untuk respons cepat piket intelijen.
             </p>
           </div>
         </div>
@@ -2432,8 +2697,8 @@ const submitIssue = () => {
       </div>
 
       <!-- KARTU-KARTU BERITA (PERSIS GAMBAR 1 & 2) -->
-      <div v-if="filteredArticles.length > 0" id="article-list-container" class="space-y-6">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div v-if="filteredArticles.length > 0" id="article-list-container" class="space-y-6 transition-opacity" :class="isListLoading ? 'opacity-60' : ''" :aria-busy="isListLoading">
+        <div v-if="viewMode === 'cards'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           <div
             v-for="article in paginatedArticles"
             :key="article.id"
@@ -2519,7 +2784,7 @@ const submitIssue = () => {
                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                     <span>SINDIKASI PERS SIBER</span>
                   </span>
-                  <span class="font-bold text-slate-400">POLRI PRESISI</span>
+                  <span class="font-bold text-slate-400">POLISI BERSAMA MASYARAKAT</span>
                 </div>
               </div>
 
@@ -2535,6 +2800,16 @@ const submitIssue = () => {
                   <span class="px-2.5 py-0.5 rounded-md text-[9px] font-extrabold uppercase bg-slate-900/90 text-slate-300 border border-slate-700/80 tracking-wider">
                     {{ article.category_badge || article.category || (isDivhumas ? 'NASIONAL & MABES' : 'REGIONAL') }}
                   </span>
+                  <span
+                    v-if="article.dupe_count > 0"
+                    class="px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase bg-sky-500/15 text-sky-300 border border-sky-500/40 tracking-wider"
+                    :title="'Juga tayang di: ' + (article.also_in || []).map((o) => o.source_name).join(', ')"
+                  >+{{ article.dupe_count }} portal</span>
+                  <span
+                    v-if="isNational && article.polda_code"
+                    class="px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase bg-slate-800 text-amber-300 border border-amber-400/30 tracking-wider"
+                    :title="'Wilayah: ' + article.polda_code"
+                  >{{ article.polda_code }}</span>
                   <!-- Topic Dossier Badges -->
                   <span
                     v-for="top in (article.matched_topics || [])"
@@ -2564,12 +2839,12 @@ const submitIssue = () => {
                   class="block font-black text-sm md:text-[14px] text-white group-hover:text-amber-400 transition leading-snug line-clamp-2 h-10 md:h-11 overflow-hidden"
                   :title="article.title"
                 >
-                  {{ article.title }}
+                  <template v-for="(seg, i) in highlightParts(article.title)" :key="i"><mark v-if="seg.hit" class="bg-amber-400/30 text-inherit rounded px-0.5">{{ seg.t }}</mark><template v-else>{{ seg.t }}</template></template>
                 </a>
 
                 <!-- Summary Excerpt (Cleaned and Uniform Height 2-line clamp) -->
                 <p class="text-xs text-slate-300 line-clamp-2 h-9 overflow-hidden leading-relaxed">
-                  {{ getCleanSummary(article) }}
+                  <template v-for="(seg, i) in highlightParts(getCleanSummary(article))" :key="i"><mark v-if="seg.hit" class="bg-amber-400/30 text-inherit rounded px-0.5">{{ seg.t }}</mark><template v-else>{{ seg.t }}</template></template>
                 </p>
               </div>
 
@@ -2645,10 +2920,87 @@ const submitIssue = () => {
                         <Pin class="w-4 h-4 text-amber-400" />
                         <span>Tag Kasus Atensi</span>
                       </button>
+                      <div v-if="(article.also_in || []).length" class="mt-1 pt-1.5 border-t border-slate-700/70">
+                        <p class="px-3 pb-1 text-[10px] font-black uppercase tracking-wider text-slate-500">Juga tayang di</p>
+                        <a
+                          v-for="o in article.also_in"
+                          :key="o.link"
+                          :href="o.link"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-200 hover:bg-slate-800 hover:text-white transition"
+                        >
+                          <span class="truncate">{{ o.source_name }}</span>
+                          <ExternalLink class="w-3 h-3 text-blue-400 shrink-0" />
+                        </a>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tampilan DAFTAR RINGKAS: banyak judul per layar untuk analis -->
+        <div v-else class="rounded-2xl bg-[#0b1426] border border-slate-800 shadow-xl divide-y divide-slate-800/80 overflow-hidden">
+          <div
+            v-for="article in paginatedArticles"
+            :key="article.id"
+            class="flex items-start gap-3 px-4 py-3 hover:bg-slate-800/40 transition"
+          >
+            <span
+              class="mt-1.5 w-2 h-2 rounded-full shrink-0"
+              :class="article.sentiment === 'negatif' ? 'bg-rose-500' : (article.sentiment === 'positif' ? 'bg-emerald-400' : 'bg-slate-500')"
+              :title="'Sentimen: ' + article.sentiment"
+            ></span>
+            <div class="min-w-0 flex-1 space-y-1">
+              <a
+                :href="article.link"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="block text-[13px] font-bold text-white hover:text-amber-400 transition leading-snug"
+              >
+                <template v-for="(seg, i) in highlightParts(article.title)" :key="i"><mark v-if="seg.hit" class="bg-amber-400/30 text-inherit rounded px-0.5">{{ seg.t }}</mark><template v-else>{{ seg.t }}</template></template>
+              </a>
+              <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-slate-400">
+                <span class="font-black text-amber-400/90 uppercase tracking-wide">{{ article.source_name }}</span>
+                <span>{{ article.pub_date }}</span>
+                <span class="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 text-[10px] font-bold uppercase text-slate-300">{{ article.category_badge || article.category }}</span>
+                <span v-if="isNational && article.polda_code" class="px-1.5 py-0.5 rounded bg-slate-800 border border-amber-400/30 text-[10px] font-bold text-amber-300">{{ article.polda_code }}</span>
+                <span v-for="top in (article.matched_topics || [])" :key="top.id" class="px-1.5 py-0.5 rounded bg-amber-400/15 border border-amber-400/40 text-[10px] font-bold text-amber-300" :title="'Topik Atensi: ' + top.title">&#128204; {{ top.title }}</span>
+              </div>
+              <p v-if="(article.also_in || []).length" class="text-[11px] text-sky-300/90">
+                Juga tayang di:
+                <a
+                  v-for="(o, i) in article.also_in"
+                  :key="o.link"
+                  :href="o.link"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="hover:underline"
+                >{{ o.source_name }}<span v-if="i < article.also_in.length - 1">, </span></a>
+                <span v-if="article.dupe_count > article.also_in.length"> (+{{ article.dupe_count - article.also_in.length }})</span>
+              </p>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                @click.stop="toggleBookmark(article.id)"
+                class="p-1.5 rounded-lg border transition cursor-pointer"
+                :class="isBookmarked(article.id) ? 'bg-amber-400 text-slate-950 border-amber-300' : 'bg-slate-900 text-amber-300 border-slate-700 hover:bg-slate-800'"
+                :title="isBookmarked(article.id) ? 'Hapus dari Bookmark Tersimpan' : 'Simpan / Bookmark Berita Ini'"
+              >
+                <Bookmark class="w-3.5 h-3.5" :class="isBookmarked(article.id) ? 'fill-slate-950' : ''" />
+              </button>
+              <button
+                type="button"
+                @click.stop="openIssueModal(article)"
+                class="p-1.5 rounded-lg border bg-slate-900 text-slate-200 border-slate-700 hover:bg-slate-800 hover:text-white transition cursor-pointer"
+                title="Jadikan laporan isu publik baru"
+              >
+                <Plus class="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
         </div>
@@ -2691,7 +3043,7 @@ const submitIssue = () => {
             </div>
 
             <p class="text-[11px] text-slate-400 font-medium">
-              Halaman <span class="text-amber-400 font-bold">{{ currentPage }}</span> dari <span class="text-white font-bold">{{ totalPages }}</span> &bull; Menampilkan {{ ((currentPage - 1) * perPage) + 1 }}-{{ Math.min(currentPage * perPage, filteredArticles.length) }} dari {{ filteredArticles.length }} Berita &bull; <span class="text-amber-400 font-bold">{{ selectedRows }} Baris</span> ({{ perPage }} kartu / hal)
+              Halaman <span class="text-amber-400 font-bold">{{ currentPage }}</span> dari <span class="text-white font-bold">{{ totalPages }}</span> &bull; Menampilkan {{ articlesMeta?.from ?? 0 }}-{{ articlesMeta?.to ?? 0 }} dari {{ articlesMeta?.total ?? 0 }} Berita &bull; <span class="text-amber-400 font-bold">{{ selectedRows }} Baris</span> ({{ perPage }} kartu / hal)
             </p>
 
             <!-- Quick Row Selector at Bottom -->
@@ -2731,11 +3083,11 @@ const submitIssue = () => {
         <Newspaper class="w-12 h-12 mx-auto text-slate-600" />
         <h3 class="text-base font-bold text-white">Tidak ada artikel yang sesuai dengan filter</h3>
         <p class="text-xs text-slate-400 max-w-sm mx-auto">
-          Coba ganti pilihan portal, ubah kategori, atau klik tombol "Sinkron Berita" untuk menarik berita terkini dari seluruh portal.
+          Coba ubah kata kunci, perluas periode, atau klik tombol "Sinkron Berita" untuk menarik berita terkini dari seluruh portal.
         </p>
         <div class="flex items-center justify-center gap-3 flex-wrap">
           <button
-            @click="selectedPortal = 'Semua Portal'; selectedCategory = 'all'; showBookmarksOnly = false; showRedZoneOnly = false; selectedSentiment = 'all'; searchQuery = ''; selectedTopicId = null; currentPage = 1"
+            @click="resetAllFilters()"
             class="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs cursor-pointer transition shadow-sm"
           >
             Reset Semua Filter
@@ -2757,6 +3109,17 @@ const submitIssue = () => {
     <!-- TAB 02: BERITA & BRIEFING (EXECUTIVE SNAPSHOT & FORMAT WA RESMI)           -->
     <!-- ========================================================================= -->
     <div v-show="activeTab === '02'" class="space-y-6">
+      <!-- Situasi 24 jam (pimpinan): angka nyata dari basis data, bukan hasil AI -->
+      <MediaSituationCard
+        v-if="situation"
+        :situation="situation"
+        :stats="stats"
+        :fresh="freshState"
+        :top-concern="report?.top_concern || ''"
+        @show-redzone="activeTab = '01'; showBookmarksOnly = false; selectedTopicId = null; periodFilter = '24h'; showRedZoneOnly = true; currentPage = 1"
+        @copy-wa="copyWaReport()"
+      />
+
       <!-- Executive Briefing 200 Words -->
       <div class="rounded-3xl bg-gradient-to-br from-[#0c162e] to-[#080f20] border border-amber-400/30 p-6 shadow-2xl space-y-3">
         <div class="flex items-center justify-between border-b border-slate-800/80 pb-3 flex-wrap gap-2">
@@ -2767,8 +3130,9 @@ const submitIssue = () => {
             </h2>
             <span v-if="props.aiSetting?.has_api_key" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-300 text-[10px] font-black">
               <Bot class="w-3 h-3 text-amber-400" />
-              <span>{{ props.aiSetting?.gemini_model ? 'AI: ' + props.aiSetting.gemini_model : 'Mesin AI' }}</span>
+              <span>{{ props.aiSetting?.gemini_model ? 'AI: ' + props.aiSetting.gemini_model : 'Analisis AI' }}</span>
             </span>
+            <AiQuotaBadge />
           </div>
           <div class="flex items-center gap-2">
             <button
@@ -3614,7 +3978,7 @@ const submitIssue = () => {
             <Sparkles class="w-5 h-5 text-amber-400" />
             <div>
               <h3 class="text-base font-extrabold text-white">{{ promptModalTitle || 'Formula Prompt AI Presisi' }}</h3>
-              <p class="text-xs text-slate-400">Siap digunakan di ChatGPT (GPT-4o), Claude 3.5 Sonnet, atau Gemini Pro</p>
+              <p class="text-xs text-slate-400">Siap digunakan di asisten AI pilihan Anda</p>
             </div>
           </div>
           <button @click="showPromptModal = false" class="text-slate-400 hover:text-white">
@@ -3969,7 +4333,7 @@ const submitIssue = () => {
     </div>
 
     <!-- ========================================================================= -->
-    <!-- MODAL 7: HASIL ANALISIS AI KHUSUS TOPIK ATENSI (GEMINI PRO)               -->
+    <!-- MODAL 7: HASIL ANALISIS AI KHUSUS TOPIK ATENSI               -->
     <!-- ========================================================================= -->
     <div
       v-if="showTopicAiModal && activeAnalyzingTopic"
@@ -3981,7 +4345,7 @@ const submitIssue = () => {
           <div class="space-y-1">
             <div class="flex items-center gap-2 flex-wrap">
               <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950">
-                Google Gemini Pro
+                Analisis AI
               </span>
               <span
                 class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider"
@@ -4011,7 +4375,7 @@ const submitIssue = () => {
               :disabled="isAnalyzingTopic"
               type="button"
               class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-bold transition cursor-pointer disabled:opacity-50 select-none"
-              title="Analisis ulang kasus dengan berita terkini menggunakan Gemini AI"
+              title="Analisis ulang kasus dengan berita terkini menggunakan AI"
             >
               <RotateCw class="w-3.5 h-3.5 text-amber-400" :class="{ 'animate-spin': isAnalyzingTopic }" />
               <span>{{ isAnalyzingTopic ? 'Menganalisis...' : 'Perbarui Analisis' }}</span>

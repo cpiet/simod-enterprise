@@ -31,106 +31,51 @@ class DashboardController extends Controller
 
         [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
         $poldaId = $poldaId ?? ($selectedPolda?->id ?? ($allPoldas->first()?->id ?? 1));
-        $isNational = ($selectedCode === 'ALL');
+        $isNational = $this->aggregatesNational($selectedCode);
 
         // 1. KPI METRICS (100% Dynamic from DB - National or Specific Polda)
         $totalArticles = MediaArticle::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))->count();
         $activeFeedsCount = MediaFeed::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))->where('is_active', true)->count();
 
-        $priorityIssuesCount = Issue::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))
-            ->whereIn('priority', ['critical', 'high'])
-            ->whereNotIn('status', ['selesai'])
-            ->count();
+        // "Aktif" = laporan yang masih berjalan (menunggu telaah, ditangani, atau tahap klarifikasi).
+        // Draf, selesai (termasuk status lama resolved/closed), dan arsip tidak dihitung.
+        $activeIssueStatuses = array_merge(Issue::STATUS_GROUPS['pending'], Issue::STATUS_GROUPS['active'], Issue::STATUS_GROUPS['clarified']);
+        $issueScope = fn () => Issue::when(!$isNational, fn ($q) => $q->where('polda_id', $poldaId));
 
-        $fieldReportsCount = Issue::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))->count();
-        $pendingVerifyCount = Issue::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))
-            ->whereIn('status', ['monitoring', 'investigasi'])
-            ->count();
+        $priorityIssuesCount = $issueScope()->whereIn('priority', ['critical', 'high'])->whereIn('status', $activeIssueStatuses)->count();
+        $fieldReportsCount = $issueScope()->count();
+        $pendingVerifyCount = $issueScope()->whereIn('status', array_merge(Issue::STATUS_GROUPS['pending'], Issue::STATUS_GROUPS['active']))->count();
 
         $tasksResolvedCount = Task::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))
             ->where('status', 'completed')
             ->count();
         $totalTasksCount = Task::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))->count();
-        $taskCompletionRate = $totalTasksCount > 0 ? (int) round(($tasksResolvedCount / $totalTasksCount) * 100) : 100;
+        // Tanpa tugas sama sekali tidak ada tingkat penyelesaian (null), bukan 100%.
+        $taskCompletionRate = $totalTasksCount > 0 ? (int) round(($tasksResolvedCount / $totalTasksCount) * 100) : null;
 
-        // 2. DYNAMIC 6 POLRES SATWIL STATUSES & GEOSPATIAL MAP DATA
-        $polresList = $selectedPolda ? $selectedPolda->polres : Polres::where('is_active', true)->get();
-        $polresStatuses = [];
-        $hasAtensiSatwil = false;
-        $hasWaspadaSatwil = false;
+        $polresCount = $isNational
+            ? Polres::where('is_active', true)->count()
+            : Polres::where('polda_id', $poldaId)->where('is_active', true)->count();
+        $articles24h = MediaArticle::when(!$isNational, fn ($q) => $q->where('polda_id', $poldaId))
+            ->where('pub_date', '>=', now()->subDay()->format('Y-m-d H:i:s'))
+            ->count();
 
-        foreach ($polresList as $p) {
-            $activeIssues = Issue::where('polda_id', $p->polda_id)->where('polres_id', $p->id)
-                ->whereNotIn('status', ['selesai'])
-                ->get();
-            $totalIssues = Issue::where('polda_id', $p->polda_id)->where('polres_id', $p->id)->count();
-            $posIssues = Issue::where('polda_id', $p->polda_id)->where('polres_id', $p->id)->where('sentiment', 'positif')->count();
+        // 2. MATRIKS KONDUSIFITAS SATWIL (seluruhnya dari data nyata; lihat buildSatwilMatrix)
+        $satwilMatrix = $this->buildSatwilMatrix($isNational, $selectedPolda, $allPoldas, $activeIssueStatuses);
+        // Pin peta regional hanya untuk Polres (memiliki koordinat); mode Nasional memakai peta nasional tersendiri.
+        $polresStatuses = $isNational ? [] : array_values(array_filter($satwilMatrix, fn ($r) => $r['level'] === 'polres'));
+        $hasAtensiSatwil = collect($satwilMatrix)->contains('status', 'ATENSI');
+        $hasWaspadaSatwil = collect($satwilMatrix)->contains('status', 'WASPADA');
 
-            $scoreNum = $totalIssues > 0 ? (int) round(($posIssues / $totalIssues) * 100) : null;
-
-            $hasCritical = $activeIssues->contains(fn($i) => in_array($i->priority, ['critical', 'high']) && in_array($i->status, ['investigasi', 'monitoring']));
-            $hasWarning = $activeIssues->isNotEmpty();
-
-            if ($totalIssues === 0) {
-                $status = 'BELUM ADA DATA';
-                $color = 'slate';
-            } elseif ($hasCritical) {
-                $status = 'ATENSI';
-                $color = 'rose';
-                $hasAtensiSatwil = true;
-            } elseif ($hasWarning) {
-                $status = 'WASPADA';
-                $color = 'amber';
-                $hasWaspadaSatwil = true;
-            } else {
-                $status = 'KONDUSIF';
-                $color = 'emerald';
-            }
-
-            $latestIssue = $activeIssues->sortByDesc('virality_score')->first()
-                ?? Issue::where('polda_id', $p->polda_id)->where('polres_id', $p->id)->latest()->first();
-
-            $summary = $latestIssue ? $latestIssue->title : 'Belum ada laporan.';
-
-            $polresStatuses[] = [
-                'id'           => $p->id,
-                'code'         => $p->code,
-                'name'         => $p->name,
-                'short_name'   => $p->short_name ?: $p->name,
-                'tag_desc'     => $p->tag_desc,
-                'latitude'     => $p->latitude,
-                'longitude'    => $p->longitude,
-                'map_x'        => $p->map_x ?? 50,
-                'map_y'        => $p->map_y ?? 50,
-                'status'       => $status,
-                'color'        => $color,
-                'score'        => $scoreNum === null ? null : "{$scoreNum}%",
-                'score_num'    => $scoreNum,
-                'issues_count' => $activeIssues->count(),
-                'total_issues' => $totalIssues,
-                'summary'      => $summary,
-            ];
-        }
-
-        // Overall situation badge logic
-        if ($hasAtensiSatwil || $priorityIssuesCount > 0) {
-            $overallSituation = [
-                'text'  => 'SIAGA PRIORITAS KAMTIBMAS',
-                'color' => 'rose',
-                'ping'  => true,
-            ];
-        } elseif ($hasWaspadaSatwil) {
-            $overallSituation = [
-                'text'  => 'WASPADA ANOMALI KAMTIBMAS',
-                'color' => 'amber',
-                'ping'  => true,
-            ];
+        // Penilaian situasi hanya mengikuti laporan lapangan yang benar-benar ada (tidak mengklaim "kondusif" tanpa data).
+        if ($fieldReportsCount === 0) {
+            $overallSituation = ['text' => 'BELUM ADA LAPORAN LAPANGAN', 'color' => 'slate', 'ping' => false];
+        } elseif ($hasAtensiSatwil || $priorityIssuesCount > 0) {
+            $overallSituation = ['text' => 'SIAGA PRIORITAS KAMTIBMAS', 'color' => 'rose', 'ping' => true];
+        } elseif ($hasWaspadaSatwil || $pendingVerifyCount > 0) {
+            $overallSituation = ['text' => 'WASPADA: ADA LAPORAN AKTIF', 'color' => 'amber', 'ping' => true];
         } else {
-            $overallSituation = [
-                'text'  => 'SITUASI KONDUSIF & TERKENDALI',
-                'color' => 'emerald',
-                'ping'  => false,
-            ];
+            $overallSituation = ['text' => 'SEMUA LAPORAN TELAH DITANGANI', 'color' => 'emerald', 'ping' => false];
         }
 
         // 3. TOP 5 TRENDING ISSUES (100% Dynamic from DB - National or Specific Polda)
@@ -161,6 +106,7 @@ class DashboardController extends Controller
         $socialStats = [
             'total_posts'    => $totalSocialPosts,
             'platforms'      => $platformCounts,
+            'platform_count' => count(array_filter($platformCounts)),
             'kol_count'      => $socialKolsCount,
             'views_count'    => $totalSocialViews,
             'likes_count'    => $totalSocialLikes,
@@ -184,63 +130,18 @@ class DashboardController extends Controller
             ->limit(6)
             ->get();
 
-        // 5. 7 DAYS SENTIMENT TREND (100% Dynamic Aggregation: Media Online + Medsos + Isu)
-        $dayNames = [
-            'Sun' => 'Min', 'Mon' => 'Sen', 'Tue' => 'Sel',
-            'Wed' => 'Rab', 'Thu' => 'Kam', 'Fri' => 'Jum', 'Sat' => 'Sab',
-        ];
+        // 5. TREN SENTIMEN 7 HARI (Media Online + Medsos + Isu). Hari tanpa data tetap kosong (null), tidak diisi angka bawaan.
+        $trend = $this->sentimentTrend($isNational, (int) $poldaId);
+        $sentiment7Days = $trend['days'];
+        $windowTotal = $trend['pos'] + $trend['neu'] + $trend['neg'];
+        $avgPositivePct = $windowTotal > 0 ? (int) round(($trend['pos'] / $windowTotal) * 100) : null;
 
-        $sentiment7Days = [];
-        $totalPositiveWindow = 0;
-        $totalNegativeWindow = 0;
-        $totalNeutralWindow = 0;
-
-        for ($i = 6; $i >= 0; $i--) {
-            $date = Carbon::now()->subDays($i);
-            $dateStr = $date->toDateString();
-            $dayAbbr = $dayNames[$date->format('D')] ?? $date->format('D');
-
-            $articles = MediaArticle::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))->whereDate('pub_date', $dateStr)->get();
-            $issues = Issue::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))->whereDate('created_at', $dateStr)->get();
-            $socials = SocialPost::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))->whereDate('posted_at', $dateStr)->get();
-
-            $pos = $articles->where('sentiment', 'positif')->count() + $issues->where('sentiment', 'positif')->count() + $socials->where('sentiment', 'positif')->count();
-            $neg = $articles->where('sentiment', 'negatif')->count() + $issues->where('sentiment', 'negatif')->count() + $socials->where('sentiment', 'negatif')->count();
-            $neu = $articles->where('sentiment', 'netral')->count() + $issues->where('sentiment', 'netral')->count() + $socials->where('sentiment', 'netral')->count();
-
-            $totalDay = $pos + $neg + $neu;
-
-            if ($totalDay > 0) {
-                $posPct = (int) round(($pos / $totalDay) * 100);
-                $negPct = (int) round(($neg / $totalDay) * 100);
-                $neuPct = max(0, 100 - ($posPct + $negPct));
-            } else {
-                $posPct = 76;
-                $neuPct = 18;
-                $negPct = 6;
-            }
-
-            $sentiment7Days[] = [
-                'day'     => $dayAbbr,
-                'date'    => $dateStr,
-                'positif' => $posPct,
-                'netral'  => $neuPct,
-                'negatif' => $negPct,
-                'total'   => $totalDay,
-            ];
-
-            $totalPositiveWindow += $pos;
-            $totalNegativeWindow += $neg;
-            $totalNeutralWindow += $neu;
-        }
-
-        // Public index score (Favorability ratio: Pos / (Pos + Neg) * 100)
-        $polarizedTotal = $totalPositiveWindow + $totalNegativeWindow;
-        $publicIndexScore = $polarizedTotal > 0
-            ? (int) round(($totalPositiveWindow / $polarizedTotal) * 100)
-            : 78;
-
-        $avgPositivePct = (int) round(collect($sentiment7Days)->avg('positif'));
+        // Indeks citra publik = pos / (pos + neg) pada 7 hari terakhir; selisih = poin terhadap 7 hari sebelumnya.
+        $polarized = $trend['pos'] + $trend['neg'];
+        $publicIndexScore = $polarized > 0 ? (int) round(($trend['pos'] / $polarized) * 100) : null;
+        $prevPolarized = $trend['prev_pos'] + $trend['prev_neg'];
+        $prevIndexScore = $prevPolarized > 0 ? (int) round(($trend['prev_pos'] / $prevPolarized) * 100) : null;
+        $indexChange = ($publicIndexScore !== null && $prevIndexScore !== null) ? $publicIndexScore - $prevIndexScore : null;
 
         // 6. LIVE RADAR ARTICLES (Latest 6 from DB)
         $liveRadarArticles = MediaArticle::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))
@@ -308,11 +209,14 @@ class DashboardController extends Controller
                 'tasks_resolved'       => $tasksResolvedCount,
                 'total_tasks'          => $totalTasksCount,
                 'task_completion_rate' => $taskCompletionRate,
+                'polres_count'         => $polresCount,
+                'articles_24h'         => $articles24h,
             ],
             'socialStats'          => $socialStats,
             'topViralSocialPosts'  => $topViralSocialPosts,
             'liveSocialPosts'      => $liveSocialPosts,
             'polresStatuses'       => $polresStatuses,
+            'satwilMatrix'         => $satwilMatrix,
             'overallSituation'     => $overallSituation,
             'topIssues'            => $topIssues,
             'sentiment7Days'       => $sentiment7Days,
@@ -320,12 +224,200 @@ class DashboardController extends Controller
             'liveRadarArticles'    => $liveRadarArticles,
             'publicIndex'          => [
                 'score'  => $publicIndexScore,
-                'status' => $publicIndexScore >= 70 ? 'Positif' : ($publicIndexScore >= 50 ? 'Netral' : 'Atensi'),
-                'change' => '+6%',
-                'trend'  => 'up',
+                'status' => $publicIndexScore === null ? null : ($publicIndexScore >= 70 ? 'Positif' : ($publicIndexScore >= 50 ? 'Netral' : 'Atensi')),
+                'change' => $indexChange === null ? null : (($indexChange > 0 ? '+' : '') . $indexChange . ' poin'),
+                'trend'  => $indexChange === null ? null : ($indexChange > 0 ? 'up' : ($indexChange < 0 ? 'down' : 'flat')),
+                'sample' => $polarized,
             ],
             'metrics'              => $metrics,
         ]);
+    }
+
+    /**
+     * Matriks Kondusifitas Satwil: satu baris per Polda (mode Nasional) atau per Polres (mode Polda).
+     *
+     * Semua nilai dihitung dari data nyata, tanpa skor/asumsi:
+     *  - Status mengikuti LAPORAN ISU AKTIF milik satwil itu (modul Manajemen Isu & Tugas):
+     *      ATENSI         = ada laporan aktif berprioritas tinggi/kritis
+     *      WASPADA        = ada laporan aktif (prioritas lain)
+     *      KONDUSIF       = ada laporan, seluruhnya telah selesai/arsip
+     *      BELUM ADA DATA = belum ada laporan sama sekali (bukan berarti aman)
+     *  - Berita 7 hari: jumlah artikel (dan yang bersentimen negatif) dalam 7 hari terakhir. Mode Nasional memakai
+     *    wilayah penayangan (Polda); mode Polda mencocokkan nama wilayah Polres pada judul/ringkasan berita.
+     *    Angka ini informasi pendamping dan TIDAK memengaruhi status.
+     *
+     * @param  \Illuminate\Support\Collection<int, Polda> $allPoldas
+     * @param  array<int, string> $activeStatuses
+     * @return array<int, array<string, mixed>>
+     */
+    protected function buildSatwilMatrix(bool $isNational, ?Polda $selectedPolda, $allPoldas, array $activeStatuses): array
+    {
+        $quote = fn (array $values) => implode(',', array_map(fn ($s) => "'" . preg_replace('/[^a-z_]/i', '', $s) . "'", $values));
+        $active = $quote($activeStatuses);
+        $issueSql = "COUNT(*) as total_count, "
+            . "SUM(CASE WHEN status IN ({$active}) THEN 1 ELSE 0 END) as active_count, "
+            . "SUM(CASE WHEN status IN ({$active}) AND priority IN ('critical','high') THEN 1 ELSE 0 END) as priority_count, "
+            . "SUM(CASE WHEN sentiment = 'positif' THEN 1 ELSE 0 END) as positive_count";
+        $since = now()->subDays(7)->format('Y-m-d H:i:s');
+
+        $classify = fn (int $total, int $priority, int $activeCount) => match (true) {
+            $total === 0 => ['BELUM ADA DATA', 'slate'],
+            $priority > 0 => ['ATENSI', 'rose'],
+            $activeCount > 0 => ['WASPADA', 'amber'],
+            default => ['KONDUSIF', 'emerald'],
+        };
+
+        $rows = [];
+        $make = function (array $base, $agg, ?int $media, ?int $mediaNeg, ?string $topTitle) use ($classify) {
+            $total = (int) ($agg->total_count ?? 0);
+            $priority = (int) ($agg->priority_count ?? 0);
+            $activeCount = (int) ($agg->active_count ?? 0);
+            [$status, $color] = $classify($total, $priority, $activeCount);
+            $positive = (int) ($agg->positive_count ?? 0);
+            $scoreNum = $total > 0 ? (int) round(($positive / $total) * 100) : null;
+
+            return $base + [
+                'status'         => $status,
+                'color'          => $color,
+                'issues_count'   => $activeCount,
+                'priority_count' => $priority,
+                'total_issues'   => $total,
+                'score'          => $scoreNum === null ? null : "{$scoreNum}%",
+                'score_num'      => $scoreNum,
+                'media_7d'       => $media,
+                'media_negative_7d' => $mediaNeg,
+                'summary'        => $topTitle ?: ($total === 0 ? 'Belum ada laporan.' : 'Tidak ada laporan aktif.'),
+            ];
+        };
+
+        if ($isNational) {
+            $agg = Issue::selectRaw("polda_id, {$issueSql}")->groupBy('polda_id')->get()->keyBy('polda_id');
+            $media = MediaArticle::where('pub_date', '>=', $since)
+                ->selectRaw("polda_id, COUNT(*) as c, SUM(CASE WHEN sentiment = 'negatif' THEN 1 ELSE 0 END) as n")
+                ->groupBy('polda_id')->get()->keyBy('polda_id');
+            $top = Issue::whereIn('status', $activeStatuses)->orderByDesc('virality_score')->get(['id', 'polda_id', 'title'])
+                ->groupBy('polda_id')->map(fn ($g) => $g->first()->title);
+
+            foreach ($allPoldas as $p) {
+                $isMabes = $p->code === 'DIVHUMAS';
+                $m = $media->get($p->id);
+                $rows[] = $make([
+                    'id'          => 'polda-' . $p->id,
+                    'level'       => 'polda',
+                    'code'        => $p->code,
+                    'name'        => $isMabes ? 'Divhumas Polri (Mabes)' : $p->name,
+                    'short_name'  => $isMabes ? 'Divhumas' : $p->name,
+                    'switch_code' => $isMabes ? 'ALL' : $p->code,
+                ], $agg->get($p->id), (int) ($m->c ?? 0), (int) ($m->n ?? 0), $top->get($p->id));
+            }
+        } elseif ($selectedPolda) {
+            $polresList = $selectedPolda->polres->where('is_active', true)->values();
+            $agg = Issue::where('polda_id', $selectedPolda->id)->whereNotNull('polres_id')
+                ->selectRaw("polres_id, {$issueSql}")->groupBy('polres_id')->get()->keyBy('polres_id');
+            $top = Issue::where('polda_id', $selectedPolda->id)->whereNotNull('polres_id')->whereIn('status', $activeStatuses)
+                ->orderByDesc('virality_score')->get(['id', 'polres_id', 'title'])
+                ->groupBy('polres_id')->map(fn ($g) => $g->first()->title);
+
+            foreach ($polresList as $p) {
+                $keyword = $p->placeKeyword();
+                $media = $mediaNeg = null;
+                if ($keyword !== null) {
+                    $like = \App\Support\NewsSearch::like($keyword);
+                    $base = MediaArticle::where('polda_id', $selectedPolda->id)->where('pub_date', '>=', $since)
+                        ->where(fn ($w) => $w->whereRaw("title LIKE ? ESCAPE '!'", [$like])->orWhereRaw("summary LIKE ? ESCAPE '!'", [$like]));
+                    $media = (clone $base)->count();
+                    $mediaNeg = (clone $base)->where('sentiment', 'negatif')->count();
+                }
+
+                $rows[] = $make([
+                    'id'         => $p->id,
+                    'level'      => 'polres',
+                    'code'       => $p->code,
+                    'name'       => $p->name,
+                    'short_name' => $p->short_name ?: $p->name,
+                    'tag_desc'   => $p->tag_desc,
+                    'latitude'   => $p->latitude,
+                    'longitude'  => $p->longitude,
+                    'map_x'      => $p->map_x ?? 50,
+                    'map_y'      => $p->map_y ?? 50,
+                ], $agg->get($p->id), $media, $mediaNeg, $top->get($p->id));
+            }
+
+            // Laporan tingkat Polda (tanpa Satwil) tetap terlihat agar angka matriks cocok dengan total laporan.
+            $unit = Issue::where('polda_id', $selectedPolda->id)->whereNull('polres_id')->selectRaw($issueSql)->first();
+            if ($unit && (int) $unit->total_count > 0) {
+                $topUnit = Issue::where('polda_id', $selectedPolda->id)->whereNull('polres_id')->whereIn('status', $activeStatuses)
+                    ->orderByDesc('virality_score')->value('title');
+                $rows[] = $make([
+                    'id' => 'polda-unit', 'level' => 'polda_unit', 'code' => $selectedPolda->code,
+                    'name' => 'Tingkat Polda (tanpa Satwil)', 'short_name' => 'Tingkat Polda',
+                ], $unit, null, null, $topUnit);
+            }
+        }
+
+        $rank = ['ATENSI' => 0, 'WASPADA' => 1, 'KONDUSIF' => 2, 'BELUM ADA DATA' => 3];
+        usort($rows, fn ($a, $b) => [$rank[$a['status']], -$a['issues_count'], $a['name']] <=> [$rank[$b['status']], -$b['issues_count'], $b['name']]);
+
+        return $rows;
+    }
+
+    /**
+     * Tren sentimen 7 hari (Media Online + Medsos + Isu) dengan 3 kueri agregat, plus hitungan 7 hari sebelumnya
+     * untuk selisih indeks citra. Hari tanpa data bernilai null pada persentase (bukan angka bawaan).
+     *
+     * @return array{days: array<int, array<string, mixed>>, pos: int, neu: int, neg: int, prev_pos: int, prev_neg: int}
+     */
+    protected function sentimentTrend(bool $isNational, int $poldaId): array
+    {
+        $dayNames = ['Sun' => 'Min', 'Mon' => 'Sen', 'Tue' => 'Sel', 'Wed' => 'Rab', 'Thu' => 'Kam', 'Fri' => 'Jum', 'Sat' => 'Sab'];
+
+        $days = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $date = Carbon::now()->subDays($i);
+            $days[$date->toDateString()] = ['day' => $dayNames[$date->format('D')] ?? $date->format('D'), 'date' => $date->toDateString(), 'pos' => 0, 'neu' => 0, 'neg' => 0];
+        }
+        $from = array_key_first($days) . ' 00:00:00';
+        $prevFrom = Carbon::parse($from)->subDays(7)->format('Y-m-d H:i:s');
+
+        $sources = [[MediaArticle::class, 'pub_date'], [Issue::class, 'created_at'], [SocialPost::class, 'posted_at']];
+        $bucket = fn (?string $s) => match ($s) { 'positif' => 'pos', 'negatif' => 'neg', default => 'neu' };
+        $prev = ['pos' => 0, 'neg' => 0];
+
+        foreach ($sources as [$model, $col]) {
+            $scope = fn () => $model::query()->when(!$isNational, fn ($q) => $q->where('polda_id', $poldaId));
+
+            foreach ($scope()->where($col, '>=', $from)->selectRaw("DATE({$col}) as d, sentiment as s, COUNT(*) as c")->groupByRaw("DATE({$col}), sentiment")->get() as $r) {
+                $d = substr((string) $r->d, 0, 10);
+                if (isset($days[$d])) {
+                    $days[$d][$bucket($r->s)] += (int) $r->c;
+                }
+            }
+
+            foreach ($scope()->where($col, '>=', $prevFrom)->where($col, '<', $from)->whereIn('sentiment', ['positif', 'negatif'])->selectRaw('sentiment as s, COUNT(*) as c')->groupBy('sentiment')->get() as $r) {
+                $prev[$bucket($r->s)] += (int) $r->c;
+            }
+        }
+
+        $out = [];
+        $pos = $neu = $neg = 0;
+        foreach ($days as $d) {
+            $total = $d['pos'] + $d['neu'] + $d['neg'];
+            $posPct = $total > 0 ? (int) round(($d['pos'] / $total) * 100) : null;
+            $negPct = $total > 0 ? (int) round(($d['neg'] / $total) * 100) : null;
+            $out[] = [
+                'day'     => $d['day'],
+                'date'    => $d['date'],
+                'positif' => $posPct,
+                'netral'  => $total > 0 ? max(0, 100 - $posPct - $negPct) : null,
+                'negatif' => $negPct,
+                'total'   => $total,
+            ];
+            $pos += $d['pos'];
+            $neu += $d['neu'];
+            $neg += $d['neg'];
+        }
+
+        return ['days' => $out, 'pos' => $pos, 'neu' => $neu, 'neg' => $neg, 'prev_pos' => $prev['pos'], 'prev_neg' => $prev['neg']];
     }
 
     /**
@@ -465,6 +557,11 @@ class DashboardController extends Controller
 
         $results = [];
 
+        // Tenant Divhumas: pin Mabes + wilayah yang dihitung dari kata kunci pada pemberitaan Divhumas sendiri;
+        // pin tenant Polda lain (mis. Sulbar) TIDAK ditampilkan agar data Polda tidak bocor ke tampilan Divhumas.
+        $divhumasId = (int) Polda::where('code', 'DIVHUMAS')->value('id');
+        $divhumasMode = $scopePoldaId !== null && $scopePoldaId === $divhumasId;
+
         foreach ($regions as $r) {
             $regionPoldaId = null;
             if (isset($r['polda_id'])) {
@@ -474,7 +571,7 @@ class DashboardController extends Controller
                 }
                 $q = MediaArticle::where('polda_id', $regionPoldaId);
             } else {
-                if ($scopePoldaId !== null) {
+                if ($scopePoldaId !== null && ! $divhumasMode) {
                     continue;
                 }
                 $regionPoldaId = Polda::where('code', 'DIVHUMAS')->value('id');

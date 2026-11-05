@@ -127,7 +127,7 @@ class AiSettingController extends Controller
                 'server_env_has_key' => !empty(config('services.gemini.api_key') ?: env('GEMINI_API_KEY')),
             ],
             'recentReports'  => $recentReports,
-            'usage'          => app(\App\Services\AiQuota::class)->todaySummary(),
+            'usage'          => app(\App\Services\AiQuota::class)->todaySummary($poldaId ?? null),
         ]);
     }
 
@@ -194,6 +194,9 @@ class AiSettingController extends Controller
             AiSetting::query()->update($updateData);
         }
 
+        // Kunci/model baru harus langsung dicoba: hapus penahanan kuota akibat kunci lama.
+        app(\App\Services\AiQuota::class)->clearBlock();
+
         $keysCount = !empty($updateData['api_keys_pool']) ? count($updateData['api_keys_pool']) : count($aiSetting->getCleanKeysList());
 
         AuditLog::create([
@@ -243,6 +246,21 @@ class AiSettingController extends Controller
         return back()->with('success', '✓ Template Prompt Intelijen AI berhasil direset ke standar resmi Divhumas Polri.');
     }
 
+    /** Cabut penahanan permintaan AI secara manual (admin), dicatat di Audit Log. */
+    public function clearBlock(Request $request)
+    {
+        app(\App\Services\AiQuota::class)->clearBlock();
+
+        AuditLog::create([
+            'user_id'    => auth()->id(),
+            'action'     => 'ai.block_cleared',
+            'ip_address' => $request->ip() ?: '127.0.0.1',
+            'details'    => json_encode(['by' => 'manual']),
+        ]);
+
+        return back()->with('success', 'Penahanan permintaan AI dicabut. Permintaan berikutnya langsung dicoba.');
+    }
+
     /**
      * Test connection to Google Gemini API (Single Key or Multi-Key Pool).
      */
@@ -272,6 +290,9 @@ class AiSettingController extends Controller
         // If multiple keys or test_pool requested, run full pool test
         if (count($tokens) > 1 || $request->boolean('test_pool')) {
             $poolResult = $geminiService->testPoolKeys($tokens, $model);
+            if ($poolResult['success'] ?? false) {
+                app(\App\Services\AiQuota::class)->clearBlock();
+            }
             return response()->json($poolResult, $poolResult['success'] ? 200 : 400);
         }
 
@@ -279,12 +300,15 @@ class AiSettingController extends Controller
         $singleKey = $tokens[0];
         $result = $geminiService->testConnection($singleKey, $model);
 
+        if ($result['success'] ?? false) {
+            app(\App\Services\AiQuota::class)->clearBlock();
+        }
+
         // Attach accounts structure so frontend can display nicely
         $result['accounts'] = [
             [
                 'index'        => 1,
                 'token_masked' => $geminiService->maskApiKey($singleKey),
-                'key_raw'      => $singleKey,
                 'status'       => $result['success'] ? 'connected' : 'error',
                 'latency_ms'   => $result['latency_ms'] ?? null,
                 'model'        => $result['model'] ?? $model,

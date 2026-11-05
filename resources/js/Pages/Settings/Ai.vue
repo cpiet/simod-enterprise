@@ -814,6 +814,16 @@ const submitSettings = () => {
 
             <div class="lg:col-span-2 rounded-2xl bg-slate-900/70 border border-slate-800 p-4 space-y-3">
               <h3 class="text-xs font-black text-slate-200 uppercase tracking-wider">Ringkasan hari ini</h3>
+              <div v-if="usage.blocked" class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
+                <span>Permintaan AI sedang <b>ditahan sementara</b> (maks. {{ usage.block_minutes }} menit) karena kuota habis.</span>
+                <button type="button" @click="router.post('/settings/ai/clear-block', {}, { preserveScroll: true })" class="px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 font-black cursor-pointer">Cabut penahanan</button>
+              </div>
+              <p v-if="usage.near_limit_users > 0" class="rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-200">
+                {{ usage.near_limit_users }} pengguna sudah memakai &ge; 80% batas harian ({{ usage.daily_limit }}). Pertimbangkan menaikkan batas atau menambah kunci.
+              </p>
+              <p class="text-[10px] text-slate-500">
+                Kena kuota terakhir: {{ usage.last_quota_at ?? '—' }} &middot; Galat terakhir: {{ usage.last_error_at ?? '—' }}
+              </p>
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
                 <div class="rounded-xl bg-[#0b1426] border border-slate-800 p-2.5"><p class="text-lg font-black text-emerald-400">{{ usage.ok }}</p><p class="text-[10px] text-slate-400">Berhasil</p></div>
                 <div class="rounded-xl bg-[#0b1426] border border-slate-800 p-2.5"><p class="text-lg font-black text-sky-400">{{ usage.skipped }}</p><p class="text-[10px] text-slate-400">Dilewati</p></div>
@@ -835,7 +845,7 @@ const submitSettings = () => {
         <div class="p-6 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
           <div class="flex items-center gap-2 text-xs text-slate-400">
             <Shield class="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>Kredensial dilindungi enkripsi AES-256 dan hanya dapat dikelola oleh Administrator.</span>
+            <span>Kredensial disimpan di basis data server, selalu ditampilkan tersamar, dan hanya dapat dikelola oleh Administrator.</span>
           </div>
 
           <div class="flex items-center gap-3 w-full sm:w-auto justify-end">

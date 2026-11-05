@@ -30,3 +30,12 @@ Mode penjadwalan (setelah RSS / jam dinas / interval), daftar jam, dan toggle "a
 ## 6. Belum dikerjakan / temuan
 - Pengaturan **Apify** ("Aktifkan Sinkronisasi Background Otomatis", frekuensi) juga tampaknya tidak dijalankan penjadwal mana pun (`routes/console.php` hanya memuat RSS, prune, dan backup). Perlu diputuskan: dibuang atau dibangun.
 - Privasi: input di paket gratis Gemini dapat dipakai Google untuk peningkatan produk (periksa ketentuan resmi); untuk data operasional sebaiknya penagihan aktif.
+
+## 7. Indikator pemakaian & penahanan (update 5 Nov 2026)
+- **Pengguna:** komponen `AiQuotaBadge.vue` (dari props bersama `aiQuota` = `AiQuota::publicStatus()`) tampil di SADEWA, Briefing Command Center, Radar Media Online, dan Radar Media Sosial. Netral: tanpa vendor/model/kunci. Status `available` / `low` (sisa angka hanya tampil bila <= `LOW_THRESHOLD` = 3) / `exhausted` / `blocked`. Batas total tidak dibuka.
+- **Admin** (`/settings/ai`, izin `security_center`): status penahanan + tombol "Cabut penahanan" (`POST /settings/ai/clear-block`, tercatat `ai.block_cleared`), peringatan bila pengguna memakai >= 80% batas harian (`WARN_RATIO`), waktu terakhir kena kuota/galat.
+- **Penahanan otomatis dicabut** saat pengaturan AI disimpan atau uji koneksi berhasil (`AiQuota::clearBlock()`), karena kunci baru harus langsung dicoba.
+- Sisa kuota Google yang sebenarnya **tidak tersedia** dari API; angka yang tampil selalu hitungan SIMOD sendiri (`ai_usage_logs`).
+- Rantai model: pilihan admin -> `gemini-3.5-flash-lite` -> `gemini-3.1-flash-lite` -> `gemini-3-flash-preview` -> `gemini-3.8-flash` (kuota paket gratis dihitung per model). Format kunci baru `AQ.xxxx` (memakai titik) diterima.
+- Angka sentimen laporan medsos dihitung dari data nyata (bukan dari AI); stabilitas = 100 - persen negatif (>= 75 Terkendali, >= 50 Waspada, selain itu Kritis).
+- Test: `AiQuotaIndicatorTest`, `AiQuotaBlockClearTest`.

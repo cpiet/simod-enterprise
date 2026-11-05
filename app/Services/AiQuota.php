@@ -18,6 +18,9 @@ class AiQuota
 {
     public const DEFAULT_LIMIT = 40;
     private const BLOCK_MINUTES = 10;
+    public const LOW_THRESHOLD = 3;
+    /** Peringatan admin saat pengguna memakai sekian persen dari batas hariannya. */
+    public const WARN_RATIO = 0.8;
 
     public function limitFor(?int $poldaId): int
     {
@@ -69,6 +72,18 @@ class AiQuota
         return null;
     }
 
+    /**
+     * Cabut penahanan kuota (mis. setelah kunci API diganti atau uji koneksi berhasil), untuk semua Polda dan lingkup nasional.
+     * Tanpa ini, kunci baru tetap ditolak sampai penahanan 10 menit dari kunci lama berakhir.
+     */
+    public function clearBlock(): void
+    {
+        Cache::forget($this->blockKey(null));
+        foreach (\App\Models\Polda::pluck('id') as $id) {
+            Cache::forget($this->blockKey((int) $id));
+        }
+    }
+
     public function isBlocked(?int $poldaId): bool
     {
         return Cache::has($this->blockKey($poldaId));
@@ -79,7 +94,7 @@ class AiQuota
     {
         $status = 'ok';
         if (!($result['success'] ?? false)) {
-            $quota = str_contains((string) ($result['message'] ?? ''), 'Kuota API Gemini');
+            $quota = str_contains((string) ($result['message'] ?? ''), 'Kuota layanan analisis AI');
             $status = $quota ? 'quota' : 'error';
             if ($quota) {
                 Cache::put($this->blockKey($poldaId), true, now()->addMinutes(self::BLOCK_MINUTES));
@@ -103,8 +118,31 @@ class AiQuota
         ]);
     }
 
+    /**
+     * Status ringkas untuk pengguna biasa. Sengaja netral: tanpa vendor/model/kunci dan tanpa batas total.
+     * Jumlah sisa hanya diberikan saat tinggal sedikit (<= LOW_THRESHOLD) agar batas harian tidak mudah dihitung.
+     *
+     * @return array{state:string, remaining:?int}  state: available | low | exhausted | blocked
+     */
+    public function publicStatus(User $user, ?int $poldaId): array
+    {
+        $s = $this->snapshot($user, $poldaId);
+
+        if ($s['limit'] > 0 && $s['remaining'] === 0) {
+            return ['state' => 'exhausted', 'remaining' => 0];
+        }
+        if ($s['blocked']) {
+            return ['state' => 'blocked', 'remaining' => null];
+        }
+        if ($s['limit'] > 0 && $s['remaining'] <= self::LOW_THRESHOLD) {
+            return ['state' => 'low', 'remaining' => $s['remaining']];
+        }
+
+        return ['state' => 'available', 'remaining' => null];
+    }
+
     /** Ringkasan hari ini untuk halaman Pengaturan AI. */
-    public function todaySummary(): array
+    public function todaySummary(?int $poldaId = null): array
     {
         $since = now()->startOfDay();
         $rows = DB::table('ai_usage_logs')->where('created_at', '>=', $since);
@@ -118,7 +156,21 @@ class AiQuota
             ->map(fn ($r) => ['name' => $r->name, 'count' => (int) $r->n])->all();
         $byFeature = (clone $rows)->where('status', 'ok')->select('feature', DB::raw('count(*) as n'))->groupBy('feature')->pluck('n', 'feature');
 
+        $limit = $this->limitFor($poldaId);
+        $nearLimit = 0;
+        if ($limit > 0) {
+            $nearLimit = DB::table('ai_usage_logs')->where('created_at', '>=', $since)->where('status', 'ok')->whereNotNull('user_id')
+                ->select('user_id', DB::raw('count(*) as n'))->groupBy('user_id')
+                ->havingRaw('count(*) >= ?', [(int) ceil($limit * self::WARN_RATIO)])->get()->count();
+        }
+
         return [
+            'blocked'     => $this->isBlocked($poldaId),
+            'block_minutes' => self::BLOCK_MINUTES,
+            'near_limit_users' => $nearLimit,
+            'daily_limit' => $limit,
+            'last_quota_at' => DB::table('ai_usage_logs')->where('status', 'quota')->max('created_at'),
+            'last_error_at' => DB::table('ai_usage_logs')->where('status', 'error')->max('created_at'),
             'ok'      => (int) ($byStatus['ok'] ?? 0),
             'quota'   => (int) ($byStatus['quota'] ?? 0),
             'error'   => (int) ($byStatus['error'] ?? 0),

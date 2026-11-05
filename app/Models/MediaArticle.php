@@ -7,6 +7,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MediaArticle extends Model
 {
+    /**
+     * Sidik judul (`title_hash`) selalu diperbarui bersama judul, apa pun jalur ingest-nya
+     * (RSS, Google News, API worker), agar berita ganda lintas portal dapat digabung.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (MediaArticle $article) {
+            if ($article->isDirty('title') || empty($article->title_hash)) {
+                $article->title_hash = \App\Support\NewsSearch::titleHash($article->title);
+            }
+        });
+    }
+
     protected $fillable = [
         'polda_id',
         'feed_id',

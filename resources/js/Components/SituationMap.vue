@@ -74,7 +74,7 @@ onUnmounted(() => { if (map) map.remove(); });
       <div class="flex flex-wrap justify-between gap-2"><strong class="text-white text-sm">{{ selected.name }}</strong><span class="text-xs font-bold text-slate-300">{{ selected.status }}</span></div>
       <p class="text-xs text-slate-300">{{ selected.region || selected.tag_desc }} <span v-if="selected.basis">• {{ selected.basis }}</span></p>
       <p v-if="scope === 'national'" class="text-xs text-slate-300">{{ selected.articles_count }} berita • {{ selected.issues_count }} isu aktif • Sentimen positif: {{ selected.score ?? 'Belum ada data' }}</p>
-      <p v-else class="text-xs text-slate-300">{{ selected.issues_count }} isu aktif • {{ selected.total_issues }} laporan • Sentimen positif: {{ selected.score ?? 'Belum ada data' }}</p>
+      <p v-else class="text-xs text-slate-300">{{ selected.issues_count }} isu aktif • {{ selected.total_issues }} laporan • Laporan bersentimen positif: {{ selected.score ?? 'Belum ada laporan' }}</p>
       <p class="text-xs text-slate-300">{{ selected.latest_headline || selected.summary || 'Belum ada berita.' }}</p>
       <p v-if="selected.latest_source" class="text-xs text-slate-400">{{ selected.latest_source }}<span v-if="selected.pub_date"> • {{ selected.pub_date }}</span></p>
       <Link v-if="scope === 'regional'" :href="`/issues?polres=${encodeURIComponent(selected.code)}`" class="inline-block text-xs text-amber-400 font-bold">Lihat laporan Polres →</Link>

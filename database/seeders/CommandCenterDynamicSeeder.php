@@ -93,6 +93,11 @@ class CommandCenterDynamicSeeder extends Seeder
         $polresMamasa = Polres::where('polda_id', $sulbar->id)->where('code', 'MAMASA')->first();
         $polresMateng = Polres::where('polda_id', $sulbar->id)->where('code', 'MATENG')->first();
 
+        // Selebihnya adalah DATA CONTOH (sentimen heuristik lama, isu, tugas, publikasi): hanya bila diminta eksplisit.
+        if (! config('simod.seed_sample_data')) {
+            return;
+        }
+
         // 2. HEURISTIC SENTIMENT UPDATE ON MEDIA ARTICLES
         $positiveWords = ['berhasil', 'ungkap', 'aman', 'kondusif', 'apresiasi', 'bantu', 'bansos', 'tertib', 'humanis', 'prestasi', 'presisi', 'sukses', 'penghargaan', 'selamat', 'lancar', 'pengamanan', 'sinergi', 'patroli', 'damai', 'kebaikan', 'ramah', 'juara', 'terkendali'];
         $negativeWords = ['begal', 'curanmor', 'tewas', 'korban', 'pembunuhan', 'narkoba', 'hoaks', 'rusak', 'ricuh', 'bentrok', 'pungli', 'jambret', 'kebakaran', 'longsor', 'banjir', 'aniaya', 'cabul', 'korupsi', 'kejahatan', 'brong', 'balap liar'];

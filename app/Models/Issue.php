@@ -6,10 +6,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Issue extends Model
 {
     use HasFactory;
+    // Hapus = pindah ke Sampah (dapat dipulihkan); seluruh kueri biasa otomatis mengabaikan laporan di Sampah.
+    use SoftDeletes;
 
     /**
      * Alur resmi: draft -> monitoring -> investigasi -> klarifikasi -> selesai -> arsip.
@@ -60,11 +63,15 @@ class Issue extends Model
         'clarification_url',
         'clarified_at',
         'resolved_note',
+        'archived_at',
+        'status_before_archive',
+        'deleted_by',
     ];
 
     protected $casts = [
         'is_hoax'      => 'boolean',
         'clarified_at' => 'datetime',
+        'archived_at'  => 'datetime',
         'occurred_at'  => 'datetime',
     ];
 

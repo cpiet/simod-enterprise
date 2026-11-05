@@ -83,6 +83,44 @@ class GeminiService
     }
 
     /**
+     * Klien HTTP ke Gemini. Kunci API dikirim lewat header `x-goog-api-key` (bukan query string)
+     * agar tidak ikut tercetak di URL pada pesan galat atau log. Galat 503 (server Google sibuk)
+     * dicoba ulang dengan jeda bertahap (`services.gemini.retry_delays`, milidetik).
+     */
+    private function client(string $apiKey, int $timeout): \Illuminate\Http\Client\PendingRequest
+    {
+        $delays = (array) config('services.gemini.retry_delays', [3000, 6000]);
+
+        return Http::timeout($timeout)
+            ->retry(
+                $delays,
+                0,
+                fn ($e) => $e instanceof \Illuminate\Http\Client\RequestException && $e->response->status() === 503,
+                throw: false
+            )
+            ->withHeaders([
+                'Content-Type'   => 'application/json',
+                'x-goog-api-key' => $apiKey,
+            ]);
+    }
+
+    /**
+     * Hapus kunci API dari teks galat/log (pertahanan berlapis bila ada pustaka yang menyertakan URL penuh).
+     */
+    private function redactSecrets(string $text): string
+    {
+        return preg_replace('/(AIza[0-9A-Za-z_\-]{20,}|AQ\.[0-9A-Za-z_.\-]{20,})/', '[API-KEY]', $text) ?? $text;
+    }
+
+    /**
+     * Catat respons non-sukses selain 429/403 (mis. 503 server sibuk) supaya penyebab gagal terlihat di log.
+     */
+    private function logHttpFailure(string $context, string $model, int $status, string $message): void
+    {
+        Log::warning("Gemini {$context}: model {$model} HTTP {$status}: " . $this->redactSecrets(mb_substr($message, 0, 300)));
+    }
+
+    /**
      * Urutan model yang dicoba: model pilihan Pengaturan AI, lalu dua model gratis yang masih tersedia.
      * Model Pro/lama sengaja TIDAK ditambahkan otomatis (Pro tidak punya jatah di paket gratis dan
      * model 1.5/2.0 sudah tidak tersedia); Pro hanya dipakai bila dipilih sendiri oleh admin.
@@ -92,6 +130,8 @@ class GeminiService
         return array_values(array_unique(array_filter([
             $model,
             'gemini-3.5-flash-lite',
+            'gemini-3.1-flash-lite', // kuota harian paket gratis dihitung per model: lebih banyak cadangan = lebih tahan 429/503
+            'gemini-3-flash-preview',
             'gemini-3.8-flash',
         ])));
     }
@@ -169,7 +209,8 @@ class GeminiService
             ];
         }
 
-        if (str_contains($apiKey, ' ') || preg_match('/[^A-Za-z0-9_-]/', $apiKey)) {
+        // Titik diizinkan: format kunci baru Google berbentuk "AQ.xxxx".
+        if (str_contains($apiKey, ' ') || preg_match('/[^A-Za-z0-9_.-]/', $apiKey)) {
             return [
                 'success' => false,
                 'message' => 'Format Gemini API Key tidak valid (terdeteksi spasi atau karakter ilegal). Pastikan kunci disalin lengkap tanpa spasi.',
@@ -182,9 +223,10 @@ class GeminiService
 
         foreach ($modelsToTry as $m) {
             try {
-                $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$m}:generateContent?key={$apiKey}";
+                $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$m}:generateContent";
                 $response = Http::timeout(15)->withHeaders([
-                    'Content-Type' => 'application/json',
+                    'Content-Type'   => 'application/json',
+                    'x-goog-api-key' => $apiKey,
                 ])->post($endpoint, [
                     'contents' => [
                         [
@@ -225,7 +267,7 @@ class GeminiService
                     'model'   => $m,
                 ];
             } catch (\Throwable $e) {
-                $lastError = $e->getMessage();
+                $lastError = $this->redactSecrets($e->getMessage());
             }
         }
 
@@ -268,7 +310,6 @@ class GeminiService
             $accounts[] = [
                 'index'        => $idx + 1,
                 'token_masked' => $this->maskApiKey($key),
-                'key_raw'      => $key,
                 'status'       => $isOk ? 'connected' : 'error',
                 'latency_ms'   => $res['latency_ms'] ?? null,
                 'model'        => $res['model'] ?? $model,
@@ -347,11 +388,9 @@ class GeminiService
 
             foreach ($modelsToTry as $m) {
                 try {
-                    $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$m}:generateContent?key={$currentKey}";
+                    $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$m}:generateContent";
 
-                    $response = Http::timeout(90)->retry(2, 2000, fn ($e) => $e instanceof \Illuminate\Http\Client\RequestException && $e->response->status() === 503, throw: false)->withHeaders([
-                        'Content-Type' => 'application/json',
-                    ])->post($endpoint, [
+                    $response = $this->client($currentKey, 90)->post($endpoint, [
                         'contents' => [
                             [
                                 'parts' => [
@@ -410,6 +449,10 @@ class GeminiService
                             continue;
                         }
 
+                        if (! in_array($response->status(), [403, 429], true)) {
+                            $this->logHttpFailure('analisis media', $m, $response->status(), $errMsg);
+                        }
+
                         // 403: kunci ditolak -> pindah ke kunci berikutnya di pool.
                         if ($response->status() === 403) {
                             Log::warning("Gemini Key [{$maskedCurrentKey}] ditolak (403: {$errMsg}). Pindah ke kunci berikutnya.");
@@ -418,8 +461,8 @@ class GeminiService
                         }
                     }
                 } catch (\Throwable $e) {
-                    Log::error("Gemini Analysis Exception on key [{$maskedCurrentKey}]: " . $e->getMessage());
-                    $lastError = $e->getMessage();
+                    Log::error("Gemini Analysis Exception on key [{$maskedCurrentKey}]: " . $this->redactSecrets($e->getMessage()));
+                    $lastError = $this->redactSecrets($e->getMessage());
                 }
             }
 
@@ -446,11 +489,14 @@ class GeminiService
         $lower = strtolower($raw);
 
         if (str_contains($lower, 'quota') || str_contains($lower, 'rate limit') || str_contains($lower, 'resource_exhausted') || str_contains($lower, '429')) {
-            return 'Kuota API Gemini habis atau belum tersedia untuk model yang dipilih (paket gratis memiliki batas harian dan per menit). '
+            return 'Kuota layanan analisis AI habis atau belum tersedia untuk pengaturan model yang dipilih (paket gratis memiliki batas harian dan per menit). '
                 . 'Coba lagi beberapa menit lagi, pilih model yang lebih ringan di Pengaturan Mesin AI, atau gunakan API Key dengan penagihan aktif.';
         }
+        if (str_contains($lower, 'high demand') || str_contains($lower, 'overloaded') || str_contains($lower, 'unavailable') || str_contains($lower, '503')) {
+            return 'Server layanan analisis AI sedang sibuk (bukan masalah API Key atau kuota Anda). Biasanya pulih dalam beberapa menit; coba lagi 1–5 menit lagi.';
+        }
         if (str_contains($lower, 'api key not valid') || str_contains($lower, 'api_key_invalid') || str_contains($lower, 'permission')) {
-            return 'API Key Gemini tidak valid atau tidak berizin. Periksa kunci di Pengaturan Mesin AI.';
+            return 'API Key layanan AI tidak valid atau tidak berizin. Hubungi administrator untuk memeriksa Pengaturan Mesin AI.';
         }
 
         $first = trim(preg_split('/[\r\n]|\. /', $raw)[0] ?? $raw);
@@ -558,11 +604,9 @@ PROMPT;
 
             foreach ($modelsToTry as $m) {
                 try {
-                    $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$m}:generateContent?key={$currentKey}";
+                    $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$m}:generateContent";
 
-                    $response = Http::timeout(90)->retry(2, 2000, fn ($e) => $e instanceof \Illuminate\Http\Client\RequestException && $e->response->status() === 503, throw: false)->withHeaders([
-                        'Content-Type' => 'application/json',
-                    ])->post($endpoint, [
+                    $response = $this->client($currentKey, 90)->post($endpoint, [
                         'contents' => [
                             [
                                 'parts' => [
@@ -601,12 +645,14 @@ PROMPT;
                             ];
                         }
                     } else {
+                        $lastError = $response->json('error.message') ?? "HTTP {$response->status()}";
                         if ($response->status() === 429 || $response->status() === 403) {
                             break; // switch to next key in pool
                         }
+                        $this->logHttpFailure('analisis kasus', $m, $response->status(), $lastError);
                     }
                 } catch (\Throwable $e) {
-                    $lastError = $e->getMessage();
+                    $lastError = $this->redactSecrets($e->getMessage());
                 }
             }
         }
@@ -810,17 +856,19 @@ STATISTIK GLOBAL:
 - Total Interaksi (Likes + Shares + Komentar): {$totalEngage}
 - Komposisi Sentimen Awal: Positif {$totalPos} ({$totalPos}/{$totalSent}), Netral {$totalNet}, Negatif {$totalNeg}
 
+ATURAN DATA: analisis hanya untuk wilayah {$commandName}. Abaikan postingan yang jelas membahas wilayah/Polda lain dan jangan menggabungkannya ke dalam narasi. Angka pada "sentiment_analysis" akan dihitung ulang oleh sistem dari data nyata; fokuskan analisis pada narasi.
+
 INSTRUKSI ANALISIS INTELIJEN SIBER (kembalikan HANYA JSON murni tanpa markdown, tanpa komentar):
 {
   "executive_brief": "Ringkasan eksekutif 2-3 paragraf: topik dominan percakapan warganet 24 jam terakhir, platform mana yang paling aktif, nada dan arah opini publik. Gunakan bahasa Indonesia yang lugas, mengalir, dan bernilai intelijen tinggi.",
   "top_concern": "1-2 kalimat: isu atau narasi paling mengkhawatirkan dari sudut pandang keamanan siber dan reputasi institusi Polri yang perlu segera ditangani.",
   "sentiment_analysis": {
-    "positif": 25,
-    "netral": 45,
-    "negatif": 30,
-    "dominant": "netral",
-    "stability_index": 72,
-    "stability_label": "Waspada",
+    "positif": 0,
+    "netral": 0,
+    "negatif": 0,
+    "dominant": "positif|netral|negatif",
+    "stability_index": 0,
+    "stability_label": "Terkendali|Waspada|Kritis",
     "narrative_framing": "Deskripsi singkat framing dominan warganet: sudut pandang mayoritas yang muncul di postingan."
   },
   "buzzer_vs_organic": {
@@ -873,8 +921,8 @@ PROMPT;
 
             foreach ($modelsToTry as $m) {
                 try {
-                    $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$m}:generateContent?key={$currentKey}";
-                    $response = Http::timeout(90)->retry(2, 2000, fn ($e) => $e instanceof \Illuminate\Http\Client\RequestException && $e->response->status() === 503, throw: false)->withHeaders(['Content-Type' => 'application/json'])->post($endpoint, [
+                    $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$m}:generateContent";
+                    $response = $this->client($currentKey, 90)->post($endpoint, [
                         'contents' => [['parts' => [['text' => $prompt]]]],
                         'generationConfig' => [
                             'temperature'     => $this->temperatureFor($polda->id, true),
@@ -895,6 +943,20 @@ PROMPT;
                         }
 
                         if (!empty($parsed) && is_array($parsed)) {
+                            // Angka sentimen dihitung dari data nyata (bukan karangan/contoh model): persen dari penghitungan postingan.
+                            $tot = max(1, array_sum($sentCounts));
+                            $pos = (int) round($sentCounts['positif'] / $tot * 100);
+                            $neg = (int) round($sentCounts['negatif'] / $tot * 100);
+                            $stab = max(0, min(100, 100 - $neg));
+                            $parsed['sentiment_analysis'] = array_merge($parsed['sentiment_analysis'] ?? [], [
+                                'positif'         => $pos,
+                                'negatif'         => $neg,
+                                'netral'          => max(0, 100 - $pos - $neg),
+                                'dominant'        => array_search(max($sentCounts), $sentCounts, true),
+                                'stability_index' => $stab,
+                                'stability_label' => $stab >= 75 ? 'Terkendali' : ($stab >= 50 ? 'Waspada' : 'Kritis'),
+                            ]);
+
                             // Enhance whatsapp_script if too short
                             if (empty($parsed['whatsapp_script']) || strlen($parsed['whatsapp_script']) < 400) {
                                 $parsed['whatsapp_script'] = $this->buildSocialWhatsAppScript($parsed, $polda, $totalPosts, $sentCounts);
@@ -936,12 +998,15 @@ PROMPT;
                     } else {
                         $errMsg    = $response->json('error.message') ?? "HTTP {$response->status()}";
                         $lastError = $errMsg;
+                        if (! in_array($response->status(), [403, 429, 404], true)) {
+                            $this->logHttpFailure('analisis medsos', $m, $response->status(), $errMsg);
+                        }
                         if ($response->status() === 403) break; // kunci ditolak: pindah kunci
                         if (in_array($response->status(), [429, 404], true)) continue; // kuota/model: coba model lain
                     }
                 } catch (\Throwable $e) {
-                    $lastError = $e->getMessage();
-                    Log::error("SADEWA Social AI exception [{$maskedKey}]: " . $e->getMessage());
+                    $lastError = $this->redactSecrets($e->getMessage());
+                    Log::error("SADEWA Social AI exception [{$maskedKey}]: " . $this->redactSecrets($e->getMessage()));
                 }
             }
         }
@@ -1101,7 +1166,7 @@ PROMPT;
 
             foreach ($modelsToTry as $m) {
                 try {
-                    $url = "https://generativelanguage.googleapis.com/v1beta/models/{$m}:generateContent?key={$currentKey}";
+                    $url = "https://generativelanguage.googleapis.com/v1beta/models/{$m}:generateContent";
 
                     $payload = [
                         'contents' => [
@@ -1116,9 +1181,7 @@ PROMPT;
                         ],
                     ];
 
-                    $response = Http::withHeaders(['Content-Type' => 'application/json'])
-                        ->timeout(30)->retry(2, 2000, fn ($e) => $e instanceof \Illuminate\Http\Client\RequestException && $e->response->status() === 503, throw: false)
-                        ->post($url, $payload);
+                    $response = $this->client($currentKey, 45)->post($url, $payload);
 
                     if ($response->successful()) {
                         $json = $response->json();
@@ -1136,8 +1199,11 @@ PROMPT;
 
                     $errorBody = $response->body();
                     $lastError = "Model {$m} (Key #{$keyIndex}): " . ($response->json('error.message') ?? $errorBody);
+                    if (! $response->successful()) {
+                        $this->logHttpFailure('chat SADEWA', $m, $response->status(), (string) ($response->json('error.message') ?? $errorBody));
+                    }
                 } catch (\Throwable $e) {
-                    $lastError = "Exception Model {$m} (Key #{$keyIndex}): " . $e->getMessage();
+                    $lastError = "Exception Model {$m} (Key #{$keyIndex}): " . $this->redactSecrets($e->getMessage());
                 }
             }
         }

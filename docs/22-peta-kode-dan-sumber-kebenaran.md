@@ -1,6 +1,6 @@
 # 🧭 22. Peta Kode & Sumber Kebenaran (Source of Truth)
 
-Dokumen ini adalah **peta tunggal** antara dokumentasi dan kode SIMOD Enterprise. Seluruh angka di sini diverifikasi langsung dari repositori pada **5 November 2026** (baseline `php artisan test`: **151 tests, 905 assertions, PASS**).
+Dokumen ini adalah **peta tunggal** antara dokumentasi dan kode SIMOD Enterprise. Seluruh angka di sini diverifikasi langsung dari repositori pada **5 November 2026** (baseline `php artisan test`: **262 tests, 1981 assertions, PASS**; 129 rute; 39 tabel; 20 kunci RBAC).
 
 > [!IMPORTANT]
 > **Aturan emas:** bila dokumen lain bertentangan dengan dokumen ini atau dengan kode, **kode yang benar**. Perbarui dokumennya, bukan sebaliknya. Dokumen berstatus *snapshot historis* (angka test/berita lama) ditandai eksplisit di dokumennya masing-masing.
@@ -18,7 +18,7 @@ Dokumen ini adalah **peta tunggal** antara dokumentasi dan kode SIMOD Enterprise
 | Skema basis data | `database/migrations/*` | bagian 6 di bawah |
 | Data awal (tenant, feed, akun) | `database/seeders/*` | [02](02-perintah-artisan-dan-cli.md), [PANDUAN_SETUP](PANDUAN_SETUP_KOMPUTER_RUMAH.md) |
 | Perintah CLI & jadwal | `app/Console/Commands/*`, `routes/console.php` | [02](02-perintah-artisan-dan-cli.md) |
-| Aturan wajib AI agent | `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md` | [21](21-standarisasi-multi-agent-dan-sinkronisasi-lintas-model.md) |
+| Aturan wajib AI agent | `AGENTS.md` (induk); `CLAUDE.md` & `GEMINI.md` mengimpornya; `.github/copilot-instructions.md` ringkasan | [21](21-standarisasi-multi-agent-dan-sinkronisasi-lintas-model.md) |
 
 ---
 
@@ -32,7 +32,7 @@ Dokumen ini adalah **peta tunggal** antara dokumentasi dan kode SIMOD Enterprise
 | Sesi / cache / antrean | Driver `database` (`SESSION_DRIVER`, `CACHE_STORE`, `QUEUE_CONNECTION`) |
 | Worker eksternal | `scraper/media_crawler.py` (Python) → `POST /api/v1/ingest/*` |
 
-> **Catatan Windows:** pada Git Bash `php` mungkin tidak ada di `PATH`. Gunakan PHP Laragon (`D:\laragon\bin\php\php-8.2.28-nts-Win32-vs16-x64\php.exe`) atau terminal Laragon. Untuk npm di PowerShell gunakan `npm.cmd`.
+> **Catatan Windows:** bila `php` tidak dikenal di terminal, gunakan PHP Laragon (`<laragon>\bin\php\php-8.2.28-nts-Win32-vs16-x64\php.exe`) atau terminal Laragon. Untuk npm di PowerShell gunakan `npm.cmd`.
 
 ---
 
@@ -55,9 +55,9 @@ Dokumen ini adalah **peta tunggal** antara dokumentasi dan kode SIMOD Enterprise
 
 ---
 
-## 4. Peta Rute (117 rute aplikasi: 113 web + 4 API)
+## 4. Peta Rute (129 rute aplikasi: 125 web + 4 API)
 
-> Seluruh rute web (kecuali `/login` dan `/logout`) berada di grup `Route::middleware('auth')`. Setiap rute modul juga memakai `->middleware('module:kunci')` (lihat bagian 7). `POST /login` dibatasi `throttle:10,1`.
+> Hitungan dari `php artisan route:list`, di luar rute bawaan framework (`/up`, `storage/{path}`, `_inertia/devtools/*`). Seluruh rute web (kecuali `/login` dan `/logout`) berada di grup `Route::middleware(['auth', 'idle'])`. Setiap rute modul juga memakai `->middleware('module:kunci')` (lihat bagian 7). `POST /login` dibatasi `throttle:10,1`.
 
 ### 4.1. Web (`routes/web.php`)
 
@@ -105,7 +105,11 @@ Endpoint bertanda *(token)* memakai middleware `ingest.token`: header `Authoriza
 | `GoogleNewsCrawlerService` | Penarikan Google News on-demand untuk topik atensi |
 | `SocialSyndicationService` | Ingesti medsos Tier 1 (Google News `site:`) → Tier 2 (RSS publik) → Tier 3 (fallback sintetis) |
 | `ApifySyncService` | Scraper Apify (token pool + failover), `crawlKeyword`, `syncPolda` |
-| `GeminiService` | Analisis AI (media & medsos, SADEWA), pool kunci Gemini + sanitizer |
+| `GeminiService` | Analisis AI (media & medsos, SADEWA), pool kunci Gemini (kunci via header `x-goog-api-key`), rantai model `modelChain()`, coba ulang 503 bertahap |
+| `MediaArticleListing` | Daftar Radar Media Online di server: pencarian, filter, penggabungan berita ganda, paginasi, facet, KPI, kesegaran, situasi pimpinan ([doc 29](29-radar-media-pencarian-server-dan-command-center-data-nyata.md)) |
+| `AiQuota` | Batas pemakaian AI per pengguna per hari, penahanan saat kuota Google habis, log `ai_usage_logs` ([doc 28](28-batas-pemakaian-ai-dan-penghematan-kuota.md)) |
+| `InstagramAccountMonitoringService` | Pantauan akun Instagram manual ([doc 25](25-peta-grafik-dan-pantauan-instagram.md)) |
+| `SystemHealth` | Pengukuran kesehatan server, status penjadwal (cron), dan daftar kesiapan hosting ([doc 30](30-audit-log-keamanan-hosting-dan-arsip-hapus-laporan.md)) |
 | `DatabaseBackupService` | Snapshot SQL terkompresi, hash SHA-256, pruning |
 | `NewsCleanupService` | Pembersihan berita multi-Polda (kebal bookmark) |
 
@@ -113,21 +117,30 @@ Endpoint bertanda *(token)* memakai middleware `ingest.token`: header `Authoriza
 
 | Perintah | Keterangan |
 |:---|:---|
+| `audit:prune {--days=}` | Pangkas log audit lebih lama dari retensi (bawaan 180 hari; 0 = nonaktif); dijadwalkan harian 02:30 |
+| `simod:demo-prepare {--force} {--keep-articles} {--sync}` | Bersihkan data contoh dan siapkan demo Divhumas + Sulbar (dry-run kecuali `--force`; doc 31) |
+| `media:reindex {--polda=} {--only=}` | Hitung ulang sentimen (aturan konteks Polri) dan `title_hash` berita yang sudah tersimpan |
 | `rss:sync {--polda=} {--force} {--scheduled}` | Sinkron RSS aman (mutex). `--polda=ALL` = Divhumas |
 | `media:prune {--days=} {--polda=}` | Pangkas berita lama non-bookmark (default `MEDIA_RETENTION_DAYS=90`) |
 | `db:backup {--type=scheduled} {--force} {--retention=}` | Snapshot basis data |
-| `simod:scrape-rss {--polda=}` | Perintah lama: tarik RSS seluruh portal Satwil |
-| `simod:sync-feeds {--polda=SULBAR} {--force}` | Perintah lama: sinkron feed terdaftar |
 
 **Scheduler (`routes/console.php`):** `rss:sync --scheduled` tiap menit (`withoutOverlapping(10)`); `db:backup --type=scheduled` tiap 10 menit (`withoutOverlapping(20)`); `media:prune` harian 02:00 (hanya bila `MEDIA_RETENTION_DAYS > 0`).
 
+### 5.2b. Kelas bantu (`app/Support`)
+
+| Kelas | Peran |
+|:---|:---|
+| `NewsSentiment` | Sentimen berita berbasis aturan untuk konteks Polri |
+| `NewsSearch` | Parser pencarian (`kata`, `"frasa"`, `-kecualikan`), kondisi LIKE aman, skor relevansi, `titleHash()` |
+| `FastTime` | Format waktu ringan untuk daftar besar |
+
 ### 5.3. Middleware
 
-`HandleInertiaRequests` (props bersama: tenant, navigasi, permission, flash, metrik sidebar; kosong untuk tamu), `PreventBackHistory` (header anti-cache pada grup `web`), `EnsureModulePermission` (alias `module`, penegakan RBAC per rute), `EnsureIngestToken` (alias `ingest.token`, API ingest), `trustProxies(at: '*')`. Pengecualian CSRF: `social-intelligence/test-connection`, `media-intelligence/gemini-test`, `settings/ai/test`.
+`HandleInertiaRequests` (props bersama: tenant, navigasi, permission, flash, metrik sidebar; kosong untuk tamu), `PreventBackHistory` (header anti-cache pada grup `web`), `EnsureModulePermission` (alias `module`, penegakan RBAC per rute), `EnforceSessionTimeout` (alias `idle`, batas sesi tidak aktif), `EnsureIngestToken` (alias `ingest.token`, API ingest), `trustProxies(at: '*')`. Pengecualian CSRF: `social-intelligence/test-connection`, `media-intelligence/gemini-test`, `settings/ai/test`.
 
 ---
 
-## 6. Basis Data (38 tabel = 31 domain + 7 infrastruktur Laravel)
+## 6. Basis Data (39 tabel = 32 domain + 7 infrastruktur Laravel)
 
 | Kelompok | Tabel |
 |:---|:---|
@@ -135,12 +148,12 @@ Endpoint bertanda *(token)* memakai middleware `ingest.token`: header `Authoriza
 | Media online | `media_feeds`, `media_articles`, `media_topics`, `media_article_topic`, `media_intelligence_reports`, `early_warnings`, `rss_sync_settings`, `rss_sync_logs` |
 | Media sosial | `social_posts`, `social_settings`, `social_investigation_cases`, `social_intelligence_reports`, `monitored_instagram_accounts` |
 | Isu, rilis & tugas | `issues`, `issue_status_history`, `press_releases`, `tasks`, `task_updates`, `publications`, `media_files` |
-| Keamanan, AI & sistem | `audit_logs`, `security_settings`, `role_permissions`, `menu_items`, `ai_settings`, `sadewa_conversations`, `backup_settings`, `backup_records` |
+| Keamanan, AI & sistem | `audit_logs`, `security_settings`, `role_permissions`, `menu_items`, `ai_settings`, `ai_usage_logs`, `sadewa_conversations`, `backup_settings`, `backup_records` |
 | Infrastruktur Laravel | `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`, `sessions`, `password_reset_tokens` |
 
 ---
 
-## 7. RBAC: 21 Kunci Modul & 6 Peran Bawaan
+## 7. RBAC: 20 Kunci Modul & 6 Peran Bawaan
 
 **20 kunci modul** (`RolePermission::defaultModules()`), per pilar:
 
@@ -155,8 +168,8 @@ Endpoint bertanda *(token)* memakai middleware `ingest.token`: header `Authoriza
 
 | `role_key` | Nama | Modul aktif |
 |:---|:---|:---:|
-| `kadiv_humas` | Kadivhumas Polri | 21 / 20 |
-| `super_admin_mabes` | Super Administrator Mabes | 21 / 20 |
+| `kadiv_humas` | Kadivhumas Polri | 20 / 20 |
+| `super_admin_mabes` | Super Administrator Mabes | 20 / 20 |
 | `polda_leader` | Pimpinan Polda (Kabid Humas) | 16 / 20 |
 | `verifikator` | Verifikator (Kasubbid Penmas) | 12 / 20 |
 | `analis` | Analis Intelijen Media & Siber | 8 / 20 |
@@ -176,7 +189,7 @@ Endpoint bertanda *(token)* memakai middleware `ingest.token`: header `Authoriza
 |:---|:---|
 | Tenant yang di-seed | **6**: Divhumas Polri (Mabes) + Polda Sulbar, Gorontalo, Sulsel, Sultra, Kaltim |
 | Feed RSS Sulbar (`SulbarRssFeedsSeeder`) | **29** |
-| Feed RSS nasional Divhumas (`DivhumasNationalRssFeedsSeeder`) | **33** |
+| Feed RSS nasional Divhumas (`DivhumasNationalRssFeedsSeeder`) | **33** (basis data yang di-seed sebelum seeder diperbarui bisa masih berisi 22; jalankan `php artisan db:seed --class=DivhumasNationalRssFeedsSeeder` untuk menyamakan) |
 
 > **"34 Polda"** pada dokumen lain adalah **target cakupan arsitektur** (`php artisan rss:sync` tanpa opsi memproses semua Polda aktif di basis data), bukan jumlah Polda yang di-seed saat ini.
 
@@ -202,15 +215,25 @@ Temuan saat menyelaraskan dokumen dengan kode (5 Nov 2026), beserta status perba
 | 11 | Halaman Mail & Pemeliharaan hanya mock klien; 8 parameter Pusat Keamanan tersimpan tetapi tidak diterapkan; "Ganti Kata Sandi"/PIN di Profil hanya notifikasi. | ✅ **Diperbaiki** — halaman dihapus; Keamanan memakai 3 parameter yang ditegakkan (lockout login, batas sesi); ganti kata sandi nyata. Lihat [doc 24](24-penyederhanaan-isu-tugas-publikasi-dan-administrasi.md). |
 | 9 | Syarat keamanan worker doc 14 (SSRF, XXE, dedup berlapis) belum tentu terimplementasi. | ⏳ **Terbuka** — audit `RssFeedService` sebelum mengaktifkan feed baru. |
 
+| 12 | Dokumen menyebut akun `cpiet` kebal hapus/nonaktif, padahal kode (`SystemModuleController::toggleUserStatus`/`deleteUser`) hanya melindungi `id = 1`, `kadivhumas`, `superadmin`. | ⏳ **Terbuka**: dokumen disesuaikan dengan kode; tambahkan `cpiet` ke daftar di kode bila memang harus dilindungi. |
+| 13 | `README.md` root masih memuat kata sandi akun seed dalam teks biasa. | ✅ **Dihapus dari README**. ⚠️ Masih ada di riwayat git: anggap bocor dan ganti di lingkungan non-lokal. |
+| 14 | `MediaIntelligenceController` tidak memeriksa tenant pada bookmark, ubah/hapus topik, tag artikel, analisis & crawl topik (IDOR antar-Polda). | ✅ **Diperbaiki** — `authorizeTenantRecord()` di semua aksi; diuji di `MediaIntelligenceTenantIsolationTest`. Lihat [doc 29](29-radar-media-pencarian-server-dan-command-center-data-nyata.md) §7. |
+| 15 | Command Center memuat banyak angka karangan (indeks `+6%`, tren 76/18/6%, barometer 80/15/5, "29 Portal", "6 Polres", tugas 100%) dan matriks kosong pada mode Nasional. | ✅ **Diperbaiki** — nilai nyata atau "belum ada data"; lihat doc 29 §6. |
+| 16 | Kunci API Gemini dikirim di URL (`?key=`), dapat tercetak di pesan galat/log. | ✅ **Diperbaiki** — header `x-goog-api-key` + penyamaran pola `AIza...`. |
+| 17 | Halaman Audit Log penuh angka/klaim tiruan; filter tidak berfungsi; ekspor CSV salah sasaran; aktivitas keamanan tidak dibatasi tenant; tidak ada cara membersihkan log. | ✅ **Diperbaiki** — doc 30 §1–§4. |
+| 18 | Laporan isu tidak dapat diarsipkan/dihapus dari daftar; arsip bercampur di tab Semua. | ✅ **Ditambahkan** — arsip, Sampah, pulihkan, aksi massal; doc 30 §5. |
+| 19 | Kunci API Gemini/Apify tersimpan tanpa enkripsi di basis data (klaim "AES-256" di UI keliru). | ⏳ **Terbuka** — klaim dihapus; enkripsi at-rest perlu keputusan (doc 30 §6). |
+| 20 | Berita dari feed yang sama di dua Polda saling "mengambil" karena kunci simpan hanya URL; mode Nasional menggabungkan data Polda ke tampilan Divhumas; data medsos buatan (sintetis, tren statis) tampil seperti data nyata. | ✅ **Diperbaiki** — kunci (polda_id, url); Divhumas hanya data Divhumas (`SIMOD_NATIONAL_AGGREGATE`); fallback buatan dimatikan (`SIMOD_SOCIAL_SYNTHETIC`); data contoh opt-in (`SIMOD_SEED_SAMPLE`). Doc 31. |
+
 **Risiko tersisa yang perlu keputusan:** (a) pengecualian CSRF pada 3 endpoint `test-connection` (`social-intelligence/test-connection`, `media-intelligence/gemini-test`, `settings/ai/test`); (b) kata sandi seed pada seeder/riwayat git; (c) `GET /logout` masih tersedia (logout lewat GET rawan CSRF-logout ringan); (d) `trustProxies(at: '*')`.
 
 ---
 
 ## 10. Pengujian
 
-`tests/Feature` memuat 22 berkas (plus `tests/Unit/ExampleTest.php`): `CommandCenterNationalMapAndKpiTest` (5 test), `DatabaseBackupTest`, `DivhumasNationalFeedsTest`, `DynamicMenuAndSecurityAuditTest`, `EndToEndAuditStressTest`, `EnterpriseFullSuiteTest`, `ExampleTest`, `GeminiMediaIntelligenceTest`, `InstagramAccountMonitoringTest` (2 test), `MediaTopicDossierTest`, `NewsCleanupTest`, `PersonaliaAuthorityTest` (6 test), `RolePermissionMatrixTest`, `RssSyncTest`, `SadewaChatTest` (7 test), `SecurityCenterTest`, `SocialIntelligenceTest` (12 test), `TenantSecurityTest` (3 test), `AdminSystemEnforcementTest` (4 test: lockout login, batas sesi, ganti kata sandi, halaman mock terhapus), `TenantOverrideProtectionTest` (4 test: tenant tidak dapat dialihkan klien), `AuthHardeningTest` (9 test: gerbang login, kredensial, simulasi peran, token ingest), `ModulePermissionEnforcementTest` (6 test: penegakan RBAC server-side).
+`tests/Feature` memuat 36 berkas (plus `tests/Unit/ExampleTest.php`): `AiModelSelectionTest` (6), `AiQuotaAndSavingsTest` (9), `CommandCenterRefreshTest` (5), `GeminiQuotaFallbackTest` (2), `CommandCenterNationalMapAndKpiTest` (5 test), `DatabaseBackupTest`, `DivhumasNationalFeedsTest`, `DynamicMenuAndSecurityAuditTest`, `EndToEndAuditStressTest`, `EnterpriseFullSuiteTest`, `ExampleTest`, `GeminiMediaIntelligenceTest`, `InstagramAccountMonitoringTest` (2 test), `MediaTopicDossierTest`, `NewsCleanupTest`, `PersonaliaAuthorityTest` (6 test), `RolePermissionMatrixTest`, `RssSyncTest`, `SadewaChatTest` (7 test), `SecurityCenterTest`, `SocialIntelligenceTest` (12 test), `TenantSecurityTest` (3 test), `AdminSystemEnforcementTest` (4 test: lockout login, batas sesi, ganti kata sandi, halaman mock terhapus), `TenantOverrideProtectionTest` (4 test: tenant tidak dapat dialihkan klien), `AuthHardeningTest` (9 test: gerbang login, kredensial, simulasi peran, token ingest), `ModulePermissionEnforcementTest` (6 test: penegakan RBAC server-side).
 
-Baseline wajib sebelum dan sesudah perubahan: `php artisan test` → **151 passed (905 assertions)** dan `npm.cmd run build` tanpa galat. Helper test: `$this->actingAsSuperAdmin()` (`tests/TestCase.php`).
+Baseline wajib sebelum dan sesudah perubahan: `php artisan test` → **262 passed (1981 assertions)** dan `npm.cmd run build` tanpa galat. Helper test: `$this->actingAsSuperAdmin()` (`tests/TestCase.php`).
 
 ---
 
@@ -224,5 +247,5 @@ Baseline wajib sebelum dan sesudah perubahan: `php artisan test` → **151 passe
    Select-String -Path app\Models\RolePermission.php -Pattern "'key'"   # kunci modul
    ```
 3. Jangan menulis `?polda=` pada contoh tautan UI; gunakan `POST /tenant/switch` dengan payload `code`.
-4. Path proyek yang berlaku: `d:\laragon\www\simod-enterprise` (bukan `d:\Foto\laragon\...`).
+4. Path proyek berbeda antar komputer (mis. `D:\Foto\laragon\www\simod-enterprise` atau `D:\laragon\www\simod-enterprise`). Jangan menulis path absolut atau tautan `file:///` di dokumen; gunakan tautan relatif.
 5. Perintah npm di Windows: `npm.cmd`.

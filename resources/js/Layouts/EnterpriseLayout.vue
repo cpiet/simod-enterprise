@@ -570,15 +570,15 @@ const switchRole = (newRole) => {
         </div>
       </div>
 
-      <!-- Presisi Motto Footer Box -->
+      <!-- Tagline: Polisi Bersama Masyarakat -->
       <div v-if="!isDesktopSidebarCollapsed" class="p-3 border-t border-slate-800/80 bg-[#080e1c]">
         <div class="rounded-xl bg-gradient-to-br from-slate-900 to-[#0c162d] border border-amber-400/20 p-3 shadow-inner">
           <div class="flex items-center gap-2 mb-1.5">
             <Shield class="w-3.5 h-3.5 text-amber-400" />
-            <span class="text-[10px] font-black tracking-wider text-amber-400 uppercase">POLRI PRESISI</span>
+            <span class="text-[10px] font-black tracking-wider text-amber-400 uppercase">POLISI BERSAMA MASYARAKAT</span>
           </div>
           <p class="text-[9px] text-slate-300 leading-tight">
-            Prediktif &bull; Responsibilitas &bull; Transparansi Berkeadilan
+            Sistem Monitoring &amp; Opini Publik Digital
           </p>
           <div class="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[9px] text-slate-300 font-mono">
             <span class="flex items-center gap-1.5">

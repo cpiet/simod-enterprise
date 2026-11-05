@@ -24,29 +24,47 @@ class IssueController extends Controller
     {
         $allPoldas = Polda::withCount('polres')->where('is_active', true)->get();
         [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
-        $isNational = ($selectedCode === 'ALL');
+        $isNational = $this->aggregatesNational($selectedCode);
+        $canManage = $this->canManageIssues($request);
+        $user = $request->user();
 
-        $statusFilter = $request->query('status', 'all');
-        $priorityFilter = $request->query('priority', 'all');
-        $categoryFilter = $request->query('category', 'all');
-        $polresFilter = $request->query('polres', 'all');
-        $search = $request->query('q', '');
+        $statusFilter = (string) $request->query('status', 'all');
+        $priorityFilter = (string) $request->query('priority', 'all');
+        $categoryFilter = (string) $request->query('category', 'all');
+        $polresFilter = (string) $request->query('polres', 'all');
+        $search = (string) $request->query('q', '');
+        $sort = in_array($request->query('sort'), ['terlama', 'prioritas', 'diperbarui'], true) ? (string) $request->query('sort') : 'terbaru';
+        $perPage = in_array((int) $request->query('per_page'), [15, 30, 50], true) ? (int) $request->query('per_page') : 15;
+
+        // Tab Sampah hanya untuk pengelola laporan; selain itu diabaikan.
+        $trashView = $statusFilter === 'trash' && $canManage;
+        if ($statusFilter === 'trash' && ! $canManage) {
+            $statusFilter = 'all';
+        }
 
         $polresList = $selectedPolda ? $selectedPolda->polres : Polres::where('is_active', true)->get();
 
-        $query = Issue::with(['polres', 'polda', 'creator'])->withCount('mediaFiles')->latest();
+        $query = Issue::with(['polres', 'polda', 'creator'])->withCount('mediaFiles');
+        if ($trashView) {
+            $query->onlyTrashed();
+        }
 
         // Multi-Tenant Scoping: Jika tingkat Polda spesifik, filter polda_id. Jika Mabes (ALL), cakup konsolidasi nasional.
         if (!$isNational && $selectedPolda) {
             $query->where('polda_id', $selectedPolda->id);
         }
 
-        if ($statusFilter !== 'all') {
+        if ($trashView) {
+            // semua status di Sampah
+        } elseif ($statusFilter === 'all') {
+            // Arsip hanya tampil di tab Arsip agar daftar kerja tidak bercampur dengan laporan yang sudah ditutup.
+            $query->whereNotIn('status', Issue::STATUS_GROUPS['archived']);
+        } else {
             $query->whereIn('status', Issue::statusesForFilter($statusFilter));
         }
 
         if ($priorityFilter === 'attention' || $priorityFilter === 'atensi') {
-            $query->whereIn('priority', ['critical', 'high'])->whereNotIn('status', ['selesai']);
+            $query->whereIn('priority', ['critical', 'high'])->whereNotIn('status', $this->closedStatuses());
         } elseif ($priorityFilter !== 'all') {
             $query->where('priority', $priorityFilter);
         }
@@ -68,7 +86,21 @@ class IssueController extends Controller
             });
         }
 
-        $issues = $query->paginate(15)->withQueryString();
+        match ($sort) {
+            'terlama'    => $query->orderBy('created_at')->orderBy('id'),
+            'diperbarui' => $query->orderByDesc('updated_at')->orderByDesc('id'),
+            'prioritas'  => $query->orderByRaw("CASE priority WHEN 'critical' THEN 0 WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END")->orderByDesc('created_at'),
+            default      => $query->orderByDesc('created_at')->orderByDesc('id'),
+        };
+
+        $issues = $query->paginate($perPage)->withQueryString()->through(function (Issue $issue) use ($request, $canManage, $trashView) {
+            $issue->setAttribute('can_archive', $canManage && ! $trashView && ! in_array($issue->status, array_merge(Issue::STATUS_GROUPS['archived'], Issue::STATUS_GROUPS['draft']), true));
+            $issue->setAttribute('can_restore', $canManage && ($trashView || in_array($issue->status, Issue::STATUS_GROUPS['archived'], true)));
+            $issue->setAttribute('can_delete', ! $trashView && $this->canTrash($request, $issue));
+            $issue->setAttribute('can_force_delete', $canManage && $trashView);
+
+            return $issue;
+        });
 
         $metrics = [
             'total_issues'    => Issue::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
@@ -82,11 +114,13 @@ class IssueController extends Controller
         // Hitungan per kelompok status (tab filter) & daftar kategori nyata untuk filter.
         $scoped = fn () => Issue::when(!$isNational && $selectedPolda, fn ($q) => $q->where('polda_id', $selectedPolda->id));
         $byStatus = $scoped()->select('status', \Illuminate\Support\Facades\DB::raw('count(*) as c'))->groupBy('status')->pluck('c', 'status');
-        $groupCounts = ['all' => (int) $byStatus->sum()];
+        $groupCounts = [];
         foreach (Issue::STATUS_GROUPS as $group => $statuses) {
             $groupCounts[$group] = (int) collect($statuses)->sum(fn ($st) => $byStatus[$st] ?? 0);
         }
-        $groupCounts['attention'] = $scoped()->whereIn('priority', ['critical', 'high'])->whereNotIn('status', ['selesai'])->count();
+        $groupCounts['all'] = (int) $byStatus->sum() - $groupCounts['archived'];
+        $groupCounts['attention'] = $scoped()->whereIn('priority', ['critical', 'high'])->whereNotIn('status', $this->closedStatuses())->count();
+        $groupCounts['trash'] = $canManage ? $scoped()->onlyTrashed()->count() : 0;
         $categoryOptions = $scoped()->whereNotNull('category')->distinct()->orderBy('category')->pluck('category');
 
         return Inertia::render('Issues/Index', [
@@ -103,7 +137,11 @@ class IssueController extends Controller
                 'category' => $categoryFilter,
                 'polres'   => $polresFilter,
                 'q'        => $search,
+                'sort'     => $sort,
+                'per_page' => $perPage,
             ],
+            'canManage'      => $canManage,
+            'canBulkDelete'  => $canManage,
             'metrics'        => $metrics,
         ]);
     }
@@ -125,9 +163,13 @@ class IssueController extends Controller
             'tasks',
             'publications',
             'pressReleases',
-        ])->findOrFail($id);
+        ])->withTrashed()->findOrFail($id);
 
         $this->authorizeTenantRecord($request, $issue);
+        $canManage = $this->canManageIssues($request);
+        if ($issue->trashed() && ! $canManage) {
+            abort(404);
+        }
 
         $metrics = [
             'total_issues'   => Issue::when($selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
@@ -141,6 +183,13 @@ class IssueController extends Controller
             'selectedCode'  => $selectedCode,
             'issue'         => $issue,
             'metrics'       => $metrics,
+            'manage'        => [
+                'trashed'      => $issue->trashed(),
+                'can_archive'  => $canManage && ! $issue->trashed() && ! in_array($issue->status, array_merge(Issue::STATUS_GROUPS['archived'], Issue::STATUS_GROUPS['draft']), true),
+                'can_restore'  => $canManage && ($issue->trashed() || in_array($issue->status, Issue::STATUS_GROUPS['archived'], true)),
+                'can_delete'   => ! $issue->trashed() && $this->canTrash($request, $issue),
+                'can_force'    => $canManage && $issue->trashed(),
+            ],
         ]);
     }
 
@@ -273,7 +322,7 @@ class IssueController extends Controller
     public function exportCsv(Request $request)
     {
         [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
-        $isNational = ($selectedCode === 'ALL');
+        $isNational = $this->aggregatesNational($selectedCode);
         $statusFilter = $request->query('status', 'all');
         $priorityFilter = $request->query('priority', 'all');
         $categoryFilter = $request->query('category', 'all');
@@ -475,24 +524,287 @@ class IssueController extends Controller
      */
     public function close(Request $request, $id)
     {
+        return $this->archive($request, $id);
+    }
+
+    /**
+     * Arsipkan laporan. Tahap sebelumnya disimpan sehingga arsip dapat dipulihkan ke tahap semula.
+     */
+    public function archive(Request $request, $id)
+    {
         $issue = Issue::findOrFail($id);
         $this->authorizeTenantRecord($request, $issue);
-        $fromStatus = $issue->status;
 
-        $issue->update([
-            'status'     => 'arsip',
-            'updated_at' => now(),
+        $skip = $this->archiveOne($issue, $this->reasonFrom($request));
+        if ($skip !== null) {
+            return back()->with('error', "Laporan tidak dapat diarsipkan: {$skip}.");
+        }
+        $this->audit('issue.archive', $issue);
+
+        return back()->with('success', 'Laporan diarsipkan. Pulihkan kapan saja dari tab Arsip.');
+    }
+
+    /**
+     * Pulihkan laporan dari Arsip (ke tahap semula) atau dari Sampah.
+     */
+    public function restore(Request $request, $id)
+    {
+        $issue = Issue::withTrashed()->findOrFail($id);
+        $this->authorizeTenantRecord($request, $issue);
+
+        $wasTrashed = $issue->trashed();
+        $skip = $this->restoreOne($issue);
+        if ($skip !== null) {
+            return back()->with('error', "Laporan tidak dapat dipulihkan: {$skip}.");
+        }
+        $this->audit('issue.restore', $issue);
+
+        return back()->with('success', $wasTrashed ? 'Laporan dipulihkan dari Sampah.' : 'Laporan dipulihkan dari Arsip.');
+    }
+
+    /**
+     * Hapus laporan = pindah ke Sampah (dapat dipulihkan). Pengelola dapat menghapus laporan apa pun;
+     * pembuat laporan hanya dapat menghapus drafnya sendiri.
+     */
+    public function destroy(Request $request, $id)
+    {
+        $issue = Issue::findOrFail($id);
+        $this->authorizeTenantRecord($request, $issue);
+        abort_unless($this->canTrash($request, $issue), 403, 'Anda tidak berwenang menghapus laporan ini.');
+
+        $skip = $this->trashOne($issue, $this->reasonFrom($request));
+        if ($skip !== null) {
+            return back()->with('error', "Laporan tidak dapat dihapus: {$skip}.");
+        }
+        $this->audit('issue.delete', $issue);
+
+        $message = 'Laporan dipindahkan ke Sampah. Dapat dipulihkan dari tab Sampah.';
+
+        return $request->boolean('from_show') ? redirect()->route('issues.index')->with('success', $message) : back()->with('success', $message);
+    }
+
+    /**
+     * Hapus permanen laporan yang sudah di Sampah (beserta foto buktinya). Tidak dapat dibatalkan.
+     */
+    public function forceDestroy(Request $request, $id)
+    {
+        $issue = Issue::onlyTrashed()->findOrFail($id);
+        $this->authorizeTenantRecord($request, $issue);
+        abort_unless($this->canManageIssues($request), 403);
+
+        if (strtoupper(trim((string) $request->input('confirm'))) !== 'HAPUS') {
+            return back()->with('error', 'Ketik HAPUS untuk mengonfirmasi penghapusan permanen.');
+        }
+
+        $this->audit('issue.delete_permanent', $issue);
+        $this->forceDeleteOne($issue);
+
+        $message = 'Laporan dihapus permanen.';
+
+        return $request->boolean('from_show') ? redirect()->route('issues.index', ['status' => 'trash'])->with('success', $message) : back()->with('success', $message);
+    }
+
+    /**
+     * Aksi massal: arsipkan, pulihkan, hapus (ke Sampah), hapus permanen, atau ubah prioritas.
+     * Laporan di luar wilayah pengguna atau yang tidak memenuhi syarat dilewati dan dilaporkan.
+     */
+    public function bulk(Request $request)
+    {
+        $data = $request->validate([
+            'action'   => 'required|in:archive,restore,delete,delete_permanent,priority',
+            'ids'      => 'required|array|min:1|max:100',
+            'ids.*'    => 'integer',
+            'priority' => 'required_if:action,priority|nullable|in:low,medium,high,critical',
+            'reason'   => 'nullable|string|max:300',
+            'confirm'  => 'nullable|string|max:20',
         ]);
 
-        IssueStatusHistory::create([
-            'issue_id'    => $issue->id,
-            'actor_id'    => auth()->id(),
-            'from_status' => $fromStatus,
-            'to_status'   => 'arsip',
-            'reason'      => 'Laporan ditutup dan dipindahkan ke arsip dinas kepolisian.',
+        if ($data['action'] === 'delete_permanent' && strtoupper(trim((string) ($data['confirm'] ?? ''))) !== 'HAPUS') {
+            return back()->with('error', 'Ketik HAPUS untuk mengonfirmasi penghapusan permanen.');
+        }
+
+        $user = $request->user();
+        $issues = Issue::withTrashed()->whereIn('id', $data['ids'])->get();
+        $done = 0;
+        $skipped = [];
+        $titles = [];
+
+        foreach ($issues as $issue) {
+            $inTenant = $user->isSuperAdmin() || ! $user->polda_id || (int) $issue->polda_id === (int) $user->polda_id;
+            if (! $inTenant) {
+                $skipped['di luar wilayah Anda'] = ($skipped['di luar wilayah Anda'] ?? 0) + 1;
+                continue;
+            }
+
+            $skip = match ($data['action']) {
+                'archive'          => $this->archiveOne($issue, $data['reason'] ?? null),
+                'restore'          => $this->restoreOne($issue),
+                'delete'           => $this->canTrash($request, $issue) ? $this->trashOne($issue, $data['reason'] ?? null) : 'tidak berwenang',
+                'delete_permanent' => $issue->trashed() ? $this->forceDeleteOne($issue) : 'belum di Sampah',
+                'priority'         => $issue->trashed() ? 'berada di Sampah' : $this->setPriority($issue, $data['priority']),
+            };
+
+            if ($skip === null) {
+                $done++;
+                $titles[] = $issue->report_code ?: ('#' . $issue->id);
+            } else {
+                $skipped[$skip] = ($skipped[$skip] ?? 0) + 1;
+            }
+        }
+
+        $missing = count($data['ids']) - $issues->count();
+        if ($missing > 0) {
+            $skipped['tidak ditemukan'] = $missing;
+        }
+
+        AuditLog::log('issue.bulk', 'issues', null, [
+            'summary' => "Aksi massal {$data['action']}: {$done} laporan diproses, " . array_sum($skipped) . ' dilewati.',
+            'action'  => $data['action'],
+            'done'    => $done,
+            'skipped' => $skipped,
+            'codes'   => array_slice($titles, 0, 50),
         ]);
 
-        return redirect()->back()->with('success', "Laporan berhasil diarsipkan.");
+        $verb = ['archive' => 'diarsipkan', 'restore' => 'dipulihkan', 'delete' => 'dipindahkan ke Sampah', 'delete_permanent' => 'dihapus permanen', 'priority' => 'diubah prioritasnya'][$data['action']];
+        $message = "{$done} laporan {$verb}.";
+        if ($skipped) {
+            $message .= ' Dilewati: ' . collect($skipped)->map(fn ($n, $why) => "{$n} ({$why})")->implode(', ') . '.';
+        }
+
+        return $done > 0 ? back()->with('success', $message) : back()->with('error', $message);
+    }
+
+    // ------------------------------------------------------------------ pembantu arsip/hapus
+
+    /** Pengelola laporan: verifikator ke atas (izin `issues_verify`). */
+    private function canManageIssues(Request $request): bool
+    {
+        $user = $request->user();
+
+        return (bool) ($user && ($user->isSuperAdmin() || $user->hasPermission('issues_verify')));
+    }
+
+    /** Pengelola boleh menghapus apa pun; pembuat hanya drafnya sendiri. */
+    private function canTrash(Request $request, Issue $issue): bool
+    {
+        if ($issue->trashed()) {
+            return false;
+        }
+        if ($this->canManageIssues($request)) {
+            return true;
+        }
+        $user = $request->user();
+
+        return $user && $user->hasPermission('issues_create') && $issue->status === 'draft' && (int) $issue->created_by === (int) $user->id;
+    }
+
+    /** Status yang menandai laporan sudah ditutup (tidak lagi "aktif"). */
+    private function closedStatuses(): array
+    {
+        return array_merge(Issue::STATUS_GROUPS['done'], Issue::STATUS_GROUPS['archived']);
+    }
+
+    private function reasonFrom(Request $request): ?string
+    {
+        $reason = trim((string) $request->input('reason', ''));
+
+        return $reason === '' ? null : mb_substr($reason, 0, 300);
+    }
+
+    private function history(Issue $issue, ?string $from, string $to, string $reason): void
+    {
+        IssueStatusHistory::create(['issue_id' => $issue->id, 'actor_id' => auth()->id(), 'from_status' => $from, 'to_status' => $to, 'reason' => $reason]);
+    }
+
+    private function audit(string $action, Issue $issue): void
+    {
+        AuditLog::log($action, 'issue', (string) $issue->id, ['report_code' => $issue->report_code, 'title' => $issue->title]);
+    }
+
+    /** @return string|null alasan dilewati; null bila berhasil */
+    private function archiveOne(Issue $issue, ?string $reason): ?string
+    {
+        if ($issue->trashed()) {
+            return 'berada di Sampah';
+        }
+        if (in_array($issue->status, Issue::STATUS_GROUPS['archived'], true)) {
+            return 'sudah diarsipkan';
+        }
+        if ($issue->status === 'draft') {
+            return 'masih draf (hapus saja bila tidak diperlukan)';
+        }
+
+        $from = $issue->status;
+        $issue->update(['status' => 'arsip', 'archived_at' => now(), 'status_before_archive' => $from]);
+        $this->history($issue, $from, 'arsip', $reason ?: 'Laporan diarsipkan.');
+
+        return null;
+    }
+
+    /** @return string|null */
+    private function restoreOne(Issue $issue): ?string
+    {
+        if ($issue->trashed()) {
+            $issue->restore();
+            $issue->update(['deleted_by' => null]);
+            $this->history($issue, 'dihapus', $issue->status, 'Dipulihkan dari Sampah.');
+
+            return null;
+        }
+        if (! in_array($issue->status, Issue::STATUS_GROUPS['archived'], true)) {
+            return 'tidak berada di Arsip atau Sampah';
+        }
+
+        $to = $issue->status_before_archive && $issue->status_before_archive !== 'arsip' ? $issue->status_before_archive : 'selesai';
+        $issue->update(['status' => $to, 'archived_at' => null, 'status_before_archive' => null]);
+        $this->history($issue, 'arsip', $to, 'Dipulihkan dari Arsip ke tahap semula.');
+
+        return null;
+    }
+
+    /** @return string|null */
+    private function trashOne(Issue $issue, ?string $reason): ?string
+    {
+        if ($issue->trashed()) {
+            return 'sudah di Sampah';
+        }
+
+        $this->history($issue, $issue->status, 'dihapus', $reason ?: 'Laporan dipindahkan ke Sampah.');
+        $issue->update(['deleted_by' => auth()->id()]);
+        $issue->delete();
+
+        return null;
+    }
+
+    /** @return string|null */
+    private function setPriority(Issue $issue, string $priority): ?string
+    {
+        if ($issue->priority === $priority) {
+            return 'prioritas sudah sama';
+        }
+        $from = $issue->priority;
+        $issue->update(['priority' => $priority]);
+        $this->history($issue, $issue->status, $issue->status, "Prioritas diubah dari {$from} menjadi {$priority}.");
+
+        return null;
+    }
+
+    /** Hapus permanen beserta berkas foto bukti. @return string|null */
+    private function forceDeleteOne(Issue $issue): ?string
+    {
+        foreach (\App\Models\MediaFile::where('issue_id', $issue->id)->get() as $file) {
+            try {
+                if ($file->file_path) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->delete(ltrim(preg_replace('#^/?storage/#', '', (string) $file->file_path), '/'));
+                }
+            } catch (\Throwable $e) {
+                // berkas fisik tidak ditemukan: lanjutkan
+            }
+            $file->delete();
+        }
+        $issue->forceDelete();
+
+        return null;
     }
 
     /**

@@ -4,6 +4,7 @@ import { router, Link, usePage } from '@inertiajs/vue3';
 import IssueStepper from '@/Components/IssueStepper.vue';
 import { statusMeta, priorityMeta, normalizeStatus } from '@/utils/issueFlow';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
+import ConfirmDialog from '@/Components/ConfirmDialog.vue';
 import {
   Shield,
   ShieldCheck,
@@ -37,6 +38,8 @@ import {
   Archive,
   Send,
   Bot,
+  ArchiveRestore,
+  Trash2,
 } from 'lucide-vue-next';
 
 const askSadewa = () => window.dispatchEvent(new CustomEvent('open-sadewa-copilot', { detail: { scope: 'issues', subject: props.issue?.title || '' } }));
@@ -47,6 +50,7 @@ const props = defineProps({
   selectedCode: String,
   issue: Object,
   metrics: Object,
+  manage: { type: Object, default: () => ({}) },
 });
 
 // Modals
@@ -111,11 +115,26 @@ onUnmounted(() => document.removeEventListener('click', closeFloating));
 const submitDraft = () => {
   router.post('/issues/' + props.issue.id + '/submit', {}, { preserveScroll: true });
 };
-const archiveIssue = () => {
-  if (confirm('Arsipkan laporan ini? Laporan selesai akan disimpan sebagai arsip.')) {
-    router.post('/issues/' + props.issue.id + '/close', {}, { preserveScroll: true });
-  }
+// ---- Arsip / Sampah: dialog konfirmasi (bukan window.confirm) ----
+const confirmState = ref({ open: false, kind: '' });
+const confirmBusy = ref(false);
+const askAction = (kind) => { confirmState.value = { open: true, kind }; };
+const archiveIssue = () => askAction('archive');
+const CONFIRMS = {
+  archive: { title: 'Arsipkan laporan ini?', message: 'Laporan pindah ke tab Arsip dan dapat dipulihkan ke tahap semula kapan saja.', confirmLabel: 'Arsipkan', tone: 'primary', withReason: true },
+  trash: { title: 'Pindahkan laporan ke Sampah?', message: 'Laporan hilang dari daftar dan KPI, tetapi dapat dipulihkan dari tab Sampah.', confirmLabel: 'Pindahkan ke Sampah', tone: 'danger', withReason: true },
+  force: { title: 'Hapus permanen laporan ini?', message: 'Laporan beserta foto buktinya dihapus selamanya dan TIDAK dapat dipulihkan.', confirmLabel: 'Hapus permanen', tone: 'danger', requireText: 'HAPUS' },
 };
+const confirmProps = computed(() => (confirmState.value.open ? CONFIRMS[confirmState.value.kind] : { title: '' }));
+const runConfirm = ({ reason, confirm }) => {
+  const id = props.issue.id;
+  const opts = { preserveScroll: true, onFinish: () => { confirmBusy.value = false; confirmState.value.open = false; } };
+  confirmBusy.value = true;
+  if (confirmState.value.kind === 'archive') router.post(`/issues/${id}/archive`, { reason }, opts);
+  else if (confirmState.value.kind === 'trash') router.delete(`/issues/${id}`, { data: { reason, from_show: 1 }, ...opts });
+  else router.delete(`/issues/${id}/force`, { data: { confirm, from_show: 1 }, ...opts });
+};
+const restoreIssue = () => router.post(`/issues/${props.issue.id}/restore`, {}, { preserveScroll: true });
 
 const ACTIONS = {
   submit: { label: 'Ajukan ke Verifikasi', icon: Send, run: submitDraft },
@@ -126,6 +145,9 @@ const ACTIONS = {
   returnIt: { label: 'Kembalikan (Revisi)', icon: RotateCcw, run: () => { isReturnModalOpen.value = true; } },
   resolve: { label: 'Selesaikan Kasus', icon: CheckCircle2, run: () => { isResolveModalOpen.value = true; } },
   archive: { label: 'Arsipkan', icon: Archive, run: archiveIssue },
+  restore: { label: 'Pulihkan', icon: ArchiveRestore, run: restoreIssue },
+  trash: { label: 'Hapus (ke Sampah)', icon: Trash2, run: () => askAction('trash') },
+  force: { label: 'Hapus permanen', icon: Trash2, run: () => askAction('force') },
 };
 
 const PLAN = {
@@ -143,11 +165,27 @@ const allowed = (key) => {
   return !!perms.value.issues_verify;
 };
 const actionPlan = computed(() => {
+  const m = props.manage || {};
+  // Laporan di Sampah: hanya pulihkan / hapus permanen.
+  if (m.trashed) {
+    return { primary: m.can_restore ? ACTIONS.restore : null, secondary: null, menu: m.can_force ? [{ key: 'force', ...ACTIONS.force }] : [] };
+  }
+
   const plan = PLAN[stage.value] || PLAN.arsip;
+  const primary = plan.primary && allowed(plan.primary) ? ACTIONS[plan.primary] : null;
+  const menu = plan.menu.filter(allowed).map((k) => ({ key: k, ...ACTIONS[k] }));
+
+  // Pengelolaan laporan (izin dihitung server): arsipkan di tahap mana pun, pulihkan dari arsip, hapus ke Sampah.
+  if (m.can_archive && plan.primary !== 'archive') menu.push({ key: 'archive', ...ACTIONS.archive });
+  if (m.can_restore) {
+    if (stage.value === 'arsip') return { primary: ACTIONS.restore, secondary: null, menu: m.can_delete ? [{ key: 'trash', ...ACTIONS.trash }] : [] };
+  }
+  if (m.can_delete) menu.push({ key: 'trash', ...ACTIONS.trash });
+
   return {
-    primary: plan.primary && allowed(plan.primary) ? ACTIONS[plan.primary] : null,
+    primary,
     secondary: plan.secondary && allowed(plan.secondary) ? ACTIONS[plan.secondary] : null,
-    menu: plan.menu.filter(allowed).map((k) => ({ key: k, ...ACTIONS[k] })),
+    menu,
   };
 });
 
@@ -252,6 +290,11 @@ const formatWita = (dateStr) => {
     :selected-code="selectedCode"
     :metrics="metrics"
   >
+    <div v-if="manage.trashed" class="p-4 rounded-2xl bg-rose-950/40 border border-rose-500/40 flex flex-wrap items-center justify-between gap-3 text-xs text-rose-100">
+      <p class="flex items-center gap-2"><Trash2 class="w-4 h-4 text-rose-300 shrink-0" /> Laporan ini berada di <strong>Sampah</strong>: tersembunyi dari daftar dan KPI.</p>
+      <button v-if="manage.can_restore" type="button" @click="restoreIssue" class="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black cursor-pointer">Pulihkan laporan</button>
+    </div>
+
     <!-- Top Breadcrumb & Return -->
     <div class="flex items-center justify-between gap-4 pb-2 border-b border-slate-800">
       <Link
@@ -1095,6 +1138,7 @@ const formatWita = (dateStr) => {
         </div>
       </div>
     </div>
+    <ConfirmDialog :open="confirmState.open" :busy="confirmBusy" v-bind="confirmProps" @confirm="runConfirm" @cancel="confirmState.open = false" />
   </EnterpriseLayout>
 </template>
 

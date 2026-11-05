@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { router, Link, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
+import AiQuotaBadge from '../../Components/AiQuotaBadge.vue';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
 import {
   Bot,
@@ -1881,6 +1882,7 @@ const getBuzzerRiskClass = (level) => {
               <Sparkles class="w-4 h-4 text-slate-950" :class="{'animate-spin': isAnalyzingAI}" />
               <span>{{ isAnalyzingAI ? 'SADEWA Sedang Menganalisis...' : '⚡ Sintesis Intelijen Medsos Otomatis' }}</span>
             </button>
+            <AiQuotaBadge class="mt-2 ml-1" />
           </div>
         </div>
       </div>
@@ -1948,7 +1950,7 @@ const getBuzzerRiskClass = (level) => {
         <div v-if="activeAiTab === 'briefing'" class="space-y-4">
           <!-- Model info banner -->
           <div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-            <span>Dianalisis oleh SADEWA AI ({{ socialAiReport.model_used }})</span>
+            <span>Dianalisis oleh SADEWA AI<template v-if="socialAiReport.model_used"> ({{ socialAiReport.model_used }})</template></span>
             <span>&bull; {{ socialAiReport.posts_count }} postingan diproses</span>
             <span>&bull; Waktu respons: {{ socialAiReport.latency_ms }}ms</span>
           </div>
@@ -2565,7 +2567,7 @@ const getBuzzerRiskClass = (level) => {
                   Lintas 5 Platform (𝕏, YouTube, Instagram, TikTok, Facebook)
                 </span>
                 <span class="text-[11px] text-slate-400">
-                  Update: <strong class="text-amber-400">{{ publicTrends?.meta?.last_updated || 'Realtime' }}</strong>
+                  Update: <strong class="text-amber-400">{{ publicTrends?.meta?.last_updated || 'belum tersedia' }}</strong>
                 </span>
               </div>
               <h2 class="text-xl md:text-2xl font-black tracking-tight text-white flex items-center gap-2">
@@ -2575,6 +2577,7 @@ const getBuzzerRiskClass = (level) => {
               <p class="text-xs text-slate-300 mt-1 max-w-3xl leading-relaxed">
                 Pemantauan tren warganet Indonesia secara holistik. Menangkap fenomena percakapan viral di ruang publik sekaligus menyaring potensi kejahatan siber, phishing, disinformasi, dan kerawanan kamtibmas sebelum meluas.
               </p>
+              <p v-if="publicTrends?.meta?.available === false" class="mt-2 px-3 py-2 rounded-xl bg-amber-400/10 border border-amber-400/40 text-[11px] text-amber-200 max-w-3xl" role="status">{{ publicTrends.meta.note }}</p>
             </div>
 
             <div class="flex items-center gap-2.5 shrink-0">

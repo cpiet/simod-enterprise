@@ -115,12 +115,12 @@ class RssFeedService
 
             $parts = parse_url($url);
             $host = strtolower((string) ($parts['host'] ?? ''));
-            if (! $parts || ! in_array(strtolower((string) ($parts['scheme'] ?? '')), ['http', 'https'], true)
-                || $host === '' || in_array($host, ['localhost', '127.0.0.1', '::1', '0.0.0.0', '169.254.169.254'], true)) {
+            if (! $parts || ! \App\Support\SafeUrl::isPublicHttp($url)) {
                 continue;
             }
 
             $handle = curl_init($url);
+            curl_setopt_array($handle, \App\Support\SafeUrl::curlOptions());
             curl_setopt_array($handle, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_FOLLOWLOCATION => true,
@@ -128,8 +128,6 @@ class RssFeedService
                 CURLOPT_MAXREDIRS      => 4,
                 CURLOPT_TIMEOUT        => 8,
                 CURLOPT_CONNECTTIMEOUT => 4,
-                CURLOPT_SSL_VERIFYPEER => false,
-                CURLOPT_SSL_VERIFYHOST => false,
                 CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 (compatible; SIMOD-Enterprise/2.0)',
                 CURLOPT_HTTPHEADER     => ['Accept: application/rss+xml, application/xml, text/xml, application/atom+xml, text/html;q=0.9, */*;q=0.8'],
             ]);
@@ -167,12 +165,12 @@ class RssFeedService
     {
         $parts = parse_url($url);
         $host = strtolower((string) ($parts['host'] ?? ''));
-        if (! $parts || ! in_array(strtolower((string) ($parts['scheme'] ?? '')), ['http', 'https'], true)
-            || $host === '' || in_array($host, ['localhost', '127.0.0.1', '::1', '0.0.0.0', '169.254.169.254'], true)) {
+        if (! $parts || ! \App\Support\SafeUrl::isPublicHttp($url)) {
             return '';
         }
 
         $ch = curl_init($url);
+        curl_setopt_array($ch, \App\Support\SafeUrl::curlOptions());
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_FOLLOWLOCATION => true,
@@ -180,8 +178,6 @@ class RssFeedService
             CURLOPT_MAXREDIRS      => 4,
             CURLOPT_TIMEOUT        => 8,
             CURLOPT_CONNECTTIMEOUT => 4,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false,
             CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 (compatible; SIMOD-Enterprise/2.0)',
             CURLOPT_HTTPHEADER     => ['Accept: application/rss+xml, application/xml, text/xml, application/atom+xml, text/html;q=0.9, */*;q=0.8'],
         ]);
@@ -266,11 +262,14 @@ class RssFeedService
             $category = 'Hukum & Kriminal';
         }
 
+        $titleText = html_entity_decode($title, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $summaryText = $this->cleanSummary($raw);
+
         return [
             'id'             => substr(md5($link), 0, 12),
-            'title'          => html_entity_decode($title, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+            'title'          => $titleText,
             'link'           => $link,
-            'summary'        => $this->cleanSummary($raw),
+            'summary'        => $summaryText,
             'image_url'      => $imageUrl,
             'pub_date'       => date('d M Y, H.i', $timestamp) . ' WITA',
             'timestamp'      => $timestamp,
@@ -279,7 +278,7 @@ class RssFeedService
             'source_name'    => strtoupper($source['name'] ?? 'MEDIA ONLINE'),
             'category'       => $category,
             'category_badge' => strtoupper($category),
-            'sentiment'      => 'netral',
+            'sentiment'      => \App\Support\NewsSentiment::detect($titleText, $summaryText),
         ];
     }
 

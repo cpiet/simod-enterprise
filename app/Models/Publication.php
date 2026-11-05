@@ -48,7 +48,7 @@ class Publication extends Model
 
     public function issue(): BelongsTo
     {
-        return $this->belongsTo(Issue::class);
+        return $this->belongsTo(Issue::class)->withTrashed();
     }
 }
 

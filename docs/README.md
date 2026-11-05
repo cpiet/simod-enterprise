@@ -9,7 +9,7 @@ Dokumentasi ini memandu arsitektur, seluruh perintah CLI, modul operasional, int
 
 | No | Dokumen | Ringkasan Pembahasan |
 |:---|:---|:---|
-| **🤖** | [AGENTS.md](../AGENTS.md) / [CLAUDE.md](../CLAUDE.md) / [Copilot](../.github/copilot-instructions.md) | **Instruksi Khusus AI Coding Agents (Codex, Claude, Gemini, Copilot)**: Arsitektur, konvensi, aturan multi-tenant, dan panduan testing. |
+| **🤖** | [AGENTS.md](../AGENTS.md) (induk) · [CLAUDE.md](../CLAUDE.md) / [GEMINI.md](../GEMINI.md) (impor AGENTS.md) · [Copilot](../.github/copilot-instructions.md) (ringkasan) | **Instruksi AI Coding Agents**: AGENTS.md adalah sumber aturan tunggal; berkas lain hanya mengimpor atau meringkasnya. |
 | **01** | [01. Arsitektur & Multi-Tenant](01-arsitektur-dan-multi-tenant.md) | Hierarki Mabes Polri &rarr; Polda &rarr; Polres, skema basis data, dan isolasi tenant. |
 | **02** | [02. Daftar Perintah Artisan & CLI](02-perintah-artisan-dan-cli.md) | Seluruh command Artisan: migrasi, seed, server, automated test suite, dan CLI scheduler. |
 | **03** | [03. Media Intelligence & RSS Feeds](03-modul-media-intelligence-dan-rss.md) | Mesin agregator paralel `curl_multi`, 29 portal berita Sulbar & nasional, fair quota, live sync. |
@@ -31,13 +31,17 @@ Dokumentasi ini memandu arsitektur, seluruh perintah CLI, modul operasional, int
 | **19** | [19. Optimalisasi Radar Medsos & Sintesis AI SADEWA](19-optimalisasi-radar-media-sosial-dan-sintesis-ai-sadewa.md) | Multi-Tier Autonomous Ingestion Engine (zero-cost syndication), SADEWA Social AI Synthesis, restrukturisasi 4 pilar tab, dan sentralisasi token Apify di admin. |
 | **20** | [20. Audit, Refactoring, AppSec & Portabilitas Multi-Domain](20-audit-refactoring-appsec-dan-pembersihan-kode.md) | Pembersihan kode mati, kanonikalisasi rute anti-tampering, sistem notifikasi toast reaktif global, proteksi IDOR, dan panduan multi-hosting. |
 | **21** | [21. Standarisasi Multi-Agent & Sinkronisasi Lintas Model](21-standarisasi-multi-agent-dan-sinkronisasi-lintas-model.md) | Panduan interoperabilitas multi-agent (Codex, Claude, Gemini, Copilot), mapping file konfigurasi, 3 aturan baku, dan protokol hand-off. |
-| **22** | [22. Peta Kode & Sumber Kebenaran](22-peta-kode-dan-sumber-kebenaran.md) | **Rujukan utama**: stack, perilaku tenant nyata, 110 rute, 36 tabel, 20 modul RBAC, seeder, CLI, pengujian, dan temuan audit dokumentasi. |
+| **22** | [22. Peta Kode & Sumber Kebenaran](22-peta-kode-dan-sumber-kebenaran.md) | **Rujukan utama**: stack, perilaku tenant nyata, 120 rute, 39 tabel, 20 modul RBAC, seeder, CLI, pengujian, dan temuan audit dokumentasi. |
 | **23** | [23. Optimalisasi Performa & UX (Radar Media, Medsos, Command Center)](23-optimalisasi-performa-dan-ux-radar-media-online.md) | Diagnosis lambatnya pindah menu (DevTools, query bersama, peta), cache versi, prefetch, serta Tahap A penyederhanaan UX per peran. |
 | **24** | [24. Penyederhanaan Isu & Tugas, Publikasi, Administrasi](24-penyederhanaan-isu-tugas-publikasi-dan-administrasi.md) | Alur isu resmi tunggal dan bug alur yang diperbaiki, persetujuan publikasi, unggah galeri nyata, keamanan yang benar-benar diterapkan, serta halaman mock yang dihapus. |
 | **25** | [25. Peta, Grafik dan Pantauan Instagram](25-peta-grafik-dan-pantauan-instagram.md) | Peta OpenStreetMap, perhitungan grafik media sosial, pantauan akun Instagram manual, batasan data, dan deployment. |
 | **26** | [26. SADEWA AI Asisten Multi-Sumber](26-asisten-sadewa-multi-sumber-dan-riwayat-percakapan.md) | Chat SADEWA lintas Media Online, Media Sosial, dan Isu Internal; lingkup mengikuti RBAC, jawaban bersumber terverifikasi [M/S/I/E], dan riwayat privat per akun di server. |
 | **27** | [27. Perbarui Briefing Command Center](27-perbarui-briefing-command-center.md) | Satu aksi untuk menyegarkan Media Online dan Media Sosial dengan progres per jalur, mode hemat Apify, dan hak akses per langkah. |
 | **28** | [28. Batas Pemakaian AI & Penghematan Kuota](28-batas-pemakaian-ai-dan-penghematan-kuota.md) | Batas permintaan AI per pengguna per hari, penahanan saat kuota Google habis, analisis tidak diulang bila data sama, dan penghapusan pengaturan otomasi AI yang tidak berfungsi. |
+| **29** | [29. Radar Media: Pencarian Server & Command Center Data Nyata](29-radar-media-pencarian-server-dan-command-center-data-nyata.md) | Galat Gemini 503, kesegaran data, sentimen konteks Polri, penggabungan berita ganda, pencarian server, tampilan per peran, lingkup nasional, matriks Kondusifitas Satwil yang jujur, dan penegakan tenant. |
+| **30** | [30. Audit Log, Keamanan, Kesiapan Hosting & Arsip/Hapus Laporan](30-audit-log-keamanan-hosting-dan-arsip-hapus-laporan.md) | Audit Log dinamis dengan filter, ekspor, pembersihan aman, dan retensi otomatis; kesiapan hosting yang terukur; arsip, Sampah, pulihkan, dan aksi massal pada laporan isu. |
+| **31** | [31. Demo Divhumas + Sulbar & Panduan Deploy Hostinger](31-demo-divhumas-sulbar-dan-panduan-deploy-hostinger.md) | Isolasi Divhumas/Sulbar, RSS terpisah per Polda (kunci polda+URL), medsos tanpa data buatan, `simod:demo-prepare`, dan langkah deploy Hostinger. |
+| **32** | [32. Audit Total Pra-Unggah](32-audit-total-pra-deploy.md) | Hasil audit UI/UX, multi-hosting, white-label AI, kode mati, dan keamanan sebelum deploy; daftar temuan terbuka. |
 
 > **Konvensi:** bila ada perbedaan antara dokumen dan kode, rujukan yang berlaku adalah [doc 22](22-peta-kode-dan-sumber-kebenaran.md) dan kode itu sendiri. Dokumen bertanda *snapshot historis* (angka test/berita lama) tidak diperbarui otomatis.
 
@@ -50,7 +54,7 @@ Dokumentasi ini memandu arsitektur, seluruh perintah CLI, modul operasional, int
 # Pastikan database 'simod_enterprise' aktif di localhost:3306
 
 # 2. Masuk ke direktori proyek
-cd d:\laragon\www\simod-enterprise
+cd <folder-proyek>   # mis. D:\Foto\laragon\www\simod-enterprise
 
 # 3. Jalankan migrasi dan seeding komplit
 php artisan migrate --seed
@@ -58,7 +62,7 @@ php artisan migrate --seed
 # 4. Bangun aset frontend
 npm.cmd run build
 
-# 5. Jalankan automated test suite (151 tests, 905 assertions)
+# 5. Jalankan automated test suite (seluruh test wajib lulus; baseline di doc 22 §10)
 php artisan test
 
 # 6. Jalankan sinkronisasi berita RSS aman (dengan Mutex Lock)

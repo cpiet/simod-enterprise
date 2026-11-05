@@ -6,6 +6,7 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import axios from 'axios';
+import AiQuotaBadge from './AiQuotaBadge.vue';
 import { router, usePage } from '@inertiajs/vue3';
 import { RefreshCw, CheckCircle2, XCircle, MinusCircle, Loader2, X } from 'lucide-vue-next';
 
@@ -143,6 +144,7 @@ const rows = computed(() => [
         <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': running }" />
         <span>{{ running ? 'Memperbarui…' : allFresh ? 'Baru diperbarui' : 'Perbarui Briefing' }}</span>
       </button>
+      <AiQuotaBadge />
     </div>
 
     <ul v-if="canRefresh && hasResult" class="rounded-xl border border-slate-700/80 bg-slate-900/70 divide-y divide-slate-800" aria-live="polite">

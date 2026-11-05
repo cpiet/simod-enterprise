@@ -153,6 +153,8 @@ class HandleInertiaRequests extends Middleware
                 'role'        => $activeRole,
                 'permissions' => $activePermissions,
             ],
+            // Indikator pemakaian AI untuk pengguna (netral, tanpa vendor/model); dievaluasi malas per permintaan.
+            'aiQuota' => fn () => $user ? app(\App\Services\AiQuota::class)->publicStatus($user, $selectedPolda?->id) : null,
             'sidebarMetrics' => $sidebarMetrics,
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),

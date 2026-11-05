@@ -69,6 +69,7 @@ class CommandCenterNationalMapAndKpiTest extends TestCase
     }
     public function test_map_uses_real_coordinates_and_does_not_invent_empty_data(): void
     {
+        config(['simod.national_aggregate' => true]);
         $polda = Polda::where('code', 'SULBAR')->firstOrFail();
         MediaArticle::where('polda_id', $polda->id)->delete();
         Issue::where('polda_id', $polda->id)->delete();

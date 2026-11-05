@@ -35,4 +35,15 @@ class Polres extends Model
     {
         return $this->hasMany(User::class);
     }
+
+    /**
+     * Nama wilayah (mis. "Polresta Mamuju" -> "Mamuju") untuk mencocokkan berita yang menyebut wilayah ini.
+     * Null bila terlalu pendek/ambigu (kurang dari 4 huruf).
+     */
+    public function placeKeyword(): ?string
+    {
+        $keyword = trim((string) preg_replace('/^(polrestabes|polresta|polres|polsek|polda)\s+/i', '', (string) $this->name));
+
+        return mb_strlen($keyword) >= 4 ? $keyword : null;
+    }
 }

@@ -244,7 +244,7 @@ class RssSyncService
                 if ($link === '') continue;
 
                 MediaArticle::updateOrCreate(
-                    ['url' => $link],
+                    ['polda_id' => $polda->id, 'url' => $link],
                     [
                         'polda_id'    => $polda->id,
                         'feed_id'     => $item['source_id'] ?: null,

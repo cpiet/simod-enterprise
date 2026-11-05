@@ -45,6 +45,11 @@ class SocialIntelligenceSeeder extends Seeder
             );
         }
 
+        // Postingan di bawah ini adalah DATA CONTOH (tautan karangan): hanya bila diminta eksplisit.
+        if (! config('simod.seed_sample_data')) {
+            return;
+        }
+
         // 2. Realistic Multi-Platform Social Posts Dataset (Instagram, TikTok, X, YouTube)
         $posts = array (
   0 => 

@@ -112,7 +112,7 @@ class AiModelSelectionTest extends TestCase
     public function test_pro_models_are_not_added_to_fallback_chain_automatically(): void
     {
         $service = new GeminiService();
-        $this->assertSame(['gemini-3.5-flash-lite', 'gemini-3.8-flash'], $service->modelChain('gemini-3.5-flash-lite'));
+        $this->assertSame(['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3-flash-preview', 'gemini-3.8-flash'], $service->modelChain('gemini-3.5-flash-lite'));
         $this->assertSame('gemini-2.5-pro', $service->modelChain('gemini-2.5-pro')[0]);
         $this->assertNotContains('gemini-1.5-pro', $service->modelChain('gemini-3.8-flash'));
     }

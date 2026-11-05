@@ -10,6 +10,17 @@ class EnterpriseDatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        // Tanpa kata sandi bawaan di kode (repositori publik): pakai SIMOD_SEED_PASSWORD bila diisi, jika tidak
+        // dibuat acak per akun dan ditampilkan SEKALI di akhir proses seeding. Segera ganti setelah login pertama.
+        $issued = [];
+        $fixed = env('SIMOD_SEED_PASSWORD');
+        $pw = function (string $username) use (&$issued, $fixed) {
+            $plain = $fixed ?: \Illuminate\Support\Str::password(16, symbols: false);
+            $issued[$username] = $plain;
+
+            return Hash::make($plain);
+        };
+
         // 1. SEED POLDAS (TENANTS)
         $sulbarId = DB::table('poldas')->insertGetId([
             'code'             => 'SULBAR',
@@ -147,7 +158,7 @@ class EnterpriseDatabaseSeeder extends Seeder
                 'name'         => 'Irjen Pol. Johnny Eddizon Isir, S.I.K., M.T.C.P.',
                 'username'     => 'kadivhumas',
                 'email'        => 'kadivhumas@polri.go.id',
-                'password'     => Hash::make('DivhumasPolri#2026'),
+                'password'     => $pw('kadivhumas'),
                 'role'         => 'kadiv_humas',
                 'badge_number' => '75060789',
                 'phone'        => '081119750607',
@@ -162,7 +173,7 @@ class EnterpriseDatabaseSeeder extends Seeder
                 'name'         => 'Super Administrator Mabes',
                 'username'     => 'superadmin',
                 'email'        => 'superadmin@polri.go.id',
-                'password'     => Hash::make('MabesPolri#2026'),
+                'password'     => $pw('superadmin'),
                 'role'         => 'super_admin_mabes',
                 'badge_number' => '80010001',
                 'phone'        => '081100001111',
@@ -177,7 +188,7 @@ class EnterpriseDatabaseSeeder extends Seeder
                 'name'         => 'Lutfi Alfandra',
                 'username'     => 'cpiet',
                 'email'        => 'alumnidarus@gmail.com',
-                'password'     => Hash::make('T0p1s@y@bund@r'),
+                'password'     => $pw('cpiet'),
                 'role'         => 'super_admin_mabes',
                 'badge_number' => '89020089',
                 'phone'        => '081299998888',
@@ -192,7 +203,7 @@ class EnterpriseDatabaseSeeder extends Seeder
                 'name'         => 'Kombes Pol. Slamet Wahyudi (Kabid Humas)',
                 'username'     => 'kabid_sulbar',
                 'email'        => 'kabid.sulbar@polri.go.id',
-                'password'     => Hash::make('SulbarHumas#2026'),
+                'password'     => $pw('kabid_sulbar'),
                 'role'         => 'polda_leader',
                 'badge_number' => '76040112',
                 'phone'        => '081234567891',
@@ -207,7 +218,7 @@ class EnterpriseDatabaseSeeder extends Seeder
                 'name'         => 'Kombes Pol. Desmont Harjendro (Kabid Humas)',
                 'username'     => 'kabid_gorontalo',
                 'email'        => 'kabid.gorontalo@polri.go.id',
-                'password'     => Hash::make('GorontaloHumas#2026'),
+                'password'     => $pw('kabid_gorontalo'),
                 'role'         => 'polda_leader',
                 'badge_number' => '77080223',
                 'phone'        => '081234567892',
@@ -269,6 +280,15 @@ class EnterpriseDatabaseSeeder extends Seeder
         // Seed 29 RSS Sources Resmi Terorganisir untuk Polda Sulbar & 33 Feed Nasional Divhumas
         $this->call(SulbarRssFeedsSeeder::class);
         $this->call(DivhumasNationalRssFeedsSeeder::class);
-        $this->call(MediaTopicsSeeder::class);
+        if (config('simod.seed_sample_data')) {
+            $this->call(MediaTopicsSeeder::class);   // topik atensi contoh
+        }
+
+        if ($issued !== [] && $this->command) {
+            $this->command->warn('Akun awal dibuat. Catat kata sandi berikut SEKARANG (tidak ditampilkan lagi) lalu ganti di menu Profil:');
+            foreach ($issued as $user => $plain) {
+                $this->command->line("  {$user} : {$plain}");
+            }
+        }
     }
 }

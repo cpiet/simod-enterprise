@@ -76,15 +76,8 @@ php artisan db:backup --type=scheduled
 php artisan db:backup --force --retention=30
 ```
 
-### 2.4. Perintah Lama (Legacy, Masih Terdaftar)
-```powershell
-# Tarik RSS seluruh portal Satwil (opsional filter kode Polda)
-php artisan simod:scrape-rss --polda=SULBAR
-
-# Sinkron feed media terdaftar (default SULBAR)
-php artisan simod:sync-feeds --polda=SULBAR --force
-```
-Untuk operasional harian gunakan `rss:sync` (bagian 2.1) yang dilengkapi mutex lock dan fair quota.
+### 2.4. Perintah Lama
+Dihapus pada audit pra-unggah (doc 32): `simod:scrape-rss` dan `simod:sync-feeds`. Gunakan `rss:sync` (bagian 2.1).
 
 ---
 
@@ -92,7 +85,7 @@ Untuk operasional harian gunakan `rss:sync` (bagian 2.1) yang dilengkapi mutex l
 
 Pengujian fitur aplikasi menggunakan PHPUnit dengan basis data SQLite in-memory (aman, cepat, dan tidak menghapus database MySQL lokal):
 ```powershell
-# Menjalankan seluruh test suite (151 tests, 905 assertions)
+# Menjalankan seluruh test suite (baseline terkini: lihat doc 22 §10)
 php artisan test
 
 # Menjalankan spesifik modul DatabaseBackupTest

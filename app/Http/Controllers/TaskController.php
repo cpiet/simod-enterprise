@@ -17,7 +17,7 @@ class TaskController extends Controller
     {
         $allPoldas = Polda::withCount('polres')->where('is_active', true)->get();
         [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
-        $isNational = ($selectedCode === 'ALL');
+        $isNational = $this->aggregatesNational($selectedCode);
         $statusFilter = $request->query('status', 'all');
         $priorityFilter = $request->query('priority', 'all');
 

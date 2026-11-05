@@ -53,7 +53,7 @@ class SadewaController extends Controller
     public function meta(Request $request): JsonResponse
     {
         [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
-        $isNational = $selectedCode === 'ALL';
+        $isNational = $this->aggregatesNational($selectedCode);
         $allowed = $this->allowedScopes($request);
         $since = now()->subDay();
 
@@ -136,7 +136,7 @@ class SadewaController extends Controller
         $user = $request->user();
         [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
         $selectedPolda = $this->requestedPoldaOverride($request, $selectedPolda) ?? \App\Models\Polda::first();
-        $isNational = $selectedCode === 'ALL';
+        $isNational = $this->aggregatesNational($selectedCode);
 
         $allowed = $this->allowedScopes($request);
         if (empty($allowed)) {

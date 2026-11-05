@@ -82,7 +82,7 @@ Token dibaca dari `INGEST_API_TOKEN` (`config/simod.php` → `ingest_token`). Al
 
 1. Masuk ke folder scraper:
    ```powershell
-   cd d:\laragon\www\simod-enterprise\scraper
+   cd <folder-proyek>\scraper   # mis. D:\Foto\laragon\www\simod-enterprise\scraper
    ```
 2. Instal pustaka dependensi:
    ```powershell

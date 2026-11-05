@@ -235,7 +235,7 @@ class RssSyncController extends Controller
         $validated = $request->validate([
             'polda_id' => 'nullable|exists:poldas,id',
             'name'     => 'required|string|max:100',
-            'url'      => 'required|url|max:255',
+            'url'      => ['required', 'url', 'max:255', fn ($attr, $value, $fail) => \App\Support\SafeUrl::isPublicHttp($value, false) ? null : $fail('URL feed harus http/https ke alamat publik.')],
             'category' => 'nullable|string|max:50',
         ]);
 
@@ -310,8 +310,8 @@ class RssSyncController extends Controller
     public function testFeed(Request $request): JsonResponse
     {
         $url = $request->input('url');
-        if (!filter_var($url, FILTER_VALIDATE_URL)) {
-            return response()->json(['valid' => false, 'message' => 'Format URL tidak valid.'], 422);
+        if (!filter_var($url, FILTER_VALIDATE_URL) || ! \App\Support\SafeUrl::isPublicHttp($url)) {
+            return response()->json(['valid' => false, 'message' => 'URL tidak valid atau tidak diizinkan (hanya http/https ke alamat publik).'], 422);
         }
 
         $start = microtime(true);
@@ -321,9 +321,16 @@ class RssSyncController extends Controller
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 6);
         curl_setopt($ch, CURLOPT_USERAGENT, 'SIMOD-Enterprise-Validator/2.0');
+        curl_setopt_array($ch, \App\Support\SafeUrl::curlOptions());
         $body = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $effective = (string) curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
         curl_close($ch);
+        // Redirect ke alamat internal dianggap gagal (pencegahan SSRF lewat pengalihan).
+        if ($effective !== '' && $effective !== $url && ! \App\Support\SafeUrl::isPublicHttp($effective)) {
+            $body = null;
+            $httpCode = 0;
+        }
 
         $latency = round((microtime(true) - $start) * 1000);
 

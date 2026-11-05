@@ -4,8 +4,8 @@
 Modul ini bertugas memantau pemberitaan media massa daring secara real-time untuk mendeteksi narasi yang berkembang di wilayah hukum Satwil.
 
 - **Lokasi Service**:
-  - [`app/Services/RssFeedService.php`](file:///d:/laragon/www/simod-enterprise/app/Services/RssFeedService.php) — Parser XML/Atom paralel via `curl_multi`.
-  - [`app/Services/RssSyncService.php`](file:///d:/laragon/www/simod-enterprise/app/Services/RssSyncService.php) — Orkestrasi jadwal otomatis, Mutex Atomic Lock, kuota adil antar-sumber (*fair per-feed quota*), dan Auto-Capping Multi-Polda.
+  - [`app/Services/RssFeedService.php`](../app/Services/RssFeedService.php) — Parser XML/Atom paralel via `curl_multi`.
+  - [`app/Services/RssSyncService.php`](../app/Services/RssSyncService.php) — Orkestrasi jadwal otomatis, Mutex Atomic Lock, kuota adil antar-sumber (*fair per-feed quota*), dan Auto-Capping Multi-Polda.
 - **Mekanisme**: Memanfaatkan **`curl_multi`** sehingga seluruh 29 portal berita ditarik secara bersamaan (*non-blocking parallel request*). Waktu agregasi rata-rata hanya membutuhkan 4 hingga 8 detik untuk ratusan berita.
 - **Strategi Caching**: Hasil parse XML/Atom disimpan pada Cache Laravel (`Cache::put`) dengan TTL default 300 detik (5 menit). Penarikan berikutnya berlangsung instan (< 50ms).
 

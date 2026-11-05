@@ -12,7 +12,9 @@ use App\Models\MediaTopic;
 use App\Models\Polda;
 use App\Models\Polres;
 use App\Models\PressRelease;
+use App\Models\RssSyncLog;
 use App\Services\GeminiService;
+use App\Services\MediaArticleListing;
 use App\Services\RssFeedService;
 use App\Support\FastTime;
 use Illuminate\Http\JsonResponse;
@@ -59,7 +61,7 @@ class MediaIntelligenceController extends Controller
             foreach ($bySource as $srcKey => $items) {
                 foreach (array_slice($items, 0, 25) as $item) {
                     MediaArticle::updateOrCreate(
-                        ['url' => $item['link']],
+                        ['polda_id' => $poldaId, 'url' => $item['link']],
                         [
                             'polda_id'    => $poldaId,
                             'feed_id'     => $item['source_id'] ?: null,
@@ -76,40 +78,16 @@ class MediaIntelligenceController extends Controller
             }
         }
 
+        // Catat sinkron manual (refresh=1) agar penanda kesegaran data di halaman akurat.
+        if (isset($liveArticles)) {
+            $this->logManualSync($poldaId, $mediaFeeds->count(), count($liveArticles), count($liveArticles));
+        }
+
         // Load active Media Topics (Smart Dossier Atensi Pimpinan)
         $dbTopics = MediaTopic::where('polda_id', $poldaId)
             ->where('status', 'active')
             ->latest()
             ->get();
-
-        // Load articles from database (up to 3,000 latest articles to prevent dropping any feed)
-        $dbArticles = MediaArticle::where('polda_id', $poldaId)
-            ->latest('pub_date')
-            ->latest('id')
-            ->limit(3000)
-            ->get();
-
-        // Tren 7 hari (total & negatif per hari) untuk sparkline KPI; dihitung dari artikel yang sudah dimuat.
-        $trend7 = [];
-        for ($i = 6; $i >= 0; $i--) {
-            $day = now()->subDays($i)->format('Y-m-d');
-            $trend7[$day] = ['date' => $day, 'label' => date('d M', strtotime($day)), 'total' => 0, 'negatif' => 0];
-        }
-        foreach ($dbArticles as $a) {
-            $day = substr((string) $a->getRawOriginal('pub_date'), 0, 10);
-            if (isset($trend7[$day])) {
-                $trend7[$day]['total']++;
-                if (($a->sentiment ?? '') === 'negatif') {
-                    $trend7[$day]['negatif']++;
-                }
-            }
-        }
-
-        $articleIds = $dbArticles->pluck('id')->toArray();
-        $manualArticleTopics = DB::table('media_article_topic')
-            ->whereIn('media_article_id', $articleIds)
-            ->get()
-            ->groupBy('media_article_id');
 
         $topicsMap = [];
         foreach ($dbTopics as $t) {
@@ -135,111 +113,29 @@ class MediaIntelligenceController extends Controller
             ];
         }
 
-        // Format articles for frontend with topic matching
-        $articles = $dbArticles->map(function ($a) use (&$topicsMap, $manualArticleTopics) {
-            $manualTopicIds = $manualArticleTopics->get($a->id, collect())
-                ->pluck('media_topic_id')
-                ->map(fn($id) => (int)$id)
-                ->toArray();
+        // Cakupan data: satu Polda (terkunci tenant) atau seluruh Polda aktif pada mode Nasional (hanya Mabes/Super Admin
+        // yang dapat berada di mode ini; resolveActiveTenant() menolak personel daerah).
+        $isNational = $this->aggregatesNational($selectedCode);
+        $scopeIds = $isNational
+            ? array_values(array_unique(array_merge($allPoldas->pluck('id')->all(), [$poldaId])))
+            : [$poldaId];
 
-            $matchedTopicIds = [];
-            $matchedTopics = [];
-            $textToSearch = mb_strtolower($a->title . ' ' . $a->summary);
+        $listing = (new MediaArticleListing(
+            $scopeIds,
+            $isNational,
+            $isNational ? 'Asia/Jakarta' : ($selectedPolda->timezone ?? 'Asia/Makassar')
+        ))->setTopics($topicsMap);
 
-            foreach ($topicsMap as $tId => &$tData) {
-                $isMatch = false;
-                if (in_array($tId, $manualTopicIds, true)) {
-                    $isMatch = true;
-                } else {
-                    foreach ($tData['keywords_array'] as $kw) {
-                        if ($kw !== '' && str_contains($textToSearch, $kw)) {
-                            $isMatch = true;
-                            break;
-                        }
-                    }
-                }
-
-                if ($isMatch) {
-                    $matchedTopicIds[] = $tId;
-                    $matchedTopics[] = [
-                        'id'       => $tId,
-                        'title'    => $tData['title'],
-                        'priority' => $tData['priority'],
-                    ];
-                    $tData['articles_count']++;
-                }
-            }
-            unset($tData);
-
-            return [
-                'id'                => (string) $a->id,
-                'title'             => $a->title,
-                'source_name'       => strtoupper($a->source_name),
-                'category'          => $a->category,
-                'category_badge'    => strtoupper($a->category),
-                'time_ago'          => FastTime::ago($a->getRawOriginal('created_at')),
-                'pub_date'          => FastTime::stamp($a->getRawOriginal('pub_date')) . ' WITA',
-                'summary'           => $a->summary ?: 'Cuplikan berita pantauan intelijen media belum tersedia.',
-                'image_url'         => $a->image_url,
-                'link'              => $a->url,
-                'sentiment'         => $a->sentiment ?: 'netral',
-                'is_bookmarked'     => (bool) $a->is_bookmarked,
-                'feed_id'           => $a->feed_id,
-                'source_id'         => $a->feed_id ?? 0,
-                'matched_topic_ids' => $matchedTopicIds,
-                'matched_topics'    => $matchedTopics,
-                'manual_topic_ids'  => $manualTopicIds,
-            ];
-        })->toArray();
-
-        // Portal Summary with counts directly from loaded articles to guarantee 100% parity with frontend
-        $loadedPortalCounts = [];
-        $liveCrawlCount = 0;
-        foreach ($articles as $art) {
-            $srcUpper = strtoupper($art['source_name'] ?? '');
-            $loadedPortalCounts[$srcUpper] = ($loadedPortalCounts[$srcUpper] ?? 0) + 1;
-            if (empty($art['feed_id']) || str_contains($art['link'] ?? '', 'news.google.com')) {
-                $liveCrawlCount++;
-            }
+        // Pencarian, filter, penggabungan berita ganda & paginasi dilakukan di server atas seluruh arsip.
+        $filters = MediaArticleListing::filtersFromRequest($request, $scopeIds);
+        $pageData = $listing->page($filters);
+        $scopeFeeds = MediaFeed::whereIn('polda_id', $scopeIds)->get(['name', 'is_active']);
+        $facets = $listing->facets($filters, $scopeFeeds->pluck('name')->unique()->values()->all());
+        foreach ($listing->topicCounts() as $topicId => $topicCount) {
+            $topicsMap[$topicId]['articles_count'] = $topicCount;
         }
-
-        // Strictly ensure ONLY the registered active feeds for this Polda are shown in filter
-        $mergedPortalCounts = [];
-        foreach ($mediaFeeds as $feed) {
-            $feedUpper = strtoupper($feed->name);
-            $mergedPortalCounts[$feedUpper] = $loadedPortalCounts[$feedUpper] ?? 0;
-        }
-        ksort($mergedPortalCounts);
-
-        $portalsList = [
-            ['name' => 'Semua Portal', 'count' => count($articles)],
-        ];
-
-        // Tambahkan opsi Sebaran Internet (Google News) jika terdapat artikel live crawling
-        if ($liveCrawlCount > 0) {
-            $portalsList[] = [
-                'name'  => '🌐 SEBARAN INTERNET (GOOGLE NEWS)',
-                'count' => $liveCrawlCount,
-            ];
-        }
-
-        foreach ($mergedPortalCounts as $name => $count) {
-            $portalsList[] = ['name' => $name, 'count' => $count];
-        }
-
-        // Category Summary with counts
-        $categoryGroup = [];
-        foreach ($articles as $art) {
-            $cat = $art['category'];
-            $categoryGroup[$cat] = ($categoryGroup[$cat] ?? 0) + 1;
-        }
-
-        $categoriesList = [
-            ['name' => 'Semua Kategori', 'count' => count($articles)],
-        ];
-        foreach ($categoryGroup as $cat => $count) {
-            $categoriesList[] = ['name' => $cat, 'count' => $count];
-        }
+        $stats = $listing->stats();
+        $isLeadership = in_array($request->user()?->role, ['kadiv_humas', 'polda_leader', 'super_admin_mabes', 'superadmin'], true);
 
         // Query Early Warnings scoped to active Polda
         $earlyWarnings = EarlyWarning::where('polda_id', $poldaId)->orderByDesc('level')->get();
@@ -275,8 +171,9 @@ class MediaIntelligenceController extends Controller
         $aiSettingModel = AiSetting::where('polda_id', $selectedPolda->id)->first();
         $aiSetting = [
             'has_api_key'     => !empty($rawApiKey),
-            'masked_api_key'  => $geminiService->maskApiKey($rawApiKey),
-            'gemini_model'    => $aiSettingModel?->gemini_model ?? $geminiService->getModel($selectedPolda->id),
+            // Telemetri teknis (kunci tersamar, nama model) hanya untuk admin; pengguna lain tidak melihat vendor/model AI.
+            'masked_api_key'  => $this->isAiAdmin() ? $geminiService->maskApiKey($rawApiKey) : null,
+            'gemini_model'    => $this->isAiAdmin() ? ($aiSettingModel?->gemini_model ?? $geminiService->getModel($selectedPolda->id)) : null,
             'is_auto_analyze' => (bool) ($aiSettingModel?->is_auto_analyze ?? false),
             'last_analyzed_at'=> $aiSettingModel?->last_analyzed_at ? $aiSettingModel->last_analyzed_at->diffForHumans() : null,
             'last_status'     => $aiSettingModel?->last_status,
@@ -301,19 +198,65 @@ class MediaIntelligenceController extends Controller
             'selectedCode'     => $selectedCode,
             'earlyWarnings'    => $earlyWarnings,
             'mediaFeeds'       => $mediaFeeds,
-            'sampleArticles'   => $articles,
+            'sampleArticles'   => $pageData['articles'],
+            'articlesMeta'     => $pageData['meta'],
+            'searchTerms'      => $pageData['terms'],
+            'filters'          => $filters,
+            'facets'           => $facets,
+            'stats'            => collect($stats)->except('trend7')->merge(['portals_active' => $scopeFeeds->where('is_active', true)->count()])->all(),
+            'freshness'        => $listing->freshness(),
+            'situation'        => $isLeadership ? $listing->situation() : null,
+            'isNational'       => $isNational,
+            'myArea'           => $this->myArea($request),
             'topics'           => array_values($topicsMap),
-            'portalsList'      => $portalsList,
-            'categoriesList'   => $categoriesList,
             'report'           => $report,
             'aiPromptTemplate' => $aiPromptTemplate,
             'aiSetting'        => $aiSetting,
             'issues'           => $issues,
             'pressReleases'    => $pressReleases,
             'suggestedTopics'  => $suggestedTopics,
-            'trend7'           => array_values($trend7),
+            'trend7'           => $stats['trend7'],
             'metrics'          => $metrics,
         ]);
+    }
+
+    /**
+     * Catat sinkron manual dari antarmuka ke `rss_sync_logs` agar kesegaran data terlihat di halaman.
+     */
+    protected function logManualSync(int $poldaId, int $feeds, int $fetched, int $stored): void
+    {
+        RssSyncLog::create([
+            'polda_id'         => $poldaId,
+            'sync_type'        => 'manual_ui',
+            'status'           => 'success',
+            'feeds_processed'  => $feeds,
+            'articles_fetched' => $fetched,
+            'articles_stored'  => $stored,
+            'message'          => 'Sinkron manual dari antarmuka Radar Media Online.',
+        ]);
+    }
+
+    /**
+     * Wilayah penugasan pengguna (Polres) sebagai kata kunci pencarian cepat "Wilayah Saya".
+     * Hanya Polres milik Polda pengguna yang dipertimbangkan.
+     *
+     * @return array{label: string, keyword: string}|null
+     */
+    protected function myArea(Request $request): ?array
+    {
+        $user = $request->user();
+        if (! $user || ! $user->polres_id || ! $user->polda_id) {
+            return null;
+        }
+
+        $polres = Polres::where('id', $user->polres_id)->where('polda_id', $user->polda_id)->first();
+        if (! $polres) {
+            return null;
+        }
+
+        $keyword = $polres->placeKeyword();
+
+        return $keyword === null ? null : ['label' => (string) $polres->name, 'keyword' => $keyword];
     }
 
     /**
@@ -355,7 +298,7 @@ class MediaIntelligenceController extends Controller
                 foreach ($bySource as $srcKey => $items) {
                     foreach (array_slice($items, 0, 25) as $item) {
                         MediaArticle::updateOrCreate(
-                            ['url' => $item['link']],
+                            ['polda_id' => $polda->id, 'url' => $item['link']],
                             [
                                 'polda_id'    => $polda->id,
                                 'feed_id'     => $item['source_id'] ?: null,
@@ -372,6 +315,10 @@ class MediaIntelligenceController extends Controller
                     }
                 }
             }
+        }
+
+        if ($shouldSync && isset($liveArticles)) {
+            $this->logManualSync($polda->id, $mediaFeeds->count(), count($liveArticles), $syncedCount);
         }
 
         // Fetch latest articles for this Polda (up to 30)
@@ -425,7 +372,7 @@ class MediaIntelligenceController extends Controller
         if (!$result['success']) {
             $aiSetting->update([
                 'last_status' => 'error',
-                'last_error'  => $result['message'] ?? 'Gagal memproses analisis Gemini Pro.',
+                'last_error'  => $result['message'] ?? 'Gagal memproses analisis AI.',
             ]);
 
             if ($request->wantsJson()) {
@@ -565,11 +512,11 @@ class MediaIntelligenceController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => 'Pengaturan Google Gemini Pro berhasil disimpan.',
+                'message' => 'Pengaturan mesin AI berhasil disimpan.',
             ]);
         }
 
-        return back()->with('success', 'Pengaturan Google Gemini Pro berhasil disimpan.');
+        return back()->with('success', 'Pengaturan mesin AI berhasil disimpan.');
     }
 
     /**
@@ -1242,9 +1189,10 @@ PROMPT;
     /**
      * Toggle bookmark artikel (disimpan di database agar tidak ikut dibersihkan).
      */
-    public function toggleBookmark(int $id): JsonResponse
+    public function toggleBookmark(Request $request, int $id): JsonResponse
     {
         $article = MediaArticle::findOrFail($id);
+        $this->authorizeTenantRecord($request, $article);
         $article->update(['is_bookmarked' => ! $article->is_bookmarked]);
 
         return response()->json(['id' => (string) $article->id, 'is_bookmarked' => $article->is_bookmarked]);
@@ -1256,7 +1204,11 @@ PROMPT;
     public function importBookmarks(Request $request): JsonResponse
     {
         $ids = collect($request->input('ids', []))->filter(fn ($i) => is_numeric($i))->map(fn ($i) => (int) $i)->take(2000);
-        $count = MediaArticle::whereIn('id', $ids)->update(['is_bookmarked' => true]);
+        $user = $request->user();
+        $count = MediaArticle::whereIn('id', $ids)
+            // Personel daerah hanya dapat menandai berita Polda-nya sendiri (ID asing diabaikan).
+            ->when($user && ! $user->isSuperAdmin() && $user->polda_id, fn ($q) => $q->where('polda_id', $user->polda_id))
+            ->update(['is_bookmarked' => true]);
 
         return response()->json(['imported' => $count]);
     }
@@ -1305,6 +1257,7 @@ PROMPT;
     public function updateTopic(Request $request, int $id): RedirectResponse
     {
         $topic = MediaTopic::findOrFail($id);
+        $this->authorizeTenantRecord($request, $topic);
 
         $validated = $request->validate([
             'title'       => 'required|string|max:255',
@@ -1322,9 +1275,10 @@ PROMPT;
     /**
      * Hapus Topik Atensi Pimpinan.
      */
-    public function deleteTopic(int $id): RedirectResponse
+    public function deleteTopic(Request $request, int $id): RedirectResponse
     {
         $topic = MediaTopic::findOrFail($id);
+        $this->authorizeTenantRecord($request, $topic);
         $title = $topic->title;
         $topic->delete();
 
@@ -1342,6 +1296,12 @@ PROMPT;
 
         $article = MediaArticle::findOrFail($id);
         $topicId = (int) $validated['topic_id'];
+        $topicRecord = MediaTopic::findOrFail($topicId);
+
+        // Artikel dan topik harus milik tenant pengguna DAN satu wilayah yang sama.
+        $this->authorizeTenantRecord($request, $article);
+        $this->authorizeTenantRecord($request, $topicRecord);
+        abort_if((int) $article->polda_id !== (int) $topicRecord->polda_id, 403, 'Artikel dan topik berasal dari wilayah yang berbeda.');
 
         $existing = DB::table('media_article_topic')
             ->where('media_article_id', $article->id)
@@ -1386,6 +1346,7 @@ PROMPT;
     public function analyzeTopicAi(Request $request, int $id): JsonResponse
     {
         $topic = MediaTopic::with('polda')->findOrFail($id);
+        $this->authorizeTenantRecord($request, $topic);
         $polda = $topic->polda ?? Polda::find($topic->polda_id);
 
         if (!$polda) {
@@ -1447,7 +1408,7 @@ PROMPT;
             return response()->json([
                 'success' => false,
                 'status'  => 'missing_api_key',
-                'message' => 'Google Gemini API Key belum diatur di menu Keamanan & Pemeliharaan -> Mesin Intelijen AI.',
+                'message' => 'Kunci API Mesin AI belum diatur di menu Keamanan & Pemeliharaan -> Mesin Intelijen AI.',
             ], 422);
         }
 
@@ -1523,6 +1484,7 @@ PROMPT;
     public function crawlTopicLive(Request $request, int $id): JsonResponse
     {
         $topic = MediaTopic::findOrFail($id);
+        $this->authorizeTenantRecord($request, $topic);
         $customQuery = $request->input('query');
         $depth = (int) $request->input('depth', 50);
 

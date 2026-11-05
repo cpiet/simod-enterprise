@@ -6,6 +6,7 @@
  */
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import axios from 'axios';
+import AiQuotaBadge from './AiQuotaBadge.vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import { Marked } from 'marked';
 import {
@@ -414,6 +415,7 @@ const sourceTypeLabel = { media: 'Media', social: 'Medsos', issue: 'Isu', ews: '
               <template v-if="view === 'history'">{{ history.length }} tersimpan di akun Anda</template>
               <template v-else>{{ scopeLabel || 'Memuat data…' }}<template v-if="meta?.tenant"> · {{ meta.tenant }}</template></template>
             </p>
+            <AiQuotaBadge v-if="view !== 'history'" />
           </div>
 
           <div class="relative" data-sdw-menu>
