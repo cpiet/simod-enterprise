@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
+use App\Models\MonitoredInstagramAccount;
 use App\Models\Polda;
 use App\Models\Polres;
 use App\Models\SocialIntelligenceReport;
@@ -11,6 +12,7 @@ use App\Models\SocialPost;
 use App\Models\SocialSetting;
 use App\Services\ApifySyncService;
 use App\Services\GeminiService;
+use App\Services\InstagramAccountMonitoringService;
 use App\Services\SocialSyndicationService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -87,6 +89,13 @@ class SocialIntelligenceController extends Controller
                   ->orWhere('author_handle', 'like', "%{$search}%")
                   ->orWhere('kol_category', 'like', "%{$search}%");
             });
+        }
+
+        // Grafik mengikuti filter daftar, tetapi tidak dibatasi tanggal drill-down.
+        $timelineQuery = clone $query;
+        $postDate = $request->validate(['post_date' => ['nullable', 'date_format:Y-m-d']])['post_date'] ?? null;
+        if ($postDate) {
+            $query->whereDate('posted_at', $postDate);
         }
 
         // Sorting
@@ -319,11 +328,12 @@ class SocialIntelligenceController extends Controller
             'selectedCase'        => $selectedCase,
             'metrics'             => $metrics,
             'kolProfiles'         => $kolProfiles,
+            'monitoredInstagramAccounts' => MonitoredInstagramAccount::where('polda_id', $poldaId)->orderBy('username')->get(),
             'trendingHashtags'    => $trendingData['trendingHashtags'],
             'trendingByPlatform'  => $trendingData['trendingByPlatform'],
             'publicTrends'        => $service->getPublicTrendsData(),
             'supportedActors'     => $service->getSupportedTrendActors(),
-            'spikeTimeline'       => $this->getSentimentSpikeTimeline($poldaScope, $selectedPolda, $isNational),
+            'spikeTimeline'       => $this->getSentimentSpikeTimeline($timelineQuery, $selectedPolda, $isNational),
             'wordCloud'           => $this->getWordCloudData($poldaScope, $selectedPolda),
             'peakHours'           => $peakHours,
             'settings'            => $settings,
@@ -340,8 +350,35 @@ class SocialIntelligenceController extends Controller
                 'satwil'     => $satwil,
                 'case_id'    => $selectedCaseId,
                 'bookmarked' => $isBookmarkedOnly,
+                'post_date'  => $postDate,
             ],
         ]);
+    }
+
+    public function addInstagramAccount(Request $request, InstagramAccountMonitoringService $monitor, ApifySyncService $apify)
+    {
+        $request->merge(['username' => strtolower(ltrim(trim((string) $request->input('username')), '@'))]);
+        $validated = $request->validate(['username' => ['required', 'string', 'max:30', 'regex:/^[a-z0-9._]+$/']]);
+        [, , $poldaId] = $this->resolveActiveTenant($request);
+        abort_unless($poldaId, 422, 'Pilih tenant sebelum menambah akun pantauan.');
+        $account = MonitoredInstagramAccount::firstOrCreate(['polda_id' => $poldaId, 'username' => $validated['username']]);
+        $result = $monitor->sync($account, $apify);
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function syncInstagramAccount(Request $request, int $id, InstagramAccountMonitoringService $monitor, ApifySyncService $apify)
+    {
+        [, , $poldaId] = $this->resolveActiveTenant($request);
+        $account = MonitoredInstagramAccount::where('polda_id', $poldaId)->findOrFail($id);
+        $result = $monitor->sync($account, $apify);
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    public function deleteInstagramAccount(Request $request, int $id)
+    {
+        [, , $poldaId] = $this->resolveActiveTenant($request);
+        MonitoredInstagramAccount::where('polda_id', $poldaId)->findOrFail($id)->delete();
+        return response()->json(['message' => 'Akun dihapus dari daftar pantauan.']);
     }
 
     /**
@@ -1061,86 +1098,62 @@ class SocialIntelligenceController extends Controller
      */
     protected function getSentimentSpikeTimeline($poldaScope, ?Polda $selectedPolda, bool $isNational): array
     {
-        $posts = (clone $poldaScope)->select('content', 'sentiment', 'posted_at', 'views_count', 'likes_count')->get();
-
+        $today = now()->startOfDay();
+        // Enam hari sebelumnya diperlukan sebagai pembanding untuk hari pertama grafik.
+        $posts = (clone $poldaScope)->where('posted_at', '>=', $today->copy()->subDays(12))
+            ->where('posted_at', '<', $today->copy()->addDay())
+            ->select('sentiment', 'posted_at', 'post_id')->get();
+        $byDate = $posts->groupBy(fn ($post) => $post->posted_at->format('Y-m-d'));
         $days = [];
-        $totalNeg = 0;
-        $totalPos = 0;
-        $totalNet = 0;
+        $totalPos = $totalNet = $totalNeg = $totalUnknown = $syntheticCount = 0;
+        $peakNegativeDay = null;
+        $maxNegative = -1;
 
         for ($i = 6; $i >= 0; $i--) {
-            $date = now()->subDays($i)->format('Y-m-d');
-            $label = now()->subDays($i)->translatedFormat('d M');
-            $dayPosts = $posts->filter(fn($p) => $p->posted_at && $p->posted_at->format('Y-m-d') === $date);
-            
+            $date = $today->copy()->subDays($i);
+            $dayPosts = $byDate->get($date->format('Y-m-d'), collect());
             $pos = $dayPosts->where('sentiment', 'positif')->count();
             $net = $dayPosts->where('sentiment', 'netral')->count();
             $neg = $dayPosts->where('sentiment', 'negatif')->count();
-            $tot = $dayPosts->count();
-
-            // If prior day has 0 in database, provide a smooth baseline so graph is continuous
-            if ($tot === 0) {
-                $baseMultiplier = max(1, 7 - $i);
-                $pos = 3 + ($baseMultiplier % 4);
-                $net = 6 + ($baseMultiplier % 5);
-                $neg = 2 + ($baseMultiplier % 3);
-                $tot = $pos + $net + $neg;
+            $unknown = $dayPosts->count() - $pos - $net - $neg;
+            $baseline = 0;
+            for ($j = 1; $j <= 6; $j++) {
+                $previous = $byDate->get($date->copy()->subDays($j)->format('Y-m-d'), collect());
+                $baseline += $previous->where('sentiment', 'negatif')->count();
             }
-
+            $average = $baseline / 6;
+            $isSpike = $neg >= 5 && $neg >= 1.5 * $average;
+            if ($isSpike && $neg > $maxNegative) {
+                $peakNegativeDay = $date->translatedFormat('d M');
+                $maxNegative = $neg;
+            }
+            $syntheticCount += $dayPosts->filter(fn ($post) => str_starts_with($post->post_id ?? '', 'synthetic_'))->count();
             $totalPos += $pos;
             $totalNet += $net;
             $totalNeg += $neg;
-
+            $totalUnknown += $unknown;
             $days[] = [
-                'date'       => $date,
-                'label'      => $label,
-                'positif'    => $pos,
-                'netral'     => $net,
-                'negatif'    => $neg,
-                'total'      => $tot,
-                'is_spike'   => false,
-                'spike_note' => '',
+                'date' => $date->format('Y-m-d'), 'label' => $date->translatedFormat('d M'),
+                'positif' => $pos, 'netral' => $net, 'negatif' => $neg, 'unknown' => $unknown,
+                'total' => $dayPosts->count(), 'is_spike' => $isSpike,
+                'baseline_negative' => round($average, 1),
+                'spike_note' => $isSpike ? "{$neg} unggahan bersentimen negatif; rata-rata 6 hari sebelumnya " . round($average, 1) . ' per hari.' : '',
             ];
         }
-
-        // Calculate moving average of negative mentions
-        $avgNeg = count($days) > 0 ? ($totalNeg / count($days)) : 1;
-        $spikeDetected = false;
-        $peakDay = $days[0]['label'];
-        $maxTotal = 0;
-
-        foreach ($days as &$d) {
-            if ($d['total'] > $maxTotal) {
-                $maxTotal = $d['total'];
-                $peakDay = $d['label'];
-            }
-            if ($d['negatif'] >= ($avgNeg * 1.5) && $d['negatif'] >= 5) {
-                $d['is_spike'] = true;
-                $d['spike_note'] = "🚨 Anomali Lonjakan Negatif: {$d['negatif']} keluhan aduan warganet!";
-                $spikeDetected = true;
-            }
-        }
-        unset($d);
-
-        $totalAll = $totalPos + $totalNet + $totalNeg;
-        $posPct = $totalAll > 0 ? round(($totalPos / $totalAll) * 100) : 0;
-        $stabilityScore = max(10, min(100, (int) ($posPct + ($totalNet / max(1, $totalAll) * 50))));
+        $total = $totalPos + $totalNet + $totalNeg + $totalUnknown;
 
         return [
-            'days'                   => $days,
-            'summary'                => [
-                'total_7d'           => $totalAll,
-                'positive_7d'        => $totalPos,
-                'neutral_7d'         => $totalNet,
-                'negative_7d'        => $totalNeg,
-                'positive_pct'       => $posPct,
-                'spike_detected'     => $spikeDetected,
-                'peak_day'           => $peakDay,
-                'stability_score'    => $stabilityScore,
-                'stability_label'    => $stabilityScore >= 75 ? 'Sangat Terkendali' : ($stabilityScore >= 50 ? 'Waspada' : 'Kritis'),
-                'verdict'            => $spikeDetected
-                    ? "Terdeteksi lonjakan isu negatif pada {$peakDay}. Disarankan rilis konter narasi dan klarifikasi di jam puncak siang."
-                    : "Sentimen opini publik 7 hari terakhir relatif stabil, narasi positif dan netral mendominasi {$posPct}% percakapan.",
+            'days' => $days,
+            'summary' => [
+                'calculated_at' => now()->format('d M Y H:i T'),
+                'total_7d' => $total, 'positive_7d' => $totalPos, 'neutral_7d' => $totalNet,
+                'negative_7d' => $totalNeg, 'unknown_7d' => $totalUnknown,
+                'synthetic_identified' => $syntheticCount,
+                'spike_detected' => $peakNegativeDay !== null,
+                'peak_day' => $peakNegativeDay,
+                'verdict' => $total === 0 ? 'Tidak ada unggahan tersimpan pada periode ini.' : ($peakNegativeDay
+                    ? "Lonjakan negatif terbesar terdeteksi pada {$peakNegativeDay}; tinjau unggahan terkait."
+                    : 'Tidak ada lonjakan negatif yang memenuhi ambang pada periode ini.'),
             ],
         ];
     }

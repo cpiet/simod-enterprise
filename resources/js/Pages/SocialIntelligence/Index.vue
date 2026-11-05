@@ -64,6 +64,7 @@ const props = defineProps({
   casePosts: { type: Object, default: null },
   metrics: Object,
   kolProfiles: Array,
+  monitoredInstagramAccounts: { type: Array, default: () => [] },
   trendingHashtags: Array,
   trendingByPlatform: Object,
   publicTrends: Object,
@@ -83,6 +84,40 @@ const page = usePage();
 const permissions = computed(() => page.props.auth?.permissions || {});
 const canSync = computed(() => !!permissions.value.social_intelligence_sync);
 const canCreateIssue = computed(() => !!permissions.value.issues_create);
+const instagramUsername = ref('');
+const instagramBusy = ref(false);
+const instagramMessage = ref('');
+const instagramError = ref(false);
+const syncInstagram = async (account = null) => {
+  if (instagramBusy.value || (!account && !instagramUsername.value.trim())) return;
+  instagramBusy.value = true;
+  instagramMessage.value = '';
+  try {
+    const response = account
+      ? await axios.post(`/social-intelligence/instagram-accounts/${account.id}/sync`)
+      : await axios.post('/social-intelligence/instagram-accounts', { username: instagramUsername.value });
+    instagramMessage.value = response.data.message;
+    instagramError.value = false;
+    if (!account) instagramUsername.value = '';
+  } catch (error) {
+    instagramError.value = true;
+    instagramMessage.value = error.response?.data?.errors?.username?.[0] || error.response?.data?.message || 'Sinkronisasi gagal. Silakan coba lagi.';
+  } finally {
+    router.reload({ only: ['monitoredInstagramAccounts'], preserveScroll: true });
+    instagramBusy.value = false;
+  }
+};
+const removeInstagram = async (account) => {
+  if (!confirm(`Hapus @${account.username} dari daftar pantauan?`)) return;
+  try {
+    await axios.delete(`/social-intelligence/instagram-accounts/${account.id}`);
+    router.reload({ only: ['monitoredInstagramAccounts'], preserveScroll: true });
+  } catch {
+    instagramError.value = true;
+    instagramMessage.value = 'Akun tidak dapat dihapus.';
+  }
+};
+const instagramDate = (date) => date ? new Date(date).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : 'Waktu tidak tersedia';
 
 // Pimpinan & Polda mendarat di Briefing; peran lain di Radar Percakapan
 const activeTab = ref(props.filters?.tab || (['kadiv_humas', 'polda_leader'].includes(page.props.auth?.role) ? 'briefing' : 'radar'));
@@ -103,8 +138,9 @@ const kolOnly = ref(Boolean(props.filters?.kol));
 const selectedSort = ref(props.filters?.sort || 'latest');
 const searchQuery = ref(props.filters?.q || '');
 const selectedSatwil = ref(props.filters?.satwil || 'all');
+const selectedPostDate = ref(props.filters?.post_date || '');
 const activeFilterCount = computed(() =>
-  (selectedSentiment.value !== 'all' ? 1 : 0) + (kolOnly.value ? 1 : 0) + (selectedSatwil.value !== 'all' ? 1 : 0)
+  (selectedSentiment.value !== 'all' ? 1 : 0) + (kolOnly.value ? 1 : 0) + (selectedSatwil.value !== 'all' ? 1 : 0) + (selectedPostDate.value ? 1 : 0)
 );
 const clearAdvancedFilters = () => {
   selectedSentiment.value = 'all';
@@ -142,6 +178,7 @@ const handleFilter = () => {
     sort: selectedSort.value,
     q: searchQuery.value,
     satwil: selectedSatwil.value,
+    post_date: selectedPostDate.value || undefined,
   }, { preserveState: true, preserveScroll: true });
 };
 
@@ -566,8 +603,8 @@ const deltaLabel = (key) => {
 };
 
 // Grafik kolom bertumpuk 7 hari: negatif di dasar (mudah dibandingkan), lalu netral, lalu positif
-const chartOpen = ref(Boolean(props.spikeTimeline?.summary?.spike_detected));
-const stabilityScore = computed(() => props.spikeTimeline?.summary?.stability_score ?? null);
+const chartOpen = ref(true);
+const chartMax = computed(() => Math.max(...spikeTimelineDays.value.map(d => d.total || 0), 1));
 const barGeom = computed(() => {
   const days = spikeTimelineDays.value;
   const max = Math.max(...days.map((d) => d.total || 0), 1);
@@ -580,7 +617,8 @@ const barGeom = computed(() => {
     const hn = h(d.negatif);
     const hu = h(d.netral);
     const hp = h(d.positif);
-    return { i, d, x, bw, hn, hu, hp, yn: base - hn, yu: base - hn - hu, yp: base - hn - hu - hp, cx: x + bw / 2, base };
+    const hx = h(d.unknown);
+    return { i, d, x, bw, hn, hu, hp, hx, yn: base - hn, yu: base - hn - hu, yp: base - hn - hu - hp, yx: base - hn - hu - hp - hx, cx: x + bw / 2, base };
   });
 });
 
@@ -604,6 +642,14 @@ const activeDayData = computed(() => {
   if (spikeIdx !== -1) return spikeTimelineDays.value[spikeIdx];
   return spikeTimelineDays.value[spikeTimelineDays.value.length - 1] || null;
 });
+const dayPercent = (value) => activeDayData.value?.total ? Math.round(100 * value / activeDayData.value.total) : 0;
+const showDayPosts = (sentiment = null) => {
+  if (!activeDayData.value?.total) return;
+  selectedPostDate.value = activeDayData.value.date;
+  if (sentiment) selectedSentiment.value = sentiment;
+  activeTab.value = 'radar';
+  handleFilter();
+};
 
 const getSvgX = (index) => {
   const total = Math.max(1, spikeTimelineDays.value.length - 1);
@@ -1289,9 +1335,8 @@ const getBuzzerRiskClass = (level) => {
               class="px-2 py-0.5 rounded-full text-[10px] font-bold"
               :class="spikeTimeline?.summary?.spike_detected ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30' : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'"
             >
-              {{ spikeTimeline?.summary?.spike_detected ? '🚨 Lonjakan terdeteksi' : '🟢 Stabil' }}
+              {{ spikeTimeline?.summary?.spike_detected ? 'Lonjakan negatif terdeteksi' : (spikeTimeline?.summary?.total_7d ? 'Tidak ada lonjakan terdeteksi' : 'Belum ada data') }}
             </span>
-            <span v-if="stabilityScore !== null" class="text-[11px] text-slate-500 dark:text-slate-400 font-mono">Indeks stabilitas {{ stabilityScore }}/100</span>
           </span>
           <ChevronDown class="w-4 h-4 text-slate-400 transition-transform" :class="chartOpen ? 'rotate-180' : ''" />
         </button>
@@ -1301,19 +1346,26 @@ const getBuzzerRiskClass = (level) => {
             <span class="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400"><span class="w-3 h-3 rounded-sm bg-emerald-500 inline-block"></span>Positif</span>
             <span class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400"><span class="w-3 h-3 rounded-sm bg-slate-400 dark:bg-slate-600 inline-block"></span>Netral</span>
             <span class="flex items-center gap-1.5 text-rose-600 dark:text-rose-400"><span class="w-3 h-3 rounded-sm bg-rose-500 inline-block"></span>Negatif</span>
+            <span v-if="spikeTimeline?.summary?.unknown_7d" class="flex items-center gap-1.5 text-amber-700 dark:text-amber-400"><span class="w-3 h-3 rounded-sm bg-amber-500 inline-block"></span>Belum diklasifikasi</span>
           </div>
+          <p class="text-xs text-slate-600 dark:text-slate-400">Jumlah unggahan tersimpan sesuai filter aktif, berdasarkan tanggal unggahan. Dihitung {{ spikeTimeline?.summary?.calculated_at }}. Nol berarti tidak ada data tersimpan, bukan bukti tidak ada percakapan.</p>
+          <p class="text-xs text-slate-600 dark:text-slate-400">Lonjakan: minimal 5 unggahan negatif dan 1,5 kali rata-rata 6 hari sebelumnya. Sentimen adalah klasifikasi, bukan jumlah aduan, dan perlu ditinjau. {{ spikeTimeline?.summary?.synthetic_identified || 0 }} data simulasi teridentifikasi; asal data lain belum selalu dapat diverifikasi.</p>
 
           <div class="relative w-full overflow-x-auto no-scrollbar">
             <svg viewBox="0 0 650 185" class="w-full h-48 select-none" role="img" aria-label="Kolom bertumpuk percakapan positif, netral, dan negatif selama 7 hari">
-              <line x1="45" y1="150" x2="605" y2="150" stroke="currentColor" class="text-slate-300 dark:text-slate-700" />
-              <g v-for="g in barGeom" :key="g.i" class="cursor-pointer" @mouseenter="activeDayIndex = g.i" @click="activeDayIndex = g.i">
+              <g v-for="step in [0, 0.5, 1]" :key="step">
+                <line x1="45" :y1="150 - step * 115" x2="605" :y2="150 - step * 115" stroke="currentColor" class="text-slate-200 dark:text-slate-700" />
+                <text x="39" :y="154 - step * 115" text-anchor="end" font-size="10" class="fill-slate-600 dark:fill-slate-400">{{ Math.round(chartMax * step) }}</text>
+              </g>
+              <g v-for="g in barGeom" :key="g.i" class="cursor-pointer" role="button" tabindex="0" :aria-label="`${g.d.label}, ${g.d.total} unggahan`" @focus="activeDayIndex = g.i" @keydown.enter.prevent="activeDayIndex = g.i" @keydown.space.prevent="activeDayIndex = g.i" @mouseenter="activeDayIndex = g.i" @click="activeDayIndex = g.i">
                 <rect :x="g.x - 8" y="8" :width="g.bw + 16" height="170" fill="transparent" />
                 <rect :x="g.x" :y="g.yn" :width="g.bw" :height="g.hn" class="fill-rose-500" rx="2" />
                 <rect :x="g.x" :y="g.yu" :width="g.bw" :height="g.hu" class="fill-slate-400 dark:fill-slate-600" />
                 <rect :x="g.x" :y="g.yp" :width="g.bw" :height="g.hp" class="fill-emerald-500" rx="2" />
-                <rect v-if="activeDayIndex === g.i" :x="g.x - 3" :y="g.yp - 3" :width="g.bw + 6" :height="g.base - g.yp + 3" fill="none" stroke="#6366f1" stroke-width="2" rx="4" />
-                <text :x="g.cx" :y="g.yp - 6" text-anchor="middle" font-size="11" font-weight="700" class="fill-slate-600 dark:fill-slate-300">{{ g.d.total }}</text>
-                <text v-if="g.d.is_spike" :x="g.cx" :y="g.yp - 19" text-anchor="middle" font-size="10" font-weight="800" class="fill-rose-600 dark:fill-rose-400">▲ Lonjakan</text>
+                <rect :x="g.x" :y="g.yx" :width="g.bw" :height="g.hx" class="fill-amber-500" />
+                <rect v-if="activeDayIndex === g.i" :x="g.x - 3" :y="g.yx - 3" :width="g.bw + 6" :height="g.base - g.yx + 3" fill="none" stroke="#6366f1" stroke-width="2" rx="4" />
+                <text :x="g.cx" :y="g.yx - 6" text-anchor="middle" font-size="11" font-weight="700" class="fill-slate-600 dark:fill-slate-300">{{ g.d.total }}</text>
+                <text v-if="g.d.is_spike" :x="g.cx" :y="g.yx - 19" text-anchor="middle" font-size="10" font-weight="800" class="fill-rose-600 dark:fill-rose-400">▲ Lonjakan</text>
                 <text :x="g.cx" y="168" text-anchor="middle" font-size="10" class="fill-slate-500 dark:fill-slate-400">{{ g.d.label }}</text>
               </g>
             </svg>
@@ -1327,15 +1379,14 @@ const getBuzzerRiskClass = (level) => {
               <span v-if="activeDayData?.is_spike" class="ml-2 px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500 text-white">Lonjakan</span>
             </div>
             <div class="flex items-center gap-4">
-              <div><span class="text-[10px] text-slate-500 font-bold block">Positif</span><span class="font-black text-emerald-600 dark:text-emerald-400 text-sm">{{ activeDayData?.positif || 0 }}</span></div>
-              <div><span class="text-[10px] text-slate-500 font-bold block">Netral</span><span class="font-black text-slate-700 dark:text-slate-300 text-sm">{{ activeDayData?.netral || 0 }}</span></div>
-              <div><span class="text-[10px] text-slate-500 font-bold block">Negatif</span><span class="font-black text-rose-600 dark:text-rose-400 text-sm">{{ activeDayData?.negatif || 0 }}</span></div>
+              <button v-for="sent in ['positif', 'netral', 'negatif']" :key="sent" type="button" :disabled="!activeDayData?.[sent]" @click="showDayPosts(sent)" class="text-left disabled:opacity-60" :aria-label="`Lihat unggahan ${sent} pada ${activeDayData?.label}`"><span class="text-[10px] text-slate-500 font-bold block capitalize">{{ sent }}</span><span class="font-black text-slate-900 dark:text-white text-sm">{{ activeDayData?.[sent] || 0 }} <span class="text-[10px]">({{ dayPercent(activeDayData?.[sent] || 0) }}%)</span></span></button>
             </div>
             <div class="md:col-span-2 border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 pt-2 md:pt-0 md:pl-4">
               <span class="text-[10px] text-slate-500 font-bold block">Kesimpulan</span>
               <p class="text-[11px] text-slate-700 dark:text-slate-300 font-medium leading-relaxed">
-                {{ activeDayData?.is_spike ? activeDayData.spike_note : (spikeTimeline?.summary?.verdict || 'Situasi percakapan publik terpantau kondusif.') }}
+                {{ activeDayData?.is_spike ? activeDayData.spike_note : (activeDayData?.total ? 'Tidak memenuhi ambang lonjakan negatif pada hari ini.' : 'Tidak ada unggahan tersimpan pada hari ini.') }}
               </p>
+              <button v-if="activeDayData?.total" type="button" @click="showDayPosts()" class="mt-1 font-bold text-indigo-700 dark:text-indigo-300 hover:underline">Lihat {{ activeDayData.total }} unggahan hari ini →</button>
             </div>
           </div>
         </div>
@@ -1514,6 +1565,7 @@ const getBuzzerRiskClass = (level) => {
       <!-- Chip filter aktif -->
       <div v-if="activeFilterCount > 0" class="flex flex-wrap items-center gap-2 -mt-2">
         <span class="text-[11px] font-bold text-slate-500">Filter aktif:</span>
+        <button v-if="selectedPostDate" type="button" @click="selectedPostDate = ''; handleFilter()" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200">Tanggal: {{ selectedPostDate }} <X class="w-3 h-3" /></button>
         <button v-if="selectedSentiment !== 'all'" type="button" @click="selectedSentiment = 'all'; handleFilter()" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-amber-400 cursor-pointer">
           Sentimen: {{ selectedSentiment }} <X class="w-3 h-3" />
         </button>
@@ -2139,6 +2191,39 @@ const getBuzzerRiskClass = (level) => {
 
     <!-- TAB 03: RADAR KOL & AKUN KRITIS -->
     <div v-if="activeTab === 'kol'" class="space-y-4">
+      <section class="rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm space-y-4">
+        <div>
+          <h2 class="text-base font-black text-slate-900 dark:text-white">Pantau Akun Instagram</h2>
+          <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">Unggahan publik dari akun terpilih, diambil melalui Apify. Sinkronisasi dilakukan secara manual dan mengambil hingga 5 unggahan; biaya Apify dapat berlaku.</p>
+        </div>
+        <form v-if="canSync" class="flex flex-col sm:flex-row gap-2" @submit.prevent="syncInstagram()">
+          <label for="instagram-monitor-username" class="sr-only">Username Instagram</label>
+          <input id="instagram-monitor-username" v-model="instagramUsername" maxlength="31" placeholder="Contoh: @mohmahfudmd" class="flex-1 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-white" />
+          <button type="submit" :disabled="instagramBusy || !instagramUsername.trim()" class="rounded-xl bg-amber-400 px-4 py-2 text-sm font-bold text-slate-950 disabled:opacity-50">{{ instagramBusy ? 'Menyinkronkan...' : 'Tambah & sinkronkan' }}</button>
+        </form>
+        <p v-if="instagramMessage" role="status" class="text-xs font-semibold" :class="instagramError ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'">{{ instagramMessage }}</p>
+        <p v-if="!monitoredInstagramAccounts.length" class="rounded-xl bg-slate-50 dark:bg-slate-900 p-4 text-sm text-slate-600 dark:text-slate-400">Belum ada akun Instagram dalam daftar pantauan tenant ini.</p>
+        <article v-for="account in monitoredInstagramAccounts" :key="account.id" class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 class="font-bold text-slate-900 dark:text-white">{{ account.display_name || 'Akun Instagram' }} <span class="text-slate-600 dark:text-slate-400">@{{ account.username }}</span></h3>
+              <p class="text-xs text-slate-600 dark:text-slate-400">{{ account.last_synced_at ? `Terakhir berhasil: ${instagramDate(account.last_synced_at)}` : 'Belum ada sinkronisasi berhasil' }}<span v-if="account.sync_status === 'error'"> · Sinkronisasi terakhir gagal</span><span v-else-if="account.sync_status === 'empty'"> · Tidak ada hasil yang dapat diverifikasi</span></p>
+            </div>
+            <div v-if="canSync" class="flex gap-2">
+              <button type="button" :disabled="instagramBusy" @click="syncInstagram(account)" class="rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs font-bold text-slate-800 dark:text-slate-200 disabled:opacity-50">{{ instagramBusy ? 'Memproses...' : 'Sinkronkan' }}</button>
+              <button type="button" :disabled="instagramBusy" @click="removeInstagram(account)" class="rounded-lg border border-rose-200 dark:border-rose-900 px-3 py-1.5 text-xs font-bold text-rose-700 dark:text-rose-400">Hapus</button>
+            </div>
+          </div>
+          <p v-if="!account.posts?.length" class="text-xs text-slate-600 dark:text-slate-400">Belum ada unggahan yang dapat ditampilkan.</p>
+          <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <a v-for="post in account.posts" :key="post.url" :href="post.url" target="_blank" rel="noopener noreferrer" class="block rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 hover:border-amber-400">
+              <p class="text-xs font-semibold text-slate-600 dark:text-slate-400">{{ instagramDate(post.posted_at) }} · Buka Instagram ↗</p>
+              <p class="mt-1 text-sm text-slate-800 dark:text-slate-200 line-clamp-3">{{ post.caption || 'Unggahan tanpa keterangan teks.' }}</p>
+              <p class="mt-2 text-xs text-slate-600 dark:text-slate-400">Suka: {{ post.likes === null ? 'Tidak tersedia' : formatNumber(post.likes) }} · Komentar: {{ post.comments === null ? 'Tidak tersedia' : formatNumber(post.comments) }}</p>
+            </a>
+          </div>
+        </article>
+      </section>
       <div class="rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4">
         <div class="border-b border-slate-200 dark:border-slate-800 pb-3">
           <h2 class="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">

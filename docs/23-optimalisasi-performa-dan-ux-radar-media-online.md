@@ -108,3 +108,9 @@ Hindari donat/gauge dan 3 garis saling silang; jangan hanya mengandalkan merah-h
 ## 4. Pengujian
 - `php artisan test` → 116 passed (710 assertions); `npm.cmd run build` tanpa galat.
 - Belum tercakup otomatis: perilaku visual/interaksi menu `⋯`, panel Filter, dan Dossier. Periksa manual di browser pada tema Dark dan Light, lebar desktop dan ponsel.
+
+## Peta situasi geografis
+
+Command Center menggunakan Leaflet dan tile OpenStreetMap melalui HTTPS; URL aplikasi mengikuti domain yang melayani aplikasi, sehingga tidak dikunci ke domain lokal. Tile default memerlukan akses internet. Untuk penyedia tile lain, atur `VITE_MAP_TILE_URL` dan `VITE_MAP_ATTRIBUTION` di `.env`, lalu jalankan `npm.cmd run build` saat deployment. Pertahankan atribusi dan patuhi ketentuan penyedia tile. Server tile publik OpenStreetMap bersifat best-effort dan tidak menyediakan jaminan layanan atau unduhan offline massal.
+
+Penanda nasional adalah 11 sentra representatif, dengan lokasi pusat wilayah, bukan lokasi kejadian. Enam sentra awal menggunakan data tenant terkait; lima sentra lainnya adalah perkiraan dari kata kunci berita pada tenant Divhumas, bukan lokasi terverifikasi. Data nasional dibatasi ke tenant bagi pengguna wilayah. Penanda satwil menggunakan koordinat Polres yang tersimpan; wilayah tanpa koordinat tetap tersedia di daftar. Status berasal dari indikator berita/isu yang tersedia, bukan penetapan resmi, dan data kosong dinyatakan sebagai belum ada data. Cache peta bertahan 60 detik.

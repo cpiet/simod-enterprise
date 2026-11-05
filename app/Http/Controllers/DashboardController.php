@@ -60,18 +60,21 @@ class DashboardController extends Controller
         $hasWaspadaSatwil = false;
 
         foreach ($polresList as $p) {
-            $activeIssues = Issue::where('polres_id', $p->id)
+            $activeIssues = Issue::where('polda_id', $p->polda_id)->where('polres_id', $p->id)
                 ->whereNotIn('status', ['selesai'])
                 ->get();
-            $totalIssues = Issue::where('polres_id', $p->id)->count();
-            $posIssues = Issue::where('polres_id', $p->id)->where('sentiment', 'positif')->count();
+            $totalIssues = Issue::where('polda_id', $p->polda_id)->where('polres_id', $p->id)->count();
+            $posIssues = Issue::where('polda_id', $p->polda_id)->where('polres_id', $p->id)->where('sentiment', 'positif')->count();
 
-            $scoreNum = $totalIssues > 0 ? (int) round(($posIssues / $totalIssues) * 100) : 85;
+            $scoreNum = $totalIssues > 0 ? (int) round(($posIssues / $totalIssues) * 100) : null;
 
             $hasCritical = $activeIssues->contains(fn($i) => in_array($i->priority, ['critical', 'high']) && in_array($i->status, ['investigasi', 'monitoring']));
-            $hasWarning = $activeIssues->isNotEmpty() || $scoreNum < 80;
+            $hasWarning = $activeIssues->isNotEmpty();
 
-            if ($hasCritical) {
+            if ($totalIssues === 0) {
+                $status = 'BELUM ADA DATA';
+                $color = 'slate';
+            } elseif ($hasCritical) {
                 $status = 'ATENSI';
                 $color = 'rose';
                 $hasAtensiSatwil = true;
@@ -85,9 +88,9 @@ class DashboardController extends Controller
             }
 
             $latestIssue = $activeIssues->sortByDesc('virality_score')->first()
-                ?? Issue::where('polres_id', $p->id)->latest()->first();
+                ?? Issue::where('polda_id', $p->polda_id)->where('polres_id', $p->id)->latest()->first();
 
-            $summary = $latestIssue ? $latestIssue->title : "{$p->tag_desc}: Situasi kamtibmas kondusif, patroli presisi rutin berjalan.";
+            $summary = $latestIssue ? $latestIssue->title : 'Belum ada laporan.';
 
             $polresStatuses[] = [
                 'id'           => $p->id,
@@ -101,7 +104,7 @@ class DashboardController extends Controller
                 'map_y'        => $p->map_y ?? 50,
                 'status'       => $status,
                 'color'        => $color,
-                'score'        => "{$scoreNum}%",
+                'score'        => $scoreNum === null ? null : "{$scoreNum}%",
                 'score_num'    => $scoreNum,
                 'issues_count' => $activeIssues->count(),
                 'total_issues' => $totalIssues,
@@ -259,7 +262,7 @@ class DashboardController extends Controller
 
         // 7. PETA NUSANTARA INDONESIA (Agregasi Berita Berbasis Database untuk Mabes & Nasional)
         // Data peta nasional bersifat global dan berat (puluhan query LIKE); cache singkat 60 detik.
-        $nationalMapData = Cache::remember('simod.map.national', 60, fn () => $this->buildNationalMapData());
+        $nationalMapData = Cache::remember('simod.map.geographic.v2.'.($isNational ? 'national' : $poldaId), 60, fn () => $this->buildNationalMapData($isNational ? null : (int) $poldaId));
 
         // 8. LATEST AI INTELLIGENCE REPORTS (Media Online & Media Sosial)
         // If national scope (selectedCode === 'ALL' or 'DIVHUMAS'), prioritize Divisi Humas Polri (Mabes) report
@@ -329,11 +332,13 @@ class DashboardController extends Controller
      * Membangun Agregasi Peta Situasi Kamtibmas Nusantara (Indonesia Map)
      * Mengelompokkan berita aktual dari basis data media_articles ke 11 wilayah/Polda jajaran utama.
      */
-    protected function buildNationalMapData(): array
+    protected function buildNationalMapData(?int $scopePoldaId = null): array
     {
         $regions = [
             [
                 'code'           => 'DIVHUMAS',
+                'latitude'       => -6.2088,
+                'longitude'      => 106.8456,
                 'name'           => 'Mabes Polri & Metro Jaya',
                 'short_name'     => 'Mabes / Metro Jaya',
                 'region'         => 'DKI Jakarta & Nasional',
@@ -343,6 +348,8 @@ class DashboardController extends Controller
             ],
             [
                 'code'           => 'SULBAR',
+                'latitude'       => -2.6718,
+                'longitude'      => 118.8872,
                 'name'           => 'Polda Sulawesi Barat',
                 'short_name'     => 'Polda Sulbar',
                 'region'         => 'Sulawesi Barat (6 Polres)',
@@ -352,6 +359,8 @@ class DashboardController extends Controller
             ],
             [
                 'code'           => 'SULSEL',
+                'latitude'       => -5.1477,
+                'longitude'      => 119.4327,
                 'name'           => 'Polda Sulawesi Selatan',
                 'short_name'     => 'Polda Sulsel',
                 'region'         => 'Sulawesi Selatan (Makassar)',
@@ -361,6 +370,8 @@ class DashboardController extends Controller
             ],
             [
                 'code'           => 'SULTRA',
+                'latitude'       => -3.9985,
+                'longitude'      => 122.5126,
                 'name'           => 'Polda Sulawesi Tenggara',
                 'short_name'     => 'Polda Sultra',
                 'region'         => 'Sulawesi Tenggara (Kendari)',
@@ -370,6 +381,8 @@ class DashboardController extends Controller
             ],
             [
                 'code'           => 'GORONTALO',
+                'latitude'       => 0.5435,
+                'longitude'      => 123.0568,
                 'name'           => 'Polda Gorontalo & Sulut',
                 'short_name'     => 'Polda Gorontalo',
                 'region'         => 'Gorontalo & Teluk Tomini',
@@ -379,6 +392,8 @@ class DashboardController extends Controller
             ],
             [
                 'code'           => 'KALTIM',
+                'latitude'       => -0.5022,
+                'longitude'      => 117.1537,
                 'name'           => 'Polda Kaltim & IKN Nusantara',
                 'short_name'     => 'Polda Kaltim / IKN',
                 'region'         => 'Kalimantan Timur & IKN',
@@ -388,6 +403,8 @@ class DashboardController extends Controller
             ],
             [
                 'code'           => 'SUMUT',
+                'latitude'       => 3.5952,
+                'longitude'      => 98.6722,
                 'name'           => 'Polda Sumut & Aceh',
                 'short_name'     => 'Polda Sumut',
                 'region'         => 'Sumatera Bagian Utara',
@@ -398,6 +415,8 @@ class DashboardController extends Controller
             ],
             [
                 'code'           => 'JATENG',
+                'latitude'       => -6.9667,
+                'longitude'      => 110.4167,
                 'name'           => 'Polda Jateng & DIY',
                 'short_name'     => 'Polda Jateng',
                 'region'         => 'Jawa Tengah (Semarang/Solo)',
@@ -408,6 +427,8 @@ class DashboardController extends Controller
             ],
             [
                 'code'           => 'JATIM',
+                'latitude'       => -7.2575,
+                'longitude'      => 112.7521,
                 'name'           => 'Polda Jawa Timur',
                 'short_name'     => 'Polda Jatim',
                 'region'         => 'Jawa Timur & Madura',
@@ -418,6 +439,8 @@ class DashboardController extends Controller
             ],
             [
                 'code'           => 'BALI',
+                'latitude'       => -8.65,
+                'longitude'      => 115.2167,
                 'name'           => 'Polda Bali & NTB/NTT',
                 'short_name'     => 'Polda Bali / Nusra',
                 'region'         => 'Bali & Nusa Tenggara',
@@ -428,6 +451,8 @@ class DashboardController extends Controller
             ],
             [
                 'code'           => 'PAPUA',
+                'latitude'       => -2.5337,
+                'longitude'      => 140.7181,
                 'name'           => 'Polda Papua & Jajaran',
                 'short_name'     => 'Polda Papua',
                 'region'         => 'Papua & Papua Barat',
@@ -441,11 +466,23 @@ class DashboardController extends Controller
         $results = [];
 
         foreach ($regions as $r) {
+            $regionPoldaId = null;
             if (isset($r['polda_id'])) {
-                $q = MediaArticle::where('polda_id', $r['polda_id']);
+                $regionPoldaId = Polda::where('code', $r['code'])->value('id');
+                if (! $regionPoldaId || ($scopePoldaId !== null && (int) $regionPoldaId !== $scopePoldaId)) {
+                    continue;
+                }
+                $q = MediaArticle::where('polda_id', $regionPoldaId);
             } else {
+                if ($scopePoldaId !== null) {
+                    continue;
+                }
+                $regionPoldaId = Polda::where('code', 'DIVHUMAS')->value('id');
+                if (! $regionPoldaId) {
+                    continue;
+                }
                 $kws = array_merge([$r['keyword']], $r['extra_keywords'] ?? []);
-                $q = MediaArticle::where(function ($sub) use ($kws) {
+                $q = MediaArticle::where('polda_id', $regionPoldaId)->where(function ($sub) use ($kws) {
                     foreach ($kws as $kw) {
                         $sub->orWhere('title', 'like', "%{$kw}%")->orWhere('summary', 'like', "%{$kw}%");
                     }
@@ -460,21 +497,24 @@ class DashboardController extends Controller
             $neu = (int) $agg->neu;
             $latest = $total > 0 ? (clone $q)->latest('pub_date')->first() : null;
 
-            $posPct = $total > 0 ? (int) round(($pos / $total) * 100) : 75;
-            $negPct = $total > 0 ? (int) round(($neg / $total) * 100) : 5;
-            $neuPct = max(0, 100 - ($posPct + $negPct));
+            $posPct = $total > 0 ? (int) round(($pos / $total) * 100) : null;
+            $negPct = $total > 0 ? (int) round(($neg / $total) * 100) : null;
+            $neuPct = $total > 0 ? max(0, 100 - ($posPct + $negPct)) : null;
 
             // Periksa Isu Terkait di Database
-            $issuesCount = Issue::where(function ($iq) use ($r) {
+            $issuesCount = Issue::where(function ($iq) use ($r, $regionPoldaId) {
                 if (isset($r['polda_id'])) {
-                    $iq->where('polda_id', $r['polda_id']);
+                    $iq->where('polda_id', $regionPoldaId);
                 } else {
-                    $iq->where('title', 'like', "%{$r['name']}%");
+                    $iq->where('polda_id', $regionPoldaId)->where('title', 'like', "%{$r['name']}%");
                 }
             })->whereNotIn('status', ['selesai'])->count();
 
             // Status Kamtibmas / Opini
-            if ($negPct >= 15 || in_array($r['code'], ['SULBAR', 'JATENG']) || $issuesCount > 2) {
+            if ($total === 0 && $issuesCount === 0) {
+                $status = 'BELUM ADA DATA';
+                $color = 'slate';
+            } elseif (($negPct !== null && $negPct >= 15) || $issuesCount > 2) {
                 $status = 'ATENSI';
                 $color = 'rose';
             } elseif ($negPct >= 8 || $total > 40 || $issuesCount > 0) {
@@ -491,6 +531,9 @@ class DashboardController extends Controller
                 'name'            => $r['name'],
                 'short_name'      => $r['short_name'],
                 'region'          => $r['region'],
+                'latitude'        => $r['latitude'],
+                'longitude'       => $r['longitude'],
+                'basis'           => isset($r['polda_id']) ? 'Tenant Polda' : 'Perkiraan kata kunci berita',
                 'map_x'           => $r['map_x'],
                 'map_y'           => $r['map_y'],
                 'articles_count'  => $total,
@@ -500,12 +543,12 @@ class DashboardController extends Controller
                     'netral'  => $neuPct,
                     'negatif' => $negPct,
                 ],
-                'score'           => "{$posPct}%",
+                'score'           => $posPct === null ? null : "{$posPct}%",
                 'status'          => $status,
                 'color'           => $color,
-                'latest_headline' => $latest ? $latest->title : "Patroli siber rutin kamtibmas terpantau kondusif.",
-                'latest_source'   => $latest ? $latest->source_name : "DIVHUMAS POLRI",
-                'pub_date'        => $latest ? Carbon::parse($latest->pub_date)->diffForHumans() : "Terkini",
+                'latest_headline' => $latest ? $latest->title : null,
+                'latest_source'   => $latest ? $latest->source_name : null,
+                'pub_date'        => $latest?->pub_date ? Carbon::parse($latest->pub_date)->diffForHumans() : null,
             ];
         }
 

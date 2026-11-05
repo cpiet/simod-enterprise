@@ -34,6 +34,7 @@ Dokumentasi ini memandu arsitektur, seluruh perintah CLI, modul operasional, int
 | **22** | [22. Peta Kode & Sumber Kebenaran](22-peta-kode-dan-sumber-kebenaran.md) | **Rujukan utama**: stack, perilaku tenant nyata, 110 rute, 36 tabel, 20 modul RBAC, seeder, CLI, pengujian, dan temuan audit dokumentasi. |
 | **23** | [23. Optimalisasi Performa & UX (Radar Media, Medsos, Command Center)](23-optimalisasi-performa-dan-ux-radar-media-online.md) | Diagnosis lambatnya pindah menu (DevTools, query bersama, peta), cache versi, prefetch, serta Tahap A penyederhanaan UX per peran. |
 | **24** | [24. Penyederhanaan Isu & Tugas, Publikasi, Administrasi](24-penyederhanaan-isu-tugas-publikasi-dan-administrasi.md) | Alur isu resmi tunggal dan bug alur yang diperbaiki, persetujuan publikasi, unggah galeri nyata, keamanan yang benar-benar diterapkan, serta halaman mock yang dihapus. |
+| **25** | [25. Peta, Grafik dan Pantauan Instagram](25-peta-grafik-dan-pantauan-instagram.md) | Peta OpenStreetMap, perhitungan grafik media sosial, pantauan akun Instagram manual, batasan data, dan deployment. |
 
 > **Konvensi:** bila ada perbedaan antara dokumen dan kode, rujukan yang berlaku adalah [doc 22](22-peta-kode-dan-sumber-kebenaran.md) dan kode itu sendiri. Dokumen bertanda *snapshot historis* (angka test/berita lama) tidak diperbarui otomatis.
 

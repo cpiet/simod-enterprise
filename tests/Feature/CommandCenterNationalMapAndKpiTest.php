@@ -67,4 +67,35 @@ class CommandCenterNationalMapAndKpiTest extends TestCase
             ->has('issues.data')
         );
     }
+    public function test_map_uses_real_coordinates_and_does_not_invent_empty_data(): void
+    {
+        $polda = Polda::where('code', 'SULBAR')->firstOrFail();
+        MediaArticle::where('polda_id', $polda->id)->delete();
+        Issue::where('polda_id', $polda->id)->delete();
+        \Illuminate\Support\Facades\Cache::flush();
+
+        $response = $this->actingAs(User::first())->get('/');
+        $response->assertInertia(fn ($page) => $page
+            ->where('nationalMapData', fn ($regions) => collect($regions)->contains(fn ($region) =>
+                $region['code'] === 'SULBAR'
+                && $region['latitude'] === -2.6718
+                && $region['longitude'] === 118.8872
+                && $region['status'] === 'BELUM ADA DATA'
+                && $region['score'] === null
+                && $region['latest_headline'] === null
+            ))
+        );
+    }
+
+    public function test_regional_user_only_receives_their_own_national_map_data(): void
+    {
+        $polda = Polda::where('code', 'SULBAR')->firstOrFail();
+        $user = User::factory()->create(['polda_id' => $polda->id, 'role' => 'operator']);
+        \Illuminate\Support\Facades\Cache::flush();
+
+        $this->actingAs($user)->get('/')->assertInertia(fn ($page) => $page
+            ->where('nationalMapData', fn ($regions) => collect($regions)->every(fn ($region) => $region['code'] === 'SULBAR'))
+        );
+    }
+
 }

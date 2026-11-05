@@ -119,6 +119,42 @@ class SocialIntelligenceTest extends TestCase
         $resPositif->assertInertia(fn ($page) => $page->has('posts.data', 1));
     }
 
+    public function test_timeline_uses_filtered_stored_posts_and_drilldown_keeps_the_week(): void
+    {
+        $this->travelTo(now()->startOfDay()->addHours(12));
+        for ($i = 0; $i < 5; $i++) {
+            SocialPost::create([
+                'polda_id' => $this->polda->id, 'platform' => 'x', 'author_name' => 'Warga', 'author_handle' => '@warga', 'post_url' => 'https://example.com/post',
+                'post_id' => 'timeline_'.$i, 'content' => 'Laporan', 'sentiment' => 'negatif',
+                'posted_at' => now()->subDay(),
+            ]);
+        }
+        SocialPost::create([
+            'polda_id' => $this->polda->id, 'platform' => 'instagram', 'author_name' => 'Warga', 'author_handle' => '@warga', 'post_url' => 'https://example.com/post',
+            'post_id' => 'other_platform', 'content' => 'Laporan', 'sentiment' => 'positif', 'posted_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->user)->get('/social-intelligence?platform=x&post_date='.now()->subDay()->format('Y-m-d'));
+        $response->assertOk()->assertInertia(fn ($page) => $page
+            ->has('posts.data', 5)
+            ->where('spikeTimeline.summary.total_7d', 5)
+            ->where('spikeTimeline.days.0.total', 0)
+            ->where('spikeTimeline.days.5.negatif', 5)
+            ->where('spikeTimeline.days.5.is_spike', true)
+            ->where('spikeTimeline.days.6.total', 0)
+        );
+    }
+
+    public function test_empty_timeline_does_not_invent_posts_or_stability(): void
+    {
+        $this->actingAs($this->user)->get('/social-intelligence')->assertOk()->assertInertia(fn ($page) => $page
+            ->where('spikeTimeline.summary.total_7d', 0)
+            ->where('spikeTimeline.summary.spike_detected', false)
+            ->missing('spikeTimeline.summary.stability_score')
+            ->where('spikeTimeline.days.0.total', 0)
+        );
+    }
+
     public function test_toggle_bookmark_persists(): void
     {
         $post = SocialPost::create([
