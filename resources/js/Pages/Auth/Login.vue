@@ -8,7 +8,6 @@ import {
   KeyRound,
   Eye,
   EyeOff,
-  Building2,
   CheckCircle2,
   AlertCircle,
   Fingerprint,
@@ -19,12 +18,10 @@ onMounted(() => {
   document.documentElement.classList.remove('light');
 });
 
-const props = defineProps({
-  poldas: Array,
+defineProps({
   errors: Object,
 });
 
-const selectedPoldaId = ref('ALL');
 const showPassword = ref(false);
 
 const form = ref({
@@ -35,26 +32,12 @@ const form = ref({
 
 const isSubmitting = ref(false);
 
-const fillAccount = (user, poldaId) => {
-  form.value.username = user;
-  form.value.password = '';
-  selectedPoldaId.value = poldaId;
-};
-
 const handleLogin = () => {
   isSubmitting.value = true;
-  let poldaCode = 'ALL';
-  if (selectedPoldaId.value !== 'ALL') {
-    const chosenPolda = props.poldas?.find((p) => p.id === selectedPoldaId.value);
-    poldaCode = chosenPolda ? chosenPolda.code : 'SULBAR';
-  }
-
   router.post('/login', {
     username: form.value.username,
     password: form.value.password,
     remember: form.value.remember,
-    polda_id: selectedPoldaId.value,
-    polda_code: poldaCode,
   }, {
     onFinish: () => {
       isSubmitting.value = false;
@@ -101,62 +84,6 @@ const handleLogin = () => {
             Sistem Informasi Manajemen Operasional Dokumentasi
           </p>
 
-          <!-- Polda Tenant Selector Pill -->
-          <div class="pt-2">
-            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-700 shadow-inner">
-              <Building2 class="w-3.5 h-3.5 text-amber-400" />
-              <select
-                v-model="selectedPoldaId"
-                class="bg-transparent text-xs font-extrabold text-amber-300 outline-none cursor-pointer pr-1"
-              >
-                <option value="ALL" class="bg-slate-900 text-amber-400 font-black">
-                  🇮🇩 Divhumas Polri (Komando Nasional)
-                </option>
-                <option
-                  v-for="polda in poldas"
-                  :key="polda.id"
-                  :value="polda.id"
-                  class="bg-slate-900 text-white font-bold"
-                >
-                  🏛️ {{ polda.name }}
-                </option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <!-- Quick Account Selector Buttons -->
-        <div class="space-y-1.5">
-          <p class="text-[10px] font-black uppercase tracking-wider text-slate-400 text-center">Pilih Akun (isi kata sandi dinas):</p>
-          <div class="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              @click="fillAccount('kadivhumas', 'ALL')"
-              class="p-2 rounded-xl border text-center transition cursor-pointer"
-              :class="form.username === 'kadivhumas' ? 'bg-amber-400/20 border-amber-400 text-amber-300' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'"
-            >
-              <p class="text-[10px] font-black">⭐⭐ Kadivhumas</p>
-              <p class="text-[8px] opacity-75">Irjen Johnny Isir</p>
-            </button>
-            <button
-              type="button"
-              @click="fillAccount('superadmin', 'ALL')"
-              class="p-2 rounded-xl border text-center transition cursor-pointer"
-              :class="form.username === 'superadmin' ? 'bg-rose-500/20 border-rose-400 text-rose-300' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'"
-            >
-              <p class="text-[10px] font-black">Superadmin</p>
-              <p class="text-[8px] opacity-75">Mabes Polri</p>
-            </button>
-            <button
-              type="button"
-              @click="fillAccount('kabid_sulbar', (poldas?.[0]?.id || 1))"
-              class="p-2 rounded-xl border text-center transition cursor-pointer"
-              :class="form.username === 'kabid_sulbar' ? 'bg-sky-500/20 border-sky-400 text-sky-300' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'"
-            >
-              <p class="text-[10px] font-black">Kabid Sulbar</p>
-              <p class="text-[8px] opacity-75">Kombes Slamet</p>
-            </button>
-          </div>
         </div>
 
         <!-- Form Login -->
@@ -182,6 +109,7 @@ const handleLogin = () => {
                   v-model="form.username"
                   type="text"
                   placeholder="Masukkan username atau NRP dinas"
+                  autocomplete="username"
                   class="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700 text-sm font-semibold text-white placeholder-slate-400 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition"
                   required
                 />
@@ -199,6 +127,7 @@ const handleLogin = () => {
                   v-model="form.password"
                   :type="showPassword ? 'text' : 'password'"
                   placeholder="Masukkan kata sandi dinas"
+                  autocomplete="current-password"
                   class="w-full pl-10 pr-11 py-3 rounded-xl bg-slate-900/90 border border-slate-700 text-sm font-semibold text-white placeholder-slate-400 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition"
                   required
                 />

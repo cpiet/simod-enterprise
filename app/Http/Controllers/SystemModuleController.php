@@ -934,10 +934,23 @@ class SystemModuleController extends Controller
                 'lockout_minutes'         => (int) $setting->lockout_minutes,
                 'session_timeout_minutes' => (int) $setting->session_timeout_minutes,
             ],
+            'nationalBriefEnabled' => (bool) (SecuritySetting::current(null)->share_national_brief ?? true),
             'securityLogs'  => $logs,
             'securityStats' => $stats,
             'securityView'  => ['show' => $show, 'limit' => $limit, 'matching' => $matching],
         ]);
+    }
+
+    /** Saklar global: tampilkan/sembunyikan ringkasan isu nasional di Command Center daerah. */
+    public function toggleNationalBrief(Request $request)
+    {
+        $data = $request->validate(['enabled' => 'required|boolean']);
+        $setting = SecuritySetting::current(null);
+        $setting->update(['share_national_brief' => (bool) $data['enabled'], 'updated_by' => auth()->id()]);
+
+        AuditLog::log('security.national_brief', 'security_settings', (string) $setting->id, ['enabled' => (bool) $data['enabled']]);
+
+        return back()->with('success', $data['enabled'] ? 'Ringkasan isu nasional ditampilkan di Command Center daerah.' : 'Ringkasan isu nasional disembunyikan dari Command Center daerah.');
     }
 
     /**

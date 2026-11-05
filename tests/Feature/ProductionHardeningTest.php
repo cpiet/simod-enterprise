@@ -84,4 +84,18 @@ class ProductionHardeningTest extends TestCase
             $this->assertTrue(collect($route->gatherMiddleware())->contains(fn ($m) => str_starts_with((string) $m, 'throttle:')), $route->uri() . ' harus dibatasi laju');
         }
     }
+
+    public function test_login_page_leaks_no_tenant_or_account_hints_and_ignores_tenant_input(): void
+    {
+        $polda = \App\Models\Polda::create(['code' => 'SULBAR', 'name' => 'Polda Sulbar', 'region' => 'x', 'timezone' => 'Asia/Makassar', 'is_active' => true]);
+        $other = \App\Models\Polda::create(['code' => 'GORONTALO', 'name' => 'Polda Gorontalo', 'region' => 'y', 'timezone' => 'Asia/Makassar', 'is_active' => true]);
+
+        $this->get('/login')->assertOk()->assertInertia(fn (Assert $p) => $p->component('Auth/Login')->missing('poldas'));
+
+        $user = User::create(['polda_id' => $polda->id, 'name' => 'Kabid', 'username' => 'kb_' . uniqid(), 'email' => uniqid() . '@polri.go.id', 'password' => 'RahasiaUji#2026', 'role' => 'polda_leader', 'is_active' => true]);
+
+        // Klien mencoba memaksa tenant lain lewat formulir: harus diabaikan.
+        $this->post('/login', ['username' => $user->username, 'password' => 'RahasiaUji#2026', 'polda_code' => 'GORONTALO', 'polda_id' => $other->id])->assertRedirect();
+        $this->assertSame('SULBAR', session('active_polda_code'));
+    }
 }

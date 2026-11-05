@@ -107,3 +107,8 @@ Tab **Penjadwal** di Audit Log (dan banner kuning di atas halaman bila tidak akt
 - **Kunci API (Gemini, Apify) tersimpan apa adanya di basis data** (`ai_settings`), tanpa enkripsi. Sebelum hosting publik, disarankan memakai cast `encrypted` Laravel (butuh migrasi data lama dan `APP_KEY` yang dijaga). Klaim "AES-256" sudah dihapus dari antarmuka.
 - Laporan tidak memiliki **kedaluwarsa otomatis Sampah**; laporan yang dihapus tetap di Sampah sampai dihapus permanen.
 - Cakupan aksi yang ditulis ke Audit Log masih terbatas (mis. verifikasi, tugas, dan publikasi belum semuanya tercatat); halaman akan menampilkan apa pun yang tercatat.
+
+## Addendum: Halaman masuk tanpa petunjuk akun/tenant (7 Nov 2026)
+- `Auth/Login.vue` tidak lagi memuat pemilih Polda maupun tombol "Pilih Akun" (kadivhumas/superadmin/kabid_sulbar) yang membuat username mudah ditebak. Hanya username/NRP + kata sandi.
+- `AuthController::showLogin` tidak mengirim daftar Polda ke klien; `login()` mengabaikan `polda_id`/`polda_code` dari formulir. Tenant ditentukan akun: personel daerah terkunci ke Polda-nya, Super Admin/Kadivhumas masuk ke lingkup Divhumas lalu berpindah lewat `POST /tenant/switch`.
+- Test: `ProductionHardeningTest::test_login_page_leaks_no_tenant_or_account_hints_and_ignores_tenant_input`.

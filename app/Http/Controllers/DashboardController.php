@@ -192,7 +192,29 @@ class DashboardController extends Controller
             $latestSocialReport = SocialIntelligenceReport::latest('report_date')->latest('id')->first();
         }
 
+        // 9. RINGKASAN ISU NASIONAL untuk Command Center daerah (baca-saja, dari laporan eksekutif Divhumas).
+        // Pengecualian isolasi yang disengaja: Divhumas dipilih eksplisit oleh server (bukan input klien) dan hanya 3 field + waktu yang dikirim.
+        $nationalBriefEnabled = false;
+        $nationalBrief = null;
+        if (! $isNational && $selectedCode !== 'DIVHUMAS') {
+            $nationalBriefEnabled = (bool) (\App\Models\SecuritySetting::current(null)->share_national_brief ?? true);
+            if ($nationalBriefEnabled) {
+                $divId = (int) Polda::where('code', 'DIVHUMAS')->value('id');
+                $nat = $divId ? MediaIntelligenceReport::where('polda_id', $divId)->latest('report_date')->latest('id')->first() : null;
+                if ($nat && ($nat->top_concern || $nat->executive_brief)) {
+                    $nationalBrief = [
+                        'top_concern'     => $nat->top_concern,
+                        'executive_brief' => $nat->executive_brief,
+                        'core_decision'   => $nat->core_decision,
+                        'updated_at'      => optional($nat->updated_at)->toIso8601String(),
+                    ];
+                }
+            }
+        }
+
         return Inertia::render('Dashboard', [
+            'nationalBriefEnabled' => $nationalBriefEnabled,
+            'nationalBrief'        => $nationalBrief,
             'allPoldas'            => $allPoldas,
             'selectedPolda'        => $selectedPolda,
             'selectedCode'         => $selectedCode,

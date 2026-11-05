@@ -47,6 +47,8 @@ const props = defineProps({
   isNational: Boolean,
   nationalMapData: Array,
   latestMediaReport: Object,
+  nationalBrief: { type: Object, default: null },
+  nationalBriefEnabled: { type: Boolean, default: false },
   latestSocialReport: Object,
   kpi: Object,
   socialStats: Object,
@@ -576,6 +578,23 @@ const getPlatformBadge = (platform) => {
               <ArrowRight class="w-3.5 h-3.5" />
             </Link>
           </div>
+        </div>
+
+        <!-- Isu Nasional dari Divhumas (hanya Command Center daerah; baca-saja) -->
+        <div v-if="nationalBriefEnabled" class="national-brief rounded-2xl border border-sky-500/30 bg-sky-500/5 p-4 space-y-2.5">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <span class="text-[11px] font-black uppercase tracking-wider text-sky-700 dark:text-sky-300">Isu Nasional (dari Divhumas Polri)</span>
+            <span v-if="nationalBrief?.updated_at" class="text-[10px] font-mono text-slate-500 dark:text-slate-400">Laporan nasional: {{ formatTimeAgo(nationalBrief.updated_at) }}</span>
+          </div>
+          <template v-if="nationalBrief">
+            <p v-if="nationalBrief.top_concern" class="text-xs font-bold text-slate-900 dark:text-white leading-relaxed">{{ nationalBrief.top_concern }}</p>
+            <p v-if="nationalBrief.executive_brief" class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-5 whitespace-pre-line">{{ nationalBrief.executive_brief }}</p>
+            <div v-if="nationalBrief.core_decision" class="p-2.5 rounded-xl bg-amber-500/10 border-l-4 border-amber-400 text-xs">
+              <span class="block text-[10px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-300">Arahan Taktis Komando</span>
+              <p class="italic text-slate-700 dark:text-amber-100 leading-relaxed">"{{ nationalBrief.core_decision }}"</p>
+            </div>
+          </template>
+          <p v-else class="text-xs text-slate-500 dark:text-slate-400">Belum ada laporan nasional dari Divhumas.</p>
         </div>
       </div>
 

@@ -68,6 +68,7 @@ class AuditLog extends Model
         'social_case.archive'       => 'Kasus medsos diarsipkan',
         'audit.purged'              => 'Log audit dibersihkan',
         'ai.block_cleared'          => 'Penahanan permintaan AI dicabut',
+        'security.national_brief'   => 'Ringkasan isu nasional diubah',
         'audit.auto_pruned'         => 'Log audit dipangkas otomatis',
         'audit.retention'           => 'Retensi log audit diubah',
         'demo.prepare'              => 'Persiapan demo (data contoh dibersihkan)',

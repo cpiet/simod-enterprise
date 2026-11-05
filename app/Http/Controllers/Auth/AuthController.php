@@ -26,11 +26,8 @@ class AuthController extends Controller
             return redirect()->route('dashboard');
         }
 
-        $poldas = Polda::where('is_active', true)->orderBy('name')->get();
-
-        return Inertia::render('Auth/Login', [
-            'poldas' => $poldas,
-        ]);
+        // Tanpa daftar Polda/akun ke klien: halaman masuk tidak membocorkan struktur organisasi maupun nama akun.
+        return Inertia::render('Auth/Login');
     }
 
     /**
@@ -45,8 +42,6 @@ class AuthController extends Controller
         $validated = $request->validate([
             'username'   => 'required|string|max:120',
             'password'   => 'required|string|max:255',
-            'polda_id'   => 'nullable',
-            'polda_code' => 'nullable|string|max:30',
             'remember'   => 'nullable|boolean',
         ]);
 
@@ -103,20 +98,13 @@ class AuthController extends Controller
         $request->session()->forget('simod_logged_out');
         $request->session()->regenerate();
 
-        // Set Active Tenant Session Cleanly (Zero URL Query Parameter)
+        // Tenant aktif ditentukan oleh akun (bukan pilihan di formulir): personel daerah terkunci ke Polda-nya,
+        // Super Admin/Kadivhumas masuk ke lingkup Divhumas dan dapat berpindah lewat POST /tenant/switch.
         $targetCode = 'ALL';
-        if ($user && !$user->isSuperAdmin() && $user->polda_id) {
+        if (! $user->isSuperAdmin() && $user->polda_id) {
             $userPolda = Polda::find($user->polda_id);
             $targetCode = $userPolda?->code ?? 'SULBAR';
             $request->session()->put('active_polda_id', $userPolda?->id);
-        } elseif (!empty($validated['polda_code'])) {
-            $targetCode = strtoupper(trim($validated['polda_code']));
-        } elseif (!empty($validated['polda_id']) && $validated['polda_id'] !== 'ALL') {
-            $chosenPolda = Polda::find($validated['polda_id']);
-            if ($chosenPolda) {
-                $targetCode = $chosenPolda->code === 'DIVHUMAS' ? 'ALL' : $chosenPolda->code;
-                $request->session()->put('active_polda_id', $chosenPolda->id);
-            }
         }
 
         $request->session()->put('active_polda_code', $targetCode);

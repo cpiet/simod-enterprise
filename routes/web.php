@@ -131,6 +131,7 @@ Route::post('/settings/polda/update', [SystemModuleController::class, 'updatePol
 Route::post('/settings/polda/create', [SystemModuleController::class, 'storePolda'])->middleware('module:polda_settings')->name('settings.polda.create');
 Route::post('/settings/polres/create', [SystemModuleController::class, 'storePolres'])->middleware('module:polda_settings')->name('settings.polres.create');
 Route::get('/security', [SystemModuleController::class, 'securityCenter'])->middleware('module:security_center')->name('security.center');
+Route::post('/security/national-brief', [SystemModuleController::class, 'toggleNationalBrief'])->middleware('module:security_center')->name('security.national-brief');
 Route::post('/security', [SystemModuleController::class, 'updateSecurity'])->middleware('module:security_center')->name('security.update');
 Route::get('/roles', [SystemModuleController::class, 'rolesMatrix'])->middleware('module:roles_matrix_manage')->name('roles.matrix');
 Route::post('/roles', [SystemModuleController::class, 'updateRolesMatrix'])->middleware('module:roles_matrix_manage')->name('roles.update');

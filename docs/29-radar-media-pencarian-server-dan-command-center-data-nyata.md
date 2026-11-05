@@ -147,3 +147,10 @@ Cara kerja ([`DashboardController::buildSatwilMatrix`](../app/Http/Controllers/D
 - Pencarian teks penuh (FULLTEXT) bila arsip melampaui puluhan ribu artikel; saat ini `LIKE` dengan indeks `(polda_id, pub_date)`.
 - Peta Command Center masih memakai `polda_id` tetap (5–10) dan pencocokan kata kunci wilayah; perlu dibuat dinamis.
 - Menjalankan penjadwal otomatis untuk analisis AI dan Apify (lihat doc 27 dan 28).
+
+## Addendum: Ringkasan Isu Nasional di Command Center daerah (7 Nov 2026)
+- Kartu **"Isu Nasional (dari Divhumas Polri)"** tampil di tab Media Online Command Center **daerah** (bukan di tampilan Divhumas/nasional). Baca-saja; memakai laporan eksekutif terbaru Divhumas, tanpa panggilan AI baru dan tanpa memakai kuota daerah.
+- Pengecualian isolasi yang disengaja dan terbatas: `DashboardController` memilih Polda `DIVHUMAS` secara eksplisit di server (bukan input klien) dan hanya mengirim `top_concern`, `executive_brief`, `core_decision`, `updated_at`. Berita/medsos Polda lain tidak ikut.
+- Tanpa laporan Divhumas: `nationalBrief = null` dan kartu menampilkan "Belum ada laporan nasional dari Divhumas." (tanpa isi karangan).
+- Saklar admin: `/security` (izin `security_center`) -> `POST /security/national-brief`, kolom `security_settings.share_national_brief` (baris global, default aktif), tercatat `security.national_brief`. Matikan untuk demo yang terisolasi penuh.
+- Migrasi baru: `2026_11_07_090000_add_share_national_brief_to_security_settings` (jalankan `php artisan migrate`). Test: `NationalBriefForRegionTest`.

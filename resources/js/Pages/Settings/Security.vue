@@ -12,6 +12,7 @@ const props = defineProps({
   selectedCode: String,
   metrics: Object,
   security: Object,
+  nationalBriefEnabled: { type: Boolean, default: true },
   securityLogs: { type: Array, default: () => [] },
   securityStats: { type: Object, default: () => ({ total: 0, failed24: 0, login24: 0, changes24: 0 }) },
   securityView: { type: Object, default: () => ({ show: 'semua', limit: 15, matching: 0 }) },
@@ -63,6 +64,18 @@ const field = 'w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 borde
     :metrics="metrics"
   >
     <SecurityMaintenanceTabs :selected-code="selectedCode" />
+
+    <div class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b1426] p-4 flex flex-wrap items-center justify-between gap-3">
+      <div class="min-w-0">
+        <p class="text-sm font-black text-slate-900 dark:text-white">Ringkasan isu nasional di Command Center daerah</p>
+        <p class="text-[11px] text-slate-500 dark:text-slate-400">Bila aktif, Polda melihat (baca-saja) isu kritis, ringkasan, dan arahan dari laporan eksekutif Divhumas. Data berita/medsos Polda lain tidak ikut. Matikan untuk demo yang terisolasi penuh.</p>
+      </div>
+      <button type="button" @click="router.post('/security/national-brief', { enabled: !nationalBriefEnabled }, { preserveScroll: true })"
+        class="px-3.5 py-2 rounded-xl text-xs font-black cursor-pointer border transition"
+        :class="nationalBriefEnabled ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300'">
+        {{ nationalBriefEnabled ? 'Aktif · klik untuk mematikan' : 'Nonaktif · klik untuk mengaktifkan' }}
+      </button>
+    </div>
 
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div class="min-w-0">
