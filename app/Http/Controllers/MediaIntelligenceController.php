@@ -1241,11 +1241,16 @@ PROMPT;
 
         $crawlNotice = '';
         if ($request->boolean('crawl_live', true)) {
-            $crawler = new \App\Services\GoogleNewsCrawlerService();
-            $result = $crawler->crawlAndIngestForTopic($topic, null, 40);
-            if (!empty($result['count'])) {
-                $crawlNotice = " dan {$result['count']} sebaran berita internet berhasil ditarik!";
-            }
+            // Penarikan Google News (jaringan eksternal + puluhan penulisan) dijalankan SETELAH respons terkirim,
+            // supaya permintaan tidak menggantung di balik proxy (Cloudflare/LiteSpeed) dan tidak berujung galat 520/524.
+            defer(function () use ($topic) {
+                try {
+                    app(\App\Services\GoogleNewsCrawlerService::class)->crawlAndIngestForTopic($topic, null, 40);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Penarikan Google News untuk topik #' . $topic->id . ' gagal: ' . $e->getMessage());
+                }
+            });
+            $crawlNotice = '. Penarikan berita internet berjalan di latar belakang; muat ulang beberapa detik lagi untuk melihat hasilnya';
         }
 
         return back()->with('success', "Topik Atensi Pimpinan \"{$validated['title']}\" berhasil dibuat{$crawlNotice}");

@@ -1,4 +1,5 @@
 <script setup>
+import { stripBase } from '../utils/basePath';
 import { ref, computed, onMounted, watch } from 'vue';
 import { router, Link, usePage } from '@inertiajs/vue3';
 import SadewaCopilot from '@/Components/SadewaCopilot.vue';
@@ -209,7 +210,7 @@ const isRouteActive = (target) => {
   if (!target) return false;
 
   // 1. Reactive current URL from Inertia usePage()
-  const rawUrl = page.url || (typeof window !== 'undefined' ? window.location.pathname : '');
+  const rawUrl = stripBase(page.url || (typeof window !== 'undefined' ? window.location.pathname : ''));
   const currentPath = (rawUrl.split('?')[0].replace(/\/+$/, '') || '/').toLowerCase();
 
   // Normalize target to object

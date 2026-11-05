@@ -98,4 +98,9 @@ class ProductionHardeningTest extends TestCase
         $this->post('/login', ['username' => $user->username, 'password' => 'RahasiaUji#2026', 'polda_code' => 'GORONTALO', 'polda_id' => $other->id])->assertRedirect();
         $this->assertSame('SULBAR', session('active_polda_code'));
     }
+
+    public function test_page_exposes_base_path_for_subfolder_deployments(): void
+    {
+        $this->get('/login')->assertOk()->assertSee('window.__SIMOD_BASE__', false);
+    }
 }

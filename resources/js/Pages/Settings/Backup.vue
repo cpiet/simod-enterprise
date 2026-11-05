@@ -1,4 +1,5 @@
 <script setup>
+import { withBase } from '../../utils/basePath';
 import { ref, computed } from 'vue';
 import { router, useForm, Link } from '@inertiajs/vue3';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
@@ -80,7 +81,7 @@ const triggerInstantBackup = () => {
 
 // Aksi 2: Unduh Berkas Cadangan
 const downloadBackup = (filename) => {
-  window.location.href = `/database/backup/download/${encodeURIComponent(filename)}`;
+  window.location.href = withBase(`/database/backup/download/${encodeURIComponent(filename)}`);
 };
 
 // Aksi 3: Buka Modal Konfirmasi Pulihkan / Restore

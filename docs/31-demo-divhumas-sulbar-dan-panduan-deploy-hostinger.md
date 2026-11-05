@@ -85,3 +85,16 @@ php artisan simod:demo-prepare --force --keep-articles # pertahankan berita yang
 - **Tile peta** memakai OpenStreetMap publik; untuk penggunaan operasional gunakan penyedia berizin (`VITE_MAP_TILE_URL` pada build).
 - **Pembaruan berikutnya:** unggah kode, `composer install --no-dev`, unggah `public/build` baru, `php artisan migrate --force`, lalu `php artisan config:cache route:cache view:cache` dan `php artisan optimize:clear` bila tampilan tidak berubah.
 - **Rollback:** pulihkan cadangan dari menu Backup Data (jadwal cadangan memerlukan cron aktif).
+
+## Addendum: Deploy di subfolder (mis. `https://domain/simod-v2/`) (7 Nov 2026)
+- Aplikasi mendukung awalan subfolder tanpa mengubah alamat absolut di kode Vue (`/issues`, `/settings/ai`, dst.): `app.blade.php` mengekspos `window.__SIMOD_BASE__` (= `request()->getBasePath()`, kosong di akar domain); `resources/js/utils/basePath.js` (`BASE`, `withBase`, `stripBase`) dipakai oleh `http.onRequest` Inertia (`app.js`), interceptor axios (`bootstrap.js`), pencocokan menu aktif (`EnterpriseLayout.vue`), dan navigasi penuh halaman (`Error.vue`, `Settings/Backup.vue`).
+- Build aset untuk subfolder: `ASSET_URL=https://domain/simod-v2 npm run build` (laravel-vite-plugin memakainya sebagai `base`). Build lokal biasa tanpa `ASSET_URL`.
+- Susunan server yang disarankan: kode di `simod-v2-app/` SEJAJAR `public_html`; isi `public/` ke `public_html/simod-v2/` dengan `index.php` yang menunjuk `../../simod-v2-app/...` dan `$app->usePublicPath(__DIR__)`. `.env`: `APP_URL`, `ASSET_URL`, `SESSION_PATH=/simod-v2`.
+- Diuji di peramban headless dengan server yang meniru subfolder: login, navigasi SPA antar menu, reload langsung, permintaan axios, dan aset berhasil; tanpa 404.
+- Test: `ProductionHardeningTest::test_page_exposes_base_path_for_subfolder_deployments`.
+
+## Addendum: Penarikan Google News saat membuat Topik Atensi (7 Nov 2026)
+- Di balik Cloudflare + Hostinger, permintaan "Simpan topik" yang ikut menarik Google News dapat berakhir galat **520** walau data masuk. `MediaIntelligenceController::storeTopic` kini menyimpan topik lalu menjalankan penarikan **setelah respons terkirim** (`defer()`), sehingga permintaan cepat selesai; berita muncul beberapa detik kemudian (muat ulang). Kegagalan penarikan hanya dicatat di log, tidak menggagalkan penyimpanan topik.
+- Tombol "Tarik berita" manual (`crawl-live`) tetap sinkron karena menampilkan hasil langsung.
+- Galat 520 yang tetap muncul di jalur lain: cek log akses hPanel dan coba mode Cloudflare "DNS only" untuk memisahkan penyebab.
+- Test: `MediaTopicDossierTest::test_topic_creation_pulls_news_after_response_without_blocking` (memakai tiruan crawler, tanpa jaringan).

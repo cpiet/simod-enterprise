@@ -3,7 +3,24 @@ import '../css/app.css';
 
 import { createApp, h } from 'vue';
 import { createInertiaApp, router } from '@inertiajs/vue3';
+import { http } from '@inertiajs/core';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
+import { BASE } from './utils/basePath';
+
+// Aplikasi di subfolder: semua permintaan Inertia ke path internal diberi awalan subfolder (URL sudah absolut di tahap ini).
+if (BASE) {
+    http.onRequest((config) => {
+        try {
+            const u = new URL(config.url, window.location.href);
+            if (u.origin === window.location.origin && !(u.pathname === BASE || u.pathname.startsWith(BASE + '/'))) {
+                u.pathname = BASE + u.pathname;
+                config.url = u.href;
+            }
+        } catch (e) { /* biarkan apa adanya */ }
+
+        return config;
+    });
+}
 
 // Keep CSRF token and Axios headers continuously in sync on every Inertia navigation
 router.on('navigate', (event) => {

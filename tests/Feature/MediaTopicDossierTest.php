@@ -340,4 +340,28 @@ class MediaTopicDossierTest extends TestCase
         $report->refresh();
         $this->assertCount(0, $report->suggested_topics);
     }
+
+    public function test_topic_creation_pulls_news_after_response_without_blocking(): void
+    {
+        // Pengait penarikan diganti tiruan: tes tidak boleh memanggil Google News sungguhan.
+        $fake = new class extends \App\Services\GoogleNewsCrawlerService {
+            public array $calls = [];
+
+            public function crawlAndIngestForTopic(\App\Models\MediaTopic $topic, ?string $customQuery = null, int $limit = 50): array
+            {
+                $this->calls[] = [$topic->title, $limit];
+
+                return ['success' => true, 'message' => 'ok', 'count' => 0, 'articles' => []];
+            }
+        };
+        $this->app->instance(\App\Services\GoogleNewsCrawlerService::class, $fake);
+        $this->actingAsSuperAdmin();
+
+        $res = $this->post('/media-intelligence/topics', ['title' => 'Kasus Uji Latar Belakang', 'keywords' => 'uji, latar', 'priority' => 'high']);
+
+        $res->assertRedirect();
+        $this->assertStringContainsString('latar belakang', (string) session('success'));
+        $this->assertDatabaseHas('media_topics', ['title' => 'Kasus Uji Latar Belakang']);
+        $this->assertSame([['Kasus Uji Latar Belakang', 40]], $fake->calls, 'Penarikan berjalan tepat sekali setelah respons.');
+    }
 }

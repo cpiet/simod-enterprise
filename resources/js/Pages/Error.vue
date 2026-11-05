@@ -5,6 +5,7 @@
  */
 import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
+import { withBase } from '../utils/basePath';
 import { ShieldAlert, SearchX, Clock, Hourglass, ServerCrash, Wrench, ArrowLeft } from 'lucide-vue-next';
 
 const props = defineProps({ status: { type: Number, default: 500 } });
@@ -19,7 +20,7 @@ const META = {
 };
 const meta = computed(() => META[props.status] || META[500]);
 const reloadable = computed(() => [419, 429, 503].includes(props.status));
-const goBack = () => { if (window.history.length > 1) window.history.back(); else window.location.href = '/'; };
+const goBack = () => { if (window.history.length > 1) window.history.back(); else window.location.href = withBase('/'); };
 const reload = () => window.location.reload();
 </script>
 

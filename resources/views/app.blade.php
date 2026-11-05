@@ -8,9 +8,10 @@
 
     <!-- Instant Theme Detection Script -->
     <script>
+        window.__SIMOD_BASE__ = @json(request()->getBasePath());
         (function() {
             try {
-                if (window.location.pathname.startsWith('/login')) {
+                if (window.location.pathname.replace(/\/+$/, '').endsWith('/login')) {
                     document.documentElement.classList.add('dark');
                     document.documentElement.classList.remove('light');
                     return;
@@ -26,6 +27,8 @@
             } catch (e) {}
         })();
     </script>
+
+    <link rel="icon" href="{{ asset('favicon.ico') }}">
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">

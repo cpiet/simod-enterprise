@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { withBase } from './utils/basePath';
 window.axios = axios;
 
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
@@ -14,6 +15,7 @@ export function getCookie(name) {
 
 // Request interceptor to ensure freshest CSRF/XSRF token is always sent
 window.axios.interceptors.request.use((config) => {
+    config.url = withBase(config.url);
     const xsrf = getCookie('XSRF-TOKEN');
     if (xsrf && !config.headers['X-XSRF-TOKEN']) {
         config.headers['X-XSRF-TOKEN'] = xsrf;
