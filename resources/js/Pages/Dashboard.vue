@@ -480,14 +480,24 @@ const layerLapangan = ref(true);
           <!-- Left: Executive Briefing & Core Decision (Col 7) -->
           <div class="lg:col-span-7 rounded-2xl bg-slate-950/60 border border-slate-800/80 p-5 space-y-4 flex flex-col justify-between">
             <div class="space-y-3">
-              <div class="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+              <div class="flex items-center justify-between border-b border-slate-800/80 pb-2.5 flex-wrap gap-2">
                 <h4 class="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
                   <Sparkles class="w-3.5 h-3.5 text-amber-400" />
                   <span>Executive Briefing Situasi Pemberitaan (24 Jam Terakhir)</span>
                 </h4>
-                <span class="text-[10px] font-mono text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
-                  SADEWA AI Engine
-                </span>
+                <div class="flex items-center gap-2">
+                  <span class="text-[10px] font-mono text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
+                    SADEWA AI Engine
+                  </span>
+                  <Link
+                    href="/media-intelligence?tab=02"
+                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-400/10 hover:bg-amber-400 border border-amber-400/30 hover:border-amber-400 text-amber-300 hover:text-slate-950 text-[10px] font-black transition shadow-sm group cursor-pointer"
+                    title="Buka Lembar Executive Briefing Lengkap & Format WA Resmi"
+                  >
+                    <span>Buka Lembar Briefing &amp; Berita</span>
+                    <ExternalLink class="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                  </Link>
+                </div>
               </div>
               <p class="text-xs text-slate-200 leading-relaxed whitespace-pre-line">
                 {{ latestMediaReport?.executive_brief || 'Analisis agregasi 29 portal media menunjukkan stabilitas opini publik terjaga dengan baik. Kemitraan media pers dan siaran Tribratanews berjalan efektif mengimbangi narasi minor di ruang siber.' }}
@@ -498,6 +508,20 @@ const layerLapangan = ref(true);
             <div v-if="latestMediaReport?.core_decision" class="mt-3 p-3 rounded-xl bg-amber-500/10 border-l-4 border-amber-400 text-xs text-amber-100 space-y-1">
               <span class="text-[10px] font-black uppercase tracking-wider text-amber-300 block">Arahan Taktis Komando:</span>
               <p class="italic leading-relaxed">"{{ latestMediaReport.core_decision }}"</p>
+            </div>
+
+            <!-- Quick Link / Jump to full briefing -->
+            <div class="pt-2.5 border-t border-slate-800/60 flex items-center justify-between text-[11px] flex-wrap gap-2">
+              <span class="text-slate-400 text-[10px] italic">
+                Sumber: Agregasi 33 Portal Media Online Nasional &amp; Daerah
+              </span>
+              <Link
+                href="/media-intelligence?tab=02"
+                class="inline-flex items-center gap-1.5 text-amber-400 hover:text-amber-300 font-bold hover:underline"
+              >
+                <span>Format Naskah WA Pimpinan &amp; Cetak A4</span>
+                <ArrowRight class="w-3 h-3" />
+              </Link>
             </div>
           </div>
 
@@ -537,24 +561,44 @@ const layerLapangan = ref(true);
 
             <!-- Isu Strategis Media Terdeteksi -->
             <div class="space-y-2 pt-2 border-t border-slate-800/80">
-              <span class="text-[11px] font-black text-slate-300 uppercase tracking-wider block">Isu Strategis Terdeteksi ({{ (latestMediaReport?.national_issues || latestMediaReport?.sulbar_issues || []).length || 3 }} Isu)</span>
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-black text-slate-300 uppercase tracking-wider block">
+                  Isu Strategis Terdeteksi ({{ (latestMediaReport?.national_issues || latestMediaReport?.sulbar_issues || []).length || 3 }} Isu)
+                </span>
+                <span class="text-[9px] text-slate-400 font-mono italic">Klik kartu untuk membuka berita</span>
+              </div>
               <div class="space-y-2">
-                <div
+                <a
                   v-for="(iss, idx) in (latestMediaReport?.national_issues || latestMediaReport?.sulbar_issues || []).slice(0, 3)"
                   :key="iss.title || idx"
-                  class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs space-y-1 hover:border-slate-700 transition"
+                  :href="iss.url || `/media-intelligence?q=${encodeURIComponent(iss.title || '')}`"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="group block p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-850 border border-slate-800 hover:border-amber-400/50 text-xs space-y-1.5 transition shadow-sm cursor-pointer"
+                  :title="`Buka berita asli: ${iss.title}`"
                 >
-                  <div class="flex items-center justify-between gap-1">
-                    <span class="font-bold text-white text-[11px] line-clamp-1">{{ iss.title }}</span>
+                  <div class="flex items-center justify-between gap-1.5">
+                    <span class="font-bold text-white group-hover:text-amber-300 text-[11px] line-clamp-1 flex items-center gap-1">
+                      <ExternalLink class="w-3 h-3 text-amber-400 shrink-0 opacity-70 group-hover:opacity-100" />
+                      <span class="truncate">{{ iss.title }}</span>
+                    </span>
                     <span
-                      class="px-1.5 py-0.2 rounded text-[8px] font-black uppercase shrink-0"
-                      :class="(iss.sentiment || '').toLowerCase() === 'positif' ? 'bg-emerald-500/20 text-emerald-300' : (iss.sentiment || '').toLowerCase() === 'negatif' ? 'bg-rose-500/20 text-rose-300' : 'bg-slate-800 text-slate-300'"
+                      class="px-1.5 py-0.5 rounded text-[8px] font-black uppercase shrink-0"
+                      :class="(iss.sentiment || '').toLowerCase() === 'positif' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : (iss.sentiment || '').toLowerCase() === 'negatif' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-slate-800 text-slate-300 border border-slate-700'"
                     >
                       {{ iss.sentiment || 'Netral' }}
                     </span>
                   </div>
-                  <p class="text-[10px] text-slate-400 line-clamp-1 italic">{{ iss.summary }}</p>
-                </div>
+                  <p v-if="iss.fact || iss.summary" class="text-[10px] text-slate-400 line-clamp-1 italic">
+                    {{ iss.fact || iss.summary }}
+                  </p>
+                  <div v-if="iss.source" class="flex items-center justify-between text-[9px] text-slate-400 font-mono pt-1 border-t border-slate-800/60">
+                    <span class="truncate max-w-[200px]">{{ iss.source }}</span>
+                    <span class="text-amber-400 font-bold group-hover:underline flex items-center gap-0.5">
+                      <span>Buka Berita</span> &rarr;
+                    </span>
+                  </div>
+                </a>
               </div>
             </div>
           </div>
@@ -601,14 +645,24 @@ const layerLapangan = ref(true);
           <!-- Left: Executive Social Briefing & Buzzer vs Organic Assessment (Col 7) -->
           <div class="lg:col-span-7 rounded-2xl bg-slate-950/60 border border-slate-800/80 p-5 space-y-4 flex flex-col justify-between">
             <div class="space-y-3">
-              <div class="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+              <div class="flex items-center justify-between border-b border-slate-800/80 pb-2.5 flex-wrap gap-2">
                 <h4 class="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
                   <Sparkles class="w-3.5 h-3.5 text-cyan-400" />
                   <span>Executive Briefing Situasi Media Sosial &amp; Warganet</span>
                 </h4>
-                <span class="text-[10px] font-mono text-cyan-400 bg-cyan-400/10 px-2 py-0.5 rounded border border-cyan-400/20">
-                  Social Listening Engine
-                </span>
+                <div class="flex items-center gap-2">
+                  <span class="text-[10px] font-mono text-cyan-400 bg-cyan-400/10 px-2 py-0.5 rounded border border-cyan-400/20">
+                    Social Listening Engine
+                  </span>
+                  <Link
+                    href="/social-intelligence?tab=briefing"
+                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-400/10 hover:bg-cyan-400 border border-cyan-400/30 hover:border-cyan-400 text-cyan-300 hover:text-slate-950 text-[10px] font-black transition shadow-sm group cursor-pointer"
+                    title="Buka Lembar Executive Briefing Medsos Lengkap"
+                  >
+                    <span>Buka Lembar Briefing Medsos</span>
+                    <ExternalLink class="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                  </Link>
+                </div>
               </div>
               <p class="text-xs text-slate-200 leading-relaxed whitespace-pre-line">
                 {{ latestSocialReport?.executive_brief || 'Pemantauan lintas platform media sosial mengindikasikan narasi warganet didominasi respon positif dan netral terhadap program kepolisian presisi.' }}
@@ -632,6 +686,20 @@ const layerLapangan = ref(true);
               <p class="text-[11px] text-slate-300 leading-relaxed">
                 {{ latestSocialReport.buzzer_vs_organic.assessment }}
               </p>
+            </div>
+
+            <!-- Quick Link / Jump to full social briefing -->
+            <div class="pt-2.5 border-t border-slate-800/60 flex items-center justify-between text-[11px] flex-wrap gap-2">
+              <span class="text-slate-400 text-[10px] italic">
+                Sumber: Patroli Siber 𝕏, TikTok, Instagram, YouTube &amp; KOL
+              </span>
+              <Link
+                href="/social-intelligence?tab=briefing"
+                class="inline-flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 font-bold hover:underline"
+              >
+                <span>Format Naskah WA Pimpinan &amp; Matriks Cooling System</span>
+                <ArrowRight class="w-3 h-3" />
+              </Link>
             </div>
           </div>
 

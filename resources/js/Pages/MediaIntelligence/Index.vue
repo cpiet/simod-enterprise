@@ -99,6 +99,42 @@ const availableCategories = computed(() => {
   return [];
 });
 
+// Dynamic Portals Computed directly from loaded articles to guarantee 100% parity with UI view
+const availablePortals = computed(() => {
+  const articles = props.sampleArticles || [];
+  const counts = {};
+  let liveCrawlCount = 0;
+
+  for (const a of articles) {
+    const src = (a.source_name || '').trim().toUpperCase();
+    if (src) {
+      counts[src] = (counts[src] || 0) + 1;
+    }
+    if (!a.feed_id || a.source_id === 0 || (a.link && a.link.includes('news.google.com'))) {
+      liveCrawlCount++;
+    }
+  }
+
+  const baseList = props.portalsList || [];
+  if (baseList.length > 0) {
+    return baseList
+      .filter((p) => p.name !== 'Semua Portal')
+      .map((p) => {
+        if (p.name.includes('SEBARAN INTERNET')) {
+          return { name: p.name, count: liveCrawlCount };
+        }
+        const upper = p.name.trim().toUpperCase();
+        return { name: p.name, count: counts[upper] || 0 };
+      });
+  }
+
+  const feeds = props.mediaFeeds || [];
+  return feeds.map((f) => {
+    const upper = f.name.trim().toUpperCase();
+    return { name: upper, count: counts[upper] || 0 };
+  });
+});
+
 // Bookmark disimpan di database (tidak ikut dibersihkan oleh Pembersihan Berita)
 const bookmarkedIds = ref((props.sampleArticles || []).filter((a) => a.is_bookmarked).map((a) => String(a.id)));
 const isBookmarked = (id) => bookmarkedIds.value.includes(String(id));
@@ -1234,7 +1270,8 @@ const filteredArticles = computed(() => {
     if (selectedPortal.value.includes('SEBARAN INTERNET')) {
       list = list.filter((a) => !a.feed_id || a.source_id === 0 || (a.link && a.link.includes('news.google.com')));
     } else {
-      list = list.filter((a) => a.source_name.toLowerCase() === selectedPortal.value.toLowerCase());
+      const target = selectedPortal.value.trim().toLowerCase();
+      list = list.filter((a) => (a.source_name || '').trim().toLowerCase() === target);
     }
   }
 
@@ -2205,9 +2242,9 @@ const submitIssue = () => {
               @change="selectedTopicId = null; currentPage = 1"
               class="px-2.5 py-2 rounded-xl text-xs font-bold bg-[#070d19] border border-slate-700 text-white focus:outline-none focus:border-amber-400 cursor-pointer"
             >
-              <option value="Semua Portal">Semua Portal ({{ portalsList?.length > 1 ? portalsList.length - 1 : portalsList?.length || 29 }})</option>
+              <option value="Semua Portal">Semua Portal ({{ availablePortals.length || 29 }})</option>
               <option
-                v-for="p in portalsList?.filter(p => p.name !== 'Semua Portal')"
+                v-for="p in availablePortals"
                 :key="p.name"
                 :value="p.name"
               >
@@ -2604,12 +2641,23 @@ const submitIssue = () => {
         <p class="text-xs text-slate-400 max-w-sm mx-auto">
           Coba ganti pilihan portal, ubah kategori, atau klik tombol "Sinkron Berita" untuk menarik berita terkini dari seluruh portal.
         </p>
-        <button
-          @click="selectedPortal = 'Semua Portal'; selectedCategory = 'all'; showBookmarksOnly = false; showRedZoneOnly = false; selectedSentiment = 'all'; searchQuery = ''; selectedTopicId = null; currentPage = 1"
-          class="px-4 py-2 rounded-xl bg-amber-400 text-slate-950 font-black text-xs cursor-pointer"
-        >
-          Reset Semua Filter
-        </button>
+        <div class="flex items-center justify-center gap-3 flex-wrap">
+          <button
+            @click="selectedPortal = 'Semua Portal'; selectedCategory = 'all'; showBookmarksOnly = false; showRedZoneOnly = false; selectedSentiment = 'all'; searchQuery = ''; selectedTopicId = null; currentPage = 1"
+            class="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs cursor-pointer transition shadow-sm"
+          >
+            Reset Semua Filter
+          </button>
+          <button
+            @click="refreshRssFeeds"
+            :disabled="isRefreshingRss"
+            class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs cursor-pointer transition disabled:opacity-50"
+            title="Tarik berita terbaru dari seluruh feed RSS portal media"
+          >
+            <RotateCw class="w-3.5 h-3.5 text-amber-400" :class="{ 'animate-spin': isRefreshingRss }" />
+            <span>Sinkron Berita Terkini</span>
+          </button>
+        </div>
       </div>
     </div>
 

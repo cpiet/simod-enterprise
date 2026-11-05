@@ -260,21 +260,29 @@ class DashboardController extends Controller
         $nationalMapData = $this->buildNationalMapData();
 
         // 8. LATEST AI INTELLIGENCE REPORTS (Media Online & Media Sosial)
-        $latestMediaReport = MediaIntelligenceReport::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))
+        // If national scope (selectedCode === 'ALL' or 'DIVHUMAS'), prioritize Divisi Humas Polri (Mabes) report
+        $targetPoldaId = $poldaId;
+        if ($isNational || $selectedCode === 'DIVHUMAS') {
+            $divhumasPolda = Polda::where('code', 'DIVHUMAS')->first();
+            $targetPoldaId = $divhumasPolda?->id ?? $poldaId;
+        }
+
+        $latestMediaReport = MediaIntelligenceReport::where('polda_id', $targetPoldaId)
             ->latest('report_date')
             ->latest('id')
             ->first();
 
-        if (!$latestMediaReport) {
+        // Fallback only if no report exists for targeted polda
+        if (!$latestMediaReport && $isNational) {
             $latestMediaReport = MediaIntelligenceReport::latest('report_date')->latest('id')->first();
         }
 
-        $latestSocialReport = SocialIntelligenceReport::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))
+        $latestSocialReport = SocialIntelligenceReport::where('polda_id', $targetPoldaId)
             ->latest('report_date')
             ->latest('id')
             ->first();
 
-        if (!$latestSocialReport) {
+        if (!$latestSocialReport && $isNational) {
             $latestSocialReport = SocialIntelligenceReport::latest('report_date')->latest('id')->first();
         }
 

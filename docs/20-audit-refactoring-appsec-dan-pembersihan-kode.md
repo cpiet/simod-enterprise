@@ -151,11 +151,30 @@ SESSION_SECURE_COOKIE=true
 
 ---
 
-## 🧪 6. Hasil Automated Test Suite
+## 🧭 7. Penyelarasan Executive Briefing Nasional & Navigasi Interaktif
+
+1. **Penyelarasan Tenant-Scoping Executive Briefing di Command Center (`DashboardController.php`)**:
+   - Memperbaiki query `$latestMediaReport` dan `$latestSocialReport`: Saat otoritas **DIVHUMAS / Nasional (`selectedCode === 'ALL'`)** aktif, sistem secara eksplisit mengambil laporan intelijen milik **Divisi Humas Polri (Mabes)**. Mencegah laporan kewilayahan (misal Polda Sulbar) terambil secara keliru akibat klausa `when(!$isNational, ...)` tanpa target tenant.
+   - Tetap menyediakan fallback berjenjang jika suatu Polda belum memiliki laporan intelijen AI.
+
+2. **Navigasi Interaktif 1-Klik ke Berita Asli & Naskah Eksekutif (`Dashboard.vue`)**:
+   - Menambahkan tombol aksi cepat **`[ Buka Lembar Briefing & Berita ↗ ]`** pada header kartu *Executive Briefing Situasi Pemberitaan (24 Jam Terakhir)* untuk navigasi langsung ke Radar Media Online Tab 02.
+   - Menjadikan seluruh kartu **Isu Strategis Terdeteksi** dapat diklik langsung (`<a>` link dengan atribut `target="_blank"`) menuju URL berita asli di portal media penerbit, disertai nama sumber media dan timestamp.
+   - Menambahkan footer terarah untuk akses cepat ke **Format Naskah WhatsApp Pimpinan & Cetak A4**.
+   - Menerapkan pola yang sama pada kartu *Executive Briefing Situasi Media Sosial & Warganet* dengan tautan langsung ke Radar Media Sosial Tab Briefing.
+
+3. **Sinkronisasi Reaktif Dropdown Portal (`MediaIntelligence/Index.vue`)**:
+   - Menghitung opsi dropdown portal secara dinamis (`availablePortals`) dari memori artikel aktif untuk menjamin 100% konsistensi antara angka di dropdown dan jumlah kartu yang tampil di layar.
+   - Menambahkan tombol **`[ 🔄 Sinkron Berita Terkini ]`** pada kartu empty state saat filter portal kosong.
+
+---
+
+## 🧪 8. Hasil Automated Test Suite
 
 Seluruh test suite otomatis berhasil dijalankan dengan hasil **100% lulus tanpa regresi**:
 ```text
   Tests:    93 passed (538 assertions)
-  Duration: 11.81s
+  Duration: 11.33s
 ```
 Aplikasi memenuhi seluruh standar keamanan, integritas data, dan arsitektur Presisi Divisi Humas Polri.
+
