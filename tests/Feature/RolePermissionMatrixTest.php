@@ -45,7 +45,7 @@ class RolePermissionMatrixTest extends TestCase
         $response->assertInertia(fn ($page) =>
             $page->component('Settings/Roles')
                 ->where('selectedCode', 'ALL')
-                ->has('modules', 21)
+                ->has('modules', 20)
                 ->has('roleMatrix', 6)
         );
     }

@@ -8,7 +8,7 @@ Dokumen ini disusun sebagai panduan langkah demi langkah bagi pengembang atau pe
 ## 🏛️ 1. Mengapa Tidak Memerlukan File `.sql` Mentah?
 
 Dalam standar industri arsitektur modern Laravel:
-1. **Reproducible Database**: Seluruh struktur tabel (24 tabel), data satwil (34 Polda, 25 Polres), 51 portal RSS feeds (22 Divhumas Mabes + 29 Sulbar), 103 postingan patroli siber multi-platform (Instagram, TikTok, 𝕏, YouTube), 4 pilar menu navigasi dinamis, dan matriks hak akses RBAC dibangun secara otomatis melalui **Migration & Seeders**.
+1. **Reproducible Database**: Seluruh struktur tabel (36 tabel), data satwil (Divhumas Mabes + 5 Polda beserta Polres jajaran), 62 portal RSS feeds (33 Divhumas Mabes + 29 Sulbar), 103 postingan patroli siber multi-platform (Instagram, TikTok, 𝕏, YouTube), 4 pilar menu navigasi dinamis, dan matriks hak akses RBAC dibangun secara otomatis melalui **Migration & Seeders**.
 2. **Bersih & Aman dari Konflik Git**: File `.sql` besar rentan memicu merge conflict di GitHub dan mengekspos kredensial sensitif. Seluruh file cadangan `.sql` telah dimasukkan ke dalam `.gitignore`.
 3. **Satu Perintah untuk Semua**: Cukup jalankan satu perintah `php artisan migrate:fresh --seed`, seluruh basis data akan terisi lengkap dan siap digunakan dalam hitungan detik.
 
@@ -74,6 +74,8 @@ DB_PASSWORD=
 > ```env
 > APIFY_API_TOKEN=apify_api_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 > ```
+>
+> **Wajib bila memakai worker Python** (`scraper/media_crawler.py`): isi `INGEST_API_TOKEN` dengan string acak panjang dan set variabel lingkungan yang sama pada worker (`SIMOD_INGEST_TOKEN`). Bila kosong, API ingest menolak semua permintaan (HTTP 503).
 
 ---
 
@@ -89,9 +91,9 @@ DB_PASSWORD=
    php artisan migrate:fresh --seed
    ```
    > 💡 **Apa yang terjadi saat perintah ini berjalan?**
-   > - Membuat seluruh 24 tabel sistem.
+   > - Membuat seluruh 36 tabel sistem.
    > - Membangun akun pimpinan (Kadivhumas, Superadmin Mabes, Kabid Humas Sulbar, akun developer `cpiet`).
-   > - Memasukkan 22 feed resmi nasional Divhumas Mabes dan 29 portal media Sulbar.
+   > - Memasukkan 33 feed resmi nasional Divhumas Mabes dan 29 portal media Sulbar.
    > - Memasukkan 103 postingan radar media sosial riil lengkap dengan metrik views, likes, shares, virality, dan tagar aktual.
    > - Menginisialisasi 4 pilar menu navigasi dinamis dan matriks wewenang peran (RBAC).
 
@@ -135,12 +137,14 @@ Laragon biasanya otomatis membuat virtual host. Pastikan file konfigurasi Apache
 
 Buka browser dan akses: `http://simod-enterprise.test/login`
 
-| No | Peran / Posisi | Username / Email | Password Dinas | Cakupan Otoritas |
-|:---|:---|:---|:---|:---|
-| 1 | **Super Admin Mabes** | `superadmin` / `superadmin@polri.go.id` | `MabesPolri#2026` | Akses penuh 34 Polda, Manajemen Keamanan, Backup, AI & Audit Log |
-| 2 | **Kadivhumas Polri** | `kadivhumas` / `kadivhumas@polri.go.id` | `DivhumasPolri#2026` | Pucuk Pimpinan Tertinggi, Executive Briefing & Command Center |
-| 3 | **Akun Developer / Tech** | `cpiet` / `alumnidarus@gmail.com` | `T0p1s@y@bund@r` | Superadmin Mabes & Hak Akses Khusus Pengembang |
-| 4 | **Pimpinan Polda Sulbar** | `kabid_sulbar` / `kabid.sulbar@polri.go.id` | `SulbarHumas#2026` | Komando Kehumasan Wilayah Sulawesi Barat |
+| No | Peran / Posisi | Username / Email | Cakupan Otoritas |
+|:---|:---|:---|:---|
+| 1 | **Super Admin Mabes** | `superadmin` / `superadmin@polri.go.id` | Akses penuh 34 Polda, Manajemen Keamanan, Backup, AI & Audit Log |
+| 2 | **Kadivhumas Polri** | `kadivhumas` / `kadivhumas@polri.go.id` | Pucuk Pimpinan Tertinggi, Executive Briefing & Command Center |
+| 3 | **Akun Developer / Tech** | `cpiet` / `alumnidarus@gmail.com` | Superadmin Mabes & Hak Akses Khusus Pengembang |
+| 4 | **Pimpinan Polda Sulbar** | `kabid_sulbar` / `kabid.sulbar@polri.go.id` | Komando Kehumasan Wilayah Sulawesi Barat |
+
+> **Kata sandi awal tidak lagi dicantumkan di dokumen.** Kata sandi akun awal untuk **lingkungan pengembangan lokal** ditetapkan di seeder [`EnterpriseDatabaseSeeder.php`](../database/seeders/EnterpriseDatabaseSeeder.php) (dan `PersonaliaSeeder.php`). Login kini **wajib username + kata sandi yang valid**; tidak ada lagi bypass, kata sandi demo, maupun mode PIN di halaman login. Pada deployment non-lokal, **ganti seluruh kata sandi seed** lewat menu Personalia → *Reset Password* segera setelah `migrate --seed`.
 
 ---
 

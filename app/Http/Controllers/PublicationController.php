@@ -19,6 +19,7 @@ class PublicationController extends Controller
         [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
         $isNational = ($selectedCode === 'ALL');
         $channelFilter = $request->query('channel', 'all');
+        $statusFilter = $request->query('status', 'all');
 
         $query = Publication::with(['polres', 'issue'])->latest();
 
@@ -30,13 +31,24 @@ class PublicationController extends Controller
             $query->where('channel', $channelFilter);
         }
 
+        if (isset(Publication::STATUS_GROUPS[$statusFilter])) {
+            $query->whereIn('approval_status', Publication::STATUS_GROUPS[$statusFilter]);
+        }
+
         $publications = $query->paginate(12)->withQueryString();
 
+        $scoped = fn () => Publication::when(!$isNational && $selectedPolda, fn ($q) => $q->where('polda_id', $selectedPolda->id));
+        $byChannel = $scoped()->select('channel', \DB::raw('count(*) as c'))->groupBy('channel')->pluck('c', 'channel');
+        $byApproval = $scoped()->select('approval_status', \DB::raw('count(*) as c'))->groupBy('approval_status')->pluck('c', 'approval_status');
+
+        $statusCounts = ['all' => (int) $byApproval->sum()];
+        foreach (Publication::STATUS_GROUPS as $group => $statuses) {
+            $statusCounts[$group] = (int) collect($statuses)->sum(fn ($st) => $byApproval[$st] ?? 0);
+        }
+
         $metrics = [
-            'total'        => Publication::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->count(),
-            'tribratanews' => Publication::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('channel', 'tribratanews')->count(),
-            'instagram'    => Publication::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('channel', 'instagram')->count(),
-            'tiktok'       => Publication::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))->where('channel', 'tiktok')->count(),
+            'total'    => $statusCounts['all'],
+            'channels' => $byChannel,
         ];
 
         return Inertia::render('Publications/Index', [
@@ -45,6 +57,8 @@ class PublicationController extends Controller
             'selectedCode'  => $selectedCode,
             'publications'  => $publications,
             'channelFilter' => $channelFilter,
+            'statusFilter'  => $statusFilter,
+            'statusCounts'  => $statusCounts,
             'metrics'       => $metrics,
         ]);
     }
@@ -73,6 +87,52 @@ class PublicationController extends Controller
         Publication::create($validated);
 
         return redirect()->back()->with('success', 'Konten narasi publikasi berhasil diterbitkan!');
+    }
+
+    /**
+     * Setujui draf publikasi (mis. rilis dari detail isu) -> terbit.
+     */
+    public function approve(Request $request, $id)
+    {
+        $publication = Publication::findOrFail($id);
+        $this->authorizeTenantRecord($request, $publication);
+
+        if (! in_array($publication->approval_status, Publication::STATUS_GROUPS['pending'], true)) {
+            return redirect()->back()->with('error', 'Hanya draf yang menunggu persetujuan yang dapat disetujui.');
+        }
+
+        $publication->update([
+            'approval_status' => 'published',
+            'reviewed_by'     => auth()->id(),
+            'reviewed_at'     => now(),
+            'review_notes'    => $request->input('review_notes'),
+        ]);
+
+        return redirect()->back()->with('success', 'Publikasi disetujui dan ditandai terbit.');
+    }
+
+    /**
+     * Tolak draf publikasi dengan catatan revisi wajib.
+     */
+    public function reject(Request $request, $id)
+    {
+        $publication = Publication::findOrFail($id);
+        $this->authorizeTenantRecord($request, $publication);
+
+        $validated = $request->validate(['review_notes' => 'required|string|max:1000']);
+
+        if (! in_array($publication->approval_status, Publication::STATUS_GROUPS['pending'], true)) {
+            return redirect()->back()->with('error', 'Hanya draf yang menunggu persetujuan yang dapat ditolak.');
+        }
+
+        $publication->update([
+            'approval_status' => 'rejected',
+            'reviewed_by'     => auth()->id(),
+            'reviewed_at'     => now(),
+            'review_notes'    => $validated['review_notes'],
+        ]);
+
+        return redirect()->back()->with('success', 'Publikasi ditolak dan catatan revisi dicatat.');
     }
 }
 

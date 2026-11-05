@@ -14,6 +14,7 @@ use App\Models\SocialPost;
 use App\Models\Task;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -257,7 +258,8 @@ class DashboardController extends Controller
         ];
 
         // 7. PETA NUSANTARA INDONESIA (Agregasi Berita Berbasis Database untuk Mabes & Nasional)
-        $nationalMapData = $this->buildNationalMapData();
+        // Data peta nasional bersifat global dan berat (puluhan query LIKE); cache singkat 60 detik.
+        $nationalMapData = Cache::remember('simod.map.national', 60, fn () => $this->buildNationalMapData());
 
         // 8. LATEST AI INTELLIGENCE REPORTS (Media Online & Media Sosial)
         // If national scope (selectedCode === 'ALL' or 'DIVHUMAS'), prioritize Divisi Humas Polri (Mabes) report
@@ -450,11 +452,13 @@ class DashboardController extends Controller
                 });
             }
 
-            $total = (clone $q)->count();
-            $pos = (clone $q)->where('sentiment', 'positif')->count();
-            $neg = (clone $q)->where('sentiment', 'negatif')->count();
-            $neu = (clone $q)->where('sentiment', 'netral')->count();
-            $latest = (clone $q)->latest('pub_date')->first();
+            // Satu query agregat menggantikan 4 query count terpisah per wilayah.
+            $agg = (clone $q)->selectRaw("count(*) as total, coalesce(sum(case when sentiment = 'positif' then 1 else 0 end), 0) as pos, coalesce(sum(case when sentiment = 'negatif' then 1 else 0 end), 0) as neg, coalesce(sum(case when sentiment = 'netral' then 1 else 0 end), 0) as neu")->first();
+            $total = (int) $agg->total;
+            $pos = (int) $agg->pos;
+            $neg = (int) $agg->neg;
+            $neu = (int) $agg->neu;
+            $latest = $total > 0 ? (clone $q)->latest('pub_date')->first() : null;
 
             $posPct = $total > 0 ? (int) round(($pos / $total) * 100) : 75;
             $negPct = $total > 0 ? (int) round(($neg / $total) * 100) : 5;

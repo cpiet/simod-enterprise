@@ -34,7 +34,7 @@ Administrator dapat mengelola seluruh navigasi secara *real-time* melalui antarm
 - **Edit Rute, Label & Ikon**: Mengubah nama, URL, deskripsi, dan memilih ikon visual dari 27 ikon Lucide.
 - **Ubah Urutan (*Ordering*)**: Menggeser posisi pilar maupun item menu ke atas/bawah (`POST /settings/menus/{id}/move`).
 - **Toggle Status Aktif/Nonaktif**: Menyembunyikan atau mengaktifkan modul dalam 1 klik (`POST /settings/menus/{id}/toggle`).
-- **Factory Reset**: Memulihkan susunan 4 Pilar & 10 Sub-Tab standar kapan saja (`POST /settings/menus/reset`).
+- **Factory Reset**: Memulihkan susunan 4 Pilar & 8 Sub-Tab standar kapan saja (`POST /settings/menus/reset`).
 
 ---
 

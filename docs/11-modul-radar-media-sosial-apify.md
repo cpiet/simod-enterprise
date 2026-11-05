@@ -95,7 +95,7 @@ Masing-masing media sosial memiliki karakteristik format tren yang berbeda:
 ## ⚡ 3. Cara Menjalankan Sinkronisasi Medsos
 
 ### A. Melalui Tombol Antarmuka Web
-1. Buka menu **Radar Media Sosial** (`http://simod-enterprise.test/social-intelligence?polda=SULBAR`).
+1. Buka menu **Radar Media Sosial** (`http://simod-enterprise.test/social-intelligence`).
 2. Klik tombol **`Sinkronisasi Radar`** di pojok kanan atas, atau tombol **`⚡ Tarik Data Live Apify Sekarang`** di Tab 04.
 
 ### B. Melalui Artisan Tinker / CLI
@@ -136,9 +136,9 @@ Data dari **Radar Media Sosial** terintegrasi secara *real-time* ke **Executive 
 
 ---
 
-## 🇮🇩 6. Mode Skala Nasional & Orkestrasi Divhumas Polri (`polda=ALL`)
+## 🇮🇩 6. Mode Skala Nasional & Orkestrasi Divhumas Polri (tenant `ALL`)
 
-Ketika pengguna memilih wilayah **Divhumas Polri** (parameter URL `polda=ALL`), modul Radar Media Sosial secara otomatis beradaptasi menjadi **Komando Cyber Patrol & Social Listening Nasional**:
+Ketika pengguna memilih wilayah **Divhumas Polri** (kode tenant `ALL` via `POST /tenant/switch`), modul Radar Media Sosial secara otomatis beradaptasi menjadi **Komando Cyber Patrol & Social Listening Nasional**:
 
 1. **Agregasi Metrik Nasional**:
    - Menghitung seluruh postingan dari seluruh Polda dan Satker Mabes tanpa pembatasan `polda_id`.

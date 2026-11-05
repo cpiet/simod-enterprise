@@ -1,48 +1,45 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
+import { router } from '@inertiajs/vue3';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
-import {
-  UserCheck,
-  Shield,
-  Key,
-  Lock,
-  Smartphone,
-  Save,
-  CheckCircle2,
-  AlertCircle,
-  Building2,
-  Phone,
-  Mail,
-  Clock,
-} from 'lucide-vue-next';
+import { Key, Building2, Phone, Mail, BadgeCheck, Save, UserCheck } from 'lucide-vue-next';
 
 const props = defineProps({
   allPoldas: Array,
   selectedPolda: Object,
   selectedCode: String,
   metrics: Object,
+  profile: Object,
+  errors: { type: Object, default: () => ({}) },
 });
 
-const formPassword = ref({
-  current: '',
-  new: '',
-  confirm: '',
-});
-
-const pinDinas = ref('740901');
-const pinNotification = ref(false);
-const passNotification = ref(false);
-
-const updatePin = () => {
-  pinNotification.value = true;
-  setTimeout(() => (pinNotification.value = false), 3000);
+const ROLE_LABEL = {
+  kadiv_humas: 'Kadivhumas Polri',
+  super_admin_mabes: 'Super Administrator Mabes',
+  superadmin: 'Super Administrator',
+  polda_leader: 'Pimpinan Polda (Kabid Humas)',
+  verifikator: 'Verifikator',
+  analis: 'Analis Intelijen Media & Siber',
+  operator: 'Operator Satwil',
 };
 
-const updatePassword = () => {
-  passNotification.value = true;
-  formPassword.value = { current: '', new: '', confirm: '' };
-  setTimeout(() => (passNotification.value = false), 3000);
+const form = ref({ current_password: '', password: '', password_confirmation: '' });
+const isSaving = ref(false);
+
+const canSubmit = computed(() =>
+  form.value.current_password && form.value.password.length >= 10 && form.value.password === form.value.password_confirmation
+);
+
+const submit = () => {
+  isSaving.value = true;
+  router.post('/profile/password', form.value, {
+    preserveScroll: true,
+    onSuccess: () => { form.value = { current_password: '', password: '', password_confirmation: '' }; },
+    onFinish: () => { isSaving.value = false; },
+  });
 };
+
+const field = 'w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-sm text-slate-900 dark:text-white outline-none focus:border-amber-400';
 </script>
 
 <template>
@@ -52,199 +49,72 @@ const updatePassword = () => {
     :selected-code="selectedCode"
     :metrics="metrics"
   >
-    <!-- Header -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-      <div>
-        <div class="flex items-center gap-2">
-          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950">
-            {{ selectedCode === 'ALL' ? '🇮🇩 Komando Mabes Polri' : 'Identitas Anggota' }}
-          </span>
-          <span class="text-xs font-bold text-slate-400">
-            {{ selectedCode === 'ALL' ? 'Divisi Humas Polri (Nasional)' : selectedPolda?.name }}
-          </span>
-        </div>
-        <h1 class="text-2xl md:text-3xl font-black text-white tracking-tight mt-1">
-          Profil Saya &amp; Keamanan Dinas
-        </h1>
-        <p class="text-xs md:text-sm text-slate-300">
-          Informasi identitas personel, kredensial autentikasi, serta konfigurasi PIN cepat 6-digit komando.
-        </p>
-      </div>
+    <div class="min-w-0">
+      <h1 class="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight">Profil Saya</h1>
+      <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Identitas akun dan penggantian kata sandi.</p>
     </div>
 
-    <!-- Main Grid: 2 Columns -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Col 1: Profile Card -->
-      <div class="lg:col-span-1 space-y-6">
-        <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-6 text-center relative overflow-hidden">
-          <div class="absolute top-0 left-0 right-0 h-20 bg-gradient-to-r from-amber-500/20 to-blue-500/20 border-b border-slate-800"></div>
-
-          <div class="relative pt-6">
-            <div class="w-24 h-24 mx-auto rounded-3xl bg-gradient-to-tr from-amber-500 to-amber-300 p-1 shadow-2xl">
-              <div class="w-full h-full rounded-[22px] bg-[#091122] flex items-center justify-center text-2xl font-black text-amber-400">
-                {{ selectedCode === 'ALL' ? '⭐⭐' : 'M' }}
-              </div>
-            </div>
-            <h2 class="text-lg font-black text-white mt-4">
-              {{ selectedCode === 'ALL' ? 'Irjen Pol. Johnny Eddizon Isir, S.I.K., M.T.C.P.' : 'Kombes Pol. M. Memo, S.I.K' }}
-            </h2>
-            <p class="text-xs font-bold text-amber-400">
-              {{ selectedCode === 'ALL' ? 'Kepala Divisi Humas Polri (Kadivhumas)' : 'Kasubbid Penmas Bidhumas' }}
-            </p>
-            <span class="inline-block mt-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-              Akun Aktif &amp; Terverifikasi
-            </span>
-          </div>
-
-          <div class="border-t border-slate-800 pt-4 space-y-3 text-left text-xs">
-            <div class="flex items-center justify-between">
-              <span class="text-slate-400">Pangkat / Korps</span>
-              <span class="font-bold text-white">
-                {{ selectedCode === 'ALL' ? 'IRJEN POL (⭐⭐)' : 'KOMBES POL' }}
-              </span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-slate-400">NRP</span>
-              <span class="font-mono font-bold text-amber-400">
-                {{ selectedCode === 'ALL' ? '75060789' : '74090123' }}
-              </span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-slate-400">Satuan Kerja</span>
-              <span class="font-bold text-white">
-                {{ selectedCode === 'ALL' ? 'Divisi Humas Polri (Mabes)' : (selectedPolda?.name || 'Bidhumas Polda Sulbar') }}
-              </span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-slate-400">Email Kedinasan</span>
-              <span class="font-bold text-slate-300">
-                {{ selectedCode === 'ALL' ? 'kadivhumas@polri.go.id' : 'memo.humas@polri.go.id' }}
-              </span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-slate-400">Nomor WhatsApp</span>
-              <span class="font-bold text-slate-300">
-                {{ selectedCode === 'ALL' ? '+62 811-1975-0607' : '+62 811-4200-XXXX' }}
-              </span>
-            </div>
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
+      <section class="lg:col-span-2 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm space-y-4">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 rounded-2xl bg-amber-400/15 text-amber-600 dark:text-amber-400 flex items-center justify-center"><UserCheck class="w-6 h-6" /></div>
+          <div class="min-w-0">
+            <p class="text-base font-black text-slate-900 dark:text-white truncate">{{ profile?.name }}</p>
+            <p class="text-xs font-bold text-amber-600 dark:text-amber-400">{{ ROLE_LABEL[profile?.role] || profile?.role }}</p>
           </div>
         </div>
 
-        <!-- Session Status -->
-        <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-5 shadow-xl space-y-3">
-          <h3 class="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
-            <Clock class="w-4 h-4 text-amber-400" />
-            <span>Sesi Perangkat Aktif</span>
-          </h3>
-          <div class="p-3 rounded-2xl bg-slate-900 border border-slate-800 text-xs space-y-1">
-            <div class="flex items-center justify-between">
-              <span class="font-bold text-white">Windows 11 (Chrome Desktop)</span>
-              <span class="text-[10px] font-bold text-emerald-400">Aktif</span>
-            </div>
-            <p class="text-[10px] text-slate-400">IP: 127.0.0.1 (Laragon Local) &bull; Waktu WITA</p>
+        <dl class="space-y-2.5 text-xs">
+          <div class="flex items-center gap-2"><BadgeCheck class="w-4 h-4 text-slate-400 shrink-0" /><dt class="text-slate-500 dark:text-slate-400 w-24 shrink-0">Username</dt><dd class="font-bold text-slate-900 dark:text-white truncate">{{ profile?.username }}</dd></div>
+          <div v-if="profile?.badge_number" class="flex items-center gap-2"><BadgeCheck class="w-4 h-4 text-slate-400 shrink-0" /><dt class="text-slate-500 dark:text-slate-400 w-24 shrink-0">NRP</dt><dd class="font-bold text-slate-900 dark:text-white">{{ profile.badge_number }}</dd></div>
+          <div class="flex items-center gap-2"><Building2 class="w-4 h-4 text-slate-400 shrink-0" /><dt class="text-slate-500 dark:text-slate-400 w-24 shrink-0">Satuan</dt><dd class="font-bold text-slate-900 dark:text-white">{{ profile?.polres || profile?.polda || 'Divhumas Polri (Mabes)' }}</dd></div>
+          <div class="flex items-center gap-2"><Mail class="w-4 h-4 text-slate-400 shrink-0" /><dt class="text-slate-500 dark:text-slate-400 w-24 shrink-0">Email</dt><dd class="font-bold text-slate-900 dark:text-white truncate">{{ profile?.email }}</dd></div>
+          <div v-if="profile?.phone" class="flex items-center gap-2"><Phone class="w-4 h-4 text-slate-400 shrink-0" /><dt class="text-slate-500 dark:text-slate-400 w-24 shrink-0">Telepon</dt><dd class="font-bold text-slate-900 dark:text-white">{{ profile.phone }}</dd></div>
+        </dl>
+
+        <p class="text-[11px] text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-800 pt-3">Perubahan data identitas dilakukan oleh administrator melalui menu Personalia.</p>
+      </section>
+
+      <section class="lg:col-span-3 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm space-y-4">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-rose-100 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center"><Key class="w-4 h-4" /></div>
+          <div>
+            <h2 class="text-sm font-black text-slate-900 dark:text-white">Ganti kata sandi</h2>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400">Minimal 10 karakter dan berbeda dari kata sandi saat ini.</p>
           </div>
         </div>
-      </div>
 
-      <!-- Col 2: Settings (Password & PIN) -->
-      <div class="lg:col-span-2 space-y-6">
-        <!-- Form Ganti Password -->
-        <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
-          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-            <div class="flex items-center gap-2">
-              <Lock class="w-4 h-4 text-amber-400" />
-              <h3 class="text-sm font-black text-white uppercase tracking-wider">Perbarui Kata Sandi Akun</h3>
-            </div>
-            <span v-if="passNotification" class="text-xs font-bold text-emerald-400 flex items-center gap-1">
-              <CheckCircle2 class="w-3.5 h-3.5" /> Kata sandi berhasil diperbarui!
-            </span>
-          </div>
+        <form @submit.prevent="submit" class="space-y-3.5">
+          <label class="block space-y-1">
+            <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">Kata sandi saat ini</span>
+            <input v-model="form.current_password" type="password" autocomplete="current-password" :class="field" />
+            <span v-if="errors.current_password" class="text-[11px] font-bold text-rose-500">{{ errors.current_password }}</span>
+          </label>
 
-          <div class="space-y-3 text-xs">
-            <div>
-              <label class="block font-bold text-slate-300 mb-1">Kata Sandi Saat Ini</label>
-              <input
-                v-model="formPassword.current"
-                type="password"
-                placeholder="••••••••••••"
-                class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
-              />
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label class="block font-bold text-slate-300 mb-1">Kata Sandi Baru</label>
-                <input
-                  v-model="formPassword.new"
-                  type="password"
-                  placeholder="Min. 8 Karakter Kombinasi"
-                  class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
-                />
-              </div>
-              <div>
-                <label class="block font-bold text-slate-300 mb-1">Konfirmasi Kata Sandi Baru</label>
-                <input
-                  v-model="formPassword.confirm"
-                  type="password"
-                  placeholder="Ulangi kata sandi baru"
-                  class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
-                />
-              </div>
-            </div>
-          </div>
+          <label class="block space-y-1">
+            <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">Kata sandi baru</span>
+            <input v-model="form.password" type="password" autocomplete="new-password" :class="field" />
+            <span v-if="errors.password" class="text-[11px] font-bold text-rose-500">{{ errors.password }}</span>
+          </label>
+
+          <label class="block space-y-1">
+            <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">Ulangi kata sandi baru</span>
+            <input v-model="form.password_confirmation" type="password" autocomplete="new-password" :class="field" />
+            <span v-if="form.password_confirmation && form.password !== form.password_confirmation" class="text-[11px] font-bold text-rose-500">Konfirmasi belum sama.</span>
+          </label>
 
           <div class="flex justify-end pt-2">
             <button
-              @click="updatePassword"
-              class="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition"
+              type="submit"
+              :disabled="isSaving || !canSubmit"
+              class="px-5 py-2.5 rounded-xl text-xs font-black bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-lg shadow-amber-400/25 flex items-center gap-2 transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               <Save class="w-4 h-4" />
-              <span>Simpan Kata Sandi</span>
+              <span>{{ isSaving ? 'Menyimpan...' : 'Simpan Kata Sandi' }}</span>
             </button>
           </div>
-        </div>
-
-        <!-- Form Pengaturan PIN Cepat 6-Digit -->
-        <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
-          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-            <div class="flex items-center gap-2">
-              <Smartphone class="w-4 h-4 text-amber-400" />
-              <div>
-                <h3 class="text-sm font-black text-white uppercase tracking-wider">PIN Dinas Cepat 6-Digit</h3>
-                <p class="text-[11px] text-slate-400">Digunakan untuk akses taktis dan input laporan cepat tanpa kata sandi panjang.</p>
-              </div>
-            </div>
-            <span v-if="pinNotification" class="text-xs font-bold text-emerald-400 flex items-center gap-1">
-              <CheckCircle2 class="w-3.5 h-3.5" /> PIN tersimpan!
-            </span>
-          </div>
-
-          <div class="space-y-3 text-xs">
-            <div class="max-w-xs">
-              <label class="block font-bold text-slate-300 mb-1">PIN 6-Digit Anda</label>
-              <input
-                v-model="pinDinas"
-                type="password"
-                maxlength="6"
-                placeholder="740901"
-                class="w-full tracking-[0.5em] text-center text-lg font-mono font-black px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-amber-400 focus:outline-none focus:border-amber-400"
-              />
-            </div>
-            <p class="text-[11px] text-slate-400">
-              PIN ini terenkripsi hash SHA-256 dan hanya berlaku untuk perangkat yang telah terdaftar pada database SIMOD Enterprise.
-            </p>
-          </div>
-
-          <div class="flex justify-end pt-2">
-            <button
-              @click="updatePin"
-              class="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition"
-            >
-              <Save class="w-4 h-4" />
-              <span>Perbarui PIN Dinas</span>
-            </button>
-          </div>
-        </div>
-      </div>
+        </form>
+      </section>
     </div>
   </EnterpriseLayout>
 </template>

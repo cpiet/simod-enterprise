@@ -34,6 +34,8 @@ php artisan db:seed --class=MultiPoldaArticlesHistoricalSeeder
 php artisan db:seed --class=PublicationsAndTasksSeeder
 ```
 
+`php artisan db:seed` (tanpa `--class`) menjalankan `DatabaseSeeder` secara berurutan: `EnterpriseDatabaseSeeder` (memanggil `SulbarRssFeedsSeeder`, 29 feed) → `MultiTenantPoldasSeeder` → `DivhumasNationalRssFeedsSeeder` (33 feed nasional) → `MultiPoldaArticlesHistoricalSeeder` → `CommandCenterDynamicSeeder` → `SocialIntelligenceSeeder`, lalu menu dinamis. Tenant yang di-seed: Divhumas Mabes + 5 Polda (Sulbar, Gorontalo, Sulsel, Sultra, Kaltim). Rincian: [doc 22](22-peta-kode-dan-sumber-kebenaran.md).
+
 ---
 
 ## 2. Perintah Operasional SIMOD CLI
@@ -74,13 +76,23 @@ php artisan db:backup --type=scheduled
 php artisan db:backup --force --retention=30
 ```
 
+### 2.4. Perintah Lama (Legacy, Masih Terdaftar)
+```powershell
+# Tarik RSS seluruh portal Satwil (opsional filter kode Polda)
+php artisan simod:scrape-rss --polda=SULBAR
+
+# Sinkron feed media terdaftar (default SULBAR)
+php artisan simod:sync-feeds --polda=SULBAR --force
+```
+Untuk operasional harian gunakan `rss:sync` (bagian 2.1) yang dilengkapi mutex lock dan fair quota.
+
 ---
 
 ## 3. Pengujian Otomatis (Automated Testing Suite)
 
 Pengujian fitur aplikasi menggunakan PHPUnit dengan basis data SQLite in-memory (aman, cepat, dan tidak menghapus database MySQL lokal):
 ```powershell
-# Menjalankan seluruh 26 Unit & Feature Tests (128 assertions)
+# Menjalankan seluruh test suite (116 tests, 710 assertions)
 php artisan test
 
 # Menjalankan spesifik modul DatabaseBackupTest
@@ -99,12 +111,12 @@ php artisan test --filter=SecurityCenterTest
 
 ### Kompilasi Aset untuk Produksi (Wajib setelah mengubah file Vue/CSS)
 ```powershell
-npm run build
+npm.cmd run build
 ```
 
 ### Menjalankan Vite Dev Server (Hot Module Replacement)
 ```powershell
-npm run dev
+npm.cmd run dev
 ```
 
 ---
@@ -125,4 +137,4 @@ php artisan optimize:clear
 ```powershell
 php artisan schedule:run
 ```
-*(Scheduler di `routes/console.php` menjalankan `rss:sync --scheduled` setiap menit dan `media:prune` setiap pukul 02:00).*
+*(Scheduler di `routes/console.php` menjalankan `rss:sync --scheduled` setiap menit, `db:backup --type=scheduled` setiap 10 menit (hanya mengeksekusi sesuai jadwal yang dikonfigurasi di database), dan `media:prune` setiap pukul 02:00 bila `MEDIA_RETENTION_DAYS` > 0).*

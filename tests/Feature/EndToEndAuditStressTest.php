@@ -229,16 +229,12 @@ class EndToEndAuditStressTest extends TestCase
         $this->actingAs($this->user);
 
         $res = $this->post('/security', [
-            'enable_turnstile'        => true,
             'max_login_attempts'      => 0, // min is 1
             'lockout_minutes'         => 99999, // max is 1440
-            'enable_pin'              => true,
-            'pin_expiry_days'         => 500, // max is 365
             'session_timeout_minutes' => 2, // min is 5
-            'private_media_storage'   => true,
         ]);
 
-        $res->assertSessionHasErrors(['max_login_attempts', 'lockout_minutes', 'pin_expiry_days', 'session_timeout_minutes']);
+        $res->assertSessionHasErrors(['max_login_attempts', 'lockout_minutes', 'session_timeout_minutes']);
     }
 
     /**

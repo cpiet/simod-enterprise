@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Polda;
+use App\Models\SecuritySetting;
 use App\Models\User;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -41,42 +43,61 @@ class AuthController extends Controller
         }
 
         $validated = $request->validate([
-            'username'   => 'nullable|string|max:120',
-            'password'   => 'nullable|string|max:255',
-            'pin'        => 'nullable|string|max:10',
+            'username'   => 'required|string|max:120',
+            'password'   => 'required|string|max:255',
             'polda_id'   => 'nullable',
             'polda_code' => 'nullable|string|max:30',
             'remember'   => 'nullable|boolean',
         ]);
 
-        $username = trim((string) ($validated['username'] ?? 'kadivhumas'));
-        $password = (string) ($validated['password'] ?? '');
+        $username = trim($validated['username']);
+        $password = $validated['password'];
 
         $user = User::where('username', $username)
             ->orWhere('email', $username)
             ->orWhere('badge_number', $username)
             ->first();
 
-        if ($user) {
-            if (!$user->is_active) {
-                return back()->withErrors([
-                    'username' => 'Akun personel ini sedang dinonaktifkan oleh Administrator.',
-                ]);
-            }
+        // Pesan galat seragam agar username yang valid tidak dapat dienumerasi.
+        $invalid = ['username' => 'Kredensial username atau kata sandi dinas tidak sesuai.'];
 
-            // Validate password if provided and user has a non-demo hash
-            if (!empty($password) && !Hash::check($password, $user->password)) {
-                // Allow demo password fallback for standard demo accounts
-                $demoPasswords = ['DivhumasPolri#2026', 'MabesPolri#2026', 'SulbarHumas#2026', 'PolriPresisi#2026'];
-                if (!in_array($password, $demoPasswords, true)) {
-                    return back()->withErrors([
-                        'username' => 'Kredensial username atau kata sandi dinas tidak sesuai.',
-                    ]);
-                }
-            }
+        // Penguncian akun nyata: batas percobaan & durasi kunci dari Pengaturan Keamanan.
+        $security = SecuritySetting::current($user?->polda_id);
+        $lockKey = 'login:' . strtolower($username) . '|' . $request->ip();
+        if (RateLimiter::tooManyAttempts($lockKey, (int) $security->max_login_attempts)) {
+            $minutes = (int) ceil(RateLimiter::availableIn($lockKey) / 60);
 
-            Auth::login($user, $request->boolean('remember', true));
+            return back()->withErrors([
+                'username' => 'Terlalu banyak percobaan masuk. Coba lagi dalam ' . max(1, $minutes) . ' menit.',
+            ])->onlyInput('username');
         }
+
+        if (! $user || ! Hash::check($password, $user->password)) {
+            RateLimiter::hit($lockKey, (int) $security->lockout_minutes * 60);
+
+            AuditLog::create([
+                'polda_id'     => $user?->polda_id,
+                'user_id'      => $user?->id,
+                'action'       => 'auth.login_failed',
+                'subject_type' => 'user',
+                'subject_id'   => (string) ($user?->id ?? $username),
+                'ip_address'   => $request->ip(),
+                'user_agent'   => substr((string) $request->userAgent(), 0, 250),
+                'metadata'     => ['username' => $username],
+                'created_at'   => now(),
+            ]);
+
+            return back()->withErrors($invalid)->onlyInput('username');
+        }
+
+        if (! $user->is_active) {
+            return back()->withErrors([
+                'username' => 'Akun personel ini sedang dinonaktifkan oleh Administrator.',
+            ])->onlyInput('username');
+        }
+
+        RateLimiter::clear($lockKey);
+        Auth::login($user, $request->boolean('remember', false));
 
         // Clear explicit logout lock & regenerate session ID to prevent session fixation
         $request->session()->forget('simod_logged_out');

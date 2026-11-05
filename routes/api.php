@@ -15,6 +15,8 @@ Route::get('/v1/health', function () {
     ]);
 });
 
+Route::middleware('ingest.token')->group(function () {
+
 Route::get('/v1/poldas', function () {
     return response()->json([
         'data' => Polda::with('polres')->where('is_active', true)->get(),
@@ -24,4 +26,6 @@ Route::get('/v1/poldas', function () {
 // Python Background Scraper Ingestion Endpoints
 Route::post('/v1/ingest/article', [IngestController::class, 'ingestArticle']);
 Route::post('/v1/ingest/bulk', [IngestController::class, 'bulkIngestArticles']);
+
+});
 

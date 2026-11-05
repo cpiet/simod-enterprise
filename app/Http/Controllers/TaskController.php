@@ -19,6 +19,7 @@ class TaskController extends Controller
         [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
         $isNational = ($selectedCode === 'ALL');
         $statusFilter = $request->query('status', 'all');
+        $priorityFilter = $request->query('priority', 'all');
 
         $query = Task::with(['polres', 'issue', 'updates'])->latest();
 
@@ -28,6 +29,10 @@ class TaskController extends Controller
 
         if ($statusFilter !== 'all') {
             $query->where('status', $statusFilter);
+        }
+
+        if ($priorityFilter !== 'all') {
+            $query->where('priority', $priorityFilter);
         }
 
         $tasks = $query->paginate(15)->withQueryString();
@@ -45,6 +50,7 @@ class TaskController extends Controller
             'selectedCode'  => $selectedCode,
             'tasks'         => $tasks,
             'statusFilter'  => $statusFilter,
+            'priorityFilter' => $priorityFilter,
             'metrics'       => $metrics,
         ]);
     }

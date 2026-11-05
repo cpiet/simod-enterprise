@@ -47,7 +47,7 @@ Sistem secara cerdas menentukan scope awal:
 - Pengguna dapat beralih antar-peta kapan saja secara instan.
 
 ### 2.2. Agregasi 100% Berbasis Berita Aktual Database
-Peta Indonesia tidak menggunakan data acak (*dummy*), melainkan diagregasi langsung dari **1.715 berita** di tabel `media_articles`:
+Peta Indonesia tidak menggunakan data acak (*dummy*), melainkan diagregasi langsung dari **1.715 berita** di tabel `media_articles` *(snapshot saat dokumen ditulis; angka mengikuti isi basis data)*:
 
 | Kode Sentra | Nama Polda / Wilayah Hub | Cakupan Wilayah | Berita DB | Status | Headline Terkini di Database |
 |-------------|--------------------------|-----------------|-----------|--------|------------------------------|
@@ -104,6 +104,6 @@ Seluruh fitur telah melalui verifikasi ganda:
      - `test_command_center_loads_with_national_map_data`: Memastikan data 11 sentra peta nusantara ter-inject ke komponen Dashboard.
      - `test_priority_attention_filter_on_issues_returns_active_issues`: Memverifikasi filter `priority=attention` mengembalikan seluruh 4 isu atensi aktif.
      - `test_national_tenant_consolidation_displays_cross_polda_issues`: Memverifikasi konsolidasi isu lintas-Satwil untuk Mabes Polri.
-   - Hasil eksekusi: **80 tests, 452 assertions lulus 100% (PASS)** dalam 5.72 detik.
+   - Hasil eksekusi: **80 tests, 452 assertions lulus 100% (PASS)** dalam 5.72 detik *(snapshot historis; baseline terkini 108 tests, 680 assertions)*.
 2. **Browser Automation Testing (Puppeteer)**:
    - Telah diverifikasi langsung di browser: halaman Dashboard memuat peta nusantara dengan 11 radar pin yang tepat, serta tautan Isu Prioritas Atensi membuka tabel 4 isu secara utuh.

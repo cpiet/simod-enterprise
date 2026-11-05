@@ -11,7 +11,7 @@ Dokumen ini adalah **panduan rujukan resmi sistem** yang dirancang khusus untuk 
 - **Arsitektur Utama**:
   - **Backend**: Laravel 11 / 12 (PHP 8.2+) dengan arsitektur MVC & Service Repository.
   - **Frontend**: Vue 3 (Composition API dengan `<script setup>`), Inertia.js v2 (tanpa Blade view SPA tradisional).
-  - **Styling**: Tailwind CSS v4 (`@tailwindcss/vite` tanpa `tailwind.config.js`). Konfigurasi token tema tersentralisasi di [`resources/css/app.css`](file:///d:/Foto/laragon/www/simod-enterprise/resources/css/app.css).
+  - **Styling**: Tailwind CSS v4 (`@tailwindcss/vite` tanpa `tailwind.config.js`). Konfigurasi token tema tersentralisasi di [`resources/css/app.css`](file:///d:/laragon/www/simod-enterprise/resources/css/app.css).
   - **Basis Data**: MySQL 8.x / MariaDB (produksi lokal Laragon) + SQLite in-memory (khusus automated testing).
   - **Icons**: `lucide-vue-next`.
 
@@ -19,7 +19,7 @@ Dokumen ini adalah **panduan rujukan resmi sistem** yang dirancang khusus untuk 
 
 ## 🗺️ 2. Peta 4 Pilar Navigasi & Modul Terpadu
 
-Sidebar navigasi di [`EnterpriseLayout.vue`](file:///d:/Foto/laragon/www/simod-enterprise/resources/js/Layouts/EnterpriseLayout.vue) distrukturkan secara tegas ke dalam 4 pilar hierarkis:
+Sidebar navigasi di [`EnterpriseLayout.vue`](file:///d:/laragon/www/simod-enterprise/resources/js/Layouts/EnterpriseLayout.vue) distrukturkan secara tegas ke dalam 4 pilar hierarkis:
 
 ```
 ├── 1. KOMANDO & INTELIJEN
@@ -41,15 +41,13 @@ Sidebar navigasi di [`EnterpriseLayout.vue`](file:///d:/Foto/laragon/www/simod-e
 └── 4. ADMINISTRASI & SISTEM
     ├── Personalia & Petugas         [/personalia] -> Manajemen akun personel & Satker
     ├── Pengaturan Satwil            [/settings/polda] -> Konfigurasi Polda & Polres jajaran
-    ├── Keamanan & Pemeliharaan      [/security] -> Pintu masuk 9 sub-modul pemeliharaan terpadu:
+    ├── Keamanan & Pemeliharaan      [/security] -> Pintu masuk 8 sub-modul pemeliharaan terpadu:
     │   ├── Keamanan Siber           [/security]
     │   ├── Hak Akses (RBAC)         [/roles]
     │   ├── Audit Log                [/audit-logs]
     │   ├── Backup Basis Data        [/database/backup]
     │   ├── Pembersihan Berita       [/maintenance/news-cleanup]
     │   ├── Otomasi Sinkron RSS      [/maintenance/rss-sync]
-    │   ├── Mode Pemeliharaan        [/maintenance]
-    │   ├── Konfigurasi Mail (SMTP)  [/settings/mail]
     │   └── Mesin Intelijen AI (LLM) [/settings/ai]
     └── Profil Saya                  [/profile] -> Kredensial dinas & PIN Cepat
 ```
@@ -61,15 +59,15 @@ Sidebar navigasi di [`EnterpriseLayout.vue`](file:///d:/Foto/laragon/www/simod-e
 Aplikasi memiliki mesin tema ganda bawaan yang terpasang pada tingkat root `<html>`:
 - **Mode Gelap (Command Center Dark)**: Menggunakan kelas `.dark` pada `<html>`. Latar belakang `#070d1d`, kartu `#0b1426`, teks slate terang dengan aksen gold/amber `#f59e0b`.
 - **Mode Terang (Executive Light)**: Menggunakan kelas `.light` pada `<html>`. Latar belakang `#f1f5f9`, kartu `#ffffff`, border `#e2e8f0`, teks kontras tinggi `#0f172a`.
-- **Anti-Flash Script**: Dijalankan secara sinkron di `<head>` pada [`resources/views/app.blade.php`](file:///d:/Foto/laragon/www/simod-enterprise/resources/views/app.blade.php) membaca `localStorage.getItem('simod_theme')` sebelum Vue ter-mount.
-- **PENTING UNTUK AGENT**: Jangan membuat class styling baru yang meng-hardcode warna teks hitam pekat pada dark mode. Manfaatkan token Tailwind yang sudah dipetakan di [`resources/css/app.css`](file:///d:/Foto/laragon/www/simod-enterprise/resources/css/app.css).
+- **Anti-Flash Script**: Dijalankan secara sinkron di `<head>` pada [`resources/views/app.blade.php`](file:///d:/laragon/www/simod-enterprise/resources/views/app.blade.php) membaca `localStorage.getItem('simod_theme')` sebelum Vue ter-mount.
+- **PENTING UNTUK AGENT**: Jangan membuat class styling baru yang meng-hardcode warna teks hitam pekat pada dark mode. Manfaatkan token Tailwind yang sudah dipetakan di [`resources/css/app.css`](file:///d:/laragon/www/simod-enterprise/resources/css/app.css).
 
 ---
 
 ## 📡 4. Mesin Agregasi Media Online (29 RSS Feeds) & Auto-Sync
 
 ### 4.1. Daftar 29 Portal Resmi Sulbar
-Seluruh 29 portal media dikonfigurasi melalui seeder [`SulbarRssFeedsSeeder.php`](file:///d:/Foto/laragon/www/simod-enterprise/database/seeders/SulbarRssFeedsSeeder.php):
+Seluruh 29 portal media dikonfigurasi melalui seeder [`SulbarRssFeedsSeeder.php`](file:///d:/laragon/www/simod-enterprise/database/seeders/SulbarRssFeedsSeeder.php):
 - **Regional Sulselbar (20)**: Detik Sulsel, Tribun Sulbar, ANTARA Makassar (Terkini, Top News, Daerah, Lintas Daerah), Mesakada, Mekora, Globalsulbar, Radar Sulbar, Sulbar Express, Mamuju Pos, Katinting, Kabar Sulbar, Suwarta, Sulbar Terkini, Malaqbi, Rakyat Sulbar, Bugis Pos, Bacasaja.id.
 - **Nasional & Umum (4)**: Antara News Terkini, CNN Indonesia Nasional, Tribunnews (Nasional), ANTARA Makassar (Politik).
 - **Hukum & Kriminal (3)**: Detikcom Hukum & Kriminal, ANTARA Makassar (Hukum), Polisiku.co.id.
@@ -105,7 +103,7 @@ Seluruh 29 portal media dikonfigurasi melalui seeder [`SulbarRssFeedsSeeder.php`
 - **Direct One-Click Escalation**: Tombol `🚨 Eskalasi Jadi Isu` pada setiap kartu postingan medsos dan kartu tren publik otomatis mengarahkan ke formulir `/issues/create` dengan pra-isi judul, kategori (`📱 Isu Medsos & Opini Publik`), URL sumber, tingkat prioritas, dan ringkasan.
 
 ### 4.5. Radar Media Online Divhumas Polri (33 Feed Nasional Terverifikasi & Sindikasi Google News)
-- **Tenant Scope**: Kode `DIVHUMAS` (ID `10`) atau query parameter `?polda=ALL`.
+- **Tenant Scope**: Kode `DIVHUMAS` (ID `10`) (alias sesi `ALL`, dipilih via `POST /tenant/switch` dengan payload `code`).
 - **Daftar 33 Feed Resmi Aktif**:
   1. ANTARA News Terkini (`https://www.antaranews.com/rss/terkini.xml`)
   2. ANTARA Top News (`https://www.antaranews.com/rss/top-news.xml`)
@@ -198,11 +196,11 @@ php artisan media:prune --days=90 --polda=SULBAR
 php artisan db:backup --force
 php artisan db:backup --type=scheduled
 
-# Menjalankan seluruh test suite otomatis (26 tests, 128 assertions)
+# Menjalankan seluruh test suite otomatis (116 tests, 710 assertions)
 php artisan test
 
 # Kompilasi aset Vite frontend
-npm run build
+npm.cmd run build
 
 # Menjalankan tunnel Ngrok publik untuk live demo & presentasi pimpinan
 ngrok http --domain=humped-obvious-blatantly.ngrok-free.dev --host-header=simod-enterprise.test 80
@@ -214,7 +212,7 @@ ngrok http --domain=humped-obvious-blatantly.ngrok-free.dev --host-header=simod-
 
 Saat Anda (Agent) diminta memodifikasi kode ini:
 1. **Verifikasi Database Testing**: File `phpunit.xml` telah dikonfigurasi menggunakan SQLite in-memory (`DB_CONNECTION=sqlite`, `DB_DATABASE=:memory:`). Jangan mengganti konfigurasi ini agar database MySQL pengembangan lokal tidak ter-wipe saat testing.
-2. **Jalankan Testing Sebelum Selesai**: Selalu jalankan `php artisan test` dan `npm run build` sebelum menyelesaikan tugas.
+2. **Jalankan Testing Sebelum Selesai**: Selalu jalankan `php artisan test` dan `npm.cmd run build` sebelum menyelesaikan tugas.
 3. **Multi-Tenant Scoping**: Setiap query data operasional (`MediaArticle`, `Issue`, `Task`, `EarlyWarning`) **wajib** menyertakan filter `polda_id`.
 4. **Preserve Docstrings**: Pertahankan semua dokumentasi, komentar PHPDoc, dan struktur kode yang ada.
 5. **Otomasi Live Demo Tunnel (Ngrok)**:
@@ -225,11 +223,11 @@ Saat Anda (Agent) diminta memodifikasi kode ini:
    - Konfigurasi `trustProxies` dan `URL::forceScheme('https')` di Laravel menjamin seluruh CSS/JS Vite dan form Inertia bekerja secara mulus di internet publik tanpa mixed-content block.
 6. **Keamanan URL Tenant (Anti-Tampering)**:
    - Dilarang membuat link atau tombol yang mengoper parameter query plaintext `?polda=...`.
-   - Selalu gunakan endpoint POST terotentikasi `POST /tenant/switch` dengan payload `polda_id` untuk isolasi sesi yang aman dan kebal manipulasi URL.
+   - Selalu gunakan endpoint POST terotentikasi `POST /tenant/switch` dengan payload `code` (kode Polda, mis. `SULBAR` atau `ALL`) untuk isolasi sesi yang aman dan kebal manipulasi URL.
 7. **Integritas Personalia & Proteksi Akun Master**:
    - Akun master sistem (`id: 1`, `kadivhumas`, `superadmin`, `cpiet`) berstatus kebal dari penghapusan (`deleteUser`) dan deaktivasi (`toggleUserStatus`).
    - Sesi pengguna aktif dilarang menghapus akunnya sendiri (*anti-self deletion*) atau mencabut status aktifnya sendiri (*anti-self lockout*).
-   - Otoritas personel terhubung erat ke matriks 17 modul pada 4 pilar di `/roles`.
+   - Otoritas personel terhubung erat ke matriks 20 modul pada 4 pilar di `/roles`.
 8. **Smart Dossier / Topik Atensi Pimpinan, Ingesti Live & Sugesti Tren Cerdas**:
    - Fitur atensi khusus kasus sensitif pimpinan di `/media-intelligence` untuk pemantauan instan dan konteks laporan khusus pada mesin Gemini AI.
    - Dilengkapi sistem caching analisis AI permanen (`ai_analysis`, `ai_analyzed_at`, `ai_articles_count`) untuk menghemat kuota token AI dan akses modal tanpa jeda.
@@ -246,7 +244,7 @@ Saat Anda (Agent) diminta memodifikasi kode ini:
 
 
 10. **Presisi Command Intelligence Hub di Command Center Utama (`/`)**:
-    - **Anti-Gimmick & 100% Dinamis**: Menghapus kartu ringkasan statis pimpinan dan menggantinya dengan **Presisi Command Intelligence Hub** 3-tab terpadu tepat di atas peta situasi nusantara pada [`Dashboard.vue`](file:///d:/Foto/laragon/www/simod-enterprise/resources/js/Pages/Dashboard.vue):
+    - **Anti-Gimmick & 100% Dinamis**: Menghapus kartu ringkasan statis pimpinan dan menggantinya dengan **Presisi Command Intelligence Hub** 3-tab terpadu tepat di atas peta situasi nusantara pada [`Dashboard.vue`](file:///d:/laragon/www/simod-enterprise/resources/js/Pages/Dashboard.vue):
       1. `📰 Media Online`: Membaca langsung laporan intelijen AI terkini (`latestMediaReport` dari `media_intelligence_reports`), menyajikan *Top Concern* pimpinan, *Executive Briefing 24 Jam*, *Arahan Inti Komando (Core Decision)*, proporsi sentimen media online (positif/netral/negatif), dan daftar isu strategis terdeteksi dengan tombol 1-klik menuju radar media.
       2. `📱 Media Sosial`: Membaca laporan intelijen AI medsos (`latestSocialReport` dari `social_intelligence_reports`), menyajikan *Top Concern Percakapan Warganet*, *Executive Social Briefing*, analisis polarisasi *Buzzer vs Netizen Organik* beserta tingkat risikonya, komposisi sentimen warganet, dan daftar *Akun Kritis / KOL* berisiko tinggi.
       3. `🛡️ Respon & Cooling System`: Matriks taktis penyejuk suasana Polri berjenjang (0-2 Jam, 2-6 Jam, 24 Jam) lengkap dengan Satker Pelaksana (PIC), Kanal Distribusi publikasi, dan aksi kehumasan terarah.
@@ -255,7 +253,7 @@ Saat Anda (Agent) diminta memodifikasi kode ini:
 11. **AppSec Hardening, Rute Kanonikal Anti-Tampering, & Global Toast Feedback Engine**:
     - **100% Rute Kanonikal (Zero `?polda=...` URL Leaks)**: Seluruh tautan navigasi internal (`/issues`, `/issues/create`, `/issues/{id}`, `/reports/export/csv`, dll.) dibersihkan dari parameter query plaintext. Isolasi tenant multi-satwil sepenuhnya dikendalikan oleh session server-side dan endpoint otentikasi `POST /tenant/switch`.
     - **Proteksi IDOR & Parameter Tampering**: Seluruh aksi mutasi data (`POST /issues`, `POST /tasks`, `POST /publications`, `POST /gallery`) secara ketat menegakkan `$validated['polda_id'] = $request->user()->polda_id` bagi personel wilayah, mencegah pemalsuan `polda_id` via payload request.
-    - **Global Floating Toast Feedback**: Komponen floating toast reaktif terpasang global di [`EnterpriseLayout.vue`](file:///d:/Foto/laragon/www/simod-enterprise/resources/js/Layouts/EnterpriseLayout.vue) memantau `page.props.flash` backend dengan auto-dismiss 4.5 detik dan event listener `window.addEventListener('simod-toast')`.
+    - **Global Floating Toast Feedback**: Komponen floating toast reaktif terpasang global di [`EnterpriseLayout.vue`](file:///d:/laragon/www/simod-enterprise/resources/js/Layouts/EnterpriseLayout.vue) memantau `page.props.flash` backend dengan auto-dismiss 4.5 detik dan event listener `window.addEventListener('simod-toast')`.
     - **Session Hardening & Logout**: Aksi logout menghapus cookie sesi, recaller cookie, menginvalider session token, dan disokong header HTTP `PreventBackHistory` (`no-cache, no-store, max-age=0, must-revalidate`).
 
 12. **Penyelarasan Tenant-Scoping Executive Briefing Command Center (`/`)**:
@@ -263,7 +261,7 @@ Saat Anda (Agent) diminta memodifikasi kode ini:
     - **Tautan Langsung Interaktif ke Berita Asli & Lembar Briefing**:
       - Kartu *Executive Briefing Situasi Pemberitaan (24 Jam Terakhir)* dilengkapi tombol aksi cepat `[ Buka Lembar Briefing & Berita ↗ ]` menuju Radar Media Online Tab 02.
       - Seluruh kartu pada *Isu Strategis Terdeteksi* menggunakan tag tautan aktif (`<a>` link dengan atribut `target="_blank"`) yang langsung membuka URL berita asli di portal penerbitnya saat diklik, lengkap dengan metadata nama portal media dan timestamp publikasi.
-      - Footer kartu menyediakan tautan cepat untuk akses instan ke Format Naskah WhatsApp Komando Pimpinan dan Cetak A4 Resmi.
+      - Footer kartu menyediakan tautan cepat untuk akses instan ke Format Naskah WhatsApp Komando Pimpinan.
 
 13. **100% UI Data Parity Dropdown Reaktif di Vue (`MediaIntelligence/Index.vue`)**:
     - Opsi portal media dihitung secara dinamis (`availablePortals` computed property) langsung dari memori artikel aktif di browser (`props.sampleArticles`).
@@ -286,7 +284,7 @@ SIMOD Enterprise dirancang untuk didukung secara kolaboratif oleh berbagai model
 
 ### 8.2. Protokol Kolaborasi Antar-Agent (Cross-Agent Rules of Engagement)
 1. **Never Break the Test Suite**:
-   Sebelum menyatakan suatu tugas selesai, setiap agent **wajib** menjalankan `php artisan test` (memastikan seluruh 93 tests tetap hijau) dan `npm.cmd run build` (memastikan bundle Vite terkompilasi bersih).
+   Sebelum menyatakan suatu tugas selesai, setiap agent **wajib** menjalankan `php artisan test` (memastikan seluruh 116 tests tetap hijau) dan `npm.cmd run build` (memastikan bundle Vite terkompilasi bersih).
 2. **Never Touch Testing Database Engine**:
    Jangan pernah mengubah konfigurasi `phpunit.xml` dari `:memory:` ke database fisik lokal `mysql`.
 3. **Commit Cleanly**:

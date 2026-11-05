@@ -21,8 +21,8 @@ SIMOD Enterprise dirancang dengan arsitektur **Modular Monolith Multi-Tenant** y
 ### Karakteristik Desain:
 - **Tenant Identification**: Setiap entitas utama (`issues`, `press_releases`, `media_feeds`, `publications`, `tasks`, `early_warnings`) memiliki kolom `polda_id` (foreign key ke `poldas`).
 - **Sub-Tenant (Satwil)**: Opsional terikat ke `polres_id` untuk penugasan tingkat kewilayahan.
-- **Tenant Switching Instan**: Pada antarmuka Inertia.js, pergantian Polda dilakukan secara reaktif tanpa *full-page reload* menggunakan parameter `?polda={CODE}`.
-- **Konsolidasi Mabes**: Parameter `?polda=ALL` mengagregasi data dari seluruh Polda terdaftar untuk memantau situasi kamtibmas nasional.
+- **Tenant Switching Instan**: Pada antarmuka Inertia.js, pergantian Polda dilakukan secara reaktif tanpa *full-page reload* melalui `POST /tenant/switch` dengan payload `{ "code": "SULBAR" }` (tanpa parameter query di URL).
+- **Konsolidasi Mabes**: Kode tenant `ALL` (alias `DIVHUMAS`) mengagregasi data dari seluruh Polda terdaftar untuk memantau situasi kamtibmas nasional.
 
 ---
 
@@ -32,7 +32,7 @@ SIMOD Enterprise dirancang dengan arsitektur **Modular Monolith Multi-Tenant** y
 |:---|:---|
 | **`poldas`** | Menyimpan identitas induk wilayah hukum (Nama, Kode, Region, Timezone, Kapolda, Kabid Humas). |
 | **`polres`** | Menyimpan satuan kewilayahan di bawah Polda (`polda_id`). |
-| **`users`** | Data personel kepolisian dengan peran (`role`: `super_admin_mabes`, `admin_polda`, `operator_satker`, `personel_humas`). |
+| **`users`** | Data personel kepolisian dengan peran (`role`: `kadiv_humas`, `super_admin_mabes`, `polda_leader`, `verifikator`, `analis`, `operator`). |
 | **`early_warnings`** | Matriks peringatan dini EWS (*level: red, yellow, green*), risiko reputasi, dan protokol respon 3 fase. |
 | **`media_feeds`** | Daftar sumber RSS feed lokal & nasional per Polda (`polda_id`). |
 | **`media_articles`** | Artikel hasil tarikan agregator RSS maupun crawling worker Python. |
@@ -47,17 +47,29 @@ SIMOD Enterprise dirancang dengan arsitektur **Modular Monolith Multi-Tenant** y
 
 ## 3. Tingkat Akses (Role-Based Access Control)
 
+Peran bawaan sistem (`RolePermission::defaultRoles()`; detail matriks 20 modul di [doc 12](12-modul-personalia-dan-rbac-roles.md)):
+
 1. **Kadivhumas Polri (Mabes Komando Nasional)** (`kadiv_humas`):
    - Pimpinan tertinggi komando kehumasan Polri: **Irjen Pol. Johnny Eddizon Isir, S.I.K., M.T.C.P.**
-   - Otoritas tertinggi dan pengawasan terpusat atas 34 Polda se-Indonesia dan 5 Biro/Bagian Divhumas Polri (`polda_id = null`).
-   - Akses penuh ke seluruh modul intelijen, siaran pers pimpinan, penugasan nasional, dan pengawasan satwil.
+   - Otoritas tertinggi dan pengawasan terpusat atas seluruh Polda dan Biro/Bagian Divhumas Polri (`polda_id = null`).
+   - Akses penuh (21/20 modul) ke seluruh modul intelijen, siaran pers pimpinan, penugasan nasional, dan pengawasan satwil.
 2. **Super Admin Mabes Polri** (`super_admin_mabes`):
-   - Akses administratif teknis penuh lintas seluruh Polda (`polda_id = null` atau bypass filter).
-   - Menambah, mengubah status, mengelola konfigurasi multi-tenant, dan mengaudit seluruh Polda se-Indonesia.
+   - Akses administratif teknis penuh lintas seluruh Polda (21/20 modul, bypass kunci tenant).
+   - Menambah, mengubah status, mengelola konfigurasi multi-tenant, dan mengaudit seluruh Polda.
 3. **Pimpinan Polda / Kabid Humas** (`polda_leader`):
    - Otoritas tertinggi pada satu wilayah hukum Polda (`polda_id` terkunci).
    - Mengelola feeds RSS lokal, menerbitkan Siaran Pers pimpinan, dan mendisposisikan tugas ke jajaran Polres.
-3. **Operator Satker / Kasi Humas Polres** (`operator_satker`):
+4. **Verifikator / Kasubbid Penmas** (`verifikator`): validasi fakta, klarifikasi hoaks, dan penerbitan rilis (12/20 modul).
+5. **Analis Intelijen Media & Siber** (`analis`): radar media online/sosial, analisis AI, dan pelaporan (8/20 modul).
+6. **Operator Satwil / Sie Humas Polres** (`operator`):
    - Mengelola isu dan penugasan yang didelegasikan ke Polres terkait (`polres_id`).
-   - Melaporkan perkembangan investigasi lapangan (*task updates*).
+   - Melaporkan perkembangan investigasi lapangan (*task updates*) (7/20 modul).
 
+Peran dengan `polda_id` terisi (selain `kadiv_humas`/`super_admin_mabes`/`superadmin`) **terkunci** ke Polda-nya oleh `resolveActiveTenant()`.
+
+---
+
+## 4. Referensi Silang
+
+- Daftar lengkap 36 tabel basis data, 110 rute, services, dan perintah CLI: [doc 22](22-peta-kode-dan-sumber-kebenaran.md).
+- Cakupan "34 Polda" adalah **target arsitektur**; data awal yang di-seed saat ini adalah Divhumas Polri (Mabes) + 5 Polda (Sulbar, Gorontalo, Sulsel, Sultra, Kaltim).

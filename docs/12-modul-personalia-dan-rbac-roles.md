@@ -10,12 +10,12 @@ Aplikasi SIMOD Enterprise menerapkan sistem pembagian peran (*role-based access 
 
 | Kode Role | Nama Jabatan Kedinasan | Tingkat Otoritas | Cakupan Akses | Modul Aktif |
 |:---|:---|:---|:---|:---:|
-| `kadiv_humas` | **Kadiv Humas Polri** | Pimpinan Tertinggi Mabes | Nasional (Seluruh Polda & Satwil) | 17 / 17 |
-| `super_admin_mabes` | **Super Admin Mabes** | Administrator Sistem Pusat | Nasional (Sistem & Keamanan Penuh) | 17 / 17 |
-| `polda_leader` | **Kabid Humas Polda** | Pimpinan Satwil Daerah | Regional Polda & Seluruh Polres Jajaran | 15 / 17 |
-| `verifikator` | **Kasubbid / Verifikator** | Validator Konten & Fakta | Regional Polda (Verifikasi Isu & Rilis) | 13 / 17 |
-| `analis` | **Analis Intelijen Media** | Pengolah Data & Opini | Regional / Nasional (Radar & Analisis AI) | 11 / 17 |
-| `operator` | **Operator Satwil / Polres** | Pelaksana Lapangan | Lokal Polres / Satker Tertentu | 8 / 17 |
+| `kadiv_humas` | **Kadiv Humas Polri** | Pimpinan Tertinggi Mabes | Nasional (Seluruh Polda & Satwil) | 21 / 20 |
+| `super_admin_mabes` | **Super Admin Mabes** | Administrator Sistem Pusat | Nasional (Sistem & Keamanan Penuh) | 21 / 20 |
+| `polda_leader` | **Kabid Humas Polda** | Pimpinan Satwil Daerah | Regional Polda & Seluruh Polres Jajaran | 16 / 20 |
+| `verifikator` | **Kasubbid / Verifikator** | Validator Konten & Fakta | Regional Polda (Verifikasi Isu & Rilis) | 12 / 20 |
+| `analis` | **Analis Intelijen Media** | Pengolah Data & Opini | Regional / Nasional (Radar & Analisis AI) | 8 / 20 |
+| `operator` | **Operator Satwil / Polres** | Pelaksana Lapangan | Lokal Polres / Satker Tertentu | 7 / 20 |
 
 ---
 
@@ -38,36 +38,41 @@ Untuk menjaga integritas dan stabilitas sistem komando, aturan proteksi diterapk
 
 ---
 
-## 🧩 3. Pemetaan 17 Modul Operasional pada 4 Pilar
+## 🧩 3. Pemetaan 20 Modul Operasional pada 4 Pilar
 
-Setiap role memiliki hak akses terdefinisi pada 17 modul sistem yang dikelompokkan ke dalam 4 pilar utama:
+Setiap role memiliki hak akses terdefinisi pada **20 kunci modul** (`RolePermission::defaultModules()`) yang dikelompokkan ke dalam 4 pilar utama:
 
 ```
 ├── 1. KOMANDO & INTELIJEN (6 Modul)
-│   ├── command_center      -> Dashboard Eksekutif & Early Warning System
-│   ├── media_intelligence  -> Radar Media Online & Kliping Berita 29 RSS
-│   ├── social_intelligence -> Radar Media Sosial & KOL Tracker
-│   ├── ai_briefing         -> Analisis Intelijen AI & Executive Briefing
-│   ├── ews_alert           -> Notifikasi Eskalasi Krisis Kamtibmas
-│   └── whatsapp_draft      -> Generator Naskah Briefing WhatsApp Pimpinan
+│   ├── dashboard_view              -> Command Center & Situasi Wilayah (EWS, peta)
+│   ├── media_intelligence_view     -> Radar Media Online (kliping RSS)
+│   ├── media_intelligence_ai       -> Sinkron berita & analisis otomatis AI, naskah WhatsApp
+│   ├── media_intelligence_manage   -> Master feed RSS (admin pemeliharaan)
+│   ├── social_intelligence_view    -> Radar Media Sosial, tagar, KOL
+│   └── social_intelligence_sync    -> Sinkron Apify & pengaturan medsos
 │
 ├── 2. MANAJEMEN ISU & TUGAS (5 Modul)
-│   ├── issue_monitoring    -> Pemantauan Daftar Isu Publik
-│   ├── issue_input         -> Formulir Input Laporan Lapangan
-│   ├── verification_queue  -> Antrean Verifikasi Fakta & Cek Hoaks
-│   ├── task_disposition    -> Surat Perintah & Disposisi Tugas Personel
-│   └── task_recap          -> Rekapitulasi & Progres Kinerja Anggota
+│   ├── issues_view                 -> Pemantauan daftar isu publik
+│   ├── issues_create               -> Input laporan lapangan & bukti
+│   ├── issues_verify               -> Verifikasi fakta & klarifikasi hoaks
+│   ├── tasks_disposition           -> Surat perintah & disposisi tugas
+│   └── tasks_execute               -> Laporan pelaksanaan tugas personel
 │
 ├── 3. PUBLIKASI & DOKUMENTASI (3 Modul)
-│   ├── multi_channel_pub   -> Publikasi Multi-Kanal (Tribratanews, Medsos)
-│   ├── secure_gallery      -> Galeri Dokumentasi Foto & Video Aman
-│   └── reports_anev        -> Laporan & Analisa Evaluasi (Anev) Berkala
+│   ├── publications_manage         -> Publikasi rilis multi-kanal
+│   ├── gallery_access              -> Galeri dokumentasi & arsip bukti
+│   └── reports_export              -> Laporan Anev & ekspor CSV/PDF
 │
-└── 4. ADMINISTRASI & SISTEM (3 Modul)
-    ├── personalia          -> Manajemen Personel & Akun Dinas
-    ├── settings_polda      -> Konfigurasi Satwil Polda & Polres
-    └── system_maintenance  -> Keamanan, Hak Akses, Backup DB, & Pemeliharaan
+└── 4. ADMINISTRASI & SISTEM (6 Modul)
+    ├── personalia_manage           -> Manajemen akun personalia & Satker
+    ├── polda_settings              -> Konfigurasi master satwil (Polda/Polres)
+    ├── security_center             -> Keamanan siber, audit log, Mesin Intelijen AI
+    ├── database_backup             -> Backup & restore basis data
+    ├── maintenance_ops             -> Pemeliharaan, news cleanup & RSS sync
+    └── roles_matrix_manage         -> Otoritas & matriks hak akses (RBAC)
 ```
+
+> **Penegakan server-side:** matriks ini ditegakkan oleh middleware `module:*` (`EnsureModulePermission`) pada seluruh rute modul di `routes/web.php`, selain menentukan visibilitas menu (`MenuItem::getNavigationForUser`) dan `auth.permissions` di frontend. Super Admin/Kadivhumas selalu lolos; peran lain harus memiliki minimal satu kunci yang disyaratkan rute. Perubahan matriks di `/roles` berlaku seketika. Pemetaan rute→kunci mengikuti `permission_required` pada menu (mis. `/personalia` → `personalia_manage`, `/security`, `/audit-logs`, `/settings/ai` → `security_center`). Pelanggaran → HTTP 403 (JSON untuk request AJAX).
 
 ---
 
@@ -84,7 +89,7 @@ Halaman `resources/js/Pages/Personalia/Index.vue` dilengkapi dengan:
 - **Tabel Personel Komprehensif**:
   - Kolom Profil (Avatar inisial pangkat, Nama, NRP, Pangkat/Jabatan).
   - Kolom Role & Badge Hak Akses.
-  - Kolom Otoritas Modul (`X / 17 Modul Aktif` dengan tombol *Inspect* cepat).
+  - Kolom Otoritas Modul (`X / 20 Modul Aktif` dengan tombol *Inspect* cepat).
   - Kolom Satwil/Polres Penugasan.
   - Kolom Kredensial Login (Username & Email dinas).
   - Kolom Status Switch (Aktif / Nonaktif dengan konfirmasi proteksi).
@@ -92,7 +97,7 @@ Halaman `resources/js/Pages/Personalia/Index.vue` dilengkapi dengan:
 - **5 Modal Interaktif**:
   1. *Modal Tambah Personel*: Dilengkapi preview live modul yang dapat diakses sesuai role yang dipilih, serta pembuatan otomatis username dari nama.
   2. *Modal Edit Personel*: Form pembaruan komprehensif pangkat, satwil, role, dan kredensial.
-  3. *Modal Inspeksi Otoritas (RBAC)*: Menampilkan ke-17 modul lengkap yang dikelompokkan dalam 4 pilar beserta indikator hijau (Aktif) atau abu-abu (Tidak Ada Akses).
+  3. *Modal Inspeksi Otoritas (RBAC)*: Menampilkan ke-20 modul lengkap yang dikelompokkan dalam 4 pilar beserta indikator hijau (Aktif) atau abu-abu (Tidak Ada Akses).
   4. *Modal Reset Password Dinas*: Form ganti password cepat minimal 6 karakter.
   5. *Modal Konfirmasi Hapus Akun*: Dialog konfirmasi aman dengan verifikasi akun master.
 

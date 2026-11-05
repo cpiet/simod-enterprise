@@ -53,13 +53,13 @@ const uploadForm = ref({
   caption: '',
   file_type: 'photo',
   file_url: '',
+  file: null,
   is_private: true,
 });
 const isSubmitting = ref(false);
 
 const applyFilters = () => {
   router.get('/gallery', {
-    polda: props.selectedCode,
     format: selectedFormat.value,
     polres: selectedPolres.value,
     q: search.value,
@@ -84,13 +84,22 @@ const closeLightbox = () => {
   activeMedia.value = null;
 };
 
+const onFilePicked = (e) => {
+  uploadForm.value.file = e.target.files?.[0] || null;
+};
+
 const submitUpload = () => {
   if (!uploadForm.value.title) {
-    alert('Judul media dokumentasi wajib diisi.');
+    window.dispatchEvent(new CustomEvent('simod-toast', { detail: { message: 'Judul media dokumentasi wajib diisi.', type: 'error' } }));
+    return;
+  }
+  if (!uploadForm.value.file && !uploadForm.value.file_url) {
+    window.dispatchEvent(new CustomEvent('simod-toast', { detail: { message: 'Pilih berkas atau isi tautan berkas.', type: 'error' } }));
     return;
   }
   isSubmitting.value = true;
   router.post('/gallery', uploadForm.value, {
+    forceFormData: true,
     preserveScroll: true,
     onSuccess: () => {
       isSubmitting.value = false;
@@ -102,6 +111,7 @@ const submitUpload = () => {
         caption: '',
         file_type: 'photo',
         file_url: '',
+        file: null,
         is_private: true,
       };
     },
@@ -112,7 +122,7 @@ const submitUpload = () => {
 };
 
 const formatBytes = (bytes) => {
-  if (!bytes || bytes === 0) return '1.2 MB';
+  if (!bytes || bytes === 0) return '-';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -120,7 +130,7 @@ const formatBytes = (bytes) => {
 };
 
 const formatDateWita = (dateStr) => {
-  if (!dateStr) return '28 Okt 2026, 14:00 WITA';
+  if (!dateStr) return '-';
   try {
     const d = new Date(dateStr);
     return d.toLocaleDateString('id-ID', {
@@ -143,79 +153,28 @@ const formatDateWita = (dateStr) => {
     :selected-code="selectedCode"
     :metrics="metrics"
   >
-    <!-- Header -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-      <div>
-        <div class="flex items-center gap-2">
-          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-            Penyimpanan Terproteksi
-          </span>
-          <span class="text-xs font-bold text-slate-400">{{ selectedPolda?.name || 'Polda Sulawesi Barat' }}</span>
-        </div>
-        <h1 class="text-2xl md:text-3xl font-black text-white tracking-tight mt-1">
-          Galeri Dokumentasi Media & Alat Bukti
-        </h1>
-        <p class="text-xs md:text-sm text-slate-300">
-          Repositori foto kegiatan dinas, video peliputan lapangan, dan alat bukti digital Humas Polri multi-satwil.
-        </p>
+    <!-- Header ringkas -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div class="min-w-0">
+        <p class="text-xs font-bold text-slate-400">{{ selectedCode === 'ALL' ? 'Mabes Polri (Nasional)' : selectedPolda?.name }}</p>
+        <h1 class="text-2xl md:text-3xl font-black text-white tracking-tight">Galeri Dokumentasi</h1>
       </div>
 
-      <div class="flex items-center gap-3">
-        <button
-          @click="isUploadModalOpen = true"
-          class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:brightness-110 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition"
-        >
-          <UploadCloud class="w-4 h-4" />
-          <span>Unggah Berkas Baru</span>
-        </button>
-      </div>
+      <button
+        @click="isUploadModalOpen = true"
+        class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:brightness-110 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition cursor-pointer shrink-0"
+      >
+        <UploadCloud class="w-4 h-4" />
+        <span>Unggah Berkas</span>
+      </button>
     </div>
 
-    <!-- 4 Stats Cards -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="p-4 sm:p-5 rounded-2xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
-        <div class="flex items-center justify-between">
-          <span class="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-400">Total Berkas</span>
-          <FolderClosed class="w-4 h-4 text-amber-400" />
-        </div>
-        <div class="text-2xl sm:text-3xl font-black text-white">
-          {{ galleryStats?.total_media || mediaFiles?.total || 0 }}
-        </div>
-        <p class="text-[10px] sm:text-[11px] text-slate-400">Foto & Video Terarsip</p>
-      </div>
-
-      <div class="p-4 sm:p-5 rounded-2xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
-        <div class="flex items-center justify-between">
-          <span class="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-400">Foto Dokumentasi</span>
-          <Camera class="w-4 h-4 text-emerald-400" />
-        </div>
-        <div class="text-2xl sm:text-3xl font-black text-emerald-400">
-          {{ galleryStats?.total_photos || 0 }}
-        </div>
-        <p class="text-[10px] sm:text-[11px] text-slate-400">Giat Harkamtibmas</p>
-      </div>
-
-      <div class="p-4 sm:p-5 rounded-2xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
-        <div class="flex items-center justify-between">
-          <span class="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-400">Video Peliputan</span>
-          <Video class="w-4 h-4 text-sky-400" />
-        </div>
-        <div class="text-2xl sm:text-3xl font-black text-sky-400">
-          {{ galleryStats?.total_videos || 0 }}
-        </div>
-        <p class="text-[10px] sm:text-[11px] text-slate-400">Rekaman Operasional</p>
-      </div>
-
-      <div class="p-4 sm:p-5 rounded-2xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
-        <div class="flex items-center justify-between">
-          <span class="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-400">Kapasitas Arsip</span>
-          <HardDrive class="w-4 h-4 text-amber-400" />
-        </div>
-        <div class="text-2xl sm:text-3xl font-black text-white">
-          {{ galleryStats?.total_size_mb || 14.8 }} <span class="text-sm font-bold text-slate-400">MB</span>
-        </div>
-        <p class="text-[10px] sm:text-[11px] text-emerald-400 font-semibold">Tersimpan Aman (AES)</p>
-      </div>
+    <!-- Strip statistik (angka nyata dari basis data) -->
+    <div class="rounded-2xl bg-[#0b1426] border border-slate-800 shadow-lg grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-slate-800 overflow-hidden">
+      <div class="p-4"><p class="text-[11px] font-bold text-slate-400 flex items-center gap-1.5"><FolderClosed class="w-3.5 h-3.5 text-amber-400" /> Total berkas</p><p class="text-2xl font-black text-white mt-1">{{ galleryStats?.total_media ?? 0 }}</p></div>
+      <div class="p-4"><p class="text-[11px] font-bold text-slate-400 flex items-center gap-1.5"><Camera class="w-3.5 h-3.5 text-emerald-400" /> Foto</p><p class="text-2xl font-black text-emerald-400 mt-1">{{ galleryStats?.total_photos ?? 0 }}</p></div>
+      <div class="p-4"><p class="text-[11px] font-bold text-slate-400 flex items-center gap-1.5"><Video class="w-3.5 h-3.5 text-sky-400" /> Video</p><p class="text-2xl font-black text-sky-400 mt-1">{{ galleryStats?.total_videos ?? 0 }}</p></div>
+      <div class="p-4"><p class="text-[11px] font-bold text-slate-400 flex items-center gap-1.5"><HardDrive class="w-3.5 h-3.5 text-amber-400" /> Ukuran tercatat</p><p class="text-2xl font-black text-white mt-1">{{ galleryStats?.total_size_mb ?? 0 }} <span class="text-sm font-bold text-slate-400">MB</span></p></div>
     </div>
 
     <!-- Filter & Search Toolbar -->
@@ -293,7 +252,7 @@ const formatDateWita = (dateStr) => {
           <!-- Video or Image -->
           <img
             v-if="item.file_type === 'photo' || !item.file_url?.includes('.mp4')"
-            :src="item.file_url || 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=600&auto=format&fit=crop&q=80'"
+            :src="item.file_url"
             :alt="item.title"
             class="w-full h-full object-cover group-hover:scale-105 transition duration-500"
           />
@@ -316,7 +275,7 @@ const formatDateWita = (dateStr) => {
               v-else
               class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-slate-950/80 text-amber-400 border border-slate-700 backdrop-blur-md"
             >
-              Polda Sulbar
+              {{ item.polda?.name || selectedPolda?.name || 'Polda' }}
             </span>
 
             <span
@@ -459,11 +418,11 @@ const formatDateWita = (dateStr) => {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
             <div>
               <span class="text-slate-400 block text-[11px]">Keterangan / Narasi:</span>
-              <p class="text-slate-200 font-medium mt-0.5">{{ activeMedia.caption || 'Dokumentasi resmi operasi Humas Polri.' }}</p>
+              <p class="text-slate-200 font-medium mt-0.5">{{ activeMedia.caption || 'Tanpa keterangan.' }}</p>
             </div>
             <div>
               <span class="text-slate-400 block text-[11px]">Satwil & Lokasi:</span>
-              <p class="text-amber-400 font-bold mt-0.5">{{ activeMedia.polres?.name || 'Polda Sulawesi Barat' }}</p>
+              <p class="text-amber-400 font-bold mt-0.5">{{ activeMedia.polres?.name || selectedPolda?.name || '-' }}</p>
             </div>
             <div>
               <span class="text-slate-400 block text-[11px]">Waktu Unggah:</span>
@@ -545,7 +504,7 @@ const formatDateWita = (dateStr) => {
                 v-model="uploadForm.polres_id"
                 class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
               >
-                <option value="">Polda Sulawesi Barat</option>
+                <option value="">{{ selectedPolda?.name || 'Tingkat Polda' }}</option>
                 <option v-for="p in polresList" :key="p.id" :value="p.id">
                   {{ p.name }}
                 </option>
@@ -553,20 +512,22 @@ const formatDateWita = (dateStr) => {
             </div>
           </div>
 
-          <div>
-            <label class="block font-bold text-slate-300 mb-1">URL Berkas / Media *</label>
+          <div class="space-y-2">
+            <label class="block font-bold text-slate-300">Berkas (JPG, PNG, WEBP, MP4, PDF &mdash; maks. 20 MB)</label>
+            <input
+              type="file"
+              accept=".jpg,.jpeg,.png,.webp,.mp4,.pdf"
+              @change="onFilePicked"
+              class="block w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-amber-400 file:text-slate-950 file:font-bold file:cursor-pointer"
+            />
+            <p class="text-[10px] text-slate-400">Atau isi tautan HTTPS bila berkas sudah disimpan di server lain:</p>
             <input
               v-model="uploadForm.file_url"
               type="url"
-              required
-              placeholder="https://... (URL foto/video)"
+              placeholder="https://... (opsional bila memilih berkas)"
               class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
             />
-            <p class="text-[10px] text-slate-400 mt-1">
-              Gunakan tautan aman HTTPS berkas dokumentasi atau hasil upload server TIK.
-            </p>
           </div>
-
           <div>
             <label class="block font-bold text-slate-300 mb-1">Narasi Ringkas / Keterangan</label>
             <textarea
@@ -585,7 +546,7 @@ const formatDateWita = (dateStr) => {
               class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-amber-400 focus:ring-0"
             />
             <label for="is_private" class="text-xs text-slate-300 cursor-pointer">
-              Tandai sebagai <strong>Alat Bukti Terenkripsi / Private</strong> (Hanya diakses internal Humas)
+              Tandai sebagai <strong>bukti / privat</strong> (hanya untuk internal Humas)
             </label>
           </div>
 

@@ -69,8 +69,8 @@ php artisan migrate:fresh --seed
 ### 5. Jalankan Server Pengembangan
 ```bash
 # Terminal 1: Kompilasi aset Vite
-npm run build
-# (atau 'npm run dev' untuk live reload saat pengembangan)
+npm.cmd run build
+# (atau 'npm.cmd run dev' untuk live reload saat pengembangan)
 
 # Terminal 2: Laravel Server (jika tidak menggunakan vhost Laragon)
 php artisan serve

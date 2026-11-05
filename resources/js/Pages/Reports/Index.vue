@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
+import { statusMeta, formatWitaDate } from '@/utils/issueFlow';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
 import {
   FileBarChart2,
@@ -19,6 +20,7 @@ import {
   Flame,
   Filter,
   Check,
+  Ellipsis,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -28,6 +30,7 @@ const props = defineProps({
   reportsKpi: Object,
   satwilBreakdown: Array,
   categoryBreakdown: Array,
+  categoryOptions: { type: Array, default: () => [] },
   fieldReports: Object,
   filters: Object,
   metrics: Object,
@@ -39,7 +42,6 @@ const copySuccess = ref(false);
 
 const applyFilters = () => {
   router.get('/reports', {
-    polda: props.selectedCode,
     category: selectedCategory.value,
     status: selectedStatus.value,
   }, {
@@ -48,45 +50,36 @@ const applyFilters = () => {
   });
 };
 
+const pct = (v) => (v === null || v === undefined ? 'belum ada data' : v + '%');
+
 const copyExecutiveSummary = () => {
-  const poldaName = props.selectedCode === 'ALL' ? 'Mabes Polri' : (props.selectedPolda?.name || 'Polda Sulawesi Barat');
-  const total = props.reportsKpi?.total_reports || 0;
-  const sla = props.reportsKpi?.sla_rate || 100;
-  const inProg = props.reportsKpi?.in_progress || 0;
-  const pending = props.reportsKpi?.pending_verify || 0;
+  const poldaName = props.selectedCode === 'ALL' ? 'Mabes Polri' : (props.selectedPolda?.name || '-');
+  const k = props.reportsKpi || {};
+  const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
 
-  const now = new Date();
-  const dateStr = now.toLocaleDateString('id-ID', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
-
-  const summary = `*LAPORAN REKAPITULASI & ANEV HUMAS POLRI*\nWilayah: ${poldaName}\nTanggal: ${dateStr}\n\n1. Total Laporan & Isu Terpantau: ${total} Kasus\n2. Tingkat Penyelesaian Sesuai SLA: ${sla}%\n3. Laporan Sedang Investigasi/Klarifikasi: ${inProg} Kasus\n4. Antrean Menunggu Verifikasi: ${pending} Laporan\n5. Indeks Kondusifitas Wilayah: SANGAT KONDUSIF\n\nDemikian dilaporkan kepada Pimpinan sebagai bahan pertimbangan kebijakan komando. Terima kasih.`;
+  const summary = '*LAPORAN REKAPITULASI & ANEV HUMAS POLRI*\n'
+    + 'Wilayah: ' + poldaName + '\n'
+    + 'Tanggal: ' + dateStr + '\n\n'
+    + '1. Total laporan & isu terpantau: ' + (k.total_reports || 0) + ' kasus\n'
+    + '2. Tingkat penyelesaian: ' + pct(k.sla_rate) + ' (' + (k.resolved_count || 0) + ' selesai/arsip)\n'
+    + '3. Sedang investigasi/klarifikasi: ' + (k.in_progress || 0) + ' kasus\n'
+    + '4. Antrean menunggu telaah: ' + (k.pending_verify || 0) + ' laporan\n\n'
+    + 'Demikian dilaporkan sebagai bahan pertimbangan pimpinan.';
   navigator.clipboard.writeText(summary);
   copySuccess.value = true;
   setTimeout(() => (copySuccess.value = false), 2500);
 };
 
+const showMenu = ref(false);
+const closeMenu = () => { showMenu.value = false; };
+onMounted(() => document.addEventListener('click', closeMenu));
+onUnmounted(() => document.removeEventListener('click', closeMenu));
+
 const triggerPrint = () => {
   window.print();
 };
 
-const formatDateWita = (dateStr) => {
-  if (!dateStr) return '-';
-  try {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('id-ID', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }) + ' WITA';
-  } catch (e) {
-    return dateStr;
-  }
-};
+const formatDateWita = formatWitaDate;
 </script>
 
 <template>
@@ -96,105 +89,67 @@ const formatDateWita = (dateStr) => {
     :selected-code="selectedCode"
     :metrics="metrics"
   >
-    <!-- Header Page -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-      <div>
-        <div class="flex items-center gap-2">
-          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950">
-            Analisis & Evaluasi
-          </span>
-          <span class="text-xs font-bold text-slate-400">
-            {{ selectedCode === 'ALL' ? 'Konsolidasi Nasional' : (selectedPolda?.name || 'Polda Sulawesi Barat') }}
-          </span>
-        </div>
-        <h1 class="text-2xl md:text-3xl font-black text-white tracking-tight mt-1">
-          Laporan & Rekapitulasi Anev Humas
-        </h1>
-        <p class="text-xs md:text-sm text-slate-300">
-          Statistik agregasi pemberitaan, rekapitulasi penanganan isu Kamtibmas, dan kinerja kehumasan 6 Satwil Polres.
-        </p>
+    <!-- Header ringkas: 1 aksi utama (CSV) + salin ringkasan + menu -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 print:hidden">
+      <div class="min-w-0">
+        <p class="text-xs font-bold text-slate-400">{{ selectedCode === 'ALL' ? 'Konsolidasi Nasional' : (selectedPolda?.name || '-') }}</p>
+        <h1 class="text-2xl md:text-3xl font-black text-white tracking-tight">Laporan &amp; Anev</h1>
       </div>
 
-      <!-- Action Buttons -->
-      <div class="flex flex-wrap items-center gap-2 print:hidden">
-        <button
-          @click="copyExecutiveSummary"
-          class="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 dark:border-slate-700 dark:text-slate-200 text-xs font-bold transition shadow-sm"
-        >
-          <Copy class="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
-          <span>{{ copySuccess ? 'Tersalin ke Clipboard!' : 'Salin Format WA Pimpinan' }}</span>
-        </button>
-
-        <button
-          @click="triggerPrint"
-          class="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 dark:border-slate-700 dark:text-slate-200 text-xs font-bold transition shadow-sm"
-        >
-          <Printer class="w-3.5 h-3.5 text-sky-500 dark:text-sky-400" />
-          <span>Cetak Dokumen</span>
-        </button>
-
+      <div class="flex items-center gap-2 shrink-0">
         <a
           href="/reports/export/csv"
-          class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-lg shadow-amber-400/20 transition cursor-pointer"
+          class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-lg shadow-amber-400/20 transition cursor-pointer"
         >
-          <Download class="w-3.5 h-3.5" />
-          <span>Ekspor CSV Resmi</span>
+          <Download class="w-4 h-4" />
+          <span>Ekspor CSV</span>
         </a>
+
+        <button
+          @click="copyExecutiveSummary"
+          class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer"
+          title="Salin ringkasan angka untuk laporan WhatsApp pimpinan"
+        >
+          <Copy class="w-4 h-4 text-amber-400" />
+          <span class="hidden sm:inline">{{ copySuccess ? 'Tersalin!' : 'Salin Ringkasan' }}</span>
+        </button>
+
+        <div class="relative">
+          <button type="button" @click.stop="showMenu = !showMenu" class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 cursor-pointer" title="Aksi lainnya">
+            <Ellipsis class="w-4 h-4" />
+          </button>
+          <div v-if="showMenu" @click.stop class="absolute right-0 top-full mt-2 z-30 w-48 rounded-xl bg-[#0b1426] border border-slate-700 shadow-2xl p-1.5">
+            <button type="button" @click="triggerPrint(); showMenu = false" class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-slate-200 hover:bg-slate-800 transition cursor-pointer text-left">
+              <Printer class="w-4 h-4 text-sky-400" />
+              <span>Cetak halaman</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- 4 KPI Metrics -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="p-5 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
-        <span class="text-[11px] font-black uppercase tracking-wider text-slate-400">Total Laporan Masuk</span>
-        <div class="flex items-baseline justify-between">
-          <span class="text-3xl font-black text-white">{{ reportsKpi?.total_reports || 0 }}</span>
-          <span class="text-xs font-bold text-emerald-400 flex items-center gap-0.5">
-            <TrendingUp class="w-3 h-3" /> Aktif
-          </span>
-        </div>
-        <p class="text-[11px] text-slate-400">6 Satwil Jajaran Sulbar</p>
+    <!-- Strip angka (nyata dari basis data) -->
+    <div class="rounded-2xl bg-[#0b1426] border border-slate-800 shadow-lg grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-slate-800 overflow-hidden">
+      <div class="p-4">
+        <p class="text-[11px] font-bold text-slate-400">Total laporan</p>
+        <p class="text-2xl font-black text-white mt-1">{{ reportsKpi?.total_reports || 0 }}</p>
+        <p class="text-[11px] text-slate-500">seluruh riwayat wilayah ini</p>
       </div>
-
-      <div class="p-5 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
-        <span class="text-[11px] font-black uppercase tracking-wider text-slate-400">Tingkat Penyelesaian (SLA)</span>
-        <div class="flex items-baseline justify-between">
-          <span class="text-3xl font-black text-emerald-400">{{ reportsKpi?.sla_rate || 100 }}%</span>
-          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300">Target > 80%</span>
-        </div>
-        <p class="text-[11px] text-slate-400">{{ reportsKpi?.resolved_count || 0 }} Laporan Terselesaikan</p>
+      <div class="p-4">
+        <p class="text-[11px] font-bold text-slate-400">Tingkat penyelesaian</p>
+        <p class="text-2xl font-black text-emerald-400 mt-1">{{ reportsKpi?.sla_rate === null || reportsKpi?.sla_rate === undefined ? '—' : reportsKpi.sla_rate + '%' }}</p>
+        <p class="text-[11px] text-slate-500">{{ reportsKpi?.resolved_count || 0 }} selesai / arsip</p>
       </div>
-
-      <div class="p-5 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
-        <span class="text-[11px] font-black uppercase tracking-wider text-slate-400">Sedang Ditindaklanjuti</span>
-        <div class="flex items-baseline justify-between">
-          <span class="text-3xl font-black text-amber-400">{{ reportsKpi?.in_progress || 0 }}</span>
-          <span class="text-xs font-bold text-amber-400">Operasional</span>
-        </div>
-        <p class="text-[11px] text-slate-400">Tahap Investigasi / Klarifikasi</p>
+      <div class="p-4">
+        <p class="text-[11px] font-bold text-slate-400">Sedang ditangani</p>
+        <p class="text-2xl font-black text-amber-400 mt-1">{{ reportsKpi?.in_progress || 0 }}</p>
+        <p class="text-[11px] text-slate-500">investigasi &amp; klarifikasi</p>
       </div>
-
-      <div class="p-5 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-1">
-        <span class="text-[11px] font-black uppercase tracking-wider text-slate-400">Antrean Verifikasi</span>
-        <div class="flex items-baseline justify-between">
-          <span class="text-3xl font-black text-sky-400">{{ reportsKpi?.pending_verify || 0 }}</span>
-          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-300">Menunggu</span>
-        </div>
-        <p class="text-[11px] text-slate-400">Validasi Data Tim Humas</p>
+      <div class="p-4">
+        <p class="text-[11px] font-bold text-slate-400">Menunggu telaah</p>
+        <p class="text-2xl font-black text-sky-400 mt-1">{{ reportsKpi?.pending_verify || 0 }}</p>
+        <p class="text-[11px] text-slate-500">belum diverifikasi</p>
       </div>
-    </div>
-
-    <!-- Executive Briefing Preview Card -->
-    <div class="rounded-3xl bg-gradient-to-br from-[#0c162e] to-[#080f20] border border-amber-400/30 p-6 shadow-2xl relative overflow-hidden">
-      <div class="flex items-center gap-2 mb-3">
-        <Sparkles class="w-4 h-4 text-amber-400" />
-        <h2 class="text-sm font-extrabold text-amber-400 uppercase tracking-wider">
-          Ringkasan Eksekutif Anev Siap Disposisi Pimpinan
-        </h2>
-      </div>
-      <p class="text-xs sm:text-sm text-slate-200 leading-relaxed max-w-4xl">
-        Berdasarkan konsolidasi pelaporan di lingkungan <strong>{{ selectedCode === 'ALL' ? 'Mabes Polri' : (selectedPolda?.name || 'Polda Sulawesi Barat') }}</strong>, penanganan informasi dan klarifikasi isu Kamtibmas berjalan optimal dengan tingkat penyelesaian SLA <strong>{{ reportsKpi?.sla_rate || 100 }}%</strong>. Sebanyak <strong>{{ reportsKpi?.resolved_count || 0 }}</strong> laporan berhasil dirampungkan dan diklarifikasi ke publik. Koordinasi lintas satwil di 6 Polres jajaran terpantau tanggap dan cepat mengantisipasi potensi eskalasi di ruang siber dan lapangan.
-      </p>
     </div>
 
     <!-- 2 Column Layout: Satwil Breakdown & Category Distribution -->
@@ -204,12 +159,12 @@ const formatDateWita = (dateStr) => {
         <div class="flex items-center justify-between border-b border-slate-800 pb-3">
           <div>
             <h3 class="text-sm font-black text-white uppercase tracking-wider">
-              Kinerja Kehumasan 6 Satwil Polres Jajaran
+              Kinerja per Satwil / Polres
             </h3>
             <p class="text-xs text-slate-400">Sebaran beban laporan dan kepatuhan tindak lanjut per wilayah hukum.</p>
           </div>
-          <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-            6 Satwil Terdata
+          <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-slate-800 text-slate-300 border border-slate-700">
+            {{ (satwilBreakdown || []).length }} satwil
           </span>
         </div>
 
@@ -237,15 +192,15 @@ const formatDateWita = (dateStr) => {
                     <div class="w-16 h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
                       <div
                         class="h-full bg-gradient-to-r from-amber-400 to-emerald-400 rounded-full"
-                        :style="{ width: `${satwil.sla_pct}%` }"
+                        :style="{ width: (satwil.sla_pct || 0) + '%' }"
                       ></div>
                     </div>
-                    <span class="font-mono text-[10px] text-slate-600 dark:text-slate-300">{{ satwil.sla_pct }}%</span>
+                    <span class="font-mono text-[10px] text-slate-600 dark:text-slate-300">{{ satwil.sla_pct === null ? '—' : satwil.sla_pct + '%' }}</span>
                   </div>
                 </td>
                 <td class="py-3 text-right">
                   <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    {{ satwil.sentiment }}%
+                    {{ satwil.sentiment === null ? '—' : satwil.sentiment + '%' }}
                   </span>
                 </td>
               </tr>
@@ -298,11 +253,7 @@ const formatDateWita = (dateStr) => {
             class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-400"
           >
             <option value="all">Semua Kategori</option>
-            <option value="Harkamtibmas">Harkamtibmas</option>
-            <option value="Kriminalitas">Kriminalitas</option>
-            <option value="Lalu Lintas">Lalu Lintas</option>
-            <option value="Pelayanan Publik">Pelayanan Publik</option>
-            <option value="Bencana">Bencana</option>
+            <option v-for="c in categoryOptions" :key="c" :value="c">{{ c }}</option>
           </select>
 
           <select
@@ -311,10 +262,11 @@ const formatDateWita = (dateStr) => {
             class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-400"
           >
             <option value="all">Semua Status</option>
-            <option value="selesai">Selesai</option>
-            <option value="investigasi">Investigasi</option>
+            <option value="monitoring">Perlu Telaah</option>
+            <option value="investigasi">Dalam Penanganan</option>
             <option value="klarifikasi">Klarifikasi</option>
-            <option value="monitoring">Monitoring</option>
+            <option value="selesai">Selesai</option>
+            <option value="arsip">Arsip</option>
           </select>
         </div>
       </div>
@@ -348,7 +300,7 @@ const formatDateWita = (dateStr) => {
                 </span>
               </td>
               <td class="px-6 py-4 font-semibold text-slate-300">
-                {{ rep.polres?.name || 'Polda Sulbar' }}
+                {{ rep.polres?.name || selectedPolda?.name || '-' }}
               </td>
               <td class="px-6 py-4">
                 <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
@@ -356,16 +308,8 @@ const formatDateWita = (dateStr) => {
                 </span>
               </td>
               <td class="px-6 py-4">
-                <span
-                  class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border"
-                  :class="{
-                    'bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border-emerald-500/40': rep.status === 'selesai' || rep.status === 'arsip',
-                    'bg-amber-400/20 text-amber-700 dark:text-amber-300 border-amber-400/40': rep.status === 'investigasi' || rep.status === 'klarifikasi',
-                    'bg-sky-500/20 text-sky-600 dark:text-sky-300 border-sky-500/40': rep.status === 'monitoring',
-                    'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700': rep.status === 'draft' || rep.status === 'returned',
-                  }"
-                >
-                  {{ rep.status }}
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider" :class="statusMeta(rep.status).cls">
+                  {{ statusMeta(rep.status).label }}
                 </span>
               </td>
               <td class="px-6 py-4 font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
@@ -373,7 +317,7 @@ const formatDateWita = (dateStr) => {
               </td>
               <td class="px-6 py-4 text-right print:hidden">
                 <Link
-                  :href="`/issues/${rep.id}`"
+                  :href="'/issues/' + rep.id"
                   class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-amber-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:border-slate-700 dark:text-amber-400 font-bold text-xs inline-flex items-center gap-1 transition shadow-sm"
                 >
                   <span>Detail &rarr;</span>

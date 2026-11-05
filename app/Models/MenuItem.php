@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BumpsShellCache;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,6 +10,8 @@ use Illuminate\Support\Facades\Schema;
 
 class MenuItem extends Model
 {
+    use BumpsShellCache;
+
     protected $fillable = [
         'title',
         'description',
@@ -483,8 +486,6 @@ class MenuItem extends Model
                 '/settings/menus',
                 '/audit-logs',
                 '/database/backup',
-                '/maintenance',
-                '/settings/mail',
                 '/maintenance/news-cleanup',
                 '/maintenance/rss-sync',
                 '/settings/ai',
@@ -492,7 +493,7 @@ class MenuItem extends Model
             'icon'                => 'ShieldAlert',
             'menu_location'       => 'sidebar',
             'order_index'         => 3,
-            'permission_required' => 'security_center,roles_matrix_manage,database_backup,maintenance_ops,mail_settings',
+            'permission_required' => 'security_center,roles_matrix_manage,database_backup,maintenance_ops',
             'is_active'           => true,
             'is_system'           => true,
         ]);
@@ -500,7 +501,7 @@ class MenuItem extends Model
         self::create([
             'parent_id'           => $pilar4->id,
             'title'               => 'Profil Saya',
-            'description'         => 'Kredensial & PIN Cepat',
+            'description'         => 'Identitas & ganti kata sandi',
             'route_or_url'        => '/profile',
             'match_patterns'      => ['/profile'],
             'icon'                => 'UserCheck',
@@ -512,7 +513,7 @@ class MenuItem extends Model
         ]);
 
         // =====================================================================
-        // SUB-MODUL TABS: KEAMANAN & PEMELIHARAAN (10 TABS)
+        // SUB-MODUL TABS: KEAMANAN & PEMELIHARAAN (8 TABS)
         // =====================================================================
         $securityTabs = [
             ['title' => 'Keamanan', 'route' => '/security', 'icon' => 'ShieldAlert', 'perm' => 'security_center', 'order' => 1],
@@ -522,9 +523,7 @@ class MenuItem extends Model
             ['title' => 'Backup Data', 'route' => '/database/backup', 'icon' => 'Database', 'perm' => 'database_backup', 'order' => 5],
             ['title' => 'Pembersihan Berita', 'route' => '/maintenance/news-cleanup', 'icon' => 'Eraser', 'perm' => 'maintenance_ops', 'order' => 6],
             ['title' => 'Otomasi Sinkron RSS', 'route' => '/maintenance/rss-sync', 'icon' => 'Radio', 'perm' => 'maintenance_ops', 'order' => 7],
-            ['title' => 'Mode Pemeliharaan', 'route' => '/maintenance', 'icon' => 'Wrench', 'perm' => 'maintenance_ops', 'order' => 8],
-            ['title' => 'Konfigurasi Mail', 'route' => '/settings/mail', 'icon' => 'Mail', 'perm' => 'mail_settings', 'order' => 9],
-            ['title' => 'Mesin Intelijen AI', 'route' => '/settings/ai', 'icon' => 'Bot', 'perm' => 'security_center', 'order' => 10],
+            ['title' => 'Mesin Intelijen AI', 'route' => '/settings/ai', 'icon' => 'Bot', 'perm' => 'security_center', 'order' => 8],
         ];
 
         foreach ($securityTabs as $tab) {

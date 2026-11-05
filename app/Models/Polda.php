@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BumpsShellCache;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Polda extends Model
 {
+    use BumpsShellCache;
+
     protected $fillable = [
         'code',
         'name',

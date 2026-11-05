@@ -34,7 +34,7 @@ class DatabaseBackupController extends Controller
             $allPoldas = Polda::all();
         }
 
-        $selectedCode = $request->query('polda', 'SULBAR');
+        [$selectedCode] = $this->resolveActiveTenant($request);
         $selectedPolda = null;
 
         if ($selectedCode !== 'ALL') {

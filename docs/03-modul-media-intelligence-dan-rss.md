@@ -4,8 +4,8 @@
 Modul ini bertugas memantau pemberitaan media massa daring secara real-time untuk mendeteksi narasi yang berkembang di wilayah hukum Satwil.
 
 - **Lokasi Service**:
-  - [`app/Services/RssFeedService.php`](file:///d:/Foto/laragon/www/simod-enterprise/app/Services/RssFeedService.php) — Parser XML/Atom paralel via `curl_multi`.
-  - [`app/Services/RssSyncService.php`](file:///d:/Foto/laragon/www/simod-enterprise/app/Services/RssSyncService.php) — Orkestrasi jadwal otomatis, Mutex Atomic Lock, kuota adil antar-sumber (*fair per-feed quota*), dan Auto-Capping Multi-Polda.
+  - [`app/Services/RssFeedService.php`](file:///d:/laragon/www/simod-enterprise/app/Services/RssFeedService.php) — Parser XML/Atom paralel via `curl_multi`.
+  - [`app/Services/RssSyncService.php`](file:///d:/laragon/www/simod-enterprise/app/Services/RssSyncService.php) — Orkestrasi jadwal otomatis, Mutex Atomic Lock, kuota adil antar-sumber (*fair per-feed quota*), dan Auto-Capping Multi-Polda.
 - **Mekanisme**: Memanfaatkan **`curl_multi`** sehingga seluruh 29 portal berita ditarik secara bersamaan (*non-blocking parallel request*). Waktu agregasi rata-rata hanya membutuhkan 4 hingga 8 detik untuk ratusan berita.
 - **Strategi Caching**: Hasil parse XML/Atom disimpan pada Cache Laravel (`Cache::put`) dengan TTL default 300 detik (5 menit). Penarikan berikutnya berlangsung instan (< 50ms).
 
@@ -63,7 +63,7 @@ Modul ini bertugas memantau pemberitaan media massa daring secara real-time untu
 ## 3. Fitur Interaktif pada Antarmuka Pengguna
 
 1. **Tombol `[🔄 Sinkron Berita]`**:
-   - Memaksa sinkronisasi real-time langsung dari server media (`/media-intelligence?polda=SULBAR&refresh=1`).
+   - Memaksa sinkronisasi real-time langsung dari server media (`/media-intelligence?refresh=1`).
 2. **Penomoran Halaman Interaktif (Numbered Pagination)**:
    - Deretan tombol angka halaman langsung `[ 1 ] [ 2 ] [ 3 ] ... [ 9 ]` yang dilengkapi indikator aktif berwarna emas/amber menyala (`bg-amber-400 text-slate-950 font-black`).
    - Dilengkapi *smooth scroll* otomatis ke puncak kontainer berita saat berpindah halaman.

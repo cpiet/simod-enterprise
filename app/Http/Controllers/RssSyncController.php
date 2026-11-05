@@ -201,8 +201,15 @@ class RssSyncController extends Controller
     public function triggerSync(Request $request, RssSyncService $syncService): RedirectResponse
     {
         $targetScope = $request->input('scope', 'polda'); // 'polda' or 'all'
-        $poldaCode = strtoupper((string) $request->input('polda', 'SULBAR'));
-        $polda = Polda::where('code', $poldaCode)->first();
+        $user = $request->user();
+        if ($user && ! $user->isSuperAdmin() && $user->polda_id) {
+            // Personel kewilayahan: selalu Polda sendiri, tidak boleh sinkron lintas Polda.
+            $targetScope = 'polda';
+            $polda = Polda::find($user->polda_id);
+        } else {
+            $poldaCode = strtoupper((string) $request->input('polda', 'SULBAR'));
+            $polda = Polda::where('code', $poldaCode)->first();
+        }
 
         if ($targetScope === 'all' || ! $polda) {
             $res = $syncService->syncAll('manual_ui');

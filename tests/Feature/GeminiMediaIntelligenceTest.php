@@ -39,7 +39,7 @@ class GeminiMediaIntelligenceTest extends TestCase
 
     public function test_media_intelligence_page_provides_ai_setting_prop(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => 'super_admin_mabes']);
 
         $response = $this->actingAs($user)->get('/media-intelligence?polda=ALL');
 
@@ -53,7 +53,7 @@ class GeminiMediaIntelligenceTest extends TestCase
 
     public function test_admin_can_access_ai_settings_page(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => 'super_admin_mabes']);
 
         $response = $this->actingAs($user)->get('/settings/ai?polda=ALL');
 
@@ -69,7 +69,7 @@ class GeminiMediaIntelligenceTest extends TestCase
 
     public function test_admin_can_update_apify_settings_via_ai_controller(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => 'super_admin_mabes']);
         $divhumas = Polda::where('code', 'DIVHUMAS')->first();
 
         $response = $this->actingAs($user)->post('/settings/ai/apify?polda=ALL', [
@@ -96,7 +96,7 @@ class GeminiMediaIntelligenceTest extends TestCase
 
     public function test_admin_can_update_ai_settings_and_audit_log_persists(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => 'super_admin_mabes']);
         $divhumas = Polda::where('code', 'DIVHUMAS')->first();
 
         $response = $this->actingAs($user)->post('/settings/ai?polda=ALL', [
@@ -127,7 +127,7 @@ class GeminiMediaIntelligenceTest extends TestCase
 
     public function test_analyze_gemini_without_api_key_returns_422(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => 'super_admin_mabes']);
         config(['services.gemini.api_key' => null]);
         putenv('GEMINI_API_KEY=');
         unset($_ENV['GEMINI_API_KEY'], $_SERVER['GEMINI_API_KEY']);
@@ -144,7 +144,7 @@ class GeminiMediaIntelligenceTest extends TestCase
 
     public function test_gemini_test_connection_with_mock_http(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => 'super_admin_mabes']);
 
         Http::fake([
             'generativelanguage.googleapis.com/*' => Http::response([
@@ -171,7 +171,7 @@ class GeminiMediaIntelligenceTest extends TestCase
 
     public function test_gemini_test_pool_keys_with_mock_http(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => 'super_admin_mabes']);
 
         Http::fake([
             'generativelanguage.googleapis.com/*' => Http::response([
@@ -203,7 +203,7 @@ class GeminiMediaIntelligenceTest extends TestCase
 
     public function test_admin_can_customize_ai_prompt_template_and_it_persists(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => 'super_admin_mabes']);
         $divhumas = Polda::where('code', 'DIVHUMAS')->first();
 
         $customPrompt = "DOKTRIN KHUSUS KEDINASAN HUMAS POLRI 2026\n[Tempelkan teks berita, rangkuman patroli siber, atau link isu di sini]";
@@ -228,7 +228,7 @@ class GeminiMediaIntelligenceTest extends TestCase
 
     public function test_admin_can_reset_custom_ai_prompt_template(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => 'super_admin_mabes']);
         $divhumas = Polda::where('code', 'DIVHUMAS')->first();
 
         $setting = AiSetting::forPolda($divhumas->id);
@@ -249,7 +249,7 @@ class GeminiMediaIntelligenceTest extends TestCase
 
     public function test_chat_endpoint_validates_input(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => 'super_admin_mabes']);
 
         $response = $this->actingAs($user)->postJson('/media-intelligence/chat', []);
         $response->assertStatus(422);
@@ -258,7 +258,7 @@ class GeminiMediaIntelligenceTest extends TestCase
 
     public function test_chat_endpoint_returns_ai_reply_with_mocked_gemini(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => 'super_admin_mabes']);
         $divhumas = Polda::where('code', 'DIVHUMAS')->first();
 
         $setting = AiSetting::forPolda($divhumas->id);

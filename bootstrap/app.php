@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Middleware\EnforceSessionTimeout;
+use App\Http\Middleware\EnsureIngestToken;
+use App\Http\Middleware\EnsureModulePermission;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\PreventBackHistory;
 use Illuminate\Foundation\Application;
@@ -23,6 +26,12 @@ return Application::configure(basePath: dirname(__DIR__))
                      Request::HEADER_X_FORWARDED_PROTO |
                      Request::HEADER_X_FORWARDED_AWS_ELB
         );
+
+        $middleware->alias([
+            'ingest.token' => EnsureIngestToken::class,
+            'idle'         => EnforceSessionTimeout::class,
+            'module'       => EnsureModulePermission::class,
+        ]);
 
         $middleware->redirectGuestsTo('/login');
         $middleware->redirectUsersTo('/');

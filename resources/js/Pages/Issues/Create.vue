@@ -99,6 +99,9 @@ const form = ref({
   assigned_unit: 'Bidhumas Polda',
 });
 
+// Sumber media bersifat opsional: tampil otomatis hanya bila terisi dari eskalasi Radar
+const showSource = ref(Boolean(form.value.source_url) || form.value.source_media !== 'Laporan Lapangan');
+
 const rawFiles = ref([]);
 const filePreviews = ref([]);
 
@@ -121,7 +124,7 @@ const removeFile = (index) => {
   filePreviews.value.splice(index, 1);
 };
 
-const submitReport = (targetStatus = 'submitted') => {
+const submitReport = (targetStatus = 'monitoring') => {
   validationError.value = '';
   if (!form.value.title || !form.value.summary) {
     validationError.value = 'Mohon lengkapi Judul Laporan dan Uraian Kronologi Kejadian sebelum mengirim berkas.';
@@ -193,40 +196,9 @@ const submitReport = (targetStatus = 'submitted') => {
           <h1 class="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight mt-1">
             Buat Laporan Baru
           </h1>
-          <p class="text-xs md:text-sm text-slate-600 dark:text-slate-300">
-            Formulir pelaporan operasional dokumentasi & pemantauan opini publik {{ isNational ? 'Divisi Humas Polri (Mabes Polri)' : (selectedPolda?.name || 'Humas Polda Sulbar') }}.
-          </p>
         </div>
       </div>
 
-      <!-- Action Buttons Top -->
-      <div class="flex items-center gap-2.5">
-        <Link
-          href="/issues"
-          class="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:border-slate-700 dark:text-slate-300 border border-slate-300 transition"
-        >
-          Batal
-        </Link>
-
-        <button
-          @click="submitReport('draft')"
-          type="button"
-          :disabled="isSubmitting || !form.title || !form.summary"
-          class="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-200 hover:bg-slate-300 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 transition disabled:opacity-40 cursor-pointer"
-        >
-          <span>Simpan Draf</span>
-        </button>
-
-        <button
-          @click="submitReport('submitted')"
-          type="button"
-          :disabled="isSubmitting || !form.title || !form.summary"
-          class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-lg shadow-amber-400/25 transition disabled:opacity-40 cursor-pointer"
-        >
-          <Send class="w-4 h-4 text-slate-950" />
-          <span>{{ isSubmitting ? 'Mengirim...' : 'Kirim ke Verifikasi' }}</span>
-        </button>
-      </div>
     </div>
 
     <!-- Main Form Grid -->
@@ -434,7 +406,11 @@ const submitReport = (targetStatus = 'submitted') => {
           </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+        <button type="button" @click="showSource = !showSource" class="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer">
+          {{ showSource ? 'Sembunyikan kolom sumber' : '+ Tambahkan sumber media / medsos (opsional)' }}
+        </button>
+
+        <div v-show="showSource" class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
           <div>
             <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">
               Platform / Jenis Sumber
@@ -550,8 +526,8 @@ const submitReport = (targetStatus = 'submitted') => {
         </div>
       </div>
 
-      <!-- Bottom Action Bar -->
-      <div class="flex items-center justify-between p-6 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-sm">
+      <!-- Bar aksi (sticky): satu-satunya tempat Batal / Simpan Draf / Kirim -->
+      <div class="sticky bottom-3 z-20 flex items-center justify-between p-4 rounded-3xl shadow-xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-sm">
         <Link
           href="/issues"
           class="px-5 py-2.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:border-slate-700 dark:text-slate-300 border border-slate-300 transition"
@@ -566,17 +542,17 @@ const submitReport = (targetStatus = 'submitted') => {
             :disabled="isSubmitting || !form.title || !form.summary"
             class="px-5 py-2.5 rounded-xl text-xs font-bold bg-slate-200 hover:bg-slate-300 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 transition disabled:opacity-40 cursor-pointer"
           >
-            <span>Simpan Draf Laporan</span>
+            <span>Simpan Draf</span>
           </button>
 
           <button
-            @click="submitReport('submitted')"
+            @click="submitReport('monitoring')"
             type="button"
             :disabled="isSubmitting || !form.title || !form.summary"
             class="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-lg shadow-amber-400/25 transition disabled:opacity-40 cursor-pointer"
           >
             <Send class="w-4 h-4 text-slate-950" />
-            <span>{{ isSubmitting ? 'Memproses...' : 'Kirim Laporan / Ajukan Verifikasi' }}</span>
+            <span>{{ isSubmitting ? 'Mengirim...' : 'Kirim ke Verifikasi' }}</span>
           </button>
         </div>
       </div>

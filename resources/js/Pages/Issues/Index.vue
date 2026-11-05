@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed } from 'vue';
-import { router, Link } from '@inertiajs/vue3';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { router, Link, usePage } from '@inertiajs/vue3';
+import { ISSUE_GROUPS, statusMeta, priorityMeta } from '@/utils/issueFlow';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
 import {
   Shield,
@@ -27,6 +28,8 @@ import {
   ChevronRight,
   MapPin,
   Calendar,
+  Ellipsis,
+  SlidersHorizontal,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -37,6 +40,8 @@ const props = defineProps({
   issues: Object, // Paginated
   filters: Object,
   metrics: Object,
+  groupCounts: { type: Object, default: () => ({}) },
+  categoryOptions: { type: Array, default: () => [] },
 });
 
 const searchQuery = ref(props.filters?.q || '');
@@ -111,59 +116,48 @@ const copyCode = (code) => {
   }, 2000);
 };
 
-// Format Helpers
-const getStatusLabel = (status) => {
-  const map = {
-    draft: 'Draf',
-    submitted: 'Menunggu Polres',
-    unit_verified: 'Terverifikasi Polres',
-    polda_verified: 'Terverifikasi Polda',
-    in_progress: 'Sedang Ditangani',
-    resolved: 'Hasil Diajukan',
-    closed: 'Selesai & Ditutup',
-    monitoring: 'Dalam Pantauan',
-    investigasi: 'Investigasi',
-    klarifikasi: 'Klarifikasi Dirilis',
-    selesai: 'Selesai & Ditutup',
-  };
-  return map[status] || status;
+// Izin pengguna menentukan tombol yang tampil
+const page = usePage();
+const permissions = computed(() => page.props.auth?.permissions || {});
+const canCreate = computed(() => !!permissions.value.issues_create);
+const canVerify = computed(() => !!permissions.value.issues_verify);
+
+// Menu melayang & panel filter (satu terbuka pada satu waktu)
+const openMenu = ref(null);
+const showFilterPanel = ref(false);
+const closeFloating = () => {
+  openMenu.value = null;
+  showFilterPanel.value = false;
+};
+onMounted(() => document.addEventListener('click', closeFloating));
+onUnmounted(() => document.removeEventListener('click', closeFloating));
+
+const activeFilterCount = computed(() =>
+  (selectedCategory.value !== 'all' ? 1 : 0) + (selectedPriority.value !== 'all' ? 1 : 0) + (selectedPolres.value !== 'all' ? 1 : 0)
+);
+
+const setGroup = (key) => {
+  selectedStatus.value = key;
+  handleFilter();
 };
 
-const getStatusBadgeClass = (status) => {
-  switch (status) {
-    case 'closed':
-    case 'selesai':
-      return 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40';
-    case 'resolved':
-    case 'polda_verified':
-      return 'bg-blue-500/20 text-blue-400 border border-blue-500/40';
-    case 'in_progress':
-    case 'investigasi':
-      return 'bg-amber-400/20 text-amber-300 border border-amber-400/40';
-    case 'unit_verified':
-      return 'bg-purple-500/20 text-purple-300 border border-purple-500/40';
-    case 'submitted':
-    case 'monitoring':
-      return 'bg-sky-500/20 text-sky-400 border border-sky-500/40';
-    case 'draft':
-    default:
-      return 'bg-slate-800 text-slate-400 border border-slate-700';
-  }
+const toggleAttention = () => {
+  selectedPriority.value = selectedPriority.value === 'attention' ? 'all' : 'attention';
+  handleFilter();
 };
 
-const getPriorityBadgeClass = (priority) => {
-  switch (priority) {
-    case 'critical':
-      return 'bg-rose-500 text-white font-black';
-    case 'high':
-      return 'bg-amber-400 text-slate-950 font-black shadow-sm';
-    case 'medium':
-      return 'bg-sky-500/20 text-sky-300 border border-sky-500/40';
-    case 'low':
-    default:
-      return 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-400 border border-slate-300 dark:border-slate-700';
-  }
-};
+const exportUrl = computed(() => {
+  const q = new URLSearchParams({
+    status: selectedStatus.value,
+    priority: selectedPriority.value,
+    category: selectedCategory.value,
+    polres: selectedPolres.value,
+    q: searchQuery.value,
+  });
+  return '/issues-export-csv?' + q.toString();
+});
+
+const countOf = (key) => props.groupCounts?.[key] ?? 0;
 </script>
 
 <template>
@@ -173,311 +167,275 @@ const getPriorityBadgeClass = (priority) => {
     :selected-code="selectedCode"
     :metrics="metrics"
   >
-    <!-- Top Action Bar & Title (Standardized with SIMOD-HUMAS) -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-      <div>
-        <div class="flex items-center gap-2">
-          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950">
-            Bidang Humas
-          </span>
-          <span class="text-xs font-bold text-slate-500 dark:text-slate-400">
-            {{ selectedCode === 'ALL' ? 'Semua Wilayah Hukum Mabes Polri' : selectedPolda?.name }}
-          </span>
-        </div>
-        <h1 class="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight mt-1">
-          Daftar Monitoring Laporan
-        </h1>
-        <p class="text-xs md:text-sm text-slate-600 dark:text-slate-300">
-          Menampilkan total <span class="font-bold text-amber-600 dark:text-amber-400">{{ issues?.total || 0 }}</span> laporan kamtibmas & pemantauan opini publik tercatat di sistem
+    <!-- Header ringkas: judul + 1 aksi utama + menu -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div class="min-w-0">
+        <p class="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+          {{ selectedCode === 'ALL' ? 'Semua Wilayah Hukum Mabes Polri' : selectedPolda?.name }}
         </p>
+        <h1 class="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight">Laporan Polres &amp; Isu</h1>
       </div>
 
-      <div class="flex flex-wrap items-center gap-2.5">
-        <!-- Kembali ke Dashboard -->
+      <div class="flex items-center gap-2 shrink-0">
         <Link
-          href="/"
-          class="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 border border-slate-300 transition"
-        >
-          &larr; Dashboard
-        </Link>
-
-        <!-- Ekspor CSV Resmi -->
-        <a
-          :href="`/issues-export-csv?status=${selectedStatus}&priority=${selectedPriority}&category=${selectedCategory}&polres=${selectedPolres}&q=${searchQuery}`"
-          class="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 transition flex items-center gap-2 cursor-pointer shadow-sm select-none"
-        >
-          <Download class="w-4 h-4 text-slate-600 dark:text-slate-400" />
-          <span>Ekspor CSV</span>
-        </a>
-
-        <!-- Buat Laporan Baru (Direct Navigate to Full Form Page) -->
-        <Link
+          v-if="canCreate"
           href="/issues/create"
-          class="px-4 py-2.5 rounded-xl text-xs font-black bg-amber-400 text-slate-950 hover:bg-amber-300 shadow-lg shadow-amber-400/25 flex items-center gap-2 cursor-pointer transition select-none"
+          class="px-4 py-2.5 rounded-xl text-xs font-black bg-amber-400 text-slate-950 hover:bg-amber-300 shadow-lg shadow-amber-400/25 flex items-center gap-2 transition select-none"
         >
-          <PlusCircle class="w-4 h-4 text-slate-950" />
-          <span>Buat Laporan Baru</span>
+          <PlusCircle class="w-4 h-4" />
+          <span>Buat Laporan</span>
         </Link>
+
+        <div class="relative">
+          <button
+            type="button"
+            @click.stop="openMenu = openMenu === 'head' ? null : 'head'"
+            class="p-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-600 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700 transition cursor-pointer"
+            title="Aksi lainnya"
+          >
+            <Ellipsis class="w-4 h-4" />
+          </button>
+          <div
+            v-if="openMenu === 'head'"
+            @click.stop
+            class="absolute right-0 top-full mt-2 z-30 w-52 rounded-xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-700 shadow-2xl p-1.5"
+          >
+            <a
+              :href="exportUrl"
+              class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 transition"
+            >
+              <Download class="w-4 h-4 text-slate-500" />
+              <span>Ekspor CSV (sesuai filter)</span>
+            </a>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Metrics Cards (Presisi Operational KPI) -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-      <div class="p-4 rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-sm space-y-1">
-        <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">Total Laporan</span>
-        <p class="text-2xl font-black text-slate-900 dark:text-white">{{ metrics.total_issues || 0 }}</p>
-        <p class="text-[10px] text-slate-500 dark:text-slate-400">Semua riwayat</p>
-      </div>
+    <!-- Tab status: kelompok alur + hitungan (menggantikan 5 kartu KPI & dropdown status) -->
+    <div class="flex items-center gap-2 overflow-x-auto pb-1">
+      <button
+        v-for="g in ISSUE_GROUPS"
+        :key="g.key"
+        type="button"
+        @click="setGroup(g.key)"
+        class="px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer select-none whitespace-nowrap border"
+        :class="selectedStatus === g.key
+          ? 'bg-amber-400 text-slate-950 font-black border-amber-300 shadow-md'
+          : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700'"
+      >
+        <span>{{ g.label }}</span>
+        <span
+          class="px-1.5 py-0.5 rounded-full text-[10px] font-mono"
+          :class="selectedStatus === g.key ? 'bg-slate-950 text-amber-300 font-black' : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold'"
+        >{{ countOf(g.key) }}</span>
+      </button>
 
-      <div class="p-4 rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-sm space-y-1">
-        <span class="text-[11px] font-bold text-sky-600 dark:text-sky-400">Menunggu Verifikasi</span>
-        <p class="text-2xl font-black text-sky-600 dark:text-sky-400">{{ metrics.pending_verify || 0 }}</p>
-        <p class="text-[10px] text-slate-500 dark:text-slate-400">Polres & Polda</p>
-      </div>
+      <button
+        v-if="countOf('draft') > 0"
+        type="button"
+        @click="setGroup('draft')"
+        class="px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer select-none whitespace-nowrap border"
+        :class="selectedStatus === 'draft' ? 'bg-amber-400 text-slate-950 font-black border-amber-300' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'"
+      >Draf ({{ countOf('draft') }})</button>
 
-      <div class="p-4 rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-sm space-y-1">
-        <span class="text-[11px] font-bold text-amber-600 dark:text-amber-400">Sedang Ditangani</span>
-        <p class="text-2xl font-black text-amber-600 dark:text-amber-400">{{ metrics.in_progress || 0 }}</p>
-        <p class="text-[10px] text-slate-500 dark:text-slate-400">Tindak Lanjut / Disposisi</p>
-      </div>
+      <button
+        v-if="countOf('archived') > 0"
+        type="button"
+        @click="setGroup('archived')"
+        class="px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer select-none whitespace-nowrap border"
+        :class="selectedStatus === 'archived' ? 'bg-amber-400 text-slate-950 font-black border-amber-300' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'"
+      >Arsip ({{ countOf('archived') }})</button>
 
-      <div class="p-4 rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-sm space-y-1">
-        <span class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">Selesai & Ditutup</span>
-        <p class="text-2xl font-black text-emerald-600 dark:text-emerald-400">{{ metrics.resolved || 0 }}</p>
-        <p class="text-[10px] text-slate-500 dark:text-slate-400">Tuntas & Klarifikasi</p>
-      </div>
+      <span class="h-5 w-px bg-slate-300 dark:bg-slate-700 shrink-0"></span>
 
-      <div class="p-4 rounded-2xl bg-white dark:bg-[#0b1426] border border-rose-200 dark:border-rose-900/60 shadow-sm space-y-1">
-        <span class="text-[11px] font-bold text-rose-600 dark:text-rose-400">Atensi Pimpinan (Tinggi)</span>
-        <p class="text-2xl font-black text-rose-600 dark:text-rose-400">{{ metrics.high_priority || 0 }}</p>
-        <p class="text-[10px] text-slate-500 dark:text-slate-400">Perlu Respons Cepat</p>
-      </div>
+      <button
+        type="button"
+        @click="toggleAttention"
+        class="px-3.5 py-2 rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap border"
+        :class="selectedPriority === 'attention'
+          ? 'bg-rose-600 text-white border-rose-500 shadow-md'
+          : 'bg-white dark:bg-slate-900 text-rose-600 dark:text-rose-400 border-rose-300 dark:border-rose-900/60 hover:bg-rose-50 dark:hover:bg-rose-950/30'"
+        title="Prioritas Kritis & Tinggi yang belum selesai"
+      >
+        <Flame class="w-3.5 h-3.5" />
+        <span>Atensi Pimpinan ({{ countOf('attention') }})</span>
+      </button>
     </div>
 
-    <!-- Filter & Search Bar (Standardized 5-Control Toolbar) -->
-    <div class="p-4 rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 shadow-md">
-      <!-- Search Input -->
-      <div class="relative flex-1 min-w-[240px]">
-        <Search class="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
+    <!-- Cari + Filter lanjutan -->
+    <div class="p-3.5 rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shadow-sm">
+      <div class="relative flex-1 min-w-[220px]">
+        <Search class="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5 pointer-events-none" />
         <input
           v-model="searchQuery"
           @keydown.enter="handleFilter"
           type="text"
-          placeholder="Cari kode laporan (SIM-...), judul kejadian, lokasi, atau narasi..."
+          placeholder="Cari kode (SIM-...), judul, lokasi, atau narasi..."
           class="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-400"
         />
       </div>
 
-      <!-- Select Filters -->
-      <div class="flex flex-wrap items-center gap-2">
-        <!-- Status Filter -->
-        <select
-          v-model="selectedStatus"
-          @change="handleFilter"
-          class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-amber-400"
-        >
-          <option value="all">Semua Status</option>
-          <option value="draft">Draf</option>
-          <option value="submitted">Menunggu Polres</option>
-          <option value="unit_verified">Terverifikasi Polres</option>
-          <option value="polda_verified">Terverifikasi Polda</option>
-          <option value="in_progress">Sedang Ditangani</option>
-          <option value="resolved">Hasil Diajukan</option>
-          <option value="closed">Selesai & Ditutup</option>
-        </select>
-
-        <!-- Kategori Filter -->
-        <select
-          v-model="selectedCategory"
-          @change="handleFilter"
-          class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-amber-400"
-        >
-          <option value="all">Semua Kategori</option>
-          <option value="🚨 Kejadian / Insiden Lapangan">🚨 Kejadian Lapangan</option>
-          <option value="🛡️ Kegiatan Positif Kepolisian">🛡️ Kegiatan Positif</option>
-          <option value="🗣️ Keluhan Warga (Dumas / Pelayanan)">🗣️ Keluhan Warga</option>
-          <option value="📱 Isu Medsos & Opini Publik (Cyber Patrol)">📱 Isu Medsos</option>
-        </select>
-
-        <!-- Prioritas Filter -->
-        <select
-          v-model="selectedPriority"
-          @change="handleFilter"
-          class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-amber-400"
-        >
-          <option value="all">Semua Prioritas</option>
-          <option value="attention">🔥 Prioritas Atensi (Kritis & Tinggi)</option>
-          <option value="critical">⚡ Kritis (Merah)</option>
-          <option value="high">🔴 Tinggi (Atensi)</option>
-          <option value="medium">🟡 Sedang</option>
-          <option value="low">🟢 Rendah</option>
-        </select>
-
-        <!-- Polres / Wilayah Filter -->
-        <select
-          v-if="polresList && polresList.length > 0"
-          v-model="selectedPolres"
-          @change="handleFilter"
-          class="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-amber-400"
-        >
-          <option value="all">Semua Wilayah</option>
-          <option v-for="p in polresList" :key="p.id" :value="p.code">
-            {{ p.name }}
-          </option>
-        </select>
-
+      <div class="relative">
         <button
-          v-if="selectedStatus !== 'all' || selectedPriority !== 'all' || selectedCategory !== 'all' || selectedPolres !== 'all' || searchQuery"
-          @click="resetFilter"
-          class="px-3 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-800 text-xs font-bold transition hover:bg-rose-100"
-          title="Reset Semua Filter"
+          type="button"
+          @click.stop="showFilterPanel = !showFilterPanel"
+          class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition border cursor-pointer select-none"
+          :class="activeFilterCount > 0
+            ? 'bg-amber-400/15 text-amber-700 dark:text-amber-300 border-amber-400/60'
+            : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-slate-500'"
         >
-          Reset
+          <SlidersHorizontal class="w-3.5 h-3.5" />
+          <span>Filter</span>
+          <span v-if="activeFilterCount > 0" class="px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-amber-400 text-slate-950 font-black">{{ activeFilterCount }}</span>
         </button>
+
+        <div
+          v-if="showFilterPanel"
+          @click.stop
+          class="absolute right-0 top-full mt-2 z-30 w-[min(92vw,22rem)] rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-700 shadow-2xl p-4 space-y-3"
+        >
+          <label class="block space-y-1">
+            <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">Kategori</span>
+            <select v-model="selectedCategory" @change="handleFilter" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-amber-400">
+              <option value="all">Semua Kategori</option>
+              <option v-for="c in categoryOptions" :key="c" :value="c">{{ c }}</option>
+            </select>
+          </label>
+
+          <label class="block space-y-1">
+            <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">Prioritas</span>
+            <select v-model="selectedPriority" @change="handleFilter" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-amber-400">
+              <option value="all">Semua Prioritas</option>
+              <option value="attention">Atensi (Kritis &amp; Tinggi)</option>
+              <option value="critical">Kritis</option>
+              <option value="high">Tinggi</option>
+              <option value="medium">Sedang</option>
+              <option value="low">Rendah</option>
+            </select>
+          </label>
+
+          <label v-if="polresList && polresList.length > 0" class="block space-y-1">
+            <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">Wilayah (Polres)</span>
+            <select v-model="selectedPolres" @change="handleFilter" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-amber-400">
+              <option value="all">Semua Wilayah</option>
+              <option v-for="p in polresList" :key="p.id" :value="p.code">{{ p.name }}</option>
+            </select>
+          </label>
+
+          <div class="flex items-center justify-between pt-1">
+            <button type="button" @click="resetFilter(); showFilterPanel = false" class="text-[11px] font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white cursor-pointer">Atur ulang semua</button>
+            <button type="button" @click="showFilterPanel = false" class="px-3 py-1.5 rounded-lg bg-amber-400 text-slate-950 text-xs font-black cursor-pointer">Selesai</button>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Issues List / Table (Standardized with SIMOD-HUMAS) -->
-    <div class="space-y-3.5">
+    <!-- Daftar laporan -->
+    <div class="space-y-3">
       <!-- Empty State -->
       <div
         v-if="!issues?.data || issues.data.length === 0"
-        class="rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-12 text-center shadow-lg space-y-3"
+        class="rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-10 text-center shadow-sm space-y-3"
       >
         <div class="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-400/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
           <FileText class="w-7 h-7" />
         </div>
-        <h3 class="text-base font-black text-slate-900 dark:text-white">Tidak ada laporan ditemukan</h3>
-        <p class="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-          Ubah kata kunci pencarian atau buat laporan lapangan baru menggunakan tombol di bawah ini.
-        </p>
-        <div class="pt-2">
-          <Link
-            href="/issues/create"
-            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-400 text-slate-950 font-black text-xs hover:bg-amber-300 shadow-md transition"
-          >
+        <h3 class="text-base font-black text-slate-900 dark:text-white">Tidak ada laporan pada tampilan ini</h3>
+        <p class="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">Ubah kata kunci atau filter{{ canCreate ? ', atau buat laporan lapangan baru.' : '.' }}</p>
+        <div class="flex items-center justify-center gap-2 pt-1">
+          <button type="button" @click="resetFilter" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 cursor-pointer">Atur ulang filter</button>
+          <Link v-if="canCreate" href="/issues/create" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-400 text-slate-950 font-black text-xs hover:bg-amber-300 shadow-md transition">
             <PlusCircle class="w-4 h-4" />
-            <span>Buat Laporan Baru</span>
+            <span>Buat Laporan</span>
           </Link>
         </div>
       </div>
 
-      <!-- Item Card Row -->
+      <!-- Kartu laporan -->
       <div
         v-for="issue in issues.data"
         :key="issue.id"
-        class="rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800/90 p-5 shadow-sm hover:border-slate-400 dark:hover:border-slate-700 transition space-y-3"
+        class="rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800/90 p-4 md:p-5 shadow-sm hover:border-slate-400 dark:hover:border-slate-700 transition space-y-2.5"
       >
-        <!-- Card Top Bar: Badges & Satwil -->
-        <div class="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-100 dark:border-slate-800/80 pb-3">
-          <div class="flex flex-wrap items-center gap-2">
-            <!-- Kode Laporan (SIM-...) -->
-            <button
-              @click="copyCode(issue.report_code || `SIM-${issue.id}`)"
-              type="button"
-              class="px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:border-amber-400 flex items-center gap-1.5 cursor-pointer transition"
-              :title="copiedCode === (issue.report_code || `SIM-${issue.id}`) ? 'Tersalin!' : 'Klik untuk salin kode'"
-            >
-              <Check v-if="copiedCode === (issue.report_code || `SIM-${issue.id}`)" class="w-3 h-3 text-emerald-500" />
-              <Copy v-else class="w-3 h-3 text-slate-400" />
-              <span>{{ issue.report_code || `SIM-${issue.id}` }}</span>
-            </button>
+        <div class="flex flex-wrap items-center gap-2">
+          <button
+            @click="copyCode(issue.report_code || 'SIM-' + issue.id)"
+            type="button"
+            class="px-2 py-0.5 rounded-lg text-[11px] font-mono font-bold bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:border-amber-400 flex items-center gap-1.5 cursor-pointer transition"
+            :title="copiedCode === (issue.report_code || 'SIM-' + issue.id) ? 'Tersalin!' : 'Klik untuk salin kode'"
+          >
+            <Check v-if="copiedCode === (issue.report_code || 'SIM-' + issue.id)" class="w-3 h-3 text-emerald-500" />
+            <Copy v-else class="w-3 h-3 text-slate-400" />
+            <span>{{ issue.report_code || 'SIM-' + issue.id }}</span>
+          </button>
 
-            <!-- Priority Badge -->
-            <span
-              class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider"
-              :class="getPriorityBadgeClass(issue.priority)"
-            >
-              {{ issue.priority }}
-            </span>
+          <span class="px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider" :class="priorityMeta(issue.priority).cls">
+            {{ priorityMeta(issue.priority).label }}
+          </span>
 
-            <!-- Status Verifikasi Pill -->
-            <span
-              class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider"
-              :class="getStatusBadgeClass(issue.status)"
-            >
-              {{ getStatusLabel(issue.status) }}
-            </span>
+          <span class="px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider" :class="statusMeta(issue.status).cls">
+            {{ statusMeta(issue.status).label }}
+          </span>
 
-            <!-- Category Badge -->
-            <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-              {{ issue.category }}
-            </span>
+          <span v-if="issue.is_hoax" class="px-2 py-0.5 rounded-lg text-[10px] font-black bg-rose-600 text-white flex items-center gap-1">
+            <XCircle class="w-3 h-3" /> HOAKS
+          </span>
 
-            <!-- Hoax Flag -->
-            <span
-              v-if="issue.is_hoax"
-              class="px-2 py-0.5 rounded-lg text-[10px] font-black bg-rose-600 text-white flex items-center gap-1 shadow-sm"
-            >
-              <XCircle class="w-3 h-3" /> HOAKS
-            </span>
-          </div>
-
-          <!-- Satwil / Pelapor Info -->
-          <div class="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+          <span class="ml-auto text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
             <Building2 class="w-3.5 h-3.5 text-amber-500" />
-            <span>Satwil:</span>
-            <span class="font-bold text-slate-900 dark:text-white">{{ issue.polres?.name || issue.polda?.name || (selectedCode === 'ALL' ? 'Divhumas Polri' : 'Polda Sulbar') }}</span>
-          </div>
+            <span class="font-bold text-slate-800 dark:text-slate-200">{{ issue.polres?.name || issue.polda?.name || 'Divhumas Polri' }}</span>
+          </span>
         </div>
 
-        <!-- Issue Title & Kronologi -->
-        <div class="space-y-1.5">
-          <Link
-            :href="`/issues/${issue.id}`"
-            class="text-base md:text-lg font-black text-slate-900 dark:text-white leading-snug hover:text-amber-500 dark:hover:text-amber-400 transition block"
-          >
+        <div class="space-y-1">
+          <Link :href="'/issues/' + issue.id" class="text-base font-black text-slate-900 dark:text-white leading-snug hover:text-amber-500 dark:hover:text-amber-400 transition block">
             {{ issue.title }}
           </Link>
-          <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-2">
-            {{ issue.summary }}
-          </p>
+          <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-2">{{ issue.summary }}</p>
         </div>
 
-        <!-- Metadata & Context Footer -->
-        <div class="flex flex-wrap items-center justify-between gap-3 pt-2 text-xs border-t border-slate-100 dark:border-slate-800/80">
-          <div class="flex flex-wrap items-center gap-4 text-slate-500 dark:text-slate-400 text-[11px]">
-            <span v-if="issue.location_text" class="flex items-center gap-1">
-              <MapPin class="w-3.5 h-3.5 text-slate-400" />
-              <span>{{ issue.location_text }}</span>
-            </span>
-
-            <span class="flex items-center gap-1">
-              <Calendar class="w-3.5 h-3.5 text-slate-400" />
-              <span>{{ issue.occurred_at ? new Date(issue.occurred_at).toLocaleString('id-ID') : new Date(issue.created_at).toLocaleString('id-ID') }} WITA</span>
-            </span>
-
-            <span v-if="issue.media_files_count > 0" class="px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-400/10 text-amber-700 dark:text-amber-400 font-bold">
-              📷 {{ issue.media_files_count }} Foto Bukti
-            </span>
-
-            <a
-              v-if="issue.source_url"
-              :href="issue.source_url"
-              target="_blank"
-              class="text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1"
-            >
-              <ExternalLink class="w-3 h-3" /> Sumber Media
+        <div class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-slate-500 dark:text-slate-400 text-[11px]">
+            <span v-if="issue.category" class="font-bold text-slate-700 dark:text-slate-300">{{ issue.category }}</span>
+            <span v-if="issue.location_text" class="flex items-center gap-1"><MapPin class="w-3.5 h-3.5" /> {{ issue.location_text }}</span>
+            <span class="flex items-center gap-1"><Calendar class="w-3.5 h-3.5" /> {{ new Date(issue.occurred_at || issue.created_at).toLocaleString('id-ID') }}</span>
+            <span v-if="issue.media_files_count > 0" class="font-bold text-amber-700 dark:text-amber-400">{{ issue.media_files_count }} foto bukti</span>
+            <a v-if="issue.source_url" :href="issue.source_url" target="_blank" rel="noopener noreferrer" class="text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
+              <ExternalLink class="w-3 h-3" /> Sumber
             </a>
           </div>
 
-          <div class="flex items-center gap-2">
-            <button
-              @click="openClarifyModal(issue)"
-              type="button"
-              class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 transition cursor-pointer"
-            >
-              <Sparkles class="w-3.5 h-3.5 inline mr-1 text-amber-500" />
-              <span>Klarifikasi</span>
-            </button>
-
-            <Link
-              :href="`/issues/${issue.id}`"
-              class="px-4 py-1.5 rounded-xl text-xs font-black bg-amber-400 hover:bg-amber-300 text-slate-950 flex items-center gap-1.5 transition shadow"
-            >
-              <span>Detail & Tindak Lanjut</span>
+          <div class="flex items-center gap-1.5">
+            <Link :href="'/issues/' + issue.id" class="px-4 py-1.5 rounded-xl text-xs font-black bg-amber-400 hover:bg-amber-300 text-slate-950 flex items-center gap-1.5 transition shadow">
+              <span>Buka</span>
               <ChevronRight class="w-3.5 h-3.5" />
             </Link>
+
+            <div v-if="canVerify" class="relative">
+              <button
+                type="button"
+                @click.stop="openMenu = openMenu === 'card-' + issue.id ? null : 'card-' + issue.id"
+                class="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 transition cursor-pointer"
+                title="Aksi lainnya"
+              >
+                <Ellipsis class="w-4 h-4" />
+              </button>
+              <div
+                v-if="openMenu === 'card-' + issue.id"
+                @click.stop
+                class="absolute bottom-full right-0 mb-2 z-30 w-52 rounded-xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-700 shadow-2xl p-1.5"
+              >
+                <button
+                  type="button"
+                  @click="openClarifyModal(issue); openMenu = null"
+                  class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 transition cursor-pointer text-left"
+                >
+                  <Sparkles class="w-4 h-4 text-amber-500" />
+                  <span>Klarifikasi cepat</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

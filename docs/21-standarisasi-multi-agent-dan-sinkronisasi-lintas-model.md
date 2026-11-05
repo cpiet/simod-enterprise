@@ -66,7 +66,7 @@ Setiap AI agent yang masuk ke repositori ini **wajib mematuhi 3 aturan non-negot
   php artisan test
   npm.cmd run build
   ```
-- Seluruh **93 tests (538 assertions)** harus berstatus **PASS (100% hijau)**. Jika ada test yang gagal, perbaiki kode sebelum melapor ke pengguna.
+- Seluruh **116 tests (710 assertions)** harus berstatus **PASS (100% hijau)**. Jika ada test yang gagal, perbaiki kode sebelum melapor ke pengguna.
 
 ---
 
@@ -75,7 +75,7 @@ Setiap AI agent yang masuk ke repositori ini **wajib mematuhi 3 aturan non-negot
 ### A. Isolasi Multi-Tenant & URL Kanonikal
 - Dilarang membuat navigasi atau form yang membawa query string plaintext seperti `?polda=SULBAR`.
 - Seluruh peralihan tenant dilakukan melalui endpoint terproteksi:
-  `POST /tenant/switch` dengan payload `polda_id`.
+  `POST /tenant/switch` dengan payload `code` (kode Polda, mis. `SULBAR` atau `ALL`).
 - Setiap query data operasional wajib menyertakan filter `polda_id`.
 
 ### B. Penargetan Tenant Divhumas Mabes pada Command Center (`DashboardController.php`)
@@ -114,7 +114,7 @@ Ketika Anda beralih dari satu model AI ke model AI lainnya (misal: Antigravity &
    ```bash
    php artisan test
    ```
-   Pastikan 93 tests lulus sempurna sebagai *baseline* sebelum melakukan perubahan baru.
+   Pastikan 116 tests lulus sempurna sebagai *baseline* sebelum melakukan perubahan baru.
 3. **Langkah 3: Lakukan Perubahan & Dokumentasikan**
    Lakukan penambahan fitur atau perbaikan kode sesuai instruksi di [`AGENTS.md`](../AGENTS.md) atau [`CLAUDE.md`](../CLAUDE.md).
 4. **Langkah 4: Kompilasi & Verifikasi Ulang**
@@ -131,3 +131,6 @@ Ketika Anda beralih dari satu model AI ke model AI lainnya (misal: Antigravity &
 
 Dengan protokol ini, setiap AI coding agent dapat melanjutkan pekerjaan agent sebelumnya secara mulus tanpa *knowledge loss* atau regresi arsitektur.
 
+---
+
+Rujukan peta kode, rute, tabel, dan temuan audit: [doc 22](22-peta-kode-dan-sumber-kebenaran.md).

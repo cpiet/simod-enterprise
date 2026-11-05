@@ -377,15 +377,15 @@ const navigationGroups = [
       },
       {
         name: 'Keamanan & Pemeliharaan',
-        desc: 'Keamanan, Hak Akses, Audit, Backup, Pembersihan, Sinkron RSS, Mesin AI',
+        desc: 'Keamanan, Hak Akses, Audit, Backup, Sinkron RSS, Mesin AI',
         href: '/security',
         icon: ShieldAlert,
-        match: ['/security', '/roles', '/audit-logs', '/database/backup', '/maintenance', '/settings/mail', '/maintenance/news-cleanup', '/maintenance/rss-sync', '/settings/ai'],
-        permissions: ['security_center', 'roles_matrix_manage', 'database_backup', 'maintenance_ops', 'mail_settings'],
+        match: ['/security', '/roles', '/settings/menus', '/audit-logs', '/database/backup', '/maintenance/news-cleanup', '/maintenance/rss-sync', '/settings/ai'],
+        permissions: ['security_center', 'roles_matrix_manage', 'database_backup', 'maintenance_ops'],
       },
       {
         name: 'Profil Saya',
-        desc: 'Kredensial & PIN Cepat',
+        desc: 'Identitas & ganti kata sandi',
         href: '/profile',
         icon: UserCheck,
         match: ['/profile'],
@@ -428,21 +428,24 @@ const handleLogout = () => {
 
 // Role Switcher Simulation Definition
 const availableRoles = [
-  { key: 'kadiv_humas', label: 'Kadivhumas Polri', badge: 'Mabes ⭐⭐', name: 'Irjen Pol. Johnny Eddizon Isir' },
-  { key: 'super_admin_mabes', label: 'Superadmin Mabes', badge: 'Superadmin', name: 'Super Administrator Mabes' },
-  { key: 'polda_leader', label: 'Pimpinan Polda', badge: 'Polda', name: 'Kombes Pol. Slamet Wahyudi' },
-  { key: 'verifikator', label: 'Verifikator (Penmas)', badge: 'Verifikator', name: 'AKP Syamsuddin, S.H.' },
-  { key: 'analis', label: 'Analis Intelijen', badge: 'Analis', name: 'Ipda Muhammad Ridwan, S.Kom' },
-  { key: 'operator', label: 'Operator Satwil', badge: 'Operator', name: 'Aipda Hendra Gunawan' },
+  { key: 'kadiv_humas', label: 'Kadivhumas Polri', badge: 'Mabes ⭐⭐' },
+  { key: 'super_admin_mabes', label: 'Superadmin Mabes', badge: 'Superadmin' },
+  { key: 'polda_leader', label: 'Pimpinan Polda', badge: 'Polda' },
+  { key: 'verifikator', label: 'Verifikator (Penmas)', badge: 'Verifikator' },
+  { key: 'analis', label: 'Analis Intelijen', badge: 'Analis' },
+  { key: 'operator', label: 'Operator Satwil', badge: 'Operator' },
 ];
 
+const canSimulateRole = computed(() => !!page.props.auth?.user?.can_simulate_role);
+
 const activeRoleObj = computed(() => {
-  return availableRoles.find(r => r.key === activeUserRole.value) || {
+  const meta = availableRoles.find(r => r.key === activeUserRole.value) || {
     key: activeUserRole.value,
     label: 'Personel Polri',
     badge: 'Dinas',
-    name: 'Petugas Humas',
   };
+  // Nama selalu milik pengguna yang sedang login, bukan nama contoh.
+  return { ...meta, name: page.props.auth?.user?.name || 'Pengguna' };
 });
 
 const switchRole = (newRole) => {
@@ -501,7 +504,7 @@ const switchRole = (newRole) => {
           <!-- Nav Links -->
           <div v-for="item in group.items" :key="item.id || item.name" class="space-y-1">
             <Link
-              :href="item.href"
+              :href="item.href" prefetch cache-for="30s"
               class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition group relative"
               :class="isRouteActive(item)
                 ? 'bg-amber-400 text-slate-950 font-black shadow-md shadow-amber-400/20'
@@ -553,7 +556,7 @@ const switchRole = (newRole) => {
               <Link
                 v-for="sub in item.children"
                 :key="sub.id || sub.name"
-                :href="sub.href"
+                :href="sub.href" prefetch cache-for="30s"
                 class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition"
                 :class="isRouteActive(sub)
                   ? 'bg-amber-400/20 text-amber-300 font-bold border border-amber-400/30'
@@ -862,10 +865,10 @@ const switchRole = (newRole) => {
               </div>
 
               <!-- Quick Switch Role Selector (Uji Hak Akses & Matriks Otoritas) -->
-              <div class="p-2 border-b border-slate-800/80 bg-slate-900/60 rounded-xl my-1">
+              <div v-if="canSimulateRole" class="p-2 border-b border-slate-800/80 bg-slate-900/60 rounded-xl my-1">
                 <div class="text-[10px] font-black uppercase text-slate-400 mb-1.5 flex items-center justify-between">
-                  <span>Uji Simulasi Peran (RBAC)</span>
-                  <span class="text-[9px] text-amber-400">Live Preview</span>
+                  <span>Pratinjau tampilan peran</span>
+                  <span class="text-[9px] text-slate-500">hanya menu</span>
                 </div>
                 <div class="grid grid-cols-2 gap-1.5">
                   <button
@@ -891,7 +894,7 @@ const switchRole = (newRole) => {
                   class="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 text-slate-300 hover:bg-slate-800 hover:text-white transition"
                 >
                   <UserCheck class="w-3.5 h-3.5 text-amber-400" />
-                  <span>Profil & PIN Dinas</span>
+                  <span>Profil &amp; Kata Sandi</span>
                 </Link>
                 <Link
                   href="/roles"

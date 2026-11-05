@@ -1,7 +1,7 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import axios from 'axios';
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
 import {
   Shield,
@@ -53,7 +53,8 @@ import {
   Tag,
   Edit3,
   ImageOff,
-  Printer,
+  Ellipsis,
+  SlidersHorizontal,
   Volume2,
   VolumeX,
   RotateCcw,
@@ -75,14 +76,58 @@ const props = defineProps({
   issues: Array,
   pressReleases: Array,
   suggestedTopics: { type: Array, default: () => [] },
+  trend7: { type: Array, default: () => [] },
   metrics: Object,
 });
 
 // Tenant Detection: Divhumas (Mabes Polri) vs Polda Wilayah
 const isDivhumas = computed(() => props.selectedCode === 'ALL' || props.selectedPolda?.code === 'DIVHUMAS');
 
-// Active Navigation Tab (01-04)
-const activeTab = ref('01');
+const sentimentPositive = computed(() => {
+  const r = props.report || {};
+  const v = isDivhumas.value ? r.sentiment_national?.positif : (r.sentiment_satwil?.positif ?? r.sentiment_sulbar?.positif);
+  return v === undefined || v === null ? null : v;
+});
+
+// Peran & izin pengguna (menentukan tombol yang tampil dan tab awal)
+const page = usePage();
+const authRole = computed(() => page.props.auth?.role || '');
+const canRunAi = computed(() => !!page.props.auth?.permissions?.media_intelligence_ai);
+const isOperator = computed(() => authRole.value === 'operator');
+
+// Active Navigation Tab (01-04): pimpinan & Polda mendarat di Briefing, operator di daftar berita
+const activeTab = ref(['kadiv_humas', 'polda_leader'].includes(page.props.auth?.role) ? '02' : '01');
+
+// Menu melayang (header, filter, aksi kartu) -- hanya satu terbuka pada satu waktu
+const activeFilterCount = computed(() => (selectedPortal.value !== 'Semua Portal' ? 1 : 0) + (selectedCategory.value !== 'all' ? 1 : 0));
+const openMenu = ref(null);
+const showFilterPanel = ref(false);
+const dossierOpen = ref(false);
+const closeFloating = () => {
+  openMenu.value = null;
+  showFilterPanel.value = false;
+};
+onMounted(() => document.addEventListener('click', closeFloating));
+onUnmounted(() => document.removeEventListener('click', closeFloating));
+
+// Sparkline 7 hari & selisih terhadap kemarin (KPI strip)
+const sparkPoints = (key) => {
+  const d = props.trend7 || [];
+  if (d.length < 2) return '';
+  const max = Math.max(...d.map((x) => x[key] || 0), 1);
+  return d.map((x, i) => ((i / (d.length - 1)) * 100).toFixed(1) + ',' + (26 - ((x[key] || 0) / max) * 24).toFixed(1)).join(' ');
+};
+const trendDelta = (key) => {
+  const d = props.trend7 || [];
+  if (d.length < 2) return null;
+  return (d[d.length - 1][key] || 0) - (d[d.length - 2][key] || 0);
+};
+const deltaLabel = (key) => {
+  const v = trendDelta(key);
+  if (v === null) return '';
+  if (v === 0) return '\u2014 sama dengan kemarin';
+  return (v > 0 ? '\u25B2 +' : '\u25BC ') + v + ' vs kemarin';
+};
 
 const tabs = computed(() => [
   { id: '01', name: '01. Berita Online (Live RSS)', badge: 'LIVE', icon: Radio },
@@ -286,12 +331,6 @@ const redZoneCount = computed(() => {
   return (props.sampleArticles || []).filter((a) => (a.sentiment || '').toLowerCase() === 'negatif').length;
 });
 
-// Tahap 3: Cetak 1-Lembar PDF Resmi (A4 Presisi)
-const showPrintPreviewModal = ref(false);
-const printExecutiveBriefing = () => {
-  window.print();
-};
-
 // Tahap 2: AI Copilot Chatbot (SADEWA AI - Global Dispatch)
 const openSadewaGlobal = (query = null) => {
   if (typeof window !== 'undefined') {
@@ -301,6 +340,9 @@ const openSadewaGlobal = (query = null) => {
 
 // Smart Dossier & Topik Atensi Pimpinan States
 const selectedTopicId = ref(null);
+watch(selectedTopicId, (v) => {
+  if (v) dossierOpen.value = true;
+});
 const showTopicModal = ref(false);
 const isEditingTopic = ref(false);
 const isSubmittingTopic = ref(false);
@@ -1249,7 +1291,7 @@ const whatsappReportText = computed(() => {
 const isRefreshingRss = ref(false);
 const refreshRssFeeds = () => {
   isRefreshingRss.value = true;
-  router.get('/media-intelligence', { polda: props.selectedCode, refresh: 1 }, {
+  router.get('/media-intelligence', { refresh: 1 }, {
     preserveScroll: true,
     onFinish: () => {
       isRefreshingRss.value = false;
@@ -1446,119 +1488,115 @@ const submitIssue = () => {
       </div>
     </transition>
 
-    <!-- Top Command Header with Actions (Salin Prompt AI, Tempel Ringkasan AI) -->
-    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-6 rounded-3xl bg-gradient-to-r from-[#0d182e] via-[#0b1426] to-[#070d1d] border border-slate-800 shadow-2xl relative overflow-hidden">
-      <div class="absolute top-0 right-0 -mt-12 -mr-12 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
-
-      <div class="space-y-2 relative z-10">
-        <div class="flex items-center gap-2 flex-wrap">
-          <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500/20 text-rose-400 border border-rose-500/40">
-            Klasifikasi: Rahasia Terbatas / Command Center
-          </span>
-          <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40">
-            📰 Radar Media Online & Agregasi Pers
-          </span>
-          <span class="flex items-center gap-1 text-[11px] font-bold text-emerald-400">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-            Live Radar 29 RSS Aktif
-          </span>
+    <!-- Header ringkas: 1 aksi utama + SADEWA + menu lainnya -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 md:p-5 rounded-3xl bg-gradient-to-r from-[#0d182e] via-[#0b1426] to-[#070d1d] border border-slate-800 shadow-xl relative">
+      <div class="space-y-1 min-w-0">
+        <div class="flex items-center gap-2 text-[11px] font-bold text-emerald-400">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+          <span>Live &bull; {{ mediaFeeds?.length || 0 }} portal aktif</span>
         </div>
-        <h1 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
-          Radar Media Online &bull; {{ selectedCode === 'ALL' ? 'DIVHUMAS POLRI (ORKESTRASI NASIONAL)' : selectedPolda?.name }}
-        </h1>
-        <p class="text-xs md:text-sm text-slate-300 max-w-2xl leading-relaxed">
-          Pusat Agregasi Berita Pers & Media Siber Real-Time, Analisis Isu Strategis Nasional Polri, Executive Briefing Harian Pimpinan, dan Naskah WhatsApp Terstandarisasi.
+        <h1 class="text-xl md:text-2xl font-extrabold text-white tracking-tight">Radar Media Online</h1>
+        <p class="text-xs text-slate-400 truncate">
+          {{ selectedCode === 'ALL' ? 'Divhumas Polri (Orkestrasi Nasional)' : selectedPolda?.name }}
         </p>
       </div>
 
-      <!-- Action Buttons: 1-Click All-in-One Sinkron & Analisis Otomatis + Format WA Pimpinan -->
-      <div class="flex flex-wrap items-center gap-2.5 relative z-10">
-        <!-- Button Utama: Sinkron & Analisis Otomatis (1-Click Seamless Pipeline) -->
+      <div class="flex items-center gap-2 shrink-0">
+        <!-- Aksi utama (hanya untuk peran berizin analisis AI) -->
         <button
+          v-if="canRunAi"
           @click="triggerGeminiAnalysis(true)"
           :disabled="isAnalyzingGemini"
-          class="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-black transition-all shadow-lg shadow-amber-400/25 border border-amber-300 hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed select-none"
-          title="Tarik berita terkini dari seluruh portal media dan analisis intelijen secara otomatis dalam 1 klik"
+          class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-110 text-slate-950 text-xs font-black transition shadow-lg shadow-amber-400/25 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed select-none"
+          title="Tarik berita terkini dari seluruh portal dan analisis intelijen otomatis dalam 1 klik"
         >
-          <RotateCw v-if="isAnalyzingGemini" class="w-4 h-4 text-slate-950 animate-spin" />
-          <Zap v-else class="w-4 h-4 text-slate-950 fill-slate-950" />
-          <span>{{ isAnalyzingGemini ? (syncStepText || 'Memproses Sinkron & Analisis...') : '⚡ Sinkron & Analisis Otomatis' }}</span>
-          <span v-if="props.aiSetting?.has_api_key" class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse ml-0.5" title="Mesin Analisis AI Aktif"></span>
+          <RotateCw v-if="isAnalyzingGemini" class="w-4 h-4 animate-spin" />
+          <Zap v-else class="w-4 h-4 fill-slate-950" />
+          <span>{{ isAnalyzingGemini ? (syncStepText || 'Memproses...') : 'Sinkron & Analisis' }}</span>
+          <span v-if="props.aiSetting?.has_api_key" class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" title="Mesin Analisis AI Aktif"></span>
         </button>
 
-        <!-- Button 2: Format WA Pimpinan (Tab 02) -->
-        <button
-          @click="activeTab = '02'"
-          class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white text-xs font-black transition shadow-lg shadow-emerald-600/25 border border-emerald-400/30 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
-          title="Buka format naskah WhatsApp resmi siap kirim ke pimpinan"
-        >
-          <MessageCircle class="w-4 h-4" />
-          <span>📱 Format WA Pimpinan</span>
-        </button>
-
-        <!-- Button 3: Cetak Lembar Eksekutif A4 Resmi (Tahap 3) -->
-        <button
-          @click="showPrintPreviewModal = true"
-          class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-black transition shadow-lg shadow-blue-600/25 border border-blue-400/30 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
-          title="Pratinjau & Cetak 1-Lembar Laporan Eksekutif Presisi A4 untuk Pimpinan"
-        >
-          <Printer class="w-4 h-4" />
-          <span>🖨️ Cetak A4 Resmi</span>
-        </button>
-
-        <!-- Button 4: SADEWA AI Copilot (Tahap 2) -->
         <button
           @click="openSadewaGlobal()"
-          class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-red-700 hover:from-red-500 hover:to-rose-500 text-white text-xs font-black transition shadow-lg shadow-red-600/25 border border-red-400/40 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
-          title="Buka dialog asisten AI SADEWA Copilot"
+          class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold border border-slate-700 hover:border-rose-400/60 transition cursor-pointer"
+          title="Buka asisten AI SADEWA Copilot"
         >
-          <Bot class="w-4 h-4 text-white" />
-          <span>🤖 SADEWA AI</span>
+          <Bot class="w-4 h-4 text-rose-400" />
+          <span class="hidden sm:inline">SADEWA AI</span>
         </button>
+
+        <!-- Menu lainnya -->
+        <div class="relative">
+          <button
+            type="button"
+            @click.stop="openMenu = openMenu === 'more' ? null : 'more'"
+            class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
+            title="Aksi lainnya"
+          >
+            <Ellipsis class="w-4 h-4" />
+          </button>
+          <div
+            v-if="openMenu === 'more'"
+            @click.stop
+            class="absolute right-0 top-full mt-2 z-30 w-56 rounded-xl bg-[#0b1426] border border-slate-700 shadow-2xl p-1.5"
+          >
+            <button
+              type="button"
+              @click="activeTab = '02'; openMenu = null"
+              class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-slate-200 hover:bg-slate-800 hover:text-white transition cursor-pointer text-left"
+            >
+              <MessageCircle class="w-4 h-4 text-emerald-400" />
+              <span>Format WA Pimpinan</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- 4 KPI Metrics Grid -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="p-5 rounded-2xl bg-[#0b1426] border border-slate-800 shadow-lg space-y-1">
-        <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
-          <span>Portal RSS Terdaftar</span>
-          <Radio class="w-4 h-4 text-amber-400" />
+    <!-- KPI strip: angka + sparkline 7 hari + selisih vs kemarin -->
+    <div class="rounded-2xl bg-[#0b1426] border border-slate-800 shadow-lg grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-slate-800 overflow-hidden">
+      <div class="p-4 space-y-1.5">
+        <p class="text-[11px] font-bold text-slate-400 flex items-center gap-1.5"><Newspaper class="w-3.5 h-3.5 text-sky-400" /> Berita Tersimpan</p>
+        <div class="flex items-end justify-between gap-2">
+          <p class="text-2xl font-black text-white leading-none">{{ sampleArticles?.length || 0 }}</p>
+          <svg v-if="trend7.length > 1" viewBox="0 0 100 28" preserveAspectRatio="none" class="w-20 h-7 text-sky-400" aria-hidden="true">
+            <polyline :points="sparkPoints('total')" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+          </svg>
         </div>
-        <p class="text-2xl md:text-3xl font-black text-white">{{ mediaFeeds?.length || (isDivhumas ? 22 : 29) }} Portal</p>
-        <p class="text-[11px] text-slate-400">{{ isDivhumas ? (mediaFeeds?.length || 22) + ' Portal Media Nasional Terverifikasi' : (mediaFeeds?.length || 29) + ' Portal Sulbar & Nasional' }}</p>
+        <p class="text-[11px] text-slate-400">{{ deltaLabel('total') || '7 hari terakhir' }}</p>
       </div>
 
-      <div class="p-5 rounded-2xl bg-[#0b1426] border border-slate-800 shadow-lg space-y-1">
-        <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
-          <span>Total Berita Tersimpan</span>
-          <Newspaper class="w-4 h-4 text-sky-400" />
+      <button
+        type="button"
+        @click="activeTab = '01'; showRedZoneOnly = true; showBookmarksOnly = false; currentPage = 1"
+        class="p-4 space-y-1.5 text-left hover:bg-slate-800/40 transition cursor-pointer"
+        title="Lihat berita Zona Merah"
+      >
+        <p class="text-[11px] font-bold text-slate-400 flex items-center gap-1.5"><AlertTriangle class="w-3.5 h-3.5 text-rose-400" /> Zona Merah</p>
+        <div class="flex items-end justify-between gap-2">
+          <p class="text-2xl font-black leading-none" :class="redZoneCount > 0 ? 'text-rose-400' : 'text-white'">{{ redZoneCount }}</p>
+          <svg v-if="trend7.length > 1" viewBox="0 0 100 28" preserveAspectRatio="none" class="w-20 h-7 text-rose-400" aria-hidden="true">
+            <polyline :points="sparkPoints('negatif')" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+          </svg>
         </div>
-        <p class="text-2xl md:text-3xl font-black text-white">{{ sampleArticles?.length || 150 }}</p>
-        <p class="text-[11px] text-slate-400">Pantauan 24 Jam Terakhir</p>
-      </div>
+        <p class="text-[11px]" :class="trendDelta('negatif') > 0 ? 'text-rose-300 font-bold' : 'text-slate-400'">{{ deltaLabel('negatif') || 'berita negatif' }}</p>
+      </button>
 
-      <div class="p-5 rounded-2xl bg-[#0b1426] border border-slate-800 shadow-lg space-y-1">
-        <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
-          <span>EWS Siaga Aktif</span>
-          <Flame class="w-4 h-4 text-rose-400" />
-        </div>
-        <div class="flex items-baseline gap-2">
-          <p class="text-2xl md:text-3xl font-black text-amber-400">{{ metrics.active_ews }}</p>
-          <span class="text-xs font-bold text-rose-400">Prioritas Tinggi</span>
-        </div>
-        <p class="text-[11px] text-slate-400">Mitigasi Risiko Reputasi</p>
-      </div>
+      <button
+        type="button"
+        @click="activeTab = '03'"
+        class="p-4 space-y-1.5 text-left hover:bg-slate-800/40 transition cursor-pointer"
+        title="Buka Early Warning System"
+      >
+        <p class="text-[11px] font-bold text-slate-400 flex items-center gap-1.5"><Flame class="w-3.5 h-3.5 text-amber-400" /> EWS Siaga Aktif</p>
+        <p class="text-2xl font-black leading-none" :class="(metrics?.ews_red || 0) > 0 ? 'text-rose-400' : 'text-amber-400'">{{ metrics?.active_ews || 0 }}</p>
+        <p class="text-[11px] text-slate-400">{{ metrics?.ews_red || 0 }} merah &bull; {{ metrics?.ews_yellow || 0 }} kuning</p>
+      </button>
 
-      <div class="p-5 rounded-2xl bg-[#0b1426] border border-slate-800 shadow-lg space-y-1">
-        <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
-          <span>Indeks Sentimen Publik</span>
-          <TrendingUp class="w-4 h-4 text-emerald-400" />
-        </div>
-        <p class="text-2xl md:text-3xl font-black text-emerald-400">
-          {{ (isDivhumas ? report?.sentiment_national?.positif : (report?.sentiment_satwil?.positif || report?.sentiment_sulbar?.positif)) || 84.2 }}%
-        </p>
-        <p class="text-[11px] text-slate-400">{{ isDivhumas ? 'Kondusifitas Nasional Terjaga' : 'Kondusifitas Wilayah Tinggi' }}</p>
+      <div class="p-4 space-y-1.5">
+        <p class="text-[11px] font-bold text-slate-400 flex items-center gap-1.5"><TrendingUp class="w-3.5 h-3.5 text-emerald-400" /> Sentimen Positif</p>
+        <p class="text-2xl font-black text-emerald-400 leading-none">{{ sentimentPositive === null ? '\u2014' : sentimentPositive + '%' }}</p>
+        <p class="text-[11px] text-slate-400">{{ isDivhumas ? 'Cakupan nasional' : 'Cakupan wilayah' }}</p>
       </div>
     </div>
 
@@ -1612,58 +1650,44 @@ const submitIssue = () => {
     <!-- TAB 01: LIVE RSS MEDIA PATROL (FULL PARITAS SEPERTI SIMOD)                 -->
     <!-- ========================================================================= -->
     <div v-show="activeTab === '01'" class="space-y-5">
-      <!-- Patroli Siaran Media Massa Real-Time Header -->
-      <div class="rounded-3xl bg-gradient-to-r from-[#0d182e] via-[#0b1426] to-[#070d1d] border border-slate-800 p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div class="space-y-1">
-          <div class="flex items-center gap-2">
-            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
-            <h2 class="text-lg md:text-xl font-black text-white tracking-tight flex items-center gap-2">
-              Radar & Agregasi Berita Online Real-Time
-            </h2>
-          </div>
-          <p class="text-xs text-slate-300 max-w-2xl leading-relaxed">
-            Sindikasi RSS multi-portal memantau siaran pers dan portal media online nasional & daerah secara otomatis. Dilengkapi filter portal, sentimen, pencarian instan, bookmark artikel, dan konversi ke Laporan Isu Humas.
-          </p>
-        </div>
-        <div class="flex items-center gap-2 shrink-0">
-          <button
-            @click="refreshRssFeeds"
-            :disabled="isRefreshingRss"
-            class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-white transition shadow-sm disabled:opacity-50 cursor-pointer"
-            title="Tarik berita terbaru dari portal media (hanya pembaruan berita tanpa memanggil AI)"
-          >
-            <RotateCw class="w-4 h-4 text-amber-400" :class="{ 'animate-spin': isRefreshingRss }" />
-            <span>{{ isRefreshingRss ? 'Menarik Berita...' : 'Sinkron Berita' }}</span>
-          </button>
-        </div>
+      <!-- Baris judul + sinkron berita ringan -->
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="text-sm md:text-base font-black text-white tracking-tight flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+          Berita Online Real-Time
+        </h2>
+        <button
+          @click="refreshRssFeeds"
+          :disabled="isRefreshingRss"
+          class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-white transition shadow-sm disabled:opacity-50 cursor-pointer"
+          title="Tarik berita terbaru dari portal media (tanpa memanggil AI)"
+        >
+          <RotateCw class="w-3.5 h-3.5 text-amber-400" :class="{ 'animate-spin': isRefreshingRss }" />
+          <span>{{ isRefreshingRss ? 'Menarik Berita...' : 'Sinkron Berita' }}</span>
+        </button>
       </div>
 
       <!-- SMART DOSSIER: TOPIK ATENSI & REQUEST PIMPINAN (EXECUTIVE DOSSIER HUB) -->
       <div class="rounded-3xl bg-[#0b1426] border border-amber-500/30 p-5 shadow-2xl space-y-4">
         <!-- Top Bar: Title, Count Badge & Actions -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+        <div class="flex items-center justify-between gap-3 flex-wrap" :class="dossierOpen ? 'pb-3 border-b border-slate-800' : ''">
           <div class="space-y-0.5">
             <div class="flex items-center gap-2">
               <span class="flex h-2.5 w-2.5 relative">
                 <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                 <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
               </span>
-              <h3 class="text-sm md:text-base font-extrabold text-white flex items-center gap-1.5 flex-wrap">
-                <span>Topik Atensi &amp; Request Pimpinan</span>
-                <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                  Smart Dossier
-                </span>
-                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-900 border border-slate-700 text-slate-300 flex items-center gap-1.5 shadow-xs">
-                  <span>{{ topics.length }} Kasus Dipantau</span>
+              <button type="button" @click.stop="dossierOpen = !dossierOpen" class="text-sm md:text-base font-extrabold text-white flex items-center gap-2 flex-wrap cursor-pointer select-none text-left" :aria-expanded="dossierOpen">
+                <span>Topik Atensi Pimpinan</span>
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-900 border border-slate-700 text-slate-300 flex items-center gap-1.5">
+                  <span>{{ topics.length }} kasus</span>
                   <span v-if="topics.some(t => t.priority === 'urgent')" class="text-rose-400 font-black">
-                    • {{ topics.filter(t => t.priority === 'urgent').length }} Mendesak
+                    &bull; {{ topics.filter(t => t.priority === 'urgent').length }} mendesak
                   </span>
                 </span>
-              </h3>
+                <ChevronDown class="w-4 h-4 text-slate-400 transition-transform" :class="dossierOpen ? 'rotate-180' : ''" />
+              </button>
             </div>
-            <p class="text-[11px] text-slate-400">
-              Penyaringan kasus viral / atensi khusus Kapolda &amp; Kadiv Humas berbasis pencocokan kata kunci otomatis dan tagging manual.
-            </p>
           </div>
 
           <div class="flex items-center gap-2 shrink-0 flex-wrap">
@@ -1693,6 +1717,7 @@ const submitIssue = () => {
           </div>
         </div>
 
+        <div v-show="dossierOpen" class="space-y-4">
         <!-- KASUS ATENSI SELECTOR (ADAPTIVE RESPONSIVE FLEX BADGES - RAPI & TIDAK MENUMPUK) -->
         <div class="space-y-2">
           <!-- Empty State jika belum ada topik -->
@@ -2074,27 +2099,40 @@ const submitIssue = () => {
                   </template>
                 </div>
 
-                <!-- Group Crawl & WhatsApp -->
-                <div class="flex items-center gap-2 flex-wrap">
+                <!-- Aksi lain dalam satu menu -->
+                <div class="relative">
                   <button
-                    @click="openLiveCrawlModal(currentSelectedTopic)"
-                    :disabled="isCrawlingLive"
                     type="button"
-                    class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:brightness-110 text-white text-xs font-bold shadow-sm transition cursor-pointer select-none disabled:opacity-50"
-                    title="Tarik sebaran berita terbaru dari Google News"
+                    @click.stop="openMenu = openMenu === 'topic' ? null : 'topic'"
+                    class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700 text-xs font-bold transition cursor-pointer select-none"
+                    title="Tarik berita internet, salin naskah WhatsApp"
                   >
-                    <Globe class="w-3.5 h-3.5" :class="{ 'animate-spin': isCrawlingLive && crawlingTopic?.id === currentSelectedTopic.id }" />
-                    <span>{{ (isCrawlingLive && crawlingTopic?.id === currentSelectedTopic.id) ? 'Menarik...' : '🌐 Tarik Berita Internet' }}</span>
+                    <Ellipsis class="w-4 h-4" />
+                    <span>Lainnya</span>
                   </button>
-
-                  <button
-                    @click="copyTopicWaScript(currentSelectedTopic)"
-                    class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white text-xs font-bold shadow-sm transition cursor-pointer select-none"
-                    title="Salin Naskah WhatsApp Laporan Khusus Pimpinan"
+                  <div
+                    v-if="openMenu === 'topic'"
+                    @click.stop
+                    class="absolute right-0 top-full mt-2 z-30 w-60 rounded-xl bg-[#0b1426] border border-slate-700 shadow-2xl p-1.5"
                   >
-                    <MessageSquare class="w-3.5 h-3.5" />
-                    <span>📱 Salin WA</span>
-                  </button>
+                    <button
+                      type="button"
+                      @click="openLiveCrawlModal(currentSelectedTopic); openMenu = null"
+                      :disabled="isCrawlingLive"
+                      class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-slate-200 hover:bg-slate-800 hover:text-white transition cursor-pointer text-left disabled:opacity-50"
+                    >
+                      <Globe class="w-4 h-4 text-cyan-400" :class="{ 'animate-spin': isCrawlingLive && crawlingTopic?.id === currentSelectedTopic.id }" />
+                      <span>{{ (isCrawlingLive && crawlingTopic?.id === currentSelectedTopic.id) ? 'Menarik...' : 'Tarik Berita Internet' }}</span>
+                    </button>
+                    <button
+                      type="button"
+                      @click="copyTopicWaScript(currentSelectedTopic); openMenu = null"
+                      class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-slate-200 hover:bg-slate-800 hover:text-white transition cursor-pointer text-left"
+                    >
+                      <MessageSquare class="w-4 h-4 text-emerald-400" />
+                      <span>Salin Naskah WA</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -2158,6 +2196,7 @@ const submitIssue = () => {
               </div>
             </div>
           </div>
+        </div>
         </div>
       </div>
 
@@ -2234,63 +2273,72 @@ const submitIssue = () => {
           <!-- Vertical Divider -->
           <div class="h-6 w-px bg-slate-800 hidden xl:block"></div>
 
-          <!-- Portal Dropdown -->
-          <div class="flex items-center gap-1.5">
-            <span class="text-xs font-bold text-slate-400">Portal:</span>
-            <select
-              v-model="selectedPortal"
-              @change="selectedTopicId = null; currentPage = 1"
-              class="px-2.5 py-2 rounded-xl text-xs font-bold bg-[#070d19] border border-slate-700 text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+          <!-- Filter: Portal, Kategori, Baris dalam satu panel -->
+          <div class="relative">
+            <button
+              type="button"
+              @click.stop="showFilterPanel = !showFilterPanel"
+              class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black transition cursor-pointer select-none border"
+              :class="activeFilterCount > 0
+                ? 'bg-amber-400/15 text-amber-300 border-amber-400/60'
+                : 'bg-[#070d19] text-slate-300 border-slate-700 hover:border-slate-600 hover:text-white'"
+              title="Filter portal, kategori, dan jumlah baris"
             >
-              <option value="Semua Portal">Semua Portal ({{ availablePortals.length || 29 }})</option>
-              <option
-                v-for="p in availablePortals"
-                :key="p.name"
-                :value="p.name"
-              >
-                {{ p.name }} ({{ p.count }})
-              </option>
-            </select>
-          </div>
+              <SlidersHorizontal class="w-3.5 h-3.5" />
+              <span>Filter</span>
+              <span v-if="activeFilterCount > 0" class="px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-amber-400 text-slate-950 font-black">{{ activeFilterCount }}</span>
+            </button>
 
-          <!-- Kategori Dropdown -->
-          <div class="flex items-center gap-1.5">
-            <span class="text-xs font-bold text-slate-400">Kategori:</span>
-            <select
-              v-model="selectedCategory"
-              @change="currentPage = 1"
-              class="px-2.5 py-2 rounded-xl text-xs font-bold bg-[#070d19] border border-slate-700 text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+            <div
+              v-if="showFilterPanel"
+              @click.stop
+              class="absolute left-0 top-full mt-2 z-30 w-[min(92vw,22rem)] rounded-2xl bg-[#0b1426] border border-slate-700 shadow-2xl p-4 space-y-3"
             >
-              <option value="all">Semua ({{ sampleArticles?.length || 0 }})</option>
-              <option
-                v-for="cat in availableCategories"
-                :key="cat.name"
-                :value="cat.name"
-              >
-                {{ cat.name }} ({{ cat.count }})
-              </option>
-            </select>
-          </div>
+              <label class="block space-y-1">
+                <span class="text-[11px] font-bold text-slate-400">Portal</span>
+                <select
+                  v-model="selectedPortal"
+                  @change="selectedTopicId = null; currentPage = 1"
+                  class="w-full px-2.5 py-2 rounded-xl text-xs font-bold bg-[#070d19] border border-slate-700 text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+                >
+                  <option value="Semua Portal">Semua Portal ({{ availablePortals.length || 29 }})</option>
+                  <option v-for="p in availablePortals" :key="p.name" :value="p.name">{{ p.name }} ({{ p.count }})</option>
+                </select>
+              </label>
 
-          <!-- Tampilan Baris Dropdown -->
-          <div class="flex items-center gap-1.5">
-            <span class="text-xs font-bold text-slate-400 flex items-center gap-1">
-              <Layers class="w-3.5 h-3.5 text-amber-400" />
-              <span>Baris:</span>
-            </span>
-            <select
-              v-model.number="selectedRows"
-              @change="onRowsChange"
-              class="px-2.5 py-2 rounded-xl text-xs font-bold bg-[#070d19] border border-slate-700 text-white focus:outline-none focus:border-amber-400 cursor-pointer"
-              title="Pilih jumlah baris berita per halaman"
-            >
-              <option :value="3">3 Baris (9)</option>
-              <option :value="5">5 Baris (15) — Default</option>
-              <option :value="8">8 Baris (24)</option>
-              <option :value="10">10 Baris (30)</option>
-              <option :value="15">15 Baris (45)</option>
-              <option :value="17">17 Baris (50)</option>
-            </select>
+              <label class="block space-y-1">
+                <span class="text-[11px] font-bold text-slate-400">Kategori</span>
+                <select
+                  v-model="selectedCategory"
+                  @change="currentPage = 1"
+                  class="w-full px-2.5 py-2 rounded-xl text-xs font-bold bg-[#070d19] border border-slate-700 text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+                >
+                  <option value="all">Semua ({{ sampleArticles?.length || 0 }})</option>
+                  <option v-for="cat in availableCategories" :key="cat.name" :value="cat.name">{{ cat.name }} ({{ cat.count }})</option>
+                </select>
+              </label>
+
+              <label class="block space-y-1">
+                <span class="text-[11px] font-bold text-slate-400 flex items-center gap-1"><Layers class="w-3.5 h-3.5 text-amber-400" /> Baris per halaman</span>
+                <select
+                  v-model.number="selectedRows"
+                  @change="onRowsChange"
+                  class="w-full px-2.5 py-2 rounded-xl text-xs font-bold bg-[#070d19] border border-slate-700 text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+                >
+                  <option :value="3">3 Baris (9)</option>
+                  <option :value="5">5 Baris (15) &mdash; Default</option>
+                  <option :value="8">8 Baris (24)</option>
+                  <option :value="10">10 Baris (30)</option>
+                  <option :value="15">15 Baris (45)</option>
+                  <option :value="17">17 Baris (50)</option>
+                </select>
+              </label>
+
+              <div class="flex items-center justify-between pt-1">
+                <button type="button" @click="selectedPortal = 'Semua Portal'; selectedCategory = 'all'; currentPage = 1" class="text-[11px] font-bold text-slate-400 hover:text-white cursor-pointer">Atur ulang</button>
+                <button type="button" @click="showFilterPanel = false" class="px-3 py-1.5 rounded-lg bg-amber-400 text-slate-950 text-xs font-black cursor-pointer">Selesai</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -2334,6 +2382,27 @@ const submitIssue = () => {
             <strong class="text-white font-extrabold">{{ filteredArticles.length }}</strong>
           </div>
         </div>
+      </div>
+
+      <!-- Chip filter aktif -->
+      <div v-if="activeFilterCount > 0" class="flex flex-wrap items-center gap-2 -mt-2">
+        <span class="text-[11px] font-bold text-slate-500">Filter aktif:</span>
+        <button
+          v-if="selectedPortal !== 'Semua Portal'"
+          type="button"
+          @click="selectedPortal = 'Semua Portal'; currentPage = 1"
+          class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-900 border border-slate-700 text-slate-200 hover:border-amber-400 cursor-pointer"
+        >
+          Portal: {{ selectedPortal }} <X class="w-3 h-3" />
+        </button>
+        <button
+          v-if="selectedCategory !== 'all'"
+          type="button"
+          @click="selectedCategory = 'all'; currentPage = 1"
+          class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-900 border border-slate-700 text-slate-200 hover:border-amber-400 cursor-pointer"
+        >
+          Kategori: {{ selectedCategory }} <X class="w-3 h-3" />
+        </button>
       </div>
 
       <!-- Alert Banner Mode Zona Merah Aktif -->
@@ -2518,13 +2587,12 @@ const submitIssue = () => {
                   <span>Buka</span>
                 </a>
 
-                <!-- Right: Simpan / Bookmark & Buat Isu -->
-                <div class="flex items-center gap-2">
-                  <!-- Simpan / Bookmark -->
+                <!-- Kanan: Simpan, Buat Isu (operator), menu lainnya -->
+                <div class="flex items-center gap-1.5">
                   <button
                     @click.stop="toggleBookmark(article.id)"
                     :class="[
-                      'px-3 py-1.5 rounded-full text-xs font-bold transition flex items-center gap-1.5 shadow-sm border',
+                      'px-3 py-1.5 rounded-full text-xs font-bold transition flex items-center gap-1.5 shadow-sm border cursor-pointer',
                       isBookmarked(article.id)
                         ? 'bg-amber-400 text-slate-950 font-black border-amber-300 shadow-md'
                         : 'bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-amber-300 border-slate-700'
@@ -2532,29 +2600,53 @@ const submitIssue = () => {
                     :title="isBookmarked(article.id) ? 'Hapus dari Bookmark Tersimpan' : 'Simpan / Bookmark Berita Ini'"
                   >
                     <Check v-if="isBookmarked(article.id)" class="w-3.5 h-3.5 text-slate-950" />
-                    <Copy v-else class="w-3.5 h-3.5 text-amber-400" />
-                    <span>{{ isBookmarked(article.id) ? '★ Tersimpan' : '🔖 Simpan' }}</span>
+                    <Bookmark v-else class="w-3.5 h-3.5 text-amber-400" />
+                    <span>{{ isBookmarked(article.id) ? 'Tersimpan' : 'Simpan' }}</span>
                   </button>
 
-                  <!-- Tag Kasus Atensi Pimpinan -->
                   <button
-                    @click.stop="openTagModal(article)"
-                    class="px-2.5 py-1.5 rounded-full text-xs font-bold transition flex items-center gap-1 shadow-sm border bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-amber-400 border-slate-700 cursor-pointer"
-                    title="Kaitkan atau lepaskan berita ini dari Topik Atensi Pimpinan"
-                  >
-                    <span>📌</span>
-                    <span class="hidden sm:inline">Tag</span>
-                  </button>
-
-                  <!-- Buat Isu -->
-                  <button
+                    v-if="isOperator"
                     @click.stop="openIssueModal(article)"
-                    class="px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 border-2 border-amber-400/90 hover:border-amber-300 flex items-center gap-1 transition shadow-lg shadow-amber-400/10"
-                    title="Jadikan laporan isu publik baru di SIMOD HUMAS"
+                    class="px-3 py-1.5 rounded-full text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 border-2 border-amber-400/90 hover:border-amber-300 flex items-center gap-1 transition cursor-pointer"
+                    title="Jadikan laporan isu publik baru"
                   >
-                    <Plus class="w-3.5 h-3.5 text-white" />
+                    <Plus class="w-3.5 h-3.5" />
                     <span>Buat Isu</span>
                   </button>
+
+                  <div class="relative">
+                    <button
+                      type="button"
+                      @click.stop="openMenu = openMenu === 'card-' + article.id ? null : 'card-' + article.id"
+                      class="p-1.5 rounded-full border bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border-slate-700 transition cursor-pointer"
+                      title="Aksi lainnya"
+                    >
+                      <Ellipsis class="w-4 h-4" />
+                    </button>
+                    <div
+                      v-if="openMenu === 'card-' + article.id"
+                      @click.stop
+                      class="absolute bottom-full right-0 mb-2 z-30 w-52 rounded-xl bg-[#0b1426] border border-slate-700 shadow-2xl p-1.5"
+                    >
+                      <button
+                        v-if="!isOperator"
+                        type="button"
+                        @click.stop="openIssueModal(article); openMenu = null"
+                        class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-slate-200 hover:bg-slate-800 hover:text-white transition cursor-pointer text-left"
+                      >
+                        <Plus class="w-4 h-4 text-amber-400" />
+                        <span>Buat Isu</span>
+                      </button>
+                      <button
+                        type="button"
+                        @click.stop="openTagModal(article); openMenu = null"
+                        class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-slate-200 hover:bg-slate-800 hover:text-white transition cursor-pointer text-left"
+                      >
+                        <Pin class="w-4 h-4 text-amber-400" />
+                        <span>Tag Kasus Atensi</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2696,14 +2788,6 @@ const submitIssue = () => {
               <Check v-if="isWaCopied" class="w-3.5 h-3.5 text-emerald-400" />
               <MessageSquare v-else class="w-3.5 h-3.5 text-emerald-400" />
               <span>{{ isWaCopied ? 'Tersalin!' : 'Salin Format WA Pimpinan' }}</span>
-            </button>
-            <button
-              @click="showPrintPreviewModal = true"
-              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 text-[11px] font-bold transition shadow-sm cursor-pointer"
-              title="Pratinjau dan cetak laporan 1-lembar A4 presisi untuk pimpinan"
-            >
-              <Printer class="w-3.5 h-3.5 text-blue-400" />
-              <span>Cetak A4 Resmi</span>
             </button>
             <span class="text-xs font-mono text-amber-400">{{ report?.report_time || '19.03 WITA' }}</span>
           </div>
@@ -4149,395 +4233,6 @@ const submitIssue = () => {
     </div>
   </Teleport>
 
-  <!-- ========================================================================= -->
-  <!-- TAHAP 3: MODAL PRATINJAU CETAK DOKUMEN RESMI A4 (PRESISI 1-LEMBAR)        -->
-  <!-- ========================================================================= -->
-  <Teleport to="body">
-    <div
-      v-if="showPrintPreviewModal"
-      class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/85 backdrop-blur-md overflow-y-auto no-print"
-      @click.self="showPrintPreviewModal = false"
-    >
-      <div class="relative w-full max-w-4xl bg-[#0b1426] border border-slate-700/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
-        <!-- Top Toolbar -->
-        <div class="px-6 py-4 bg-gradient-to-r from-slate-900 via-[#0d1a36] to-slate-900 border-b border-slate-800 flex items-center justify-between gap-3 shrink-0">
-          <div class="flex items-center gap-2.5">
-            <Printer class="w-5 h-5 text-amber-400" />
-            <div>
-              <h3 class="text-sm font-black text-white uppercase tracking-wider">Pratinjau Lembar Eksekutif Pimpinan (A4)</h3>
-              <p class="text-[11px] text-slate-400">Terstandarisasi 1 lembar presisi untuk meja Bapak Kapolda / Kadivhumas & Spripim</p>
-            </div>
-          </div>
-          <div class="flex items-center gap-2">
-            <button
-              @click="printExecutiveBriefing"
-              class="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-black transition flex items-center gap-2 shadow-lg shadow-amber-400/20 cursor-pointer"
-            >
-              <Printer class="w-4 h-4 text-slate-950" />
-              <span>Cetak / Simpan PDF</span>
-            </button>
-            <button
-              @click="showPrintPreviewModal = false"
-              class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition cursor-pointer"
-            >
-              <X class="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        <!-- Scrollable Sheet Container -->
-        <div class="p-4 sm:p-6 overflow-y-auto flex justify-center bg-slate-950/50">
-          <!-- The Physical A4 Sheet Appearance -->
-          <div class="w-full max-w-[210mm] bg-white text-slate-900 shadow-2xl border border-slate-300 p-8 sm:p-10 rounded-sm font-sans space-y-4">
-            <!-- Kop Dokumen Resmi Polri -->
-            <div class="flex items-center justify-between border-b-2 border-slate-900 pb-3">
-              <div class="flex items-center gap-4">
-                <div class="w-16 h-16 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center p-1 shrink-0">
-                  <Shield class="w-10 h-10 text-amber-600 fill-amber-500" />
-                </div>
-                <div>
-                  <h4 class="text-xs font-black tracking-widest text-slate-800 uppercase">Kepolisian Negara Republik Indonesia</h4>
-                  <h2 class="text-sm font-black tracking-wider text-slate-950 uppercase">{{ isDivhumas ? 'Divisi Humas Polri' : 'Bidang Humas Polda ' + (props.selectedPolda?.name || '').toUpperCase() }}</h2>
-                  <p class="text-[10px] text-slate-600 italic">Pusat Komando Analisis Media Siber, Opini Publik & Early Warning System</p>
-                </div>
-              </div>
-              <div class="text-right border-l-2 border-slate-900 pl-4">
-                <span class="inline-block px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-red-600 text-white rounded">
-                  RAHASIA / SEGERA
-                </span>
-                <p class="text-[9px] text-slate-500 mt-1 font-mono">KODE: DOC-ANEVA4/24H</p>
-                <p class="text-[9px] text-slate-700 font-bold mt-0.5">{{ metrics?.server_wita || new Date().toLocaleDateString('id-ID') }}</p>
-              </div>
-            </div>
-
-            <!-- Judul Lembar Laporan -->
-            <div class="text-center py-1 bg-slate-100 border border-slate-200 rounded">
-              <h1 class="text-xs font-black text-slate-950 uppercase tracking-widest">
-                Laporan Eksekutif Intelijen Media & Opini Publik (24 Jam)
-              </h1>
-            </div>
-
-            <!-- Seksi I: Ringkasan Eksekutif -->
-            <div class="space-y-1">
-              <div class="flex items-center gap-1.5 text-[11px] font-black uppercase text-slate-900 border-b border-slate-300 pb-1">
-                <span>I. Ringkasan Eksekutif Dinamika Pemberitaan & Situasi Kamtibmas</span>
-              </div>
-              <p class="text-[10.5px] leading-relaxed text-slate-800 text-justify">
-                {{ report?.executive_brief || 'Pemantauan portal media online dan ruang digital nasional/daerah dalam 24 jam terakhir menunjukkan stabilitas opini publik terjaga pada koridor terkendali. Tidak terdeteksi eskalasi disinformasi anomali yang berpotensi memicu instabilitas kamtibmas luas.' }}
-              </p>
-            </div>
-
-            <!-- Seksi II: Indikator Polarisasi Sentimen & Top Concern -->
-            <div class="grid grid-cols-12 gap-3">
-              <div class="col-span-5 border border-slate-300 rounded p-2.5 bg-slate-50">
-                <span class="text-[10px] font-black uppercase text-slate-900 block mb-1.5">Distribusi Sentimen Berita</span>
-                <div class="space-y-1.5 text-[10px]">
-                  <div class="flex justify-between items-center font-bold">
-                    <span class="text-emerald-700">Sentimen Positif:</span>
-                    <span class="font-black text-emerald-800">{{ report?.sentiment_positive || 52 }}%</span>
-                  </div>
-                  <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                    <div class="bg-emerald-600 h-full" :style="{ width: (report?.sentiment_positive || 52) + '%' }"></div>
-                  </div>
-
-                  <div class="flex justify-between items-center font-bold">
-                    <span class="text-slate-600">Sentimen Netral:</span>
-                    <span class="font-black text-slate-700">{{ report?.sentiment_neutral || 34 }}%</span>
-                  </div>
-                  <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                    <div class="bg-slate-500 h-full" :style="{ width: (report?.sentiment_neutral || 34) + '%' }"></div>
-                  </div>
-
-                  <div class="flex justify-between items-center font-bold">
-                    <span class="text-red-700">Sentimen Negatif (Rawan):</span>
-                    <span class="font-black text-red-800">{{ report?.sentiment_negative || 14 }}%</span>
-                  </div>
-                  <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                    <div class="bg-red-600 h-full" :style="{ width: (report?.sentiment_negative || 14) + '%' }"></div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="col-span-7 border border-red-300 bg-red-50/60 rounded p-2.5">
-                <span class="text-[10px] font-black uppercase text-red-900 flex items-center gap-1 mb-1">
-                  <AlertTriangle class="w-3 h-3 text-red-600" />
-                  <span>Atensi Utama Pimpinan (Top Concern)</span>
-                </span>
-                <p class="text-[10px] leading-snug text-slate-800 font-semibold">
-                  {{ report?.top_concern || 'Pengawasan ketat isu disinformasi ruang digital dan cooling system dialogis jelang agenda nasional.' }}
-                </p>
-                <div class="mt-2 text-[9.5px] text-slate-600 border-t border-red-200 pt-1 flex justify-between">
-                  <span>Indeks Stabilitas Siber: <strong class="text-emerald-700">88/100 (Kondusif)</strong></span>
-                  <span>Total Portal: <strong>{{ (props.mediaFeeds?.length || (isDivhumas ? 33 : 29)) }} Media</strong></span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Seksi III: Matriks Isu Menonjol & EWS Terkini -->
-            <div class="space-y-1">
-              <div class="flex items-center justify-between text-[11px] font-black uppercase text-slate-900 border-b border-slate-300 pb-1">
-                <span>II. Matriks Isu Menonjol & Early Warning System (EWS)</span>
-                <span class="text-[9px] font-normal text-slate-500">Dipilih Otomatis Berdasarkan Virality & Sentimen</span>
-              </div>
-              <table class="w-full text-left text-[9.5px] border-collapse border border-slate-300">
-                <thead>
-                  <tr class="bg-slate-100 text-slate-800">
-                    <th class="border border-slate-300 px-2 py-1 w-6 text-center">No</th>
-                    <th class="border border-slate-300 px-2 py-1">Topik Isu / Agenda Liputan</th>
-                    <th class="border border-slate-300 px-2 py-1 w-28">Kategori</th>
-                    <th class="border border-slate-300 px-2 py-1 w-20 text-center">Sentimen</th>
-                    <th class="border border-slate-300 px-2 py-1 w-24 text-center">Level Risiko</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="(item, idx) in (props.earlyWarnings?.slice(0, 3) || [])"
-                    :key="'preview-ews-' + idx"
-                    class="even:bg-slate-50"
-                  >
-                    <td class="border border-slate-300 px-2 py-1 text-center font-bold">{{ idx + 1 }}</td>
-                    <td class="border border-slate-300 px-2 py-1 font-semibold text-slate-900">{{ item.title }}</td>
-                    <td class="border border-slate-300 px-2 py-1 text-slate-600">{{ item.category || 'Harkamtibmas' }}</td>
-                    <td class="border border-slate-300 px-2 py-1 text-center font-bold" :class="item.level === 'red' ? 'text-red-700' : item.level === 'yellow' ? 'text-amber-700' : 'text-emerald-700'">
-                      {{ item.level === 'red' ? 'Negatif' : item.level === 'yellow' ? 'Netral' : 'Positif' }}
-                    </td>
-                    <td class="border border-slate-300 px-2 py-1 text-center">
-                      <span class="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase" :class="item.level === 'red' ? 'bg-red-100 text-red-800' : item.level === 'yellow' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'">
-                        {{ item.level === 'red' ? 'Mendesak' : item.level === 'yellow' ? 'Waspada' : 'Aman' }}
-                      </span>
-                    </td>
-                  </tr>
-                  <tr v-if="!props.earlyWarnings?.length" class="even:bg-slate-50">
-                    <td class="border border-slate-300 px-2 py-1 text-center font-bold">1</td>
-                    <td class="border border-slate-300 px-2 py-1 font-semibold text-slate-900">Monitoring Kamtibmas & Program Strategis Pemerintah</td>
-                    <td class="border border-slate-300 px-2 py-1 text-slate-600">Harkamtibmas</td>
-                    <td class="border border-slate-300 px-2 py-1 text-center text-emerald-700 font-bold">Positif</td>
-                    <td class="border border-slate-300 px-2 py-1 text-center">
-                      <span class="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase bg-emerald-100 text-emerald-800">Aman</span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <!-- Seksi IV: Rekomendasi Taktis Komunikasi Kehumasan -->
-            <div class="space-y-1">
-              <div class="flex items-center gap-1.5 text-[11px] font-black uppercase text-slate-900 border-b border-slate-300 pb-1">
-                <span>III. Rekomendasi Taktis Respon Kehumasan Polri</span>
-              </div>
-              <div class="grid grid-cols-3 gap-2.5 text-[9.5px]">
-                <div class="border border-slate-300 rounded p-2 bg-slate-50">
-                  <strong class="font-black text-slate-900 block mb-0.5">1. Respon 0-2 Jam (Tanggap)</strong>
-                  <p class="text-slate-700 leading-snug">Verifikasi fakta lapangan, koordinasi satu pintu juru bicara, dan hindari spekulasi liar.</p>
-                </div>
-                <div class="border border-slate-300 rounded p-2 bg-slate-50">
-                  <strong class="font-black text-slate-900 block mb-0.5">2. Respon 2-6 Jam (Rilis Pers)</strong>
-                  <p class="text-slate-700 leading-snug">Publikasi siaran pers transparan disertai infografis resmi di portal Tribratanews & media arus utama.</p>
-                </div>
-                <div class="border border-slate-300 rounded p-2 bg-slate-50">
-                  <strong class="font-black text-slate-900 block mb-0.5">3. Respon 24 Jam (Amplifikasi)</strong>
-                  <p class="text-slate-700 leading-snug">Amplifikasi pesan humanis kepolisian di media sosial serta monitoring pergerakan sentimen lanjutan.</p>
-                </div>
-              </div>
-            </div>
-
-            <!-- Pengesahan / Lembar Tanda Tangan -->
-            <div class="pt-3 border-t border-slate-300 flex justify-between items-start text-[10px] text-slate-800">
-              <div class="text-center w-52">
-                <p class="font-medium text-slate-600">Perwira Piket Siaga Siber,</p>
-                <div class="h-12 flex items-center justify-center italic text-slate-400 text-[9px]">[Tanda Tangan Dinas]</div>
-                <p class="font-black text-slate-900 border-t border-slate-400 pt-0.5">TIM ANALISIS INTELIJEN MEDIA</p>
-                <p class="text-[9px] text-slate-600">SIMOD Enterprise Command Center</p>
-              </div>
-
-              <div class="text-center w-56">
-                <p class="font-medium text-slate-600">{{ isDivhumas ? 'Jakarta' : 'Mamuju' }}, {{ new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) }}</p>
-                <p class="font-black text-slate-900 mt-0.5">Mengetahui,</p>
-                <div class="h-10 flex items-center justify-center italic text-slate-400 text-[9px]">[Tanda Tangan Pimpinan]</div>
-                <p class="font-black text-slate-950 border-t border-slate-400 pt-0.5 uppercase">{{ isDivhumas ? 'Kepala Divisi Humas Polri' : 'Kepala Bidang Humas Polda' }}</p>
-                <p class="text-[9px] text-slate-600">{{ isDivhumas ? 'Jenderal Polisi' : 'Komisaris Besar Polisi' }}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </Teleport>
-
-  <!-- ========================================================================= -->
-  <!-- DEDICATED PRINT CONTAINER UNTUK WINDOW.PRINT() (A4 PORTRAIT)              -->
-  <!-- ========================================================================= -->
-  <div id="print-a4-dossier" class="hidden print:block text-slate-900 bg-white p-6 font-sans">
-    <!-- Kop Dokumen Resmi Polri -->
-    <div class="flex items-center justify-between border-b-2 border-slate-900 pb-2 mb-3">
-      <div class="flex items-center gap-3">
-        <div class="w-14 h-14 rounded-full bg-slate-100 border border-slate-400 flex items-center justify-center p-1 shrink-0">
-          <Shield class="w-8 h-8 text-amber-600 fill-amber-500" />
-        </div>
-        <div>
-          <h4 class="text-[10px] font-black tracking-widest text-slate-800 uppercase">Kepolisian Negara Republik Indonesia</h4>
-          <h2 class="text-xs font-black tracking-wider text-slate-950 uppercase">{{ isDivhumas ? 'Divisi Humas Polri' : 'Bidang Humas Polda ' + (props.selectedPolda?.name || '').toUpperCase() }}</h2>
-          <p class="text-[9px] text-slate-600 italic">Pusat Komando Analisis Media Siber, Opini Publik & Early Warning System</p>
-        </div>
-      </div>
-      <div class="text-right border-l-2 border-slate-900 pl-3">
-        <span class="inline-block px-1.5 py-0.5 text-[8.5px] font-black uppercase tracking-wider bg-red-600 text-white rounded">
-          RAHASIA / SEGERA
-        </span>
-        <p class="text-[8.5px] text-slate-500 mt-0.5 font-mono">KODE: DOC-ANEVA4/24H</p>
-        <p class="text-[8.5px] text-slate-700 font-bold">{{ metrics?.server_wita || new Date().toLocaleDateString('id-ID') }}</p>
-      </div>
-    </div>
-
-    <!-- Judul Lembar Laporan -->
-    <div class="text-center py-1 bg-slate-100 border border-slate-300 rounded mb-3">
-      <h1 class="text-[11px] font-black text-slate-950 uppercase tracking-widest">
-        Laporan Eksekutif Intelijen Media & Opini Publik (24 Jam)
-      </h1>
-    </div>
-
-    <!-- Seksi I: Ringkasan Eksekutif -->
-    <div class="mb-3 space-y-0.5">
-      <div class="text-[10px] font-black uppercase text-slate-900 border-b border-slate-300 pb-0.5">
-        I. Ringkasan Eksekutif Dinamika Pemberitaan & Situasi Kamtibmas
-      </div>
-      <p class="text-[9.5px] leading-relaxed text-slate-800 text-justify">
-        {{ report?.executive_brief || 'Pemantauan portal media online dan ruang digital nasional/daerah dalam 24 jam terakhir menunjukkan stabilitas opini publik terjaga pada koridor terkendali. Tidak terdeteksi eskalasi disinformasi anomali yang berpotensi memicu instabilitas kamtibmas luas.' }}
-      </p>
-    </div>
-
-    <!-- Seksi II: Indikator Polarisasi Sentimen & Top Concern -->
-    <div class="grid grid-cols-12 gap-2 mb-3">
-      <div class="col-span-5 border border-slate-300 rounded p-2 bg-slate-50">
-        <span class="text-[9.5px] font-black uppercase text-slate-900 block mb-1">Distribusi Sentimen Berita</span>
-        <div class="space-y-1 text-[9px]">
-          <div class="flex justify-between items-center font-bold">
-            <span class="text-emerald-700">Sentimen Positif:</span>
-            <span class="font-black text-emerald-800">{{ report?.sentiment_positive || 52 }}%</span>
-          </div>
-          <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-            <div class="bg-emerald-600 h-full" :style="{ width: (report?.sentiment_positive || 52) + '%' }"></div>
-          </div>
-
-          <div class="flex justify-between items-center font-bold">
-            <span class="text-slate-600">Sentimen Netral:</span>
-            <span class="font-black text-slate-700">{{ report?.sentiment_neutral || 34 }}%</span>
-          </div>
-          <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-            <div class="bg-slate-500 h-full" :style="{ width: (report?.sentiment_neutral || 34) + '%' }"></div>
-          </div>
-
-          <div class="flex justify-between items-center font-bold">
-            <span class="text-red-700">Sentimen Negatif (Rawan):</span>
-            <span class="font-black text-red-800">{{ report?.sentiment_negative || 14 }}%</span>
-          </div>
-          <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-            <div class="bg-red-600 h-full" :style="{ width: (report?.sentiment_negative || 14) + '%' }"></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-span-7 border border-red-300 bg-red-50/60 rounded p-2">
-        <span class="text-[9.5px] font-black uppercase text-red-900 flex items-center gap-1 mb-0.5">
-          <AlertTriangle class="w-3 h-3 text-red-600" />
-          <span>Atensi Utama Pimpinan (Top Concern)</span>
-        </span>
-        <p class="text-[9.5px] leading-snug text-slate-800 font-semibold">
-          {{ report?.top_concern || 'Pengawasan ketat isu disinformasi ruang digital dan cooling system dialogis jelang agenda nasional.' }}
-        </p>
-        <div class="mt-1 text-[8.5px] text-slate-600 border-t border-red-200 pt-0.5 flex justify-between">
-          <span>Indeks Stabilitas Siber: <strong class="text-emerald-700">88/100 (Kondusif)</strong></span>
-          <span>Total Portal: <strong>{{ (props.mediaFeeds?.length || (isDivhumas ? 33 : 29)) }} Media</strong></span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Seksi III: Matriks Isu Menonjol & EWS Terkini -->
-    <div class="mb-3 space-y-0.5">
-      <div class="flex items-center justify-between text-[10px] font-black uppercase text-slate-900 border-b border-slate-300 pb-0.5">
-        <span>II. Matriks Isu Menonjol & Early Warning System (EWS)</span>
-        <span class="text-[8.5px] font-normal text-slate-500">Berdasarkan Virality & Sentimen</span>
-      </div>
-      <table class="w-full text-left text-[9px] border-collapse border border-slate-300">
-        <thead>
-          <tr class="bg-slate-100 text-slate-800">
-            <th class="border border-slate-300 px-1.5 py-0.5 w-6 text-center">No</th>
-            <th class="border border-slate-300 px-1.5 py-0.5">Topik Isu / Agenda Liputan</th>
-            <th class="border border-slate-300 px-1.5 py-0.5 w-24">Kategori</th>
-            <th class="border border-slate-300 px-1.5 py-0.5 w-16 text-center">Sentimen</th>
-            <th class="border border-slate-300 px-1.5 py-0.5 w-20 text-center">Level Risiko</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="(item, idx) in (props.earlyWarnings?.slice(0, 3) || [])"
-            :key="'print-ews-' + idx"
-            class="even:bg-slate-50"
-          >
-            <td class="border border-slate-300 px-1.5 py-0.5 text-center font-bold">{{ idx + 1 }}</td>
-            <td class="border border-slate-300 px-1.5 py-0.5 font-semibold text-slate-900">{{ item.title }}</td>
-            <td class="border border-slate-300 px-1.5 py-0.5 text-slate-600">{{ item.category || 'Harkamtibmas' }}</td>
-            <td class="border border-slate-300 px-1.5 py-0.5 text-center font-bold" :class="item.level === 'red' ? 'text-red-700' : item.level === 'yellow' ? 'text-amber-700' : 'text-emerald-700'">
-              {{ item.level === 'red' ? 'Negatif' : item.level === 'yellow' ? 'Netral' : 'Positif' }}
-            </td>
-            <td class="border border-slate-300 px-1.5 py-0.5 text-center">
-              <span class="px-1 py-0.2 rounded text-[8px] font-black uppercase" :class="item.level === 'red' ? 'bg-red-100 text-red-800' : item.level === 'yellow' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'">
-                {{ item.level === 'red' ? 'Mendesak' : item.level === 'yellow' ? 'Waspada' : 'Aman' }}
-              </span>
-            </td>
-          </tr>
-          <tr v-if="!props.earlyWarnings?.length" class="even:bg-slate-50">
-            <td class="border border-slate-300 px-1.5 py-0.5 text-center font-bold">1</td>
-            <td class="border border-slate-300 px-1.5 py-0.5 font-semibold text-slate-900">Monitoring Kamtibmas & Program Strategis Pemerintah</td>
-            <td class="border border-slate-300 px-1.5 py-0.5 text-slate-600">Harkamtibmas</td>
-            <td class="border border-slate-300 px-1.5 py-0.5 text-center text-emerald-700 font-bold">Positif</td>
-            <td class="border border-slate-300 px-1.5 py-0.5 text-center">
-              <span class="px-1 py-0.2 rounded text-[8px] font-black uppercase bg-emerald-100 text-emerald-800">Aman</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Seksi IV: Rekomendasi Taktis Komunikasi Kehumasan -->
-    <div class="mb-4 space-y-0.5">
-      <div class="text-[10px] font-black uppercase text-slate-900 border-b border-slate-300 pb-0.5">
-        III. Rekomendasi Taktis Respon Kehumasan Polri
-      </div>
-      <div class="grid grid-cols-3 gap-2 text-[9px]">
-        <div class="border border-slate-300 rounded p-1.5 bg-slate-50">
-          <strong class="font-black text-slate-900 block mb-0.5">1. Respon 0-2 Jam (Tanggap)</strong>
-          <p class="text-slate-700 leading-snug">Verifikasi fakta lapangan, koordinasi satu pintu juru bicara, dan hindari spekulasi liar.</p>
-        </div>
-        <div class="border border-slate-300 rounded p-1.5 bg-slate-50">
-          <strong class="font-black text-slate-900 block mb-0.5">2. Respon 2-6 Jam (Rilis Pers)</strong>
-          <p class="text-slate-700 leading-snug">Publikasi siaran pers transparan disertai infografis resmi di portal Tribratanews & media arus utama.</p>
-        </div>
-        <div class="border border-slate-300 rounded p-1.5 bg-slate-50">
-          <strong class="font-black text-slate-900 block mb-0.5">3. Respon 24 Jam (Amplifikasi)</strong>
-          <p class="text-slate-700 leading-snug">Amplifikasi pesan humanis kepolisian di media sosial serta monitoring pergerakan sentimen lanjutan.</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Pengesahan / Lembar Tanda Tangan -->
-    <div class="pt-2 border-t border-slate-300 flex justify-between items-start text-[9.5px] text-slate-800 break-inside-avoid">
-      <div class="text-center w-48">
-        <p class="font-medium text-slate-600">Perwira Piket Siaga Siber,</p>
-        <div class="h-10 flex items-center justify-center italic text-slate-400 text-[8.5px]">[Tanda Tangan Dinas]</div>
-        <p class="font-black text-slate-900 border-t border-slate-400 pt-0.5">TIM ANALISIS INTELIJEN MEDIA</p>
-        <p class="text-[8.5px] text-slate-600">SIMOD Enterprise Command Center</p>
-      </div>
-
-      <div class="text-center w-52">
-        <p class="font-medium text-slate-600">{{ isDivhumas ? 'Jakarta' : 'Mamuju' }}, {{ new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) }}</p>
-        <p class="font-black text-slate-900 mt-0.5">Mengetahui,</p>
-        <div class="h-8 flex items-center justify-center italic text-slate-400 text-[8.5px]">[Tanda Tangan Pimpinan]</div>
-        <p class="font-black text-slate-950 border-t border-slate-400 pt-0.5 uppercase">{{ isDivhumas ? 'Kepala Divisi Humas Polri' : 'Kepala Bidang Humas Polda' }}</p>
-        <p class="text-[8.5px] text-slate-600">{{ isDivhumas ? 'Jenderal Polisi' : 'Komisaris Besar Polisi' }}</p>
-      </div>
-    </div>
-  </div>
   </EnterpriseLayout>
 </template>
 
@@ -4557,33 +4252,4 @@ const submitIssue = () => {
   background: rgba(245, 158, 11, 0.5);
 }
 
-@media print {
-  @page {
-    size: A4 portrait;
-    margin: 8mm 10mm;
-  }
-  body {
-    background: white !important;
-    color: #0f172a !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-  .no-print,
-  nav,
-  aside,
-  header,
-  footer {
-    display: none !important;
-  }
-  #print-a4-dossier {
-    display: block !important;
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-}
 </style>

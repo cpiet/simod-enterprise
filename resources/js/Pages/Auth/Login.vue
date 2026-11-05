@@ -19,23 +19,20 @@ const props = defineProps({
   errors: Object,
 });
 
-const authMode = ref('password'); // 'password' | 'pin'
 const selectedPoldaId = ref('ALL');
 const showPassword = ref(false);
 
 const form = ref({
-  username: 'kadivhumas',
-  password: 'DivhumasPolri#2026',
-  pin: '750607',
+  username: '',
+  password: '',
   remember: true,
 });
 
 const isSubmitting = ref(false);
 
-const fillAccount = (user, pass, pin, poldaId) => {
+const fillAccount = (user, poldaId) => {
   form.value.username = user;
-  form.value.password = pass;
-  form.value.pin = pin;
+  form.value.password = '';
   selectedPoldaId.value = poldaId;
 };
 
@@ -50,7 +47,6 @@ const handleLogin = () => {
   router.post('/login', {
     username: form.value.username,
     password: form.value.password,
-    pin: form.value.pin,
     remember: form.value.remember,
     polda_id: selectedPoldaId.value,
     polda_code: poldaCode,
@@ -126,11 +122,11 @@ const handleLogin = () => {
 
         <!-- Quick Account Selector Buttons -->
         <div class="space-y-1.5">
-          <p class="text-[10px] font-black uppercase tracking-wider text-slate-400 text-center">Akun Cepat Komando &amp; Demo:</p>
+          <p class="text-[10px] font-black uppercase tracking-wider text-slate-400 text-center">Pilih Akun (isi kata sandi dinas):</p>
           <div class="grid grid-cols-3 gap-2">
             <button
               type="button"
-              @click="fillAccount('kadivhumas', 'DivhumasPolri#2026', '750607', 'ALL')"
+              @click="fillAccount('kadivhumas', 'ALL')"
               class="p-2 rounded-xl border text-center transition cursor-pointer"
               :class="form.username === 'kadivhumas' ? 'bg-amber-400/20 border-amber-400 text-amber-300' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'"
             >
@@ -139,7 +135,7 @@ const handleLogin = () => {
             </button>
             <button
               type="button"
-              @click="fillAccount('superadmin', 'MabesPolri#2026', '800100', 'ALL')"
+              @click="fillAccount('superadmin', 'ALL')"
               class="p-2 rounded-xl border text-center transition cursor-pointer"
               :class="form.username === 'superadmin' ? 'bg-rose-500/20 border-rose-400 text-rose-300' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'"
             >
@@ -148,7 +144,7 @@ const handleLogin = () => {
             </button>
             <button
               type="button"
-              @click="fillAccount('kabid_sulbar', 'SulbarHumas#2026', '760401', (poldas?.[0]?.id || 1))"
+              @click="fillAccount('kabid_sulbar', (poldas?.[0]?.id || 1))"
               class="p-2 rounded-xl border text-center transition cursor-pointer"
               :class="form.username === 'kabid_sulbar' ? 'bg-sky-500/20 border-sky-400 text-sky-300' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'"
             >
@@ -156,37 +152,6 @@ const handleLogin = () => {
               <p class="text-[8px] opacity-75">Kombes Slamet</p>
             </button>
           </div>
-        </div>
-
-        <!-- Auth Mode Toggle (Password vs PIN) -->
-        <div class="p-1 rounded-2xl bg-slate-950/80 border border-slate-800 grid grid-cols-2 gap-1">
-          <button
-            type="button"
-            @click="authMode = 'password'"
-            class="py-2.5 px-3 rounded-xl text-xs font-extrabold transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
-            :class="[
-              authMode === 'password'
-                ? 'bg-white text-slate-950 shadow-md font-black'
-                : 'text-slate-300 hover:text-white'
-            ]"
-          >
-            <Lock class="w-3.5 h-3.5" />
-            <span>Password Dinas</span>
-          </button>
-
-          <button
-            type="button"
-            @click="authMode = 'pin'"
-            class="py-2.5 px-3 rounded-xl text-xs font-extrabold transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
-            :class="[
-              authMode === 'pin'
-                ? 'bg-amber-400 text-slate-950 shadow-md font-black'
-                : 'text-slate-300 hover:text-white'
-            ]"
-          >
-            <KeyRound class="w-3.5 h-3.5" />
-            <span>PIN Cepat (6 Digit)</span>
-          </button>
         </div>
 
         <!-- Form Login -->
@@ -200,7 +165,7 @@ const handleLogin = () => {
           </div>
 
           <!-- Password Mode Inputs -->
-          <div v-if="authMode === 'password'" class="space-y-4">
+          <div class="space-y-4">
             <!-- Username Input -->
             <div class="space-y-1.5">
               <label class="block text-xs font-bold text-slate-100 tracking-wide">
@@ -241,29 +206,6 @@ const handleLogin = () => {
                   <Eye v-else class="w-4 h-4" />
                 </button>
               </div>
-            </div>
-          </div>
-
-          <!-- PIN Cepat Mode -->
-          <div v-else class="space-y-3">
-            <div class="space-y-1.5">
-              <label class="block text-xs font-bold text-slate-100 tracking-wide">
-                PIN Cepat Dinas (6 Angka)
-              </label>
-              <div class="relative">
-                <KeyRound class="w-4 h-4 text-amber-400 absolute left-3.5 top-3.5 pointer-events-none" />
-                <input
-                  v-model="form.pin"
-                  type="password"
-                  maxlength="6"
-                  placeholder="••••••"
-                  class="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700 text-lg font-black tracking-widest text-amber-400 placeholder-slate-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition text-center"
-                  required
-                />
-              </div>
-              <p class="text-[11px] text-slate-400 text-center font-medium">
-                Gunakan PIN cepat yang telah didaftarkan pada profil personel.
-              </p>
             </div>
           </div>
 

@@ -18,10 +18,10 @@ Dokumentasi ini memandu arsitektur, seluruh perintah CLI, modul operasional, int
 | **06** | [06. Disposisi Tugas & Audit Trail](06-modul-disposisi-tugas-dan-audit-trail.md) | Penugasan operasional ke Satker/Polres, update progres lapangan, dan immutable log. |
 | **07** | [07. Worker Scraper Python & REST API](07-worker-scraper-python-dan-api.md) | Integrasi background worker Python, REST API `/api/v1/ingest/article`, arsitektur scraping medsos. |
 | **08** | [08. Panduan Deployment & Virtual Host](08-panduan-deployment-dan-virtual-host.md) | Konfigurasi domain `http://simod-enterprise.test` di Laragon, Apache/Nginx, dan VPS Hostinger. |
-| **09** | [09. Katalog Lengkap 19 Modul & Paritas Fitur](09-katalog-lengkap-19-modul-simod-enterprise.md) | Pemetaan lengkap seluruh 19 modul operasional dan arsitektur sidebar 4 pilar terpadu. |
+| **09** | [09. Katalog Lengkap 21 Modul & Halaman](09-katalog-lengkap-19-modul-simod-enterprise.md) | Pemetaan lengkap seluruh 21 modul/halaman operasional dan arsitektur sidebar 4 pilar terpadu. |
 | **10** | [10. Daftar Lengkap 29 Sumber RSS Feed Sulbar](10-daftar-rss-feed-resmi-sulbar.md) | Rincian 29 portal resmi Sulbar & nasional, status Cloudflare bypass, dan proxy Google News. |
 | **11** | [11. Radar Media Sosial & Apify](11-modul-radar-media-sosial-apify.md) | Monitoring 𝕏, TikTok, Instagram, YouTube, Multi-API Token Pool, target akun, dan thumbnail HD. |
-| **12** | [12. Modul Personalia & Matriks Hak Akses (RBAC)](12-modul-personalia-dan-rbac-roles.md) | Tata kelola personel, proteksi akun master, anti-self-lockout, dan integrasi matriks 17 modul `/roles`. |
+| **12** | [12. Modul Personalia & Matriks Hak Akses (RBAC)](12-modul-personalia-dan-rbac-roles.md) | Tata kelola personel, proteksi akun master, anti-self-lockout, dan integrasi matriks 20 modul `/roles`. |
 | **13** | [13. Keamanan Tenant & Mesin Intelijen AI](13-keamanan-tenant-dan-mesin-intelijen-ai.md) | Keamanan URL tenant (POST session-based), Smart Dossier Atensi Pimpinan, dan Multi-API Gemini failover. |
 | **14** | [14. Katalog RSS Media Online Nasional](14-katalog-rss-media-online-nasional.md) | Registri feed media online nasional, endpoints valid, dan protokol polling ingestion pipeline. |
 | **15** | [15. Manajemen Menu Dinamis & Portabilitas Multi-Domain](15-manajemen-menu-dinamis-dan-portabilitas-multi-domain.md) | Navigasi berbasis basis data (`/settings/menus`), portabilitas multi-hosting, dan keamanan sesi (`PreventBackHistory`). |
@@ -31,6 +31,11 @@ Dokumentasi ini memandu arsitektur, seluruh perintah CLI, modul operasional, int
 | **19** | [19. Optimalisasi Radar Medsos & Sintesis AI SADEWA](19-optimalisasi-radar-media-sosial-dan-sintesis-ai-sadewa.md) | Multi-Tier Autonomous Ingestion Engine (zero-cost syndication), SADEWA Social AI Synthesis, restrukturisasi 4 pilar tab, dan sentralisasi token Apify di admin. |
 | **20** | [20. Audit, Refactoring, AppSec & Portabilitas Multi-Domain](20-audit-refactoring-appsec-dan-pembersihan-kode.md) | Pembersihan kode mati, kanonikalisasi rute anti-tampering, sistem notifikasi toast reaktif global, proteksi IDOR, dan panduan multi-hosting. |
 | **21** | [21. Standarisasi Multi-Agent & Sinkronisasi Lintas Model](21-standarisasi-multi-agent-dan-sinkronisasi-lintas-model.md) | Panduan interoperabilitas multi-agent (Codex, Claude, Gemini, Copilot), mapping file konfigurasi, 3 aturan baku, dan protokol hand-off. |
+| **22** | [22. Peta Kode & Sumber Kebenaran](22-peta-kode-dan-sumber-kebenaran.md) | **Rujukan utama**: stack, perilaku tenant nyata, 110 rute, 36 tabel, 20 modul RBAC, seeder, CLI, pengujian, dan temuan audit dokumentasi. |
+| **23** | [23. Optimalisasi Performa & UX (Radar Media, Medsos, Command Center)](23-optimalisasi-performa-dan-ux-radar-media-online.md) | Diagnosis lambatnya pindah menu (DevTools, query bersama, peta), cache versi, prefetch, serta Tahap A penyederhanaan UX per peran. |
+| **24** | [24. Penyederhanaan Isu & Tugas, Publikasi, Administrasi](24-penyederhanaan-isu-tugas-publikasi-dan-administrasi.md) | Alur isu resmi tunggal dan bug alur yang diperbaiki, persetujuan publikasi, unggah galeri nyata, keamanan yang benar-benar diterapkan, serta halaman mock yang dihapus. |
+
+> **Konvensi:** bila ada perbedaan antara dokumen dan kode, rujukan yang berlaku adalah [doc 22](22-peta-kode-dan-sumber-kebenaran.md) dan kode itu sendiri. Dokumen bertanda *snapshot historis* (angka test/berita lama) tidak diperbarui otomatis.
 
 ---
 
@@ -41,15 +46,15 @@ Dokumentasi ini memandu arsitektur, seluruh perintah CLI, modul operasional, int
 # Pastikan database 'simod_enterprise' aktif di localhost:3306
 
 # 2. Masuk ke direktori proyek
-cd d:\Foto\laragon\www\simod-enterprise
+cd d:\laragon\www\simod-enterprise
 
 # 3. Jalankan migrasi dan seeding komplit
 php artisan migrate --seed
 
 # 4. Bangun aset frontend
-npm run build
+npm.cmd run build
 
-# 5. Jalankan automated test suite (93 tests, 538 assertions)
+# 5. Jalankan automated test suite (116 tests, 710 assertions)
 php artisan test
 
 # 6. Jalankan sinkronisasi berita RSS aman (dengan Mutex Lock)

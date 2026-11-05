@@ -1,6 +1,8 @@
 <script setup>
-import { ref, computed } from 'vue';
-import { router, Link } from '@inertiajs/vue3';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { router, Link, usePage } from '@inertiajs/vue3';
+import IssueStepper from '@/Components/IssueStepper.vue';
+import { statusMeta, priorityMeta, normalizeStatus } from '@/utils/issueFlow';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
 import {
   Shield,
@@ -31,6 +33,9 @@ import {
   Check,
   Sparkles,
   Info,
+  Ellipsis,
+  Archive,
+  Send,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -89,6 +94,59 @@ const releaseForm = ref({
 });
 
 const isSubmitting = ref(false);
+
+// ---- Tindakan berikutnya mengikuti tahap alur & izin pengguna ----
+const page = usePage();
+const perms = computed(() => page.props.auth?.permissions || {});
+const stage = computed(() => normalizeStatus(props.issue.status));
+
+const openMenu = ref(null);
+const closeFloating = () => { openMenu.value = null; };
+onMounted(() => document.addEventListener('click', closeFloating));
+onUnmounted(() => document.removeEventListener('click', closeFloating));
+
+const submitDraft = () => {
+  router.post('/issues/' + props.issue.id + '/submit', {}, { preserveScroll: true });
+};
+const archiveIssue = () => {
+  if (confirm('Arsipkan laporan ini? Laporan selesai akan disimpan sebagai arsip.')) {
+    router.post('/issues/' + props.issue.id + '/close', {}, { preserveScroll: true });
+  }
+};
+
+const ACTIONS = {
+  submit: { label: 'Ajukan ke Verifikasi', icon: Send, run: submitDraft },
+  verify: { label: 'Verifikasi Laporan', icon: ShieldCheck, run: () => { isVerifyModalOpen.value = true; } },
+  clarify: { label: 'Rilis Klarifikasi / Hoaks', icon: AlertTriangle, run: () => { isClarifyModalOpen.value = true; } },
+  dispatch: { label: 'Disposisi Tugas', icon: CheckSquare, run: () => { isTaskModalOpen.value = true; } },
+  release: { label: 'Draf Siaran Pers', icon: Share2, run: () => { isReleaseModalOpen.value = true; } },
+  returnIt: { label: 'Kembalikan (Revisi)', icon: RotateCcw, run: () => { isReturnModalOpen.value = true; } },
+  resolve: { label: 'Selesaikan Kasus', icon: CheckCircle2, run: () => { isResolveModalOpen.value = true; } },
+  archive: { label: 'Arsipkan', icon: Archive, run: archiveIssue },
+};
+
+const PLAN = {
+  draft: { primary: 'submit', secondary: null, menu: [] },
+  monitoring: { primary: 'verify', secondary: null, menu: ['returnIt', 'clarify', 'dispatch', 'release', 'resolve'] },
+  investigasi: { primary: 'clarify', secondary: 'dispatch', menu: ['release', 'returnIt', 'resolve'] },
+  klarifikasi: { primary: 'resolve', secondary: 'dispatch', menu: ['release'] },
+  selesai: { primary: 'archive', secondary: null, menu: ['release'] },
+  arsip: { primary: null, secondary: null, menu: [] },
+};
+
+const allowed = (key) => {
+  if (key === 'submit') return !!perms.value.issues_create;
+  if (key === 'dispatch') return !!perms.value.tasks_disposition;
+  return !!perms.value.issues_verify;
+};
+const actionPlan = computed(() => {
+  const plan = PLAN[stage.value] || PLAN.arsip;
+  return {
+    primary: plan.primary && allowed(plan.primary) ? ACTIONS[plan.primary] : null,
+    secondary: plan.secondary && allowed(plan.secondary) ? ACTIONS[plan.secondary] : null,
+    menu: plan.menu.filter(allowed).map((k) => ({ key: k, ...ACTIONS[k] })),
+  };
+});
 
 const submitVerify = () => {
   isSubmitting.value = true;
@@ -214,31 +272,12 @@ const formatWita = (dateStr) => {
       <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div class="space-y-2 max-w-4xl">
           <div class="flex flex-wrap items-center gap-2.5">
-            <!-- Priority Badge -->
-            <span
-              class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider"
-              :class="{
-                'bg-rose-500 text-white shadow-lg shadow-rose-500/30': issue.priority === 'critical',
-                'bg-amber-500 text-slate-950': issue.priority === 'high',
-                'bg-sky-500/20 text-sky-400 border border-sky-500/40': issue.priority === 'medium',
-                'bg-slate-800 text-slate-300': issue.priority === 'low',
-              }"
-            >
-              Prioritas: {{ issue.priority }}
+            <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider" :class="priorityMeta(issue.priority).cls">
+              Prioritas: {{ priorityMeta(issue.priority).label }}
             </span>
 
-            <!-- Status Badge -->
-            <span
-              class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider"
-              :class="{
-                'bg-amber-400/20 text-amber-300 border border-amber-400/40': issue.status === 'monitoring',
-                'bg-rose-500/20 text-rose-300 border border-rose-500/40': issue.status === 'investigasi',
-                'bg-sky-500/20 text-sky-300 border border-sky-500/40': issue.status === 'klarifikasi',
-                'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40': issue.status === 'selesai',
-                'bg-slate-800 text-slate-400': issue.status === 'arsip',
-              }"
-            >
-              Status: {{ issue.status }}
+            <span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider" :class="statusMeta(issue.status).cls">
+              {{ statusMeta(issue.status).label }}
             </span>
 
             <!-- Category -->
@@ -275,65 +314,61 @@ const formatWita = (dateStr) => {
           </div>
         </div>
 
-        <!-- Action Buttons on Header -->
+        <!-- Tindakan: langkah berikutnya + menu lainnya -->
         <div class="flex items-center flex-wrap gap-2.5 shrink-0">
-          <!-- Verify Button -->
           <button
-            v-if="['monitoring', 'investigasi'].includes(issue.status)"
-            @click="isVerifyModalOpen = true"
-            class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition shadow-lg shadow-emerald-500/20"
+            v-if="actionPlan.primary"
+            type="button"
+            @click="actionPlan.primary.run()"
+            class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition shadow-lg shadow-emerald-500/20 cursor-pointer"
           >
-            <ShieldCheck class="w-4 h-4" />
-            <span>✓ Verifikasi Laporan</span>
+            <component :is="actionPlan.primary.icon" class="w-4 h-4" />
+            <span>{{ actionPlan.primary.label }}</span>
           </button>
 
-          <!-- Return for Revision -->
           <button
-            v-if="['monitoring', 'investigasi'].includes(issue.status)"
-            @click="isReturnModalOpen = true"
-            class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-amber-300 hover:text-white text-xs font-bold transition"
+            v-if="actionPlan.secondary"
+            type="button"
+            @click="actionPlan.secondary.run()"
+            class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 hover:text-white text-xs font-bold transition cursor-pointer"
           >
-            <RotateCcw class="w-4 h-4 text-amber-400" />
-            <span>Kembalikan (Revisi)</span>
+            <component :is="actionPlan.secondary.icon" class="w-4 h-4 text-sky-400" />
+            <span>{{ actionPlan.secondary.label }}</span>
           </button>
 
-          <!-- Mark Hoax / Clarify -->
-          <button
-            @click="isClarifyModalOpen = true"
-            class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 hover:text-white text-xs font-bold transition"
-          >
-            <AlertTriangle class="w-4 h-4 text-rose-400" />
-            <span>Klarifikasi / Hoaks</span>
-          </button>
-
-          <!-- Dispatch Task -->
-          <button
-            @click="isTaskModalOpen = true"
-            class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-sky-300 hover:text-white text-xs font-bold transition"
-          >
-            <CheckSquare class="w-4 h-4 text-sky-400" />
-            <span>Disposisi Tugas</span>
-          </button>
-
-          <!-- Draft Press Release -->
-          <button
-            @click="isReleaseModalOpen = true"
-            class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 text-xs font-black transition shadow-lg shadow-amber-500/20"
-          >
-            <Share2 class="w-4 h-4" />
-            <span>Draf Siaran Pers</span>
-          </button>
-
-          <!-- Resolve Button -->
-          <button
-            v-if="issue.status !== 'selesai' && issue.status !== 'arsip'"
-            @click="isResolveModalOpen = true"
-            class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/50 text-emerald-300 text-xs font-bold transition"
-          >
-            <CheckCircle2 class="w-4 h-4 text-emerald-400" />
-            <span>Selesaikan Kasus</span>
-          </button>
+          <div v-if="actionPlan.menu.length" class="relative">
+            <button
+              type="button"
+              @click.stop="openMenu = openMenu === 'issue' ? null : 'issue'"
+              class="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition cursor-pointer"
+              title="Tindakan lainnya"
+            >
+              <Ellipsis class="w-4 h-4" />
+              <span class="hidden sm:inline">Lainnya</span>
+            </button>
+            <div
+              v-if="openMenu === 'issue'"
+              @click.stop
+              class="absolute right-0 top-full mt-2 z-30 w-60 rounded-xl bg-[#0b1426] border border-slate-700 shadow-2xl p-1.5"
+            >
+              <button
+                v-for="m in actionPlan.menu"
+                :key="m.key"
+                type="button"
+                @click="m.run(); openMenu = null"
+                class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-slate-200 hover:bg-slate-800 hover:text-white transition cursor-pointer text-left"
+              >
+                <component :is="m.icon" class="w-4 h-4 text-amber-400" />
+                <span>{{ m.label }}</span>
+              </button>
+            </div>
+          </div>
         </div>
+      </div>
+
+      <!-- Tahapan penanganan -->
+      <div class="pt-4 border-t border-slate-800">
+        <IssueStepper :status="issue.status" />
       </div>
     </div>
 

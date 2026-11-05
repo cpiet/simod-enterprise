@@ -163,7 +163,9 @@ class SystemModuleController extends Controller
             'title'       => 'required|string|max:255',
             'caption'     => 'nullable|string|max:500',
             'file_type'   => 'required|in:photo,video,document',
-            'file_url'    => 'required|string|max:500',
+            'file_url'    => 'required_without:file|nullable|string|max:500',
+            'file'        => 'required_without:file_url|nullable|file|mimes:jpg,jpeg,png,webp,mp4,pdf|max:20480',
+            'is_private'  => 'nullable|boolean',
         ]);
 
         $validated['polres_id'] = !empty($validated['polres_id']) ? $validated['polres_id'] : null;
@@ -174,10 +176,27 @@ class SystemModuleController extends Controller
             $validated['polda_id'] = $request->user()->polda_id;
         }
 
-        $validated['size_bytes'] = rand(1500000, 8500000);
-        $validated['mime_type'] = $validated['file_type'] === 'video' ? 'video/mp4' : 'image/jpeg';
         $validated['review_status'] = 'approved';
-        $validated['is_private'] = true;
+        $validated['is_private'] = $request->boolean('is_private', true);
+
+        if ($request->hasFile('file') && $request->file('file')->isValid()) {
+            // Berkas nyata: simpan ke disk publik, ukuran & tipe diambil dari berkas itu sendiri.
+            $file = $request->file('file');
+            $mime = $file->getMimeType();
+            $path = $file->storeAs('uploads/gallery/' . $validated['polda_id'], \Illuminate\Support\Str::random(24) . '.' . $file->getClientOriginalExtension(), 'public');
+
+            $validated['file_path'] = $path;
+            $validated['file_url'] = '/storage/' . $path;
+            $validated['size_bytes'] = $file->getSize();
+            $validated['mime_type'] = $mime;
+            $validated['file_type'] = str_starts_with($mime, 'video/') ? 'video' : (str_starts_with($mime, 'image/') ? 'photo' : 'document');
+        } else {
+            // Tautan eksternal: ukuran tidak diketahui (0), jangan diisi angka karangan.
+            $validated['size_bytes'] = 0;
+            $validated['mime_type'] = $validated['file_type'] === 'video' ? 'video/mp4' : ($validated['file_type'] === 'document' ? 'application/pdf' : 'image/jpeg');
+        }
+
+        unset($validated['file']);
 
         MediaFile::create($validated);
 
@@ -201,7 +220,8 @@ class SystemModuleController extends Controller
         $inProgressCount = Issue::when($poldaId, fn($q) => $q->where('polda_id', $poldaId))->whereIn('status', ['investigasi', 'klarifikasi'])->count();
         $pendingVerifyCount = Issue::when($poldaId, fn($q) => $q->where('polda_id', $poldaId))->where('status', 'monitoring')->count();
 
-        $slaRate = $totalIssues > 0 ? (int)round(($resolvedCount / $totalIssues) * 100) : 100;
+        // Tingkat penyelesaian = laporan selesai/arsip dibanding seluruh laporan. Null bila belum ada data (jangan tampil 100%).
+        $slaRate = $totalIssues > 0 ? (int)round(($resolvedCount / $totalIssues) * 100) : null;
 
         // Satwil breakdown for 6 Polres
         $polresList = $selectedPolda ? $selectedPolda->polres : Polres::where('is_active', true)->get();
@@ -210,7 +230,7 @@ class SystemModuleController extends Controller
             $tot = Issue::where('polres_id', $p->id)->count();
             $res = Issue::where('polres_id', $p->id)->whereIn('status', ['selesai', 'arsip'])->count();
             $pos = Issue::where('polres_id', $p->id)->where('sentiment', 'positif')->count();
-            $sent = $tot > 0 ? (int)round(($pos / $tot) * 100) : 85;
+            $sent = $tot > 0 ? (int)round(($pos / $tot) * 100) : null;
 
             $satwilBreakdown[] = [
                 'id'         => $p->id,
@@ -219,19 +239,23 @@ class SystemModuleController extends Controller
                 'total'      => $tot,
                 'resolved'   => $res,
                 'sentiment'  => $sent,
-                'sla_pct'    => $tot > 0 ? (int)round(($res / $tot) * 100) : 100,
+                'sla_pct'    => $tot > 0 ? (int)round(($res / $tot) * 100) : null,
             ];
         }
 
-        // Category breakdown
-        $categories = ['Harkamtibmas', 'Kriminalitas', 'Lalu Lintas', 'Pelayanan Publik', 'Bencana', 'Internal Polri'];
+        // Sebaran kategori nyata (dari data), bukan daftar kategori tetap.
+        $categoryCounts = Issue::when($poldaId, fn ($q) => $q->where('polda_id', $poldaId))
+            ->whereNotNull('category')
+            ->select('category', \DB::raw('count(*) as c'))
+            ->groupBy('category')
+            ->orderByDesc('c')
+            ->pluck('c', 'category');
         $categoryBreakdown = [];
-        foreach ($categories as $cat) {
-            $count = Issue::when($poldaId, fn($q) => $q->where('polda_id', $poldaId))->where('category', $cat)->count();
+        foreach ($categoryCounts as $cat => $count) {
             $categoryBreakdown[] = [
                 'name'  => $cat,
-                'count' => $count,
-                'pct'   => $totalIssues > 0 ? (int)round(($count / $totalIssues) * 100) : 0,
+                'count' => (int) $count,
+                'pct'   => $totalIssues > 0 ? (int) round(($count / $totalIssues) * 100) : 0,
             ];
         }
 
@@ -260,6 +284,7 @@ class SystemModuleController extends Controller
             ],
             'satwilBreakdown'   => $satwilBreakdown,
             'categoryBreakdown' => $categoryBreakdown,
+            'categoryOptions'   => $categoryCounts->keys()->values(),
             'fieldReports'      => $fieldReports,
             'filters'           => [
                 'category' => $categoryFilter,
@@ -771,13 +796,51 @@ class SystemModuleController extends Controller
     public function profile(Request $request): Response
     {
         [$allPoldas, $selectedPolda, $selectedCode, $metrics] = $this->getBaseData($request);
+        $user = $request->user()->load(['polda', 'polres']);
 
         return Inertia::render('Profile/Index', [
             'allPoldas'     => $allPoldas,
             'selectedPolda' => $selectedPolda,
             'selectedCode'  => $selectedCode,
             'metrics'       => $metrics,
+            'profile'       => [
+                'name'         => $user->name,
+                'username'     => $user->username,
+                'email'        => $user->email,
+                'phone'        => $user->phone,
+                'badge_number' => $user->badge_number,
+                'role'         => $user->role,
+                'polda'        => $user->polda?->name,
+                'polres'       => $user->polres?->name,
+            ],
         ]);
+    }
+
+    /**
+     * Ganti kata sandi akun yang sedang login (wajib kata sandi saat ini).
+     */
+    public function updatePassword(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'current_password' => 'required|string',
+            'password'         => 'required|string|min:10|max:100|confirmed|different:current_password',
+        ], [
+            'password.min'       => 'Kata sandi baru minimal 10 karakter.',
+            'password.confirmed' => 'Konfirmasi kata sandi baru tidak sama.',
+            'password.different' => 'Kata sandi baru harus berbeda dari kata sandi saat ini.',
+        ]);
+
+        $user = $request->user();
+
+        if (! \Illuminate\Support\Facades\Hash::check($validated['current_password'], $user->password)) {
+            return back()->withErrors(['current_password' => 'Kata sandi saat ini tidak sesuai.']);
+        }
+
+        $user->update(['password' => $validated['password']]);
+
+        AuditLog::log('auth.password_changed', 'user', (string) $user->id, ['username' => $user->username]);
+
+        return back()->with('success', 'Kata sandi berhasil diperbarui.');
     }
 
     /**
@@ -894,22 +957,20 @@ class SystemModuleController extends Controller
         [$allPoldas, $selectedPolda, $selectedCode, $metrics] = $this->getBaseData($request);
 
         $setting = SecuritySetting::current($selectedPolda?->id);
-        $scoreData = $setting->calculateScore();
 
-        // Recent security-related audit logs from real database
+        // Peristiwa autentikasi & keamanan nyata dari audit log.
         $recentSecurityLogs = AuditLog::with('user')
-            ->whereIn('action', ['security.update', 'news.cleanup', 'login.failed', 'login.success', 'user.created', 'polda.update'])
+            ->whereIn('action', ['security.update', 'auth.login', 'auth.login_failed', 'auth.logout', 'auth.password_changed', 'user.created', 'polda.update'])
             ->latest('created_at')
-            ->limit(8)
+            ->limit(10)
             ->get()
             ->map(fn ($log) => [
                 'id'         => $log->id,
                 'action'     => $log->action,
-                'user'       => $log->user ? $log->user->name : 'Administrator',
-                'ip'         => $log->ip_address ?: '127.0.0.1',
-                'time_ago'   => $log->created_at ? $log->created_at->diffForHumans() : 'Baru saja',
-                'created_at' => $log->created_at ? $log->created_at->format('d M Y, H:i') : now()->format('d M Y, H:i'),
-                'metadata'   => $log->metadata,
+                'user'       => $log->user ? $log->user->name : (($log->metadata['username'] ?? null) ?: 'Tidak dikenal'),
+                'ip'         => $log->ip_address ?: '-',
+                'time_ago'   => $log->created_at ? $log->created_at->diffForHumans() : '-',
+                'created_at' => $log->created_at ? $log->created_at->format('d M Y, H:i') : '-',
             ]);
 
         return Inertia::render('Settings/Security', [
@@ -918,18 +979,10 @@ class SystemModuleController extends Controller
             'selectedCode'  => $selectedCode,
             'metrics'       => $metrics,
             'security'      => [
-                'enable_turnstile'        => (bool) $setting->enable_turnstile,
-                'turnstile_site_key'      => (string) $setting->turnstile_site_key,
-                'turnstile_secret_key'    => (string) $setting->turnstile_secret_key,
                 'max_login_attempts'      => (int) $setting->max_login_attempts,
                 'lockout_minutes'         => (int) $setting->lockout_minutes,
-                'enable_pin'              => (bool) $setting->enable_pin,
-                'pin_expiry_days'         => (int) $setting->pin_expiry_days,
                 'session_timeout_minutes' => (int) $setting->session_timeout_minutes,
-                'private_media_storage'   => (bool) $setting->private_media_storage,
-                'ip_whitelist'            => (string) $setting->ip_whitelist,
             ],
-            'scoreData'     => $scoreData,
             'securityLogs'  => $recentSecurityLogs,
         ]);
     }
@@ -940,16 +993,9 @@ class SystemModuleController extends Controller
     public function updateSecurity(Request $request)
     {
         $validated = $request->validate([
-            'enable_turnstile'        => 'required|boolean',
-            'turnstile_site_key'      => 'nullable|string|max:120',
-            'turnstile_secret_key'    => 'nullable|string|max:120',
             'max_login_attempts'      => 'required|integer|min:1|max:20',
             'lockout_minutes'         => 'required|integer|min:1|max:1440',
-            'enable_pin'              => 'required|boolean',
-            'pin_expiry_days'         => 'required|integer|min:1|max:365',
             'session_timeout_minutes' => 'required|integer|min:5|max:480',
-            'private_media_storage'   => 'required|boolean',
-            'ip_whitelist'            => 'nullable|string|max:1000',
         ]);
 
         [$allPoldas, $selectedPolda] = $this->getBaseData($request);
@@ -960,12 +1006,12 @@ class SystemModuleController extends Controller
 
         AuditLog::log('security.update', 'security_settings', (string) $setting->id, [
             'polda'        => $selectedPolda ? $selectedPolda->code : 'GLOBAL',
-            'turnstile'    => $validated['enable_turnstile'],
             'max_attempts' => $validated['max_login_attempts'],
             'lockout'      => $validated['lockout_minutes'],
+            'idle_timeout' => $validated['session_timeout_minutes'],
         ]);
 
-        return back()->with('success', 'Parameter Pusat Keamanan berhasil disimpan ke database dan aktif diterapkan.');
+        return back()->with('success', 'Pengaturan keamanan disimpan dan langsung berlaku untuk login dan sesi berikutnya.');
     }
 
     /**
@@ -1006,7 +1052,7 @@ class SystemModuleController extends Controller
             'polda_id'             => 'nullable|integer',
         ]);
 
-        $targetPoldaId = $validated['polda_id'] ?? $request->session()->get('active_polda_id');
+        $targetPoldaId = $this->scopedPoldaId($request, $validated['polda_id'] ?? null);
         $selectedCode = $request->session()->get('active_polda_code', $request->query('polda', 'ALL'));
         if (!$targetPoldaId && $selectedCode !== 'ALL') {
             $targetPoldaId = Polda::where('code', $selectedCode)->value('id');
@@ -1057,7 +1103,7 @@ class SystemModuleController extends Controller
      */
     public function resetRolesMatrix(Request $request): RedirectResponse
     {
-        $targetPoldaId = $request->input('polda_id') ?? $request->session()->get('active_polda_id');
+        $targetPoldaId = $this->scopedPoldaId($request, $request->input('polda_id'));
         $selectedCode = $request->session()->get('active_polda_code', $request->query('polda', 'ALL'));
         if (!$targetPoldaId) {
             if ($selectedCode === 'ALL') {
@@ -1087,33 +1133,5 @@ class SystemModuleController extends Controller
         return back()->with('success', "Matriks Hak Akses berhasil direset ke standar resmi Polri Presisi!");
     }
 
-    /**
-     * Konfigurasi Mail Server (SMTP)
-     */
-    public function mailSettings(Request $request): Response
-    {
-        [$allPoldas, $selectedPolda, $selectedCode, $metrics] = $this->getBaseData($request);
 
-        return Inertia::render('Settings/Mail', [
-            'allPoldas'     => $allPoldas,
-            'selectedPolda' => $selectedPolda,
-            'selectedCode'  => $selectedCode,
-            'metrics'       => $metrics,
-        ]);
-    }
-
-    /**
-     * Mode Pemeliharaan Sistem (Maintenance)
-     */
-    public function systemMaintenance(Request $request): Response
-    {
-        [$allPoldas, $selectedPolda, $selectedCode, $metrics] = $this->getBaseData($request);
-
-        return Inertia::render('Settings/Maintenance', [
-            'allPoldas'     => $allPoldas,
-            'selectedPolda' => $selectedPolda,
-            'selectedCode'  => $selectedCode,
-            'metrics'       => $metrics,
-        ]);
-    }
 }

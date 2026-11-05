@@ -22,7 +22,7 @@ Dokumen ini adalah **instruksi sistem resmi** yang secara otomatis dibaca oleh A
 > Pada sistem operasi **Windows / Laragon PowerShell**, selalu gunakan `npm.cmd` (bukan `npm` polos) untuk menghindari hambatan `PSSecurityException`.
 
 ```bash
-# Menjalankan seluruh test suite otomatis (93 tests, 538 assertions)
+# Menjalankan seluruh test suite otomatis (116 tests, 710 assertions)
 php artisan test
 
 # Menjalankan spesifik test file
@@ -63,7 +63,7 @@ ngrok http --domain=humped-obvious-blatantly.ngrok-free.dev --host-header=simod-
    - Gunakan selalu helper `[$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request)`.
    - **Keamanan URL Anti-Tampering (Zero `?polda=` Query Parameter Leaks)**:
      - Dilarang membuat link atau tombol yang mengoper parameter plaintext `?polda=...`.
-     - Seluruh pergantian tenant dilakukan melalui endpoint POST terotentikasi `POST /tenant/switch` dengan payload `polda_id`.
+     - Seluruh pergantian tenant dilakukan melalui endpoint POST terotentikasi `POST /tenant/switch` dengan payload `code` (mis. `SULBAR`, `ALL`).
    - **Penargetan Tenant Divhumas Mabes vs Regional**:
      - Saat lingkup adalah Nasional (`$isNational = true` atau `selectedCode === 'ALL'`), query laporan intelijen eksekutif (`latestMediaReport` dan `latestSocialReport`) **wajib secara eksplisit menargetkan `polda_id` milik Divisi Humas Polri (Mabes)**. Jangan biarkan query tanpa filter yang dapat keliru mengambil laporan wilayah daerah.
 
@@ -79,11 +79,22 @@ ngrok http --domain=humped-obvious-blatantly.ngrok-free.dev --host-header=simod-
      }
      ```
 
-5. **Integritas Akun Master & Anti-Self Lockout**:
+5. **Autentikasi & Otorisasi Server-Side**:
+   - Seluruh rute aplikasi berada di grup `Route::middleware('auth')` (kecuali `/login`, `/logout`, dan API). Login wajib username + kata sandi valid (tanpa bypass/demo password/PIN).
+   - Setiap rute modul wajib memakai `->middleware('module:kunci_modul')` (alias `EnsureModulePermission`; pisahkan beberapa kunci dengan `|`). Kunci mengikuti `RolePermission::defaultModules()`.
+   - API ingest (`/api/v1/ingest/*`, `/api/v1/poldas`) dilindungi token `INGEST_API_TOKEN` (fail-closed bila kosong).
+   - Tenant **selalu** dari `resolveActiveTenant()`; jangan membaca `$request->query('polda')` / `polda_code` dari klien. Override tenant hanya lewat `requestedPoldaOverride()` / `scopedPoldaId()` (Super Admin saja).
+   - Di test, gunakan `$this->actingAsSuperAdmin()` (helper `tests/TestCase.php`) atau buat user dengan peran yang sesuai.
+
+6. **Integritas Akun Master & Anti-Self Lockout**:
    - Akun master sistem (`id: 1`, `kadivhumas`, `superadmin`, `cpiet`) kebal dari penghapusan (`deleteUser`) dan deaktivasi (`toggleUserStatus`).
    - Sesi pengguna aktif dilarang menghapus akunnya sendiri atau mencabut status aktifnya sendiri.
 
-6. **Dual-Theme Engine (Command Center Dark & Executive Light)**:
+7. **Performa Navigasi**:
+   - Biarkan `INERTIA_DEVTOOLS_ENABLED=false` (DevTools menambah ratusan ms per render). Data bersama di `HandleInertiaRequests::share()` dicache dengan kunci versi `simod.shell_version` (otomatis naik saat `Polda`/`Polres`/`MenuItem`/`RolePermission` berubah); model baru yang memengaruhi data bersama harus memakai trait `BumpsShellCache`.
+   - Hindari `Carbon::diffForHumans()`/`format()` per baris pada daftar ribuan item; gunakan `App\Support\FastTime`. Detail: `docs/23-optimalisasi-performa-dan-ux-radar-media-online.md`.
+
+8. **Dual-Theme Engine (Command Center Dark & Executive Light)**:
    - Command Center Dark: `.dark` pada `<html>` (latar `#070d1d`, kartu `#0b1426`, aksen gold `#f59e0b`).
    - Executive Light: `.light` pada `<html>` (latar `#f1f5f9`, kartu `#ffffff`, border `#e2e8f0`).
    - Jangan membuat class styling baru yang meng-hardcode warna teks hitam pekat pada mode gelap.
@@ -114,15 +125,14 @@ Sidebar navigasi di [`resources/js/Layouts/EnterpriseLayout.vue`](file:///d:/lar
 └── 4. ADMINISTRASI & SISTEM
     ├── Personalia & Petugas         [/personalia] -> Manajemen akun personel & Satker
     ├── Pengaturan Satwil            [/settings/polda] -> Konfigurasi Polda & Polres jajaran
-    ├── Keamanan & Pemeliharaan      [/security] -> Pintu masuk 9 sub-modul pemeliharaan:
+    ├── Keamanan & Pemeliharaan      [/security] -> Pintu masuk 8 sub-modul pemeliharaan:
     │   ├── Keamanan Siber           [/security]
     │   ├── Hak Akses (RBAC)         [/roles]
+    │   ├── Manajemen Menu           [/settings/menus]
     │   ├── Audit Log                [/audit-logs]
     │   ├── Backup Basis Data        [/database/backup]
     │   ├── Pembersihan Berita       [/maintenance/news-cleanup]
     │   ├── Otomasi Sinkron RSS      [/maintenance/rss-sync]
-    │   ├── Mode Pemeliharaan        [/maintenance]
-    │   ├── Konfigurasi Mail (SMTP)  [/settings/mail]
     │   └── Mesin Intelijen AI (LLM) [/settings/ai]
     └── Profil Saya                  [/profile] -> Kredensial dinas & PIN Cepat
 ```
@@ -139,5 +149,7 @@ Sidebar navigasi di [`resources/js/Layouts/EnterpriseLayout.vue`](file:///d:/lar
 - **Docstrings & Clean Code**: Pertahankan semua komentar PHPDoc yang relevan, tipe data parameter, dan dokumentasi arsitektur yang sudah ada.
 
 ---
+📌 **Peta kode & sumber kebenaran:** [`docs/22-peta-kode-dan-sumber-kebenaran.md`](docs/22-peta-kode-dan-sumber-kebenaran.md)
+
 *Dokumen ini disinkronkan bersama `AGENTS.md` dan `.github/copilot-instructions.md` untuk menjamin kompatibilitas penuh antar AI Agents (Claude, Codex, Gemini, Antigravity).*
 

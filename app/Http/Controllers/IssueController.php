@@ -42,7 +42,7 @@ class IssueController extends Controller
         }
 
         if ($statusFilter !== 'all') {
-            $query->where('status', $statusFilter);
+            $query->whereIn('status', Issue::statusesForFilter($statusFilter));
         }
 
         if ($priorityFilter === 'attention' || $priorityFilter === 'atensi') {
@@ -79,7 +79,19 @@ class IssueController extends Controller
             'server_wita'     => now()->setTimezone($selectedPolda->timezone ?? 'Asia/Makassar')->format('d M Y, H:i:s') . ($isNational ? ' WIB' : ' WITA'),
         ];
 
+        // Hitungan per kelompok status (tab filter) & daftar kategori nyata untuk filter.
+        $scoped = fn () => Issue::when(!$isNational && $selectedPolda, fn ($q) => $q->where('polda_id', $selectedPolda->id));
+        $byStatus = $scoped()->select('status', \Illuminate\Support\Facades\DB::raw('count(*) as c'))->groupBy('status')->pluck('c', 'status');
+        $groupCounts = ['all' => (int) $byStatus->sum()];
+        foreach (Issue::STATUS_GROUPS as $group => $statuses) {
+            $groupCounts[$group] = (int) collect($statuses)->sum(fn ($st) => $byStatus[$st] ?? 0);
+        }
+        $groupCounts['attention'] = $scoped()->whereIn('priority', ['critical', 'high'])->whereNotIn('status', ['selesai'])->count();
+        $categoryOptions = $scoped()->whereNotNull('category')->distinct()->orderBy('category')->pluck('category');
+
         return Inertia::render('Issues/Index', [
+            'groupCounts'    => $groupCounts,
+            'categoryOptions' => $categoryOptions,
             'allPoldas'      => $allPoldas,
             'selectedPolda'  => $selectedPolda,
             'selectedCode'   => $selectedCode,
@@ -188,10 +200,12 @@ class IssueController extends Controller
         $validated['polres_id'] = !empty($validated['polres_id']) ? $validated['polres_id'] : null;
         $validated['report_code'] = $reportCode;
         $validated['slug'] = Str::slug($validated['title']) . '-' . Str::random(5);
-        $validated['status'] = $request->input('status', 'monitoring');
+        // Hanya dua status awal yang sah: draf, atau diajukan ke antrean verifikasi (monitoring).
+        $validated['status'] = $request->input('status') === 'draft' ? 'draft' : 'monitoring';
         $validated['sentiment'] = $validated['sentiment'] ?? 'netral';
-        $validated['virality_score'] = rand(30, 80);
-        $validated['engagement_count'] = rand(500, 8000);
+        // Laporan lapangan tidak memiliki metrik viralitas; jangan diisi angka acak.
+        $validated['virality_score'] = 0;
+        $validated['engagement_count'] = 0;
         $validated['created_by'] = auth()->id();
 
         unset($validated['files']);
@@ -272,7 +286,7 @@ class IssueController extends Controller
             $query->where('polda_id', $selectedPolda->id);
         }
         if ($statusFilter !== 'all') {
-            $query->where('status', $statusFilter);
+            $query->whereIn('status', Issue::statusesForFilter($statusFilter));
         }
         if ($priorityFilter === 'attention' || $priorityFilter === 'atensi') {
             $query->whereIn('priority', ['critical', 'high'])->whereNotIn('status', ['selesai']);
@@ -344,6 +358,13 @@ class IssueController extends Controller
     {
         $issue = Issue::findOrFail($id);
         $this->authorizeTenantRecord($request, $issue);
+
+        $request->validate(['target_status' => 'nullable|in:investigasi,klarifikasi']);
+
+        if (! in_array($issue->status, ['monitoring', 'investigasi'], true)) {
+            return redirect()->back()->with('error', 'Laporan ini tidak berada pada tahap telaah verifikasi (status saat ini: ' . $issue->status . ').');
+        }
+
         $fromStatus = $issue->status;
         $toStatus = $request->input('target_status', 'investigasi');
         $reason = $request->input('reason', 'Laporan telah ditelaah fakta lapangannya dan dinyatakan terverifikasi sah.');
@@ -363,6 +384,31 @@ class IssueController extends Controller
         ]);
 
         return redirect()->back()->with('success', "✓ Laporan {$issue->report_code} berhasil diverifikasi.");
+    }
+
+    /**
+     * Ajukan draf laporan ke antrean verifikasi (draft -> monitoring).
+     */
+    public function submitDraft(Request $request, $id)
+    {
+        $issue = Issue::findOrFail($id);
+        $this->authorizeTenantRecord($request, $issue);
+
+        if ($issue->status !== 'draft') {
+            return redirect()->back()->with('error', 'Hanya laporan berstatus draf yang dapat diajukan ke verifikasi.');
+        }
+
+        $issue->update(['status' => 'monitoring', 'updated_at' => now()]);
+
+        IssueStatusHistory::create([
+            'issue_id'    => $issue->id,
+            'actor_id'    => auth()->id(),
+            'from_status' => 'draft',
+            'to_status'   => 'monitoring',
+            'reason'      => 'Draf laporan diajukan ke antrean verifikasi',
+        ]);
+
+        return redirect()->back()->with('success', "Laporan {$issue->report_code} diajukan ke antrean verifikasi.");
     }
 
     /**

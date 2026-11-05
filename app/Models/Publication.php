@@ -25,6 +25,13 @@ class Publication extends Model
         'review_notes',
     ];
 
+    /** Kelompok status persetujuan untuk filter & KPI. */
+    public const STATUS_GROUPS = [
+        'pending'   => ['draft_release', 'pending_approval'],
+        'published' => ['published', 'approved'],
+        'rejected'  => ['rejected'],
+    ];
+
     protected $casts = [
         'reviewed_at' => 'datetime',
     ];

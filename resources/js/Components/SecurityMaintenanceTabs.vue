@@ -7,46 +7,19 @@ import {
   History,
   Database,
   Eraser,
-  Wrench,
-  Mail,
   Radio,
   Bot,
   SlidersHorizontal,
   Layers,
-  Menu,
-  Lock,
-  Globe,
-  Shield,
 } from 'lucide-vue-next';
 
-const props = defineProps({ selectedCode: { type: String, default: 'SULBAR' } });
+defineProps({ selectedCode: { type: String, default: 'SULBAR' } });
 const page = usePage();
 
-const iconMap = {
-  ShieldAlert,
-  KeyRound,
-  History,
-  Database,
-  Eraser,
-  Wrench,
-  Mail,
-  Radio,
-  Bot,
-  SlidersHorizontal,
-  Layers,
-  Menu,
-  Lock,
-  Globe,
-  Shield,
-};
+const iconMap = { ShieldAlert, KeyRound, History, Database, Eraser, Radio, Bot, SlidersHorizontal, Layers };
+const resolveIcon = (icon) => (typeof icon === 'string' ? iconMap[icon] || Layers : icon || Layers);
 
-const resolveIcon = (icon) => {
-  if (typeof icon === 'string') {
-    return iconMap[icon] || Layers;
-  }
-  return icon || Layers;
-};
-
+// Cadangan bila navigasi dinamis belum tersedia (urutan sama dengan menu_items).
 const fallbackTabs = [
   { name: 'Keamanan', href: '/security', icon: 'ShieldAlert', permission: 'security_center' },
   { name: 'Hak Akses', href: '/roles', icon: 'KeyRound', permission: 'roles_matrix_manage' },
@@ -54,10 +27,8 @@ const fallbackTabs = [
   { name: 'Audit Log', href: '/audit-logs', icon: 'History', permission: 'security_center' },
   { name: 'Backup Data', href: '/database/backup', icon: 'Database', permission: 'database_backup' },
   { name: 'Pembersihan Berita', href: '/maintenance/news-cleanup', icon: 'Eraser', permission: 'maintenance_ops' },
-  { name: 'Otomasi Sinkron RSS', href: '/maintenance/rss-sync', icon: 'Radio', permission: 'maintenance_ops' },
-  { name: 'Mode Pemeliharaan', href: '/maintenance', icon: 'Wrench', permission: 'maintenance_ops' },
-  { name: 'Konfigurasi Mail', href: '/settings/mail', icon: 'Mail', permission: 'mail_settings' },
-  { name: 'Mesin Intelijen AI', href: '/settings/ai', icon: 'Bot', permission: 'security_center' },
+  { name: 'Sinkron RSS', href: '/maintenance/rss-sync', icon: 'Radio', permission: 'maintenance_ops' },
+  { name: 'Mesin AI', href: '/settings/ai', icon: 'Bot', permission: 'security_center' },
 ];
 
 const currentPath = computed(() => (page.url || '').split('?')[0].replace(/\/+$/, '') || '/');
@@ -69,40 +40,24 @@ const visibleTabs = computed(() => {
   if (Array.isArray(dynamicTabs) && dynamicTabs.length > 0) {
     return dynamicTabs;
   }
-  return fallbackTabs.filter(t => !t.permission || userPermissions.value[t.permission] !== false);
+  return fallbackTabs.filter((t) => !t.permission || userPermissions.value[t.permission] !== false);
 });
 </script>
 
 <template>
-  <div class="space-y-2">
-    <div class="flex items-center justify-between gap-2">
-      <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500/15 dark:bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/30 dark:border-rose-500/40">
-        Keamanan, Navigasi &amp; Pemeliharaan Terpadu
-      </span>
-      <span class="text-[10px] font-mono text-slate-500 dark:text-slate-400 hidden sm:inline">
-        {{ visibleTabs.length }} Sub-Modul Aktif
-      </span>
-    </div>
-    <div class="p-2.5 rounded-2xl bg-white dark:bg-[#08101e] border border-slate-200 dark:border-slate-800 shadow-xl">
-      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-        <Link
-          v-for="t in visibleTabs"
-          :key="t.href"
-          :href="t.href"
-          :title="t.name"
-          class="group flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold text-center leading-tight transition"
-          :class="isActive(t.href)
-            ? 'bg-amber-400/15 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 border-2 border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.25)]'
-            : 'bg-slate-50 dark:bg-slate-900/90 text-slate-700 dark:text-slate-200 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700/80'"
-        >
-          <component
-            :is="resolveIcon(t.icon)"
-            class="w-4 h-4 shrink-0 transition"
-            :class="isActive(t.href) ? 'text-amber-500 dark:text-amber-400' : 'text-slate-400 dark:text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'"
-          />
-          <span class="text-xs font-bold sm:whitespace-nowrap leading-tight text-center">{{ t.name }}</span>
-        </Link>
-      </div>
-    </div>
-  </div>
+  <nav class="flex items-center gap-1.5 overflow-x-auto pb-1" aria-label="Sub-modul Administrasi & Sistem">
+    <Link
+      v-for="t in visibleTabs"
+      :key="t.href"
+      :href="t.href"
+      :title="t.name"
+      class="group flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition border shrink-0"
+      :class="isActive(t.href)
+        ? 'bg-amber-400 text-slate-950 border-amber-300 font-black shadow-md'
+        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700'"
+    >
+      <component :is="resolveIcon(t.icon)" class="w-4 h-4 shrink-0" :class="isActive(t.href) ? 'text-slate-950' : 'text-slate-400 group-hover:text-amber-500'" />
+      <span>{{ t.name }}</span>
+    </Link>
+  </nav>
 </template>

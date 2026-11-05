@@ -43,7 +43,7 @@ class EnterpriseFullSuiteTest extends TestCase
                 'name'         => 'Bripka Test Pengujian',
                 'email'        => 'test.officer@polri.go.id',
                 'password'     => bcrypt('secret123'),
-                'role'         => 'operator',
+                'role'         => 'polda_leader',
                 'badge_number' => '88990011',
                 'is_active'    => true,
             ]
@@ -220,7 +220,7 @@ class EnterpriseFullSuiteTest extends TestCase
 
     public function test_all_system_administration_modules_return_200(): void
     {
-        $this->actingAs($this->user);
+        $this->actingAsSuperAdmin();
 
         $routes = [
             '/verification-queue',
@@ -233,9 +233,7 @@ class EnterpriseFullSuiteTest extends TestCase
             '/settings/polda',
             '/security',
             '/roles',
-            '/settings/mail',
             '/database/backup',
-            '/maintenance',
         ];
 
         foreach ($routes as $route) {
@@ -246,7 +244,7 @@ class EnterpriseFullSuiteTest extends TestCase
 
     public function test_multi_tenant_crud_operations(): void
     {
-        $this->actingAs($this->user);
+        $this->actingAsSuperAdmin();
 
         // 1. Update Polda
         $updRes = $this->post('/settings/polda/update', [

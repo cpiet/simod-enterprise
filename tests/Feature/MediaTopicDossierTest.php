@@ -23,6 +23,8 @@ class MediaTopicDossierTest extends TestCase
 
     public function test_media_intelligence_loads_with_topics_prop(): void
     {
+        $this->actingAsSuperAdmin();
+
         $res = $this->get('/media-intelligence?polda=ALL');
         $res->assertOk();
         $res->assertInertia(fn ($page) => $page

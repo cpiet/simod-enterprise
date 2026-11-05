@@ -14,6 +14,7 @@ use App\Models\Polres;
 use App\Models\PressRelease;
 use App\Services\GeminiService;
 use App\Services\RssFeedService;
+use App\Support\FastTime;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -88,6 +89,22 @@ class MediaIntelligenceController extends Controller
             ->limit(3000)
             ->get();
 
+        // Tren 7 hari (total & negatif per hari) untuk sparkline KPI; dihitung dari artikel yang sudah dimuat.
+        $trend7 = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $day = now()->subDays($i)->format('Y-m-d');
+            $trend7[$day] = ['date' => $day, 'label' => date('d M', strtotime($day)), 'total' => 0, 'negatif' => 0];
+        }
+        foreach ($dbArticles as $a) {
+            $day = substr((string) $a->getRawOriginal('pub_date'), 0, 10);
+            if (isset($trend7[$day])) {
+                $trend7[$day]['total']++;
+                if (($a->sentiment ?? '') === 'negatif') {
+                    $trend7[$day]['negatif']++;
+                }
+            }
+        }
+
         $articleIds = $dbArticles->pluck('id')->toArray();
         $manualArticleTopics = DB::table('media_article_topic')
             ->whereIn('media_article_id', $articleIds)
@@ -160,8 +177,8 @@ class MediaIntelligenceController extends Controller
                 'source_name'       => strtoupper($a->source_name),
                 'category'          => $a->category,
                 'category_badge'    => strtoupper($a->category),
-                'time_ago'          => $a->created_at ? $a->created_at->diffForHumans() : 'Baru saja',
-                'pub_date'          => $a->pub_date ? $a->pub_date->format('d M Y, H.i') . ' WITA' : now()->format('d M Y, H.i') . ' WITA',
+                'time_ago'          => FastTime::ago($a->getRawOriginal('created_at')),
+                'pub_date'          => FastTime::stamp($a->getRawOriginal('pub_date')) . ' WITA',
                 'summary'           => $a->summary ?: 'Cuplikan berita pantauan intelijen media belum tersedia.',
                 'image_url'         => $a->image_url,
                 'link'              => $a->url,
@@ -294,6 +311,7 @@ class MediaIntelligenceController extends Controller
             'issues'           => $issues,
             'pressReleases'    => $pressReleases,
             'suggestedTopics'  => $suggestedTopics,
+            'trend7'           => array_values($trend7),
             'metrics'          => $metrics,
         ]);
     }
@@ -303,9 +321,9 @@ class MediaIntelligenceController extends Controller
      */
     public function analyzeGemini(Request $request): RedirectResponse|JsonResponse
     {
-        $poldaCode = $request->query('polda', 'SULBAR');
-        $searchCode = strtoupper($poldaCode) === 'ALL' ? 'DIVHUMAS' : strtoupper($poldaCode);
-        $polda = Polda::where('code', $searchCode)->first() ?? Polda::first();
+        // Tenant aktif dari sesi server (bukan dari query/klien).
+        [, $polda] = $this->resolveActiveTenant($request);
+        $polda = $polda ?? Polda::first();
 
         $geminiService = new GeminiService();
         $apiKey = $geminiService->getApiKey($polda->id);
@@ -500,9 +518,9 @@ class MediaIntelligenceController extends Controller
             'is_auto_analyze' => 'nullable|boolean',
         ]);
 
-        $poldaCode = $request->query('polda', 'SULBAR');
-        $searchCode = strtoupper($poldaCode) === 'ALL' ? 'DIVHUMAS' : strtoupper($poldaCode);
-        $polda = Polda::where('code', $searchCode)->first() ?? Polda::first();
+        // Tenant aktif dari sesi server (bukan dari query/klien).
+        [, $polda] = $this->resolveActiveTenant($request);
+        $polda = $polda ?? Polda::first();
 
         $aiSetting = AiSetting::forPolda($polda->id);
 
@@ -539,9 +557,9 @@ class MediaIntelligenceController extends Controller
         $apiKey = $request->input('api_key');
         $model = $request->input('model', 'gemini-2.5-pro');
 
-        $poldaCode = $request->query('polda', 'SULBAR');
-        $searchCode = strtoupper($poldaCode) === 'ALL' ? 'DIVHUMAS' : strtoupper($poldaCode);
-        $polda = Polda::where('code', $searchCode)->first() ?? Polda::first();
+        // Tenant aktif dari sesi server (bukan dari query/klien).
+        [, $polda] = $this->resolveActiveTenant($request);
+        $polda = $polda ?? Polda::first();
 
         $geminiService = new GeminiService();
         $apiKey = $apiKey ?: $geminiService->getApiKey($polda->id);
@@ -1233,9 +1251,8 @@ PROMPT;
             'polda_code'  => 'nullable|string|max:50',
         ]);
 
-        $poldaCode = $validated['polda_code'] ?? $request->query('polda', 'SULBAR');
-        $searchCode = strtoupper($poldaCode) === 'ALL' ? 'DIVHUMAS' : strtoupper($poldaCode);
-        $polda = Polda::where('code', $searchCode)->first() ?? Polda::where('is_active', true)->first();
+        [, $activePolda] = $this->resolveActiveTenant($request);
+        $polda = $this->requestedPoldaOverride($request, $activePolda) ?? Polda::where('is_active', true)->first();
 
         $topic = MediaTopic::create([
             'polda_id'    => $polda->id,
@@ -1507,11 +1524,7 @@ PROMPT;
         ]);
 
         [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
-        if ($request->filled('polda_id')) {
-            $selectedPolda = Polda::find($request->input('polda_id')) ?? $selectedPolda;
-        } elseif ($request->filled('polda_code')) {
-            $selectedPolda = Polda::where('code', strtoupper($request->input('polda_code')))->first() ?? $selectedPolda;
-        }
+        $selectedPolda = $this->requestedPoldaOverride($request, $selectedPolda);
         $selectedPolda = $selectedPolda ?? Polda::first();
 
         // 1. Buat Topik Atensi Baru
@@ -1646,11 +1659,7 @@ PROMPT;
         $title = trim($validated['title']);
 
         [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
-        if ($request->filled('polda_id')) {
-            $selectedPolda = Polda::find($request->input('polda_id')) ?? $selectedPolda;
-        } elseif ($request->filled('polda_code')) {
-            $selectedPolda = Polda::where('code', strtoupper($request->input('polda_code')))->first() ?? $selectedPolda;
-        }
+        $selectedPolda = $this->requestedPoldaOverride($request, $selectedPolda);
         $selectedPolda = $selectedPolda ?? Polda::first();
 
         $latestReport = MediaIntelligenceReport::where('polda_id', $selectedPolda->id)->latest()->first();
@@ -1681,11 +1690,7 @@ PROMPT;
         ]);
 
         [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
-        if ($request->filled('polda_id')) {
-            $selectedPolda = Polda::find($request->input('polda_id')) ?? $selectedPolda;
-        } elseif ($request->filled('polda_code')) {
-            $selectedPolda = Polda::where('code', strtoupper($request->input('polda_code')))->first() ?? $selectedPolda;
-        }
+        $selectedPolda = $this->requestedPoldaOverride($request, $selectedPolda);
         $selectedPolda = $selectedPolda ?? Polda::first();
 
         // Retrieve latest 40 articles for live grounding

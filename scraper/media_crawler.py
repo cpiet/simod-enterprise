@@ -3,11 +3,14 @@ SIMOD Enterprise - Python Media & Social Ingestion Worker
 Crawls real-time headlines & pushes parsed intelligence directly into Laravel 12 API.
 """
 
+import os
 import sys
 import time
 import requests
 
-API_ENDPOINT = "http://127.0.0.1:8000/api/v1/ingest/article"
+API_ENDPOINT = os.environ.get("SIMOD_API_ENDPOINT", "http://127.0.0.1:8000/api/v1/ingest/article")
+# Wajib sama dengan INGEST_API_TOKEN di .env Laravel
+INGEST_TOKEN = os.environ.get("SIMOD_INGEST_TOKEN", "")
 
 CRAWL_TARGETS = [
     {
@@ -56,7 +59,12 @@ def run_crawler():
     for idx, item in enumerate(CRAWL_TARGETS, 1):
         print(f"\n[{idx}/{len(CRAWL_TARGETS)}] Mengirim: {item['title'][:45]}... ({item['polda_code']})")
         try:
-            resp = requests.post(API_ENDPOINT, json=item, timeout=10)
+            resp = requests.post(
+                API_ENDPOINT,
+                json=item,
+                headers={"Authorization": f"Bearer {INGEST_TOKEN}", "Accept": "application/json"},
+                timeout=10,
+            )
             if resp.status_code in (200, 201):
                 res_json = resp.json()
                 print(f"   -> [OK {resp.status_code}] {res_json.get('message', 'Sukses')}")

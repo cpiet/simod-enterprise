@@ -57,16 +57,13 @@ class SecuritySetting extends Model
         return static::firstOrCreate(
             ['polda_id' => null],
             [
-                'enable_turnstile'        => true,
-                'turnstile_site_key'      => '0x4AAAAAAAiH8s-xxxxxxxx',
-                'turnstile_secret_key'    => '0x4AAAAAAAiH8s-yyyyyyyyyyyyyyyyyyyyyyyy',
+                'enable_turnstile'        => false,
                 'max_login_attempts'      => 5,
                 'lockout_minutes'         => 15,
-                'enable_pin'              => true,
+                'enable_pin'              => false,
                 'pin_expiry_days'         => 90,
-                'session_timeout_minutes' => 30,
+                'session_timeout_minutes' => 60,
                 'private_media_storage'   => true,
-                'ip_whitelist'            => "127.0.0.1\n10.12.4.15\n182.1.204.88",
             ]
         );
     }

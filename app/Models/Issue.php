@@ -11,6 +11,30 @@ class Issue extends Model
 {
     use HasFactory;
 
+    /**
+     * Alur resmi: draft -> monitoring -> investigasi -> klarifikasi -> selesai -> arsip.
+     * Status lama (submitted, unit_verified, polda_verified, in_progress, resolved, closed) dipetakan ke
+     * kelompok yang setara agar data historis tetap muncul pada filter dan KPI.
+     */
+    public const STATUS_GROUPS = [
+        'draft'     => ['draft'],
+        'pending'   => ['monitoring', 'submitted', 'unit_verified'],
+        'active'    => ['investigasi', 'polda_verified', 'in_progress'],
+        'clarified' => ['klarifikasi'],
+        'done'      => ['selesai', 'resolved', 'closed'],
+        'archived'  => ['arsip'],
+    ];
+
+    /**
+     * Daftar status untuk nilai filter (kunci kelompok atau status tunggal).
+     *
+     * @return array<int, string>
+     */
+    public static function statusesForFilter(string $filter): array
+    {
+        return self::STATUS_GROUPS[$filter] ?? [$filter];
+    }
+
     protected $fillable = [
         'polda_id',
         'polres_id',

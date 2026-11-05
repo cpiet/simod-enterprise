@@ -363,7 +363,7 @@ class SocialIntelligenceController extends Controller
     public function updateSettings(Request $request)
     {
         [$selectedCode, $selectedPolda, $resolvedPoldaId] = $this->resolveActiveTenant($request);
-        $poldaId = (int) $request->input('polda_id');
+        $poldaId = $request->user()?->isSuperAdmin() ? (int) $request->input('polda_id') : 0;
 
         if (!$poldaId || !Polda::where('id', $poldaId)->exists()) {
             $poldaId = $selectedPolda?->id
@@ -429,7 +429,7 @@ class SocialIntelligenceController extends Controller
     public function sync(Request $request, ApifySyncService $apifyService, SocialSyndicationService $syndicationService)
     {
         [$selectedCode, $selectedPolda, $resolvedPoldaId] = $this->resolveActiveTenant($request);
-        $poldaId = (int) $request->input('polda_id');
+        $poldaId = $request->user()?->isSuperAdmin() ? (int) $request->input('polda_id') : 0;
 
         if (!$poldaId || !Polda::where('id', $poldaId)->exists()) {
             $poldaId = $selectedPolda?->id

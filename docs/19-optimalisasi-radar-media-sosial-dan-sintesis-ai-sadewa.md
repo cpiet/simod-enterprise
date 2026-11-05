@@ -142,6 +142,6 @@ Seluruh test suite dijalankan dengan sukses pada lingkungan SQLite in-memory:
   - `track keyword on demand endpoint` (Syndication + Fallback)
   - `close and refresh investigation case`
   - `analyze ai endpoint returns json and records audit log` (Mock SADEWA AI)
-- **Pengujian Seluruh Sistem**: `php artisan test` — **93 tests, 538 assertions, ALL PASS**.
+- **Pengujian Seluruh Sistem**: `php artisan test` — **93 tests, 538 assertions, ALL PASS** *(snapshot historis; baseline terkini 108/680)*.
 - **Kompilasi Aset Frontend**: `npm run build` — **Built in 4.22s, 0 errors**.
 

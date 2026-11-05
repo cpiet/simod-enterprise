@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
-import { router, Link } from '@inertiajs/vue3';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { router, Link, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
 import {
@@ -21,6 +21,9 @@ import {
   Info,
   X,
   Bookmark,
+  Ellipsis,
+  SlidersHorizontal,
+  ChevronDown,
   RefreshCw,
   Sliders,
   Send,
@@ -75,17 +78,47 @@ const props = defineProps({
   filters: Object,
 });
 
-const activeTab = ref(props.filters?.tab || 'radar');
+// Peran & izin pengguna (menentukan tombol yang tampil dan tab awal)
+const page = usePage();
+const permissions = computed(() => page.props.auth?.permissions || {});
+const canSync = computed(() => !!permissions.value.social_intelligence_sync);
+const canCreateIssue = computed(() => !!permissions.value.issues_create);
+
+// Pimpinan & Polda mendarat di Briefing; peran lain di Radar Percakapan
+const activeTab = ref(props.filters?.tab || (['kadiv_humas', 'polda_leader'].includes(page.props.auth?.role) ? 'briefing' : 'radar'));
+
+// Menu melayang & panel lipat -- hanya satu menu terbuka pada satu waktu
+const openMenu = ref(null);
+const showFilterPanel = ref(false);
+const dossierOpen = ref(false);
+const closeFloating = () => {
+  openMenu.value = null;
+  showFilterPanel.value = false;
+};
+onMounted(() => document.addEventListener('click', closeFloating));
+onUnmounted(() => document.removeEventListener('click', closeFloating));
 const selectedPlatform = ref(props.filters?.platform || 'all');
 const selectedSentiment = ref(props.filters?.sentiment || 'all');
 const kolOnly = ref(Boolean(props.filters?.kol));
 const selectedSort = ref(props.filters?.sort || 'latest');
 const searchQuery = ref(props.filters?.q || '');
 const selectedSatwil = ref(props.filters?.satwil || 'all');
+const activeFilterCount = computed(() =>
+  (selectedSentiment.value !== 'all' ? 1 : 0) + (kolOnly.value ? 1 : 0) + (selectedSatwil.value !== 'all' ? 1 : 0)
+);
+const clearAdvancedFilters = () => {
+  selectedSentiment.value = 'all';
+  kolOnly.value = false;
+  selectedSatwil.value = 'all';
+  handleFilter();
+};
 
 // Smart Dossier & Topik Atensi Selection States
 const selectedCaseId = ref(props.filters?.case_id ? Number(props.filters.case_id) : (props.selectedCase?.id || null));
 const showBookmarksOnly = ref(Boolean(props.filters?.bookmarked));
+watch(selectedCaseId, (v) => {
+  if (v) dossierOpen.value = true;
+}, { immediate: true });
 
 watch(() => [props.filters, props.selectedCase], () => {
   if (props.filters?.case_id !== undefined) {
@@ -100,7 +133,6 @@ watch(() => [props.filters, props.selectedCase], () => {
 
 const handleFilter = () => {
   router.get('/social-intelligence', {
-    polda: props.selectedCode,
     tab: activeTab.value,
     case_id: selectedCaseId.value || undefined,
     bookmarked: showBookmarksOnly.value ? 1 : undefined,
@@ -145,7 +177,6 @@ const selectCasePill = (caseId) => {
 const closeCaseTab = (caseId) => {
   if (confirm('Tutup topik atensi pimpinan ini dan simpan ke arsip?')) {
     router.post(`/social-intelligence/cases/${caseId}/close`, {
-      polda: props.selectedCode,
     }, {
       preserveScroll: true,
       onSuccess: () => {
@@ -160,7 +191,6 @@ const closeCaseTab = (caseId) => {
 const refreshCaseTab = (caseId) => {
   isRefreshingCase.value = true;
   router.post(`/social-intelligence/cases/${caseId}/refresh`, {
-    polda: props.selectedCode,
   }, {
     preserveScroll: true,
     onFinish: () => {
@@ -172,7 +202,6 @@ const refreshCaseTab = (caseId) => {
 const getCaseEscalationUrl = (c) => {
   if (!c) return '/issues/create';
   const params = new URLSearchParams({
-    polda: props.selectedCode,
     title: `[Medsos Atensi] ${c.title}`,
     category: '📱 Isu Medsos & Opini Publik (Cyber Patrol)',
     priority: c.priority === 'urgent' ? 'urgent' : 'high',
@@ -517,6 +546,44 @@ const getEscalationUrl = (item) => {
 // --- PILIHAN C: MULTI-LINE SPIKE CHART REACTIVE MATH ---
 const spikeTimelineDays = computed(() => props.spikeTimeline?.days || []);
 
+// Sparkline & selisih vs hari sebelumnya (strip KPI)
+const sparkPoints = (key) => {
+  const d = spikeTimelineDays.value;
+  if (d.length < 2) return '';
+  const max = Math.max(...d.map((x) => x[key] || 0), 1);
+  return d.map((x, i) => ((i / (d.length - 1)) * 100).toFixed(1) + ',' + (26 - ((x[key] || 0) / max) * 24).toFixed(1)).join(' ');
+};
+const trendDelta = (key) => {
+  const d = spikeTimelineDays.value;
+  if (d.length < 2) return null;
+  return (d[d.length - 1][key] || 0) - (d[d.length - 2][key] || 0);
+};
+const deltaLabel = (key) => {
+  const v = trendDelta(key);
+  if (v === null) return '';
+  if (v === 0) return '— sama dengan kemarin';
+  return (v > 0 ? '▲ +' : '▼ ') + v + ' vs kemarin';
+};
+
+// Grafik kolom bertumpuk 7 hari: negatif di dasar (mudah dibandingkan), lalu netral, lalu positif
+const chartOpen = ref(Boolean(props.spikeTimeline?.summary?.spike_detected));
+const stabilityScore = computed(() => props.spikeTimeline?.summary?.stability_score ?? null);
+const barGeom = computed(() => {
+  const days = spikeTimelineDays.value;
+  const max = Math.max(...days.map((d) => d.total || 0), 1);
+  const slot = 560 / (days.length || 1);
+  const bw = Math.min(46, slot * 0.6);
+  const base = 150;
+  const h = (v) => ((v || 0) / max) * 115;
+  return days.map((d, i) => {
+    const x = 45 + i * slot + (slot - bw) / 2;
+    const hn = h(d.negatif);
+    const hu = h(d.netral);
+    const hp = h(d.positif);
+    return { i, d, x, bw, hn, hu, hp, yn: base - hn, yu: base - hn - hu, yp: base - hn - hu - hp, cx: x + bw / 2, base };
+  });
+});
+
 const spikeMaxVal = computed(() => {
   let m = 1;
   for (const d of spikeTimelineDays.value) {
@@ -680,7 +747,6 @@ const analyzeAI = async () => {
   socialAiError.value = null;
   try {
     const res = await axios.post('/social-intelligence/analyze-ai', {
-      polda: props.selectedCode,
     });
     if (res.data.success) {
       socialAiReport.value = res.data;
@@ -776,82 +842,75 @@ const getBuzzerRiskClass = (level) => {
     :selected-code="selectedCode"
     :metrics="metrics"
   >
-    <!-- Top Action Bar & Title -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-      <div>
-        <div class="flex items-center gap-2">
-          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950">
-            {{ isNational ? 'Cyber Patrol & Social Listening Nasional' : 'Cyber Patrol & Social Listening' }}
-          </span>
-          <span class="text-xs font-bold text-slate-500 dark:text-slate-400">
-            {{ isNational ? 'Divhumas Polri (Komando Nasional)' : selectedPolda?.name }}
-          </span>
+    <!-- Header ringkas: 1 aksi utama + Lacak Topik + menu lainnya -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div class="min-w-0">
+        <div class="flex items-center gap-2 flex-wrap text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
+          <span>Multi-Tier Engine aktif</span>
+          <span class="text-slate-500 dark:text-slate-400 font-semibold">&bull; {{ isNational ? 'Divhumas Polri (Nasional)' : selectedPolda?.name }}</span>
         </div>
-        <h1 class="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight mt-1">
-          {{ isNational ? 'Radar Intelijen Media Sosial Nasional' : 'Radar Intelijen Media Sosial' }}
-        </h1>
-        <p class="text-xs md:text-sm text-slate-600 dark:text-slate-300">
-          {{ isNational
-            ? 'Pemantauan komprehensif percakapan publik skala nasional, orkestrasi sentimen kewilayahan, deteksi dini isu viral, dan manajemen narasi Mabes Polri di 𝕏, TikTok, Instagram, dan YouTube.'
-            : 'Pemantauan percakapan publik, sentimen netizen, tren tagar, dan radar tokoh kritis di 𝕏, TikTok, Instagram, dan YouTube.'
-          }}
-        </p>
+        <h1 class="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight mt-1">Radar Media Sosial</h1>
       </div>
 
-      <!-- Action Buttons -->
-      <div class="flex flex-col items-end gap-2">
-        <div class="flex flex-wrap items-center gap-2.5">
-          <Link
-            href="/"
-            class="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 border border-slate-300 transition"
-          >
-            &larr; Dashboard
-          </Link>
+      <div class="flex items-center gap-2 shrink-0">
+        <!-- Aksi utama (peran berizin sinkron medsos) -->
+        <button
+          v-if="canSync"
+          @click="triggerSyncAndAnalyze"
+          type="button"
+          :disabled="isSyncing || isAnalyzingAI"
+          class="px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-110 text-slate-950 shadow-lg shadow-amber-400/25 flex items-center gap-2 cursor-pointer transition select-none disabled:opacity-60"
+          title="Tarik percakapan terbaru dan susun sintesis intelijen SADEWA"
+        >
+          <Sparkles class="w-4 h-4" :class="{ 'animate-spin': isSyncing || isAnalyzingAI }" />
+          <span>{{ (isSyncing || isAnalyzingAI) ? 'SADEWA Bekerja...' : 'Sinkron & Analisis' }}</span>
+        </button>
 
-          <!-- ↺ Perbarui Data (secondary) -->
+        <button
+          v-if="canSync"
+          @click="openTrackKeywordModal"
+          type="button"
+          class="px-3.5 py-2.5 rounded-xl text-xs font-bold bg-white hover:bg-slate-100 text-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 flex items-center gap-2 cursor-pointer transition select-none"
+          title="Lacak topik atau kasus baru secara on-demand"
+        >
+          <Sparkles class="w-4 h-4 text-sky-500" />
+          <span class="hidden sm:inline">Lacak Topik</span>
+        </button>
+
+        <div v-if="canSync || canCreateIssue" class="relative">
           <button
-            @click="triggerSync"
             type="button"
-            :disabled="isSyncing || isAnalyzingAI"
-            class="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 transition flex items-center gap-2 cursor-pointer shadow-sm select-none disabled:opacity-50"
+            @click.stop="openMenu = openMenu === 'more' ? null : 'more'"
+            class="p-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-300 dark:hover:text-white border border-slate-300 dark:border-slate-700 transition cursor-pointer"
+            title="Aksi lainnya"
           >
-            <RefreshCw class="w-4 h-4 text-sky-500" :class="{ 'animate-spin': isSyncing }" />
-            <span>{{ isSyncing ? 'Memperbarui...' : '↺ Perbarui Data' }}</span>
+            <Ellipsis class="w-4 h-4" />
           </button>
-
-          <!-- Lacak Topik Baru On-Demand -->
-          <button
-            @click="openTrackKeywordModal"
-            type="button"
-            class="px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white shadow-md shadow-sky-500/20 flex items-center gap-2 cursor-pointer transition select-none"
+          <div
+            v-if="openMenu === 'more'"
+            @click.stop
+            class="absolute right-0 top-full mt-2 z-30 w-56 rounded-xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-700 shadow-2xl p-1.5"
           >
-            <Sparkles class="w-4 h-4 text-amber-300" />
-            <span>⚡ Lacak Topik Baru</span>
-          </button>
-
-          <!-- MAIN CTA: Sinkron & Sintesis Intelijen Medsos -->
-          <button
-            @click="triggerSyncAndAnalyze"
-            type="button"
-            :disabled="isSyncing || isAnalyzingAI"
-            class="px-5 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-110 text-slate-950 shadow-lg shadow-amber-400/25 flex items-center gap-2 cursor-pointer transition select-none disabled:opacity-60"
-          >
-            <Sparkles class="w-4 h-4" :class="{ 'animate-spin': isSyncing || isAnalyzingAI }" />
-            <span>{{ (isSyncing || isAnalyzingAI) ? 'SADEWA Sedang Bekerja...' : '⚡ Sinkron & Analisis Intelijen Medsos' }}</span>
-          </button>
-
-          <!-- Buat Laporan Baru -->
-          <Link
-            href="/issues/create"
-            class="px-4 py-2.5 rounded-xl text-xs font-black bg-rose-500 text-white hover:bg-rose-600 shadow-lg shadow-rose-500/20 flex items-center gap-2 cursor-pointer transition select-none"
-          >
-            <span>+ Buat Laporan Isu</span>
-          </Link>
-        </div>
-        <!-- Engine Status Badge -->
-        <div class="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
-          <span>Multi-Tier Engine Aktif (Sindikasi Google News + Apify Standby)</span>
+            <button
+              v-if="canSync"
+              type="button"
+              @click="triggerSync(); openMenu = null"
+              :disabled="isSyncing || isAnalyzingAI"
+              class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 transition cursor-pointer text-left disabled:opacity-50"
+            >
+              <RefreshCw class="w-4 h-4 text-sky-500" :class="{ 'animate-spin': isSyncing }" />
+              <span>{{ isSyncing ? 'Memperbarui...' : 'Perbarui Data (tanpa AI)' }}</span>
+            </button>
+            <Link
+              v-if="canCreateIssue"
+              href="/issues/create"
+              class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 transition cursor-pointer text-left"
+            >
+              <AlertTriangle class="w-4 h-4 text-rose-500" />
+              <span>Buat Laporan Isu</span>
+            </Link>
+          </div>
         </div>
       </div>
     </div>
@@ -872,60 +931,56 @@ const getBuzzerRiskClass = (level) => {
       </div>
     </div>
 
-    <!-- Metrics Cards (4 KPI Cards) -->
-    <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-      <!-- Total Percakapan -->
-      <div class="p-4 rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-sm space-y-1">
-        <div class="flex items-center justify-between">
-          <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">Percakapan Terpantau</span>
-          <MessageSquare class="w-4 h-4 text-sky-500" />
+    <!-- KPI strip: angka + sparkline 7 hari + selisih vs kemarin -->
+    <div class="rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-sm grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-slate-200 dark:divide-slate-800 overflow-hidden">
+      <div class="p-4 space-y-1.5">
+        <p class="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5"><MessageSquare class="w-3.5 h-3.5 text-sky-500" /> Percakapan Terpantau</p>
+        <div class="flex items-end justify-between gap-2">
+          <p class="text-2xl font-black text-slate-900 dark:text-white leading-none">{{ metrics?.total_posts || 0 }}</p>
+          <svg v-if="spikeTimelineDays.length > 1" viewBox="0 0 100 28" preserveAspectRatio="none" class="w-20 h-7 text-sky-500" aria-hidden="true">
+            <polyline :points="sparkPoints('total')" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+          </svg>
         </div>
-        <p class="text-2xl font-black text-slate-900 dark:text-white">{{ metrics?.total_posts || 0 }}</p>
-        <p class="text-[10px] text-slate-500 dark:text-slate-400">
-          Total Jangkauan: <span class="font-bold text-slate-800 dark:text-slate-200">{{ formatNumber(metrics?.total_views) }} views</span>
-        </p>
+        <p class="text-[11px] text-slate-500 dark:text-slate-400">{{ formatNumber(metrics?.total_views) }} views &bull; {{ deltaLabel('total') || '7 hari terakhir' }}</p>
       </div>
 
-      <!-- Sentimen Polarisasi -->
-      <div class="p-4 rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-sm space-y-1">
-        <div class="flex items-center justify-between">
-          <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">Sentimen Publik</span>
-          <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-            {{ metrics?.positive_pct }}% Positif
-          </span>
+      <div class="p-4 space-y-1.5">
+        <p class="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5"><Activity class="w-3.5 h-3.5 text-emerald-500" /> Sentimen Publik</p>
+        <div class="flex items-end justify-between gap-2">
+          <p class="text-2xl font-black text-emerald-600 dark:text-emerald-400 leading-none">{{ metrics?.positive_pct ?? 0 }}%<span class="text-[11px] font-bold text-slate-500 dark:text-slate-400 ml-1">positif</span></p>
+          <svg v-if="spikeTimelineDays.length > 1" viewBox="0 0 100 28" preserveAspectRatio="none" class="w-20 h-7 text-rose-500" aria-hidden="true" title="Tren negatif 7 hari">
+            <polyline :points="sparkPoints('negatif')" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+          </svg>
         </div>
-        <!-- Triple Sentiment Progress Bar -->
-        <div class="w-full h-2 rounded-full overflow-hidden flex bg-slate-200 dark:bg-slate-800 my-2">
-          <div :style="{ width: `${metrics?.positive_pct || 0}%` }" class="bg-emerald-500 h-full" title="Positif"></div>
-          <div :style="{ width: `${metrics?.neutral_pct || 0}%` }" class="bg-slate-400 dark:bg-slate-600 h-full" title="Netral"></div>
-          <div :style="{ width: `${metrics?.negative_pct || 0}%` }" class="bg-rose-500 h-full" title="Negatif"></div>
+        <div class="w-full h-1.5 rounded-full overflow-hidden flex bg-slate-200 dark:bg-slate-800">
+          <div :style="{ width: (metrics?.positive_pct || 0) + '%' }" class="bg-emerald-500 h-full" title="Positif"></div>
+          <div :style="{ width: (metrics?.neutral_pct || 0) + '%' }" class="bg-slate-400 dark:bg-slate-600 h-full" title="Netral"></div>
+          <div :style="{ width: (metrics?.negative_pct || 0) + '%' }" class="bg-rose-500 h-full" title="Negatif"></div>
         </div>
-        <div class="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-          <span class="text-emerald-600 dark:text-emerald-400 font-bold">🟢 {{ metrics?.positive_pct }}% Pos</span>
-          <span>⚪ {{ metrics?.neutral_pct }}% Net</span>
-          <span class="text-rose-600 dark:text-rose-400 font-bold">🔴 {{ metrics?.negative_pct }}% Neg</span>
-        </div>
+        <p class="text-[11px] text-slate-500 dark:text-slate-400">Netral {{ metrics?.neutral_pct ?? 0 }}% &bull; <span :class="trendDelta('negatif') > 0 ? 'text-rose-600 dark:text-rose-400 font-bold' : ''">Negatif {{ metrics?.negative_pct ?? 0 }}%</span></p>
       </div>
 
-      <!-- Radar Tokoh Kritis / KOL -->
-      <div class="p-4 rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 shadow-sm space-y-1">
-        <div class="flex items-center justify-between">
-          <span class="text-[11px] font-bold text-amber-600 dark:text-amber-400">Tokoh Kritis & KOL</span>
-          <UserCheck class="w-4 h-4 text-amber-500" />
-        </div>
-        <p class="text-2xl font-black text-amber-600 dark:text-amber-400">{{ metrics?.kol_count || 0 }}</p>
-        <p class="text-[10px] text-slate-500 dark:text-slate-400">Akun pengamat, LBH & aktivis aktif</p>
-      </div>
+      <button
+        type="button"
+        @click="switchTab('kol')"
+        class="p-4 space-y-1.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/40 transition cursor-pointer"
+        title="Buka Radar KOL & Akun Kritis"
+      >
+        <p class="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5"><UserCheck class="w-3.5 h-3.5 text-amber-500" /> Tokoh Kritis &amp; KOL</p>
+        <p class="text-2xl font-black text-amber-600 dark:text-amber-400 leading-none">{{ metrics?.kol_count || 0 }}</p>
+        <p class="text-[11px] text-slate-500 dark:text-slate-400">Pengamat, LBH &amp; aktivis aktif</p>
+      </button>
 
-      <!-- Isu Potensi Viral -->
-      <div class="p-4 rounded-2xl bg-white dark:bg-[#0b1426] border border-rose-200 dark:border-rose-900/60 shadow-sm space-y-1">
-        <div class="flex items-center justify-between">
-          <span class="text-[11px] font-bold text-rose-600 dark:text-rose-400">Potensi Viral (Atensi)</span>
-          <Flame class="w-4 h-4 text-rose-500" />
-        </div>
-        <p class="text-2xl font-black text-rose-600 dark:text-rose-400">{{ metrics?.viral_count || 0 }}</p>
-        <p class="text-[10px] text-slate-500 dark:text-slate-400">Skor viralisasi &gt; 75 / 100</p>
-      </div>
+      <button
+        type="button"
+        @click="selectedSort = 'viral'; switchTab('radar')"
+        class="p-4 space-y-1.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/40 transition cursor-pointer"
+        title="Urutkan feed menurut paling viral"
+      >
+        <p class="text-[11px] font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1.5"><Flame class="w-3.5 h-3.5 text-rose-500" /> Potensi Viral</p>
+        <p class="text-2xl font-black text-rose-600 dark:text-rose-400 leading-none">{{ metrics?.viral_count || 0 }}</p>
+        <p class="text-[11px] text-slate-500 dark:text-slate-400">Skor viralisasi &gt; 75 / 100</p>
+      </button>
     </div>
 
     <!-- 4 Navigasi Tab Eksekutif -->
@@ -985,43 +1040,40 @@ const getBuzzerRiskClass = (level) => {
       <!-- SMART DOSSIER: TOPIK ATENSI & REQUEST PIMPINAN (IDENTIK DENGAN MEDIA INTELLIGENCE) -->
       <div class="rounded-3xl bg-[#0b1426] border border-amber-500/30 p-5 shadow-2xl space-y-4">
         <!-- Top Bar: Title & Action -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+        <div class="flex items-center justify-between gap-3 flex-wrap" :class="dossierOpen ? 'pb-3 border-b border-slate-800' : ''">
           <div class="space-y-0.5">
             <div class="flex items-center gap-2">
               <span class="flex h-2.5 w-2.5 relative">
                 <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                 <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
               </span>
-              <h3 class="text-sm md:text-base font-extrabold text-white flex items-center gap-1.5 flex-wrap">
-                <span>Topik Atensi &amp; Request Pimpinan</span>
-                <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                  Smart Dossier
-                </span>
-                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-900 border border-slate-700 text-slate-300 flex items-center gap-1.5 shadow-xs">
-                  <span>{{ investigationCases.length }} Kasus Dipantau</span>
+              <button type="button" @click.stop="dossierOpen = !dossierOpen" class="text-sm md:text-base font-extrabold text-white flex items-center gap-2 flex-wrap cursor-pointer select-none text-left" :aria-expanded="dossierOpen">
+                <span>Topik Atensi Pimpinan</span>
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-900 border border-slate-700 text-slate-300 flex items-center gap-1.5">
+                  <span>{{ investigationCases.length }} kasus</span>
                   <span v-if="investigationCases.some(c => c.priority === 'urgent')" class="text-rose-400 font-black">
-                    • {{ investigationCases.filter(c => c.priority === 'urgent').length }} Mendesak
+                    &bull; {{ investigationCases.filter(c => c.priority === 'urgent').length }} mendesak
                   </span>
                 </span>
-              </h3>
+                <ChevronDown class="w-4 h-4 text-slate-400 transition-transform" :class="dossierOpen ? 'rotate-180' : ''" />
+              </button>
             </div>
-            <p class="text-[11px] text-slate-400">
-              Penyaringan kasus viral / atensi khusus Kapolda &amp; Kadiv Humas lintas 5 platform medsos (𝕏, TikTok, Instagram, YouTube, Facebook).
-            </p>
           </div>
 
           <div class="flex items-center gap-2">
             <button
+              v-if="canSync"
               @click="openTrackKeywordModal"
               type="button"
               class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:brightness-110 text-slate-950 text-xs font-black shadow-md shadow-amber-500/20 transition cursor-pointer select-none"
             >
               <PlusCircle class="w-3.5 h-3.5" />
-              <span>+ Lacak Topik Atensi</span>
+              <span>Lacak Topik</span>
             </button>
           </div>
         </div>
 
+        <div v-show="dossierOpen" class="space-y-4">
         <!-- KASUS ATENSI SELECTOR (ADAPTIVE RESPONSIVE FLEX BADGES - RAPI & BEBAS OVERFLOW) -->
         <div class="space-y-2">
           <!-- Empty State jika belum ada kasus -->
@@ -1031,7 +1083,7 @@ const getBuzzerRiskClass = (level) => {
           >
             <p class="text-xs font-bold text-slate-300">Belum ada topik atensi pimpinan yang aktif di media sosial.</p>
             <p class="text-[11px] text-slate-500">
-              Klik <strong>"+ Lacak Topik Atensi"</strong> di atas untuk memantau tagar atau kasus spesifik secara terisolasi.
+              Klik <strong>"Lacak Topik"</strong> di atas untuk memantau tagar atau kasus spesifik secara terisolasi.
             </p>
           </div>
 
@@ -1224,193 +1276,63 @@ const getBuzzerRiskClass = (level) => {
             </div>
           </div>
         </div>
+        </div>
       </div>
 
-      <!-- GRAFIK TREN SENTIMEN & DETEKSI LONJAKAN ISU (SPIKE DETECTION) -->
-      <div class="rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm space-y-4">
-        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
-          <div>
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30">
-                Spike Anomaly Detection
-              </span>
-              <span
-                class="px-2 py-0.5 rounded-full text-[10px] font-bold"
-                :class="spikeTimeline?.summary?.spike_detected ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 animate-pulse' : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'"
-              >
-                {{ spikeTimeline?.summary?.spike_detected ? '🚨 Terdeteksi Lonjakan Isu' : '🟢 Stabilitas Opini Terkendali' }}
-              </span>
-              <span class="text-xs text-slate-500 dark:text-slate-400 font-mono">
-                Indeks Stabilitas: <strong class="text-slate-900 dark:text-white">{{ spikeTimeline?.summary?.stability_score || 85 }}/100</strong>
-              </span>
-            </div>
-            <h2 class="text-base font-black text-slate-900 dark:text-white flex items-center gap-2 mt-1">
-              <Activity class="w-5 h-5 text-indigo-500" />
-              <span>Grafik Fluktuasi Percakapan & Deteksi Lonjakan Isu (7 Hari)</span>
-            </h2>
-          </div>
-
-          <!-- Chart Legend -->
-          <div class="flex items-center gap-3 text-xs font-bold">
-            <span class="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-              <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
-              <span>Positif</span>
+      <!-- TREN 7 HARI: kolom bertumpuk (negatif di dasar), lonjakan diberi label teks -->
+      <div class="rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-4 md:p-5 shadow-sm space-y-4">
+        <button type="button" @click.stop="chartOpen = !chartOpen" class="w-full flex items-center justify-between gap-3 text-left cursor-pointer" :aria-expanded="chartOpen">
+          <span class="flex items-center gap-2 flex-wrap">
+            <Activity class="w-4 h-4 text-indigo-500" />
+            <span class="text-sm font-black text-slate-900 dark:text-white">Tren Percakapan 7 Hari</span>
+            <span
+              class="px-2 py-0.5 rounded-full text-[10px] font-bold"
+              :class="spikeTimeline?.summary?.spike_detected ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30' : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'"
+            >
+              {{ spikeTimeline?.summary?.spike_detected ? '🚨 Lonjakan terdeteksi' : '🟢 Stabil' }}
             </span>
-            <span class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-              <span class="w-3 h-3 rounded-full bg-slate-400 inline-block"></span>
-              <span>Netral</span>
-            </span>
-            <span class="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
-              <span class="w-3 h-3 rounded-full bg-rose-500 inline-block"></span>
-              <span>Negatif (Spike)</span>
-            </span>
-          </div>
-        </div>
+            <span v-if="stabilityScore !== null" class="text-[11px] text-slate-500 dark:text-slate-400 font-mono">Indeks stabilitas {{ stabilityScore }}/100</span>
+          </span>
+          <ChevronDown class="w-4 h-4 text-slate-400 transition-transform" :class="chartOpen ? 'rotate-180' : ''" />
+        </button>
 
-        <!-- Pure Reactive SVG Multi-Line Chart -->
-        <div class="relative w-full overflow-x-auto no-scrollbar">
-          <svg viewBox="0 0 650 175" class="w-full h-44 select-none">
-            <defs>
-              <linearGradient id="totalAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#6366f1" stop-opacity="0.18" />
-                <stop offset="100%" stop-color="#6366f1" stop-opacity="0.0" />
-              </linearGradient>
-            </defs>
-
-            <!-- Horizontal Gridlines -->
-            <line x1="45" y1="35" x2="605" y2="35" stroke="currentColor" class="text-slate-200 dark:text-slate-800" stroke-dasharray="3,3" />
-            <line x1="45" y1="75" x2="605" y2="75" stroke="currentColor" class="text-slate-200 dark:text-slate-800" stroke-dasharray="3,3" />
-            <line x1="45" y1="115" x2="605" y2="115" stroke="currentColor" class="text-slate-200 dark:text-slate-800" stroke-dasharray="3,3" />
-            <line x1="45" y1="150" x2="605" y2="150" stroke="currentColor" class="text-slate-300 dark:text-slate-700" stroke-width="1.5" />
-
-            <!-- Soft Total Area Path -->
-            <path :d="totalAreaPath" fill="url(#totalAreaGrad)" />
-
-            <!-- Line 1: Positif (Emerald) -->
-            <polyline
-              :points="posPolyline"
-              fill="none"
-              stroke="#10b981"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-
-            <!-- Line 2: Netral (Slate) -->
-            <polyline
-              :points="netPolyline"
-              fill="none"
-              stroke="#94a3b8"
-              stroke-width="2"
-              stroke-dasharray="4,2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-
-            <!-- Line 3: Negatif (Rose Spike) -->
-            <polyline
-              :points="negPolyline"
-              fill="none"
-              stroke="#f43f5e"
-              stroke-width="3"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-
-            <!-- Data Circle Points & Interactive Hover Columns -->
-            <g v-for="(day, idx) in spikeTimelineDays" :key="idx">
-              <!-- Interactive Transparent Trigger Column -->
-              <rect
-                :x="getSvgX(idx) - 25"
-                y="10"
-                width="50"
-                height="150"
-                fill="transparent"
-                class="cursor-pointer"
-                @mouseenter="activeDayIndex = idx"
-              />
-
-              <!-- Highlight Vertical Line on Hover -->
-              <line
-                v-if="activeDayIndex === idx"
-                :x1="getSvgX(idx)"
-                y1="20"
-                :x2="getSvgX(idx)"
-                y2="150"
-                stroke="#6366f1"
-                stroke-width="1.5"
-                stroke-dasharray="2,2"
-              />
-
-              <!-- Positif Point -->
-              <circle
-                :cx="getSvgX(idx)"
-                :cy="getSvgY(day.positif)"
-                r="3.5"
-                fill="#10b981"
-                stroke="#ffffff"
-                stroke-width="1.5"
-              />
-
-              <!-- Negatif Point with Alert Pulsating Ring if Spike -->
-              <circle
-                v-if="day.is_spike"
-                :cx="getSvgX(idx)"
-                :cy="getSvgY(day.negatif)"
-                r="7"
-                fill="#f43f5e"
-                opacity="0.3"
-                class="animate-ping"
-              />
-              <circle
-                :cx="getSvgX(idx)"
-                :cy="getSvgY(day.negatif)"
-                r="4.5"
-                :fill="day.is_spike ? '#e11d48' : '#f43f5e'"
-                stroke="#ffffff"
-                stroke-width="1.5"
-              />
-
-              <!-- X-Axis Date Labels -->
-              <text
-                :x="getSvgX(idx)"
-                y="166"
-                text-anchor="middle"
-                class="text-[10px] font-mono font-bold"
-                :fill="activeDayIndex === idx ? '#6366f1' : (day.is_spike ? '#f43f5e' : '#64748b')"
-              >
-                {{ day.label }}
-              </text>
-            </g>
-          </svg>
-        </div>
-
-        <!-- Active Data Point Inspector & Early Warning Summary -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs">
-          <div>
-            <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Waktu Analisis:</span>
-            <span class="font-black text-slate-900 dark:text-white text-sm">{{ activeDayData?.label || '7 Hari Terakhir' }}</span>
-            <span v-if="activeDayData?.is_spike" class="ml-2 px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-500 text-white">Spike!</span>
+        <div v-show="chartOpen" class="space-y-4">
+          <div class="flex items-center gap-4 text-xs font-bold">
+            <span class="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400"><span class="w-3 h-3 rounded-sm bg-emerald-500 inline-block"></span>Positif</span>
+            <span class="flex items-center gap-1.5 text-slate-500 dark:text-slate-400"><span class="w-3 h-3 rounded-sm bg-slate-400 dark:bg-slate-600 inline-block"></span>Netral</span>
+            <span class="flex items-center gap-1.5 text-rose-600 dark:text-rose-400"><span class="w-3 h-3 rounded-sm bg-rose-500 inline-block"></span>Negatif</span>
           </div>
 
-          <div class="flex items-center gap-3">
-            <div>
-              <span class="text-[10px] text-slate-500 font-bold block">🟢 Positif:</span>
-              <span class="font-black text-emerald-600 dark:text-emerald-400 text-sm">{{ activeDayData?.positif || 0 }}</span>
-            </div>
-            <div>
-              <span class="text-[10px] text-slate-500 font-bold block">⚪ Netral:</span>
-              <span class="font-black text-slate-700 dark:text-slate-300 text-sm">{{ activeDayData?.netral || 0 }}</span>
-            </div>
-            <div>
-              <span class="text-[10px] text-slate-500 font-bold block">🔴 Negatif:</span>
-              <span class="font-black text-rose-600 dark:text-rose-400 text-sm">{{ activeDayData?.negatif || 0 }}</span>
-            </div>
+          <div class="relative w-full overflow-x-auto no-scrollbar">
+            <svg viewBox="0 0 650 185" class="w-full h-48 select-none" role="img" aria-label="Kolom bertumpuk percakapan positif, netral, dan negatif selama 7 hari">
+              <line x1="45" y1="150" x2="605" y2="150" stroke="currentColor" class="text-slate-300 dark:text-slate-700" />
+              <g v-for="g in barGeom" :key="g.i" class="cursor-pointer" @mouseenter="activeDayIndex = g.i" @click="activeDayIndex = g.i">
+                <rect :x="g.x - 8" y="8" :width="g.bw + 16" height="170" fill="transparent" />
+                <rect :x="g.x" :y="g.yn" :width="g.bw" :height="g.hn" class="fill-rose-500" rx="2" />
+                <rect :x="g.x" :y="g.yu" :width="g.bw" :height="g.hu" class="fill-slate-400 dark:fill-slate-600" />
+                <rect :x="g.x" :y="g.yp" :width="g.bw" :height="g.hp" class="fill-emerald-500" rx="2" />
+                <rect v-if="activeDayIndex === g.i" :x="g.x - 3" :y="g.yp - 3" :width="g.bw + 6" :height="g.base - g.yp + 3" fill="none" stroke="#6366f1" stroke-width="2" rx="4" />
+                <text :x="g.cx" :y="g.yp - 6" text-anchor="middle" font-size="11" font-weight="700" class="fill-slate-600 dark:fill-slate-300">{{ g.d.total }}</text>
+                <text v-if="g.d.is_spike" :x="g.cx" :y="g.yp - 19" text-anchor="middle" font-size="10" font-weight="800" class="fill-rose-600 dark:fill-rose-400">▲ Lonjakan</text>
+                <text :x="g.cx" y="168" text-anchor="middle" font-size="10" class="fill-slate-500 dark:fill-slate-400">{{ g.d.label }}</text>
+              </g>
+            </svg>
           </div>
 
-          <div class="md:col-span-2 flex items-center justify-between border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 pt-2 md:pt-0 md:pl-4">
+          <!-- Inspektur hari terpilih -->
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs">
             <div>
-              <span class="text-[10px] text-slate-500 font-bold block">💡 Kesimpulan Intelijen:</span>
+              <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Hari terpilih</span>
+              <span class="font-black text-slate-900 dark:text-white text-sm">{{ activeDayData?.label || '7 Hari Terakhir' }}</span>
+              <span v-if="activeDayData?.is_spike" class="ml-2 px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500 text-white">Lonjakan</span>
+            </div>
+            <div class="flex items-center gap-4">
+              <div><span class="text-[10px] text-slate-500 font-bold block">Positif</span><span class="font-black text-emerald-600 dark:text-emerald-400 text-sm">{{ activeDayData?.positif || 0 }}</span></div>
+              <div><span class="text-[10px] text-slate-500 font-bold block">Netral</span><span class="font-black text-slate-700 dark:text-slate-300 text-sm">{{ activeDayData?.netral || 0 }}</span></div>
+              <div><span class="text-[10px] text-slate-500 font-bold block">Negatif</span><span class="font-black text-rose-600 dark:text-rose-400 text-sm">{{ activeDayData?.negatif || 0 }}</span></div>
+            </div>
+            <div class="md:col-span-2 border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 pt-2 md:pt-0 md:pl-4">
+              <span class="text-[10px] text-slate-500 font-bold block">Kesimpulan</span>
               <p class="text-[11px] text-slate-700 dark:text-slate-300 font-medium leading-relaxed">
                 {{ activeDayData?.is_spike ? activeDayData.spike_note : (spikeTimeline?.summary?.verdict || 'Situasi percakapan publik terpantau kondusif.') }}
               </p>
@@ -1492,9 +1414,8 @@ const getBuzzerRiskClass = (level) => {
           </div>
         </div>
 
-        <!-- Right Filters (Search, Sentiment, KOL, Sort) -->
+        <!-- Kanan: cari, Filter lanjutan (panel), urutan -->
         <div class="flex flex-wrap items-center gap-2">
-          <!-- Search -->
           <div class="relative min-w-[200px] flex-1 sm:flex-initial">
             <Search class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
             <input
@@ -1506,56 +1427,81 @@ const getBuzzerRiskClass = (level) => {
             />
           </div>
 
-          <!-- Satwil / Polda Filter (National Divhumas & Regional Polda Views) -->
-          <select
-            v-if="isNational || (satwils && satwils.length > 0)"
-            v-model="selectedSatwil"
-            @change="handleFilter"
-            class="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-amber-400"
-          >
-            <option value="all">{{ isNational ? '🌐 Seluruh Wilayah Hukum' : '🏛️ Seluruh Satwil (Polres)' }}</option>
-            <template v-if="isNational">
-              <option v-for="p in (allPoldas || []).filter(item => item.code !== 'DIVHUMAS')" :key="p.id" :value="p.id">
-                {{ p.name }}
-              </option>
-            </template>
-            <template v-else>
-              <option v-for="s in (satwils || [])" :key="s.id" :value="s.id">
-                {{ s.name }}
-              </option>
-            </template>
-          </select>
+          <div class="relative">
+            <button
+              type="button"
+              @click.stop="showFilterPanel = !showFilterPanel"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer select-none"
+              :class="activeFilterCount > 0
+                ? 'bg-amber-400/15 text-amber-700 dark:text-amber-300 border-amber-400/60'
+                : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-slate-500'"
+              title="Filter sentimen, KOL, dan wilayah"
+            >
+              <SlidersHorizontal class="w-3.5 h-3.5" />
+              <span>Filter</span>
+              <span v-if="activeFilterCount > 0" class="px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-amber-400 text-slate-950 font-black">{{ activeFilterCount }}</span>
+            </button>
 
-          <!-- Sentiment Filter -->
-          <select
-            v-model="selectedSentiment"
-            @change="handleFilter"
-            class="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-amber-400"
-          >
-            <option value="all">Semua Sentimen</option>
-            <option value="positif">Positif</option>
-            <option value="netral">Netral</option>
-            <option value="negatif">Negatif</option>
-          </select>
+            <div
+              v-if="showFilterPanel"
+              @click.stop
+              class="absolute right-0 top-full mt-2 z-30 w-[min(92vw,22rem)] rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-700 shadow-2xl p-4 space-y-3"
+            >
+              <label class="block space-y-1">
+                <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">Sentimen</span>
+                <select
+                  v-model="selectedSentiment"
+                  @change="handleFilter"
+                  class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-amber-400"
+                >
+                  <option value="all">Semua Sentimen</option>
+                  <option value="positif">Positif</option>
+                  <option value="netral">Netral</option>
+                  <option value="negatif">Negatif</option>
+                </select>
+              </label>
 
-          <!-- KOL Only Toggle -->
-          <button
-            @click="kolOnly = !kolOnly; handleFilter()"
-            type="button"
-            class="px-3 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer select-none flex items-center gap-1.5"
-            :class="kolOnly
-              ? 'bg-amber-400 text-slate-950 font-black border-amber-400 shadow-sm'
-              : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'"
-          >
-            <UserCheck class="w-3.5 h-3.5" />
-            <span>KOL Saja</span>
-          </button>
+              <label v-if="isNational || (satwils && satwils.length > 0)" class="block space-y-1">
+                <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">{{ isNational ? 'Wilayah hukum' : 'Satuan wilayah' }}</span>
+                <select
+                  v-model="selectedSatwil"
+                  @change="handleFilter"
+                  class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-amber-400"
+                >
+                  <option value="all">{{ isNational ? 'Seluruh Wilayah Hukum' : 'Seluruh Satwil (Polres)' }}</option>
+                  <template v-if="isNational">
+                    <option v-for="p in (allPoldas || []).filter(item => item.code !== 'DIVHUMAS')" :key="p.id" :value="p.id">{{ p.name }}</option>
+                  </template>
+                  <template v-else>
+                    <option v-for="sw in (satwils || [])" :key="sw.id" :value="sw.id">{{ sw.name }}</option>
+                  </template>
+                </select>
+              </label>
 
-          <!-- Sort -->
+              <button
+                @click="kolOnly = !kolOnly; handleFilter()"
+                type="button"
+                class="w-full px-3 py-2 rounded-xl text-xs font-bold transition border cursor-pointer select-none flex items-center justify-between gap-2"
+                :class="kolOnly
+                  ? 'bg-amber-400 text-slate-950 font-black border-amber-400 shadow-sm'
+                  : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'"
+              >
+                <span class="flex items-center gap-1.5"><UserCheck class="w-3.5 h-3.5" /> Hanya tokoh kritis / KOL</span>
+                <span>{{ kolOnly ? 'Aktif' : 'Nonaktif' }}</span>
+              </button>
+
+              <div class="flex items-center justify-between pt-1">
+                <button type="button" @click="clearAdvancedFilters" class="text-[11px] font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white cursor-pointer">Atur ulang</button>
+                <button type="button" @click="showFilterPanel = false" class="px-3 py-1.5 rounded-lg bg-amber-400 text-slate-950 text-xs font-black cursor-pointer">Selesai</button>
+              </div>
+            </div>
+          </div>
+
           <select
             v-model="selectedSort"
             @change="handleFilter"
             class="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-amber-400"
+            title="Urutkan"
           >
             <option value="latest">Terkini</option>
             <option value="viral">Paling Viral</option>
@@ -1563,6 +1509,20 @@ const getBuzzerRiskClass = (level) => {
             <option value="views">Paling Banyak Dilihat</option>
           </select>
         </div>
+      </div>
+
+      <!-- Chip filter aktif -->
+      <div v-if="activeFilterCount > 0" class="flex flex-wrap items-center gap-2 -mt-2">
+        <span class="text-[11px] font-bold text-slate-500">Filter aktif:</span>
+        <button v-if="selectedSentiment !== 'all'" type="button" @click="selectedSentiment = 'all'; handleFilter()" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-amber-400 cursor-pointer">
+          Sentimen: {{ selectedSentiment }} <X class="w-3 h-3" />
+        </button>
+        <button v-if="kolOnly" type="button" @click="kolOnly = false; handleFilter()" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-amber-400 cursor-pointer">
+          Hanya KOL <X class="w-3 h-3" />
+        </button>
+        <button v-if="selectedSatwil !== 'all'" type="button" @click="selectedSatwil = 'all'; handleFilter()" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-amber-400 cursor-pointer">
+          Wilayah dipilih <X class="w-3 h-3" />
+        </button>
       </div>
 
       <!-- Feed Grid Cards -->

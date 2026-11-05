@@ -28,7 +28,9 @@
 ```http
 Content-Type: application/json
 Accept: application/json
+Authorization: Bearer <INGEST_API_TOKEN>
 ```
+Token dibaca dari `INGEST_API_TOKEN` (`config/simod.php` → `ingest_token`). Alternatif header: `X-Ingest-Token`. Token kosong di server → HTTP **503** (fail-closed); token salah/absen → HTTP **401**. Endpoint `GET /api/v1/health` tetap publik.
 
 #### Payload JSON:
 ```json
@@ -60,20 +62,35 @@ Accept: application/json
 }
 ```
 
+### Endpoint Lainnya
+
+| Method | Endpoint | Fungsi |
+|:---|:---|:---|
+| `POST` | `/api/v1/ingest/bulk` | Ingest banyak artikel sekaligus |
+| `GET` | `/api/v1/health` | Status layanan (`status`, `system`, `version`, `timestamp`) |
+| `GET` | `/api/v1/poldas` | Daftar Polda aktif beserta Polres |
+
+### Perilaku Penting `ingest/article`
+- Kunci tenant adalah **`polda_code`**; kode yang tidak dikenal akan jatuh ke Polda pertama di basis data.
+- Duplikat dideteksi berdasarkan `url`. Artikel yang sudah ada tidak dibuat ulang: `virality_score` dan `sentiment` diperbarui dan respons berisi `"status": "updated"`.
+- `sentiment` hanya menerima `positif`, `netral`, atau `negatif`.
+- `ingest/article`, `ingest/bulk`, dan `GET /api/v1/poldas` dilindungi middleware `ingest.token` (`EnsureIngestToken`). Worker membaca token dari variabel lingkungan `SIMOD_INGEST_TOKEN` (endpoint dapat diganti via `SIMOD_API_ENDPOINT`).
+
 ---
 
 ## 3. Menjalankan Python Worker
 
 1. Masuk ke folder scraper:
    ```powershell
-   cd d:\Foto\laragon\www\simod-enterprise\scraper
+   cd d:\laragon\www\simod-enterprise\scraper
    ```
 2. Instal pustaka dependensi:
    ```powershell
    pip install -r requirements.txt
    ```
-3. Eksekusi worker:
+3. Eksekusi worker (token wajib sama dengan `INGEST_API_TOKEN` di `.env` Laravel):
    ```powershell
+   $env:SIMOD_INGEST_TOKEN = "<token>"
    python media_crawler.py
    ```
 

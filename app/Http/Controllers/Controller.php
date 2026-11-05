@@ -26,8 +26,9 @@ abstract class Controller
             return [$selectedCode, $polda, $polda?->id];
         }
 
-        // 2. Mabes / Super Admin: Baca dari parameter (jika ada, untuk backward compatibility/testing) atau session
-        $queryCode = $request->query('polda');
+        // 2. Mabes / Super Admin: baca dari session. Parameter ?polda= HANYA dihormati di lingkungan
+        //    local/testing (kompatibilitas test/CLI); di produksi diabaikan sepenuhnya.
+        $queryCode = app()->environment(['local', 'testing']) ? $request->query('polda') : null;
         if (!empty($queryCode)) {
             $selectedCode = strtoupper(trim($queryCode));
             $request->session()->put('active_polda_code', $selectedCode);
@@ -57,6 +58,40 @@ abstract class Controller
         }
 
         return [$selectedCode, $selectedPolda, $selectedPolda?->id];
+    }
+
+    /**
+     * Override tenant dari input klien (polda_id / polda_code) -- HANYA untuk Super Admin/Kadivhumas.
+     * Personel kewilayahan selalu memakai tenant aktifnya sendiri (mencegah IDOR lintas-Polda).
+     */
+    protected function requestedPoldaOverride(Request $request, ?Polda $current): ?Polda
+    {
+        $user = $request->user();
+        if (! $user || ! $user->isSuperAdmin()) {
+            return $current;
+        }
+
+        if ($request->filled('polda_id')) {
+            return Polda::find($request->input('polda_id')) ?? $current;
+        }
+        if ($request->filled('polda_code')) {
+            return Polda::where('code', strtoupper((string) $request->input('polda_code')))->first() ?? $current;
+        }
+
+        return $current;
+    }
+
+    /**
+     * ID Polda target untuk operasi tulis: personel kewilayahan dikunci ke Polda-nya, Super Admin boleh memilih.
+     */
+    protected function scopedPoldaId(Request $request, mixed $requested = null): mixed
+    {
+        $user = $request->user();
+        if ($user && ! $user->isSuperAdmin() && $user->polda_id) {
+            return $user->polda_id;
+        }
+
+        return $requested ?? $request->session()->get('active_polda_id');
     }
 
     /**

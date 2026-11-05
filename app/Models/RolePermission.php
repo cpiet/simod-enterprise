@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BumpsShellCache;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class RolePermission extends Model
 {
-    use HasFactory;
+    use HasFactory, BumpsShellCache;
 
     protected $fillable = [
         'polda_id',
@@ -158,13 +159,7 @@ class RolePermission extends Model
                 'pillar'      => '4. Administrasi & Sistem',
                 'key'         => 'maintenance_ops',
                 'name'        => 'Pemeliharaan, News Cleanup & RSS Sync',
-                'description' => 'Menjalankan pruning berita lama, sinkronisasi RSS paksa, dan mengaktifkan mode maintenance.',
-            ],
-            [
-                'pillar'      => '4. Administrasi & Sistem',
-                'key'         => 'mail_settings',
-                'name'        => 'Konfigurasi Mail Server (SMTP)',
-                'description' => 'Mengatur kredensial SMTP, port, enkripsi, dan uji kirim email laporan notifikasi dinas.',
+                'description' => 'Menjalankan pruning berita lama, sinkronisasi RSS paksa, dan mengelola jadwal sinkronisasi RSS.',
             ],
             [
                 'pillar'      => '4. Administrasi & Sistem',
@@ -204,7 +199,7 @@ class RolePermission extends Model
                     'dashboard_view', 'media_intelligence_view', 'media_intelligence_ai', 'media_intelligence_manage',
                     'social_intelligence_view', 'social_intelligence_sync', 'issues_view', 'issues_create',
                     'issues_verify', 'tasks_disposition', 'tasks_execute', 'publications_manage', 'gallery_access',
-                    'reports_export', 'personalia_manage', 'polda_settings', 'news_cleanup', 'rss_sync_manage',
+                    'reports_export', 'personalia_manage', 'polda_settings',
                 ],
             ],
             [

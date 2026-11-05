@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BumpsShellCache;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Polres extends Model
 {
+    use BumpsShellCache;
+
     protected $table = 'polres';
 
     protected $fillable = [

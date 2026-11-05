@@ -16,132 +16,139 @@ use Illuminate\Support\Facades\Route;
 // Authentication Routes (Protected by 'guest' middleware for login & session invalidation for logout)
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-    Route::post('/login', [AuthController::class, 'login'])->name('login.post');
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1')->name('login.post');
 });
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::get('/logout', [AuthController::class, 'logout'])->name('logout.get');
+
+// Seluruh rute di bawah ini wajib login (middleware 'auth' -> redirect ke /login).
+Route::middleware(['auth', 'idle'])->group(function () {
 
 // Multi-Tenant Context Switcher (CSRF Protected & RBAC Enforced)
 Route::post('/tenant/switch', [TenantController::class, 'switchTenant'])->name('tenant.switch');
 
 // Dashboard & Media Intelligence
-Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
-Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
-Route::get('/command-center', [DashboardController::class, 'index'])->name('command-center');
-Route::get('/media-intelligence', [MediaIntelligenceController::class, 'index'])->name('media-intelligence');
-Route::get('/monitoring-media-online', [MediaIntelligenceController::class, 'index'])->name('monitoring-media-online');
-Route::post('/media-intelligence/articles/{id}/bookmark', [MediaIntelligenceController::class, 'toggleBookmark'])->name('media-intelligence.bookmark');
-Route::post('/media-intelligence/articles/bookmarks/import', [MediaIntelligenceController::class, 'importBookmarks'])->name('media-intelligence.bookmark.import');
-Route::post('/media-intelligence/analyze-gemini', [MediaIntelligenceController::class, 'analyzeGemini'])->name('media-intelligence.analyze.gemini');
-Route::post('/media-intelligence/chat', [MediaIntelligenceController::class, 'chat'])->name('media-intelligence.chat');
-Route::post('/media-intelligence/gemini-settings', [MediaIntelligenceController::class, 'updateGeminiSettings'])->name('media-intelligence.gemini.settings');
-Route::post('/media-intelligence/gemini-test', [MediaIntelligenceController::class, 'testGeminiConnection'])->name('media-intelligence.gemini.test');
+Route::get('/', [DashboardController::class, 'index'])->middleware('module:dashboard_view')->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])->middleware('module:dashboard_view')->name('dashboard.index');
+Route::get('/command-center', [DashboardController::class, 'index'])->middleware('module:dashboard_view')->name('command-center');
+Route::get('/media-intelligence', [MediaIntelligenceController::class, 'index'])->middleware('module:media_intelligence_view')->name('media-intelligence');
+Route::get('/monitoring-media-online', [MediaIntelligenceController::class, 'index'])->middleware('module:media_intelligence_view')->name('monitoring-media-online');
+Route::post('/media-intelligence/articles/{id}/bookmark', [MediaIntelligenceController::class, 'toggleBookmark'])->middleware('module:media_intelligence_view')->name('media-intelligence.bookmark');
+Route::post('/media-intelligence/articles/bookmarks/import', [MediaIntelligenceController::class, 'importBookmarks'])->middleware('module:media_intelligence_view')->name('media-intelligence.bookmark.import');
+Route::post('/media-intelligence/analyze-gemini', [MediaIntelligenceController::class, 'analyzeGemini'])->middleware('module:media_intelligence_ai')->name('media-intelligence.analyze.gemini');
+Route::post('/media-intelligence/chat', [MediaIntelligenceController::class, 'chat'])->middleware('module:media_intelligence_view')->name('media-intelligence.chat');
+Route::post('/media-intelligence/gemini-settings', [MediaIntelligenceController::class, 'updateGeminiSettings'])->middleware('module:media_intelligence_ai')->name('media-intelligence.gemini.settings');
+Route::post('/media-intelligence/gemini-test', [MediaIntelligenceController::class, 'testGeminiConnection'])->middleware('module:media_intelligence_ai')->name('media-intelligence.gemini.test');
 
 // Smart Dossier & Topik Atensi Pimpinan
-Route::post('/media-intelligence/topics', [MediaIntelligenceController::class, 'storeTopic'])->name('media-intelligence.topics.store');
-Route::post('/media-intelligence/topics/{id}/update', [MediaIntelligenceController::class, 'updateTopic'])->name('media-intelligence.topics.update');
-Route::delete('/media-intelligence/topics/{id}', [MediaIntelligenceController::class, 'deleteTopic'])->name('media-intelligence.topics.delete');
-Route::post('/media-intelligence/articles/{id}/toggle-topic', [MediaIntelligenceController::class, 'toggleArticleTopic'])->name('media-intelligence.articles.toggle-topic');
-Route::post('/media-intelligence/topics/{id}/analyze-ai', [MediaIntelligenceController::class, 'analyzeTopicAi'])->name('media-intelligence.topics.analyze-ai');
-Route::post('/media-intelligence/topics/{id}/crawl-live', [MediaIntelligenceController::class, 'crawlTopicLive'])->name('media-intelligence.topics.crawl-live');
-Route::post('/media-intelligence/topics/adopt-suggestion', [MediaIntelligenceController::class, 'adoptSuggestedTopic'])->name('media-intelligence.topics.adopt-suggestion');
-Route::post('/media-intelligence/topics/dismiss-suggestion', [MediaIntelligenceController::class, 'dismissSuggestedTopic'])->name('media-intelligence.topics.dismiss-suggestion');
+Route::post('/media-intelligence/topics', [MediaIntelligenceController::class, 'storeTopic'])->middleware('module:media_intelligence_view')->name('media-intelligence.topics.store');
+Route::post('/media-intelligence/topics/{id}/update', [MediaIntelligenceController::class, 'updateTopic'])->middleware('module:media_intelligence_view')->name('media-intelligence.topics.update');
+Route::delete('/media-intelligence/topics/{id}', [MediaIntelligenceController::class, 'deleteTopic'])->middleware('module:media_intelligence_view')->name('media-intelligence.topics.delete');
+Route::post('/media-intelligence/articles/{id}/toggle-topic', [MediaIntelligenceController::class, 'toggleArticleTopic'])->middleware('module:media_intelligence_view')->name('media-intelligence.articles.toggle-topic');
+Route::post('/media-intelligence/topics/{id}/analyze-ai', [MediaIntelligenceController::class, 'analyzeTopicAi'])->middleware('module:media_intelligence_ai')->name('media-intelligence.topics.analyze-ai');
+Route::post('/media-intelligence/topics/{id}/crawl-live', [MediaIntelligenceController::class, 'crawlTopicLive'])->middleware('module:media_intelligence_ai')->name('media-intelligence.topics.crawl-live');
+Route::post('/media-intelligence/topics/adopt-suggestion', [MediaIntelligenceController::class, 'adoptSuggestedTopic'])->middleware('module:media_intelligence_ai')->name('media-intelligence.topics.adopt-suggestion');
+Route::post('/media-intelligence/topics/dismiss-suggestion', [MediaIntelligenceController::class, 'dismissSuggestedTopic'])->middleware('module:media_intelligence_view')->name('media-intelligence.topics.dismiss-suggestion');
 
 // Social Media Intelligence Radar
-Route::get('/social-intelligence', [SocialIntelligenceController::class, 'index'])->name('social-intelligence.index');
-Route::post('/social-intelligence/{id}/bookmark', [SocialIntelligenceController::class, 'toggleBookmark'])->name('social-intelligence.bookmark');
-Route::post('/social-intelligence/sync', [SocialIntelligenceController::class, 'sync'])->name('social-intelligence.sync');
-Route::post('/social-intelligence/sync-trends', [SocialIntelligenceController::class, 'syncTrends'])->name('social-intelligence.sync-trends');
-Route::post('/social-intelligence/track-keyword', [SocialIntelligenceController::class, 'trackKeyword'])->name('social-intelligence.track-keyword');
-Route::post('/social-intelligence/analyze-ai', [SocialIntelligenceController::class, 'analyzeAI'])->name('social-intelligence.analyze-ai');
-Route::get('/social-intelligence/reports/{id}', [SocialIntelligenceController::class, 'getReport'])->name('social-intelligence.reports.show');
-Route::post('/social-intelligence/cases/{id}/close', [SocialIntelligenceController::class, 'closeCase'])->name('social-intelligence.cases.close');
-Route::post('/social-intelligence/cases/{id}/refresh', [SocialIntelligenceController::class, 'refreshCase'])->name('social-intelligence.cases.refresh');
-Route::post('/social-intelligence/settings', [SocialIntelligenceController::class, 'updateSettings'])->name('social-intelligence.settings');
-Route::post('/social-intelligence/test-connection', [SocialIntelligenceController::class, 'testConnection'])->name('social-intelligence.test-connection');
+Route::get('/social-intelligence', [SocialIntelligenceController::class, 'index'])->middleware('module:social_intelligence_view')->name('social-intelligence.index');
+Route::post('/social-intelligence/{id}/bookmark', [SocialIntelligenceController::class, 'toggleBookmark'])->middleware('module:social_intelligence_view')->name('social-intelligence.bookmark');
+Route::post('/social-intelligence/sync', [SocialIntelligenceController::class, 'sync'])->middleware('module:social_intelligence_sync')->name('social-intelligence.sync');
+Route::post('/social-intelligence/sync-trends', [SocialIntelligenceController::class, 'syncTrends'])->middleware('module:social_intelligence_sync')->name('social-intelligence.sync-trends');
+Route::post('/social-intelligence/track-keyword', [SocialIntelligenceController::class, 'trackKeyword'])->middleware('module:social_intelligence_sync')->name('social-intelligence.track-keyword');
+Route::post('/social-intelligence/analyze-ai', [SocialIntelligenceController::class, 'analyzeAI'])->middleware('module:social_intelligence_view')->name('social-intelligence.analyze-ai');
+Route::get('/social-intelligence/reports/{id}', [SocialIntelligenceController::class, 'getReport'])->middleware('module:social_intelligence_view')->name('social-intelligence.reports.show');
+Route::post('/social-intelligence/cases/{id}/close', [SocialIntelligenceController::class, 'closeCase'])->middleware('module:social_intelligence_view')->name('social-intelligence.cases.close');
+Route::post('/social-intelligence/cases/{id}/refresh', [SocialIntelligenceController::class, 'refreshCase'])->middleware('module:social_intelligence_sync')->name('social-intelligence.cases.refresh');
+Route::post('/social-intelligence/settings', [SocialIntelligenceController::class, 'updateSettings'])->middleware('module:social_intelligence_sync')->name('social-intelligence.settings');
+Route::post('/social-intelligence/test-connection', [SocialIntelligenceController::class, 'testConnection'])->middleware('module:social_intelligence_sync')->name('social-intelligence.test-connection');
 
 // Issues Management
-Route::get('/issues', [IssueController::class, 'index'])->name('issues.index');
-Route::get('/issues/create', [IssueController::class, 'create'])->name('issues.create');
-Route::get('/issues-export-csv', [IssueController::class, 'exportCsv'])->name('issues.export');
-Route::get('/issues/{id}', [IssueController::class, 'show'])->name('issues.show');
-Route::post('/issues', [IssueController::class, 'store'])->name('issues.store');
-Route::post('/issues/{id}/clarify', [IssueController::class, 'updateClarification'])->name('issues.clarify');
-Route::post('/issues/{id}/verify', [IssueController::class, 'verify'])->name('issues.verify');
-Route::post('/issues/{id}/return', [IssueController::class, 'returnIssue'])->name('issues.return');
-Route::post('/issues/{id}/resolve', [IssueController::class, 'resolve'])->name('issues.resolve');
-Route::post('/issues/{id}/close', [IssueController::class, 'close'])->name('issues.close');
-Route::post('/issues/{id}/task', [IssueController::class, 'createTask'])->name('issues.task');
-Route::post('/issues/{id}/release', [IssueController::class, 'createRelease'])->name('issues.release');
+Route::get('/issues', [IssueController::class, 'index'])->middleware('module:issues_view')->name('issues.index');
+Route::get('/issues/create', [IssueController::class, 'create'])->middleware('module:issues_create')->name('issues.create');
+Route::get('/issues-export-csv', [IssueController::class, 'exportCsv'])->middleware('module:issues_view')->name('issues.export');
+Route::get('/issues/{id}', [IssueController::class, 'show'])->middleware('module:issues_view')->name('issues.show');
+Route::post('/issues', [IssueController::class, 'store'])->middleware('module:issues_create')->name('issues.store');
+Route::post('/issues/{id}/clarify', [IssueController::class, 'updateClarification'])->middleware('module:issues_verify')->name('issues.clarify');
+Route::post('/issues/{id}/submit', [IssueController::class, 'submitDraft'])->middleware('module:issues_create')->name('issues.submit');
+Route::post('/issues/{id}/verify', [IssueController::class, 'verify'])->middleware('module:issues_verify')->name('issues.verify');
+Route::post('/issues/{id}/return', [IssueController::class, 'returnIssue'])->middleware('module:issues_verify')->name('issues.return');
+Route::post('/issues/{id}/resolve', [IssueController::class, 'resolve'])->middleware('module:issues_verify')->name('issues.resolve');
+Route::post('/issues/{id}/close', [IssueController::class, 'close'])->middleware('module:issues_verify')->name('issues.close');
+Route::post('/issues/{id}/task', [IssueController::class, 'createTask'])->middleware('module:tasks_disposition')->name('issues.task');
+Route::post('/issues/{id}/release', [IssueController::class, 'createRelease'])->middleware('module:issues_verify')->name('issues.release');
 
 // Press Releases
-Route::post('/press-releases', [PressReleaseController::class, 'store'])->name('press-releases.store');
+Route::post('/press-releases', [PressReleaseController::class, 'store'])->middleware('module:issues_verify')->name('press-releases.store');
 
 // Multi-Channel Publications
-Route::get('/publications', [PublicationController::class, 'index'])->name('publications.index');
-Route::post('/publications', [PublicationController::class, 'store'])->name('publications.store');
+Route::get('/publications', [PublicationController::class, 'index'])->middleware('module:publications_manage')->name('publications.index');
+Route::post('/publications', [PublicationController::class, 'store'])->middleware('module:publications_manage')->name('publications.store');
+Route::post('/publications/{id}/approve', [PublicationController::class, 'approve'])->middleware('module:publications_manage')->name('publications.approve');
+Route::post('/publications/{id}/reject', [PublicationController::class, 'reject'])->middleware('module:publications_manage')->name('publications.reject');
 
 // Operational Tasks & Disposisi
-Route::get('/tasks', [TaskController::class, 'index'])->name('tasks.index');
-Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store');
-Route::post('/tasks/{id}/update', [TaskController::class, 'addUpdate'])->name('tasks.update');
+Route::get('/tasks', [TaskController::class, 'index'])->middleware('module:tasks_execute|tasks_disposition')->name('tasks.index');
+Route::post('/tasks', [TaskController::class, 'store'])->middleware('module:tasks_disposition')->name('tasks.store');
+Route::post('/tasks/{id}/update', [TaskController::class, 'addUpdate'])->middleware('module:tasks_execute|tasks_disposition')->name('tasks.update');
 
 // Extended Modules from SIMOD-HUMAS Parity
-Route::get('/verification-queue', [SystemModuleController::class, 'verificationQueue'])->name('verification.queue');
-Route::get('/gallery', [SystemModuleController::class, 'gallery'])->name('gallery.index');
-Route::post('/gallery', [SystemModuleController::class, 'storeMedia'])->name('gallery.store');
-Route::get('/reports', [SystemModuleController::class, 'reports'])->name('reports.index');
-Route::get('/reports/export/csv', [SystemModuleController::class, 'exportReportsCsv'])->name('reports.export.csv');
-Route::get('/personalia', [SystemModuleController::class, 'personalia'])->name('personalia.index');
-Route::post('/personalia', [SystemModuleController::class, 'storeUser'])->name('personalia.store');
-Route::put('/personalia/{id}', [SystemModuleController::class, 'updateUser'])->name('personalia.update');
-Route::post('/personalia/{id}/toggle-status', [SystemModuleController::class, 'toggleUserStatus'])->name('personalia.toggle-status');
-Route::post('/personalia/{id}/reset-password', [SystemModuleController::class, 'resetUserPassword'])->name('personalia.reset-password');
-Route::delete('/personalia/{id}', [SystemModuleController::class, 'deleteUser'])->name('personalia.delete');
-Route::get('/audit-logs', [SystemModuleController::class, 'auditLogs'])->name('audit-logs.index');
+Route::get('/verification-queue', [SystemModuleController::class, 'verificationQueue'])->middleware('module:issues_view')->name('verification.queue');
+Route::get('/gallery', [SystemModuleController::class, 'gallery'])->middleware('module:gallery_access')->name('gallery.index');
+Route::post('/gallery', [SystemModuleController::class, 'storeMedia'])->middleware('module:gallery_access')->name('gallery.store');
+Route::get('/reports', [SystemModuleController::class, 'reports'])->middleware('module:reports_export')->name('reports.index');
+Route::get('/reports/export/csv', [SystemModuleController::class, 'exportReportsCsv'])->middleware('module:reports_export')->name('reports.export.csv');
+Route::get('/personalia', [SystemModuleController::class, 'personalia'])->middleware('module:personalia_manage')->name('personalia.index');
+Route::post('/personalia', [SystemModuleController::class, 'storeUser'])->middleware('module:personalia_manage')->name('personalia.store');
+Route::put('/personalia/{id}', [SystemModuleController::class, 'updateUser'])->middleware('module:personalia_manage')->name('personalia.update');
+Route::post('/personalia/{id}/toggle-status', [SystemModuleController::class, 'toggleUserStatus'])->middleware('module:personalia_manage')->name('personalia.toggle-status');
+Route::post('/personalia/{id}/reset-password', [SystemModuleController::class, 'resetUserPassword'])->middleware('module:personalia_manage')->name('personalia.reset-password');
+Route::delete('/personalia/{id}', [SystemModuleController::class, 'deleteUser'])->middleware('module:personalia_manage')->name('personalia.delete');
+Route::get('/audit-logs', [SystemModuleController::class, 'auditLogs'])->middleware('module:security_center')->name('audit-logs.index');
 Route::get('/profile', [SystemModuleController::class, 'profile'])->name('profile.index');
-Route::get('/settings/polda', [SystemModuleController::class, 'poldaSettings'])->name('settings.polda');
-Route::post('/settings/polda/update', [SystemModuleController::class, 'updatePolda'])->name('settings.polda.update');
-Route::post('/settings/polda/create', [SystemModuleController::class, 'storePolda'])->name('settings.polda.create');
-Route::post('/settings/polres/create', [SystemModuleController::class, 'storePolres'])->name('settings.polres.create');
-Route::get('/security', [SystemModuleController::class, 'securityCenter'])->name('security.center');
-Route::post('/security', [SystemModuleController::class, 'updateSecurity'])->name('security.update');
-Route::get('/roles', [SystemModuleController::class, 'rolesMatrix'])->name('roles.matrix');
-Route::post('/roles', [SystemModuleController::class, 'updateRolesMatrix'])->name('roles.update');
-Route::post('/roles/reset', [SystemModuleController::class, 'resetRolesMatrix'])->name('roles.reset');
-Route::get('/settings/mail', [SystemModuleController::class, 'mailSettings'])->name('settings.mail');
+Route::post('/profile/password', [SystemModuleController::class, 'updatePassword'])->middleware('throttle:6,1')->name('profile.password');
+Route::get('/settings/polda', [SystemModuleController::class, 'poldaSettings'])->middleware('module:polda_settings')->name('settings.polda');
+Route::post('/settings/polda/update', [SystemModuleController::class, 'updatePolda'])->middleware('module:polda_settings')->name('settings.polda.update');
+Route::post('/settings/polda/create', [SystemModuleController::class, 'storePolda'])->middleware('module:polda_settings')->name('settings.polda.create');
+Route::post('/settings/polres/create', [SystemModuleController::class, 'storePolres'])->middleware('module:polda_settings')->name('settings.polres.create');
+Route::get('/security', [SystemModuleController::class, 'securityCenter'])->middleware('module:security_center')->name('security.center');
+Route::post('/security', [SystemModuleController::class, 'updateSecurity'])->middleware('module:security_center')->name('security.update');
+Route::get('/roles', [SystemModuleController::class, 'rolesMatrix'])->middleware('module:roles_matrix_manage')->name('roles.matrix');
+Route::post('/roles', [SystemModuleController::class, 'updateRolesMatrix'])->middleware('module:roles_matrix_manage')->name('roles.update');
+Route::post('/roles/reset', [SystemModuleController::class, 'resetRolesMatrix'])->middleware('module:roles_matrix_manage')->name('roles.reset');
 // Database Backup & Restore Center
-Route::get('/database/backup', [\App\Http\Controllers\DatabaseBackupController::class, 'index'])->name('database.backup');
-Route::post('/database/backup/create', [\App\Http\Controllers\DatabaseBackupController::class, 'createBackup'])->name('database.backup.create');
-Route::get('/database/backup/download/{filename}', [\App\Http\Controllers\DatabaseBackupController::class, 'download'])->name('database.backup.download');
-Route::post('/database/backup/restore/{filename}', [\App\Http\Controllers\DatabaseBackupController::class, 'restore'])->name('database.backup.restore');
-Route::post('/database/backup/upload-restore', [\App\Http\Controllers\DatabaseBackupController::class, 'uploadAndRestore'])->name('database.backup.upload-restore');
-Route::delete('/database/backup/delete/{filename}', [\App\Http\Controllers\DatabaseBackupController::class, 'deleteBackup'])->name('database.backup.delete');
-Route::post('/database/backup/settings', [\App\Http\Controllers\DatabaseBackupController::class, 'updateSettings'])->name('database.backup.settings');
-Route::get('/maintenance', [SystemModuleController::class, 'systemMaintenance'])->name('system.maintenance');
-Route::get('/maintenance/news-cleanup', [\App\Http\Controllers\NewsCleanupController::class, 'index'])->name('news.cleanup');
-Route::post('/maintenance/news-cleanup', [\App\Http\Controllers\NewsCleanupController::class, 'purge'])->name('news.cleanup.purge');
-Route::get('/maintenance/rss-sync', [\App\Http\Controllers\RssSyncController::class, 'index'])->name('maintenance.rss-sync');
-Route::post('/maintenance/rss-sync', [\App\Http\Controllers\RssSyncController::class, 'update'])->name('maintenance.rss-sync.update');
-Route::post('/maintenance/rss-sync/trigger', [\App\Http\Controllers\RssSyncController::class, 'triggerSync'])->name('maintenance.rss-sync.trigger');
-Route::post('/maintenance/rss-sync/feeds', [\App\Http\Controllers\RssSyncController::class, 'storeFeed'])->name('maintenance.rss-sync.feeds.store');
-Route::post('/maintenance/rss-sync/feeds/{id}/toggle', [\App\Http\Controllers\RssSyncController::class, 'toggleFeed'])->name('maintenance.rss-sync.feeds.toggle');
-Route::delete('/maintenance/rss-sync/feeds/{id}', [\App\Http\Controllers\RssSyncController::class, 'deleteFeed'])->name('maintenance.rss-sync.feeds.delete');
-Route::post('/maintenance/rss-sync/feeds/test', [\App\Http\Controllers\RssSyncController::class, 'testFeed'])->name('maintenance.rss-sync.feeds.test');
+Route::get('/database/backup', [\App\Http\Controllers\DatabaseBackupController::class, 'index'])->middleware('module:database_backup')->name('database.backup');
+Route::post('/database/backup/create', [\App\Http\Controllers\DatabaseBackupController::class, 'createBackup'])->middleware('module:database_backup')->name('database.backup.create');
+Route::get('/database/backup/download/{filename}', [\App\Http\Controllers\DatabaseBackupController::class, 'download'])->middleware('module:database_backup')->name('database.backup.download');
+Route::post('/database/backup/restore/{filename}', [\App\Http\Controllers\DatabaseBackupController::class, 'restore'])->middleware('module:database_backup')->name('database.backup.restore');
+Route::post('/database/backup/upload-restore', [\App\Http\Controllers\DatabaseBackupController::class, 'uploadAndRestore'])->middleware('module:database_backup')->name('database.backup.upload-restore');
+Route::delete('/database/backup/delete/{filename}', [\App\Http\Controllers\DatabaseBackupController::class, 'deleteBackup'])->middleware('module:database_backup')->name('database.backup.delete');
+Route::post('/database/backup/settings', [\App\Http\Controllers\DatabaseBackupController::class, 'updateSettings'])->middleware('module:database_backup')->name('database.backup.settings');
+Route::get('/maintenance/news-cleanup', [\App\Http\Controllers\NewsCleanupController::class, 'index'])->middleware('module:maintenance_ops')->name('news.cleanup');
+Route::post('/maintenance/news-cleanup', [\App\Http\Controllers\NewsCleanupController::class, 'purge'])->middleware('module:maintenance_ops')->name('news.cleanup.purge');
+Route::get('/maintenance/rss-sync', [\App\Http\Controllers\RssSyncController::class, 'index'])->middleware('module:maintenance_ops')->name('maintenance.rss-sync');
+Route::post('/maintenance/rss-sync', [\App\Http\Controllers\RssSyncController::class, 'update'])->middleware('module:maintenance_ops')->name('maintenance.rss-sync.update');
+Route::post('/maintenance/rss-sync/trigger', [\App\Http\Controllers\RssSyncController::class, 'triggerSync'])->middleware('module:maintenance_ops')->name('maintenance.rss-sync.trigger');
+Route::post('/maintenance/rss-sync/feeds', [\App\Http\Controllers\RssSyncController::class, 'storeFeed'])->middleware('module:maintenance_ops')->name('maintenance.rss-sync.feeds.store');
+Route::post('/maintenance/rss-sync/feeds/{id}/toggle', [\App\Http\Controllers\RssSyncController::class, 'toggleFeed'])->middleware('module:maintenance_ops')->name('maintenance.rss-sync.feeds.toggle');
+Route::delete('/maintenance/rss-sync/feeds/{id}', [\App\Http\Controllers\RssSyncController::class, 'deleteFeed'])->middleware('module:maintenance_ops')->name('maintenance.rss-sync.feeds.delete');
+Route::post('/maintenance/rss-sync/feeds/test', [\App\Http\Controllers\RssSyncController::class, 'testFeed'])->middleware('module:maintenance_ops')->name('maintenance.rss-sync.feeds.test');
 
 // Mesin Intelijen AI & LLM Administration Center
-Route::get('/settings/ai', [\App\Http\Controllers\AiSettingController::class, 'index'])->name('settings.ai');
-Route::post('/settings/ai', [\App\Http\Controllers\AiSettingController::class, 'update'])->name('settings.ai.update');
-Route::post('/settings/ai/test', [\App\Http\Controllers\AiSettingController::class, 'testConnection'])->name('settings.ai.test');
-Route::post('/settings/ai/reset-prompt', [\App\Http\Controllers\AiSettingController::class, 'resetPrompt'])->name('settings.ai.reset-prompt');
-Route::post('/settings/ai/apify', [\App\Http\Controllers\AiSettingController::class, 'updateApify'])->name('settings.ai.apify.update');
-Route::post('/settings/ai/test-apify', [\App\Http\Controllers\AiSettingController::class, 'testApify'])->name('settings.ai.apify.test');
+Route::get('/settings/ai', [\App\Http\Controllers\AiSettingController::class, 'index'])->middleware('module:security_center')->name('settings.ai');
+Route::post('/settings/ai', [\App\Http\Controllers\AiSettingController::class, 'update'])->middleware('module:security_center')->name('settings.ai.update');
+Route::post('/settings/ai/test', [\App\Http\Controllers\AiSettingController::class, 'testConnection'])->middleware('module:security_center')->name('settings.ai.test');
+Route::post('/settings/ai/reset-prompt', [\App\Http\Controllers\AiSettingController::class, 'resetPrompt'])->middleware('module:security_center')->name('settings.ai.reset-prompt');
+Route::post('/settings/ai/apify', [\App\Http\Controllers\AiSettingController::class, 'updateApify'])->middleware('module:security_center')->name('settings.ai.apify.update');
+Route::post('/settings/ai/test-apify', [\App\Http\Controllers\AiSettingController::class, 'testApify'])->middleware('module:security_center')->name('settings.ai.apify.test');
 
 // Manajemen Menu & Navigasi Dinamis (Database-Driven Menu Architecture)
-Route::get('/settings/menus', [MenuManagementController::class, 'index'])->name('settings.menus');
-Route::post('/settings/menus', [MenuManagementController::class, 'store'])->name('settings.menus.store');
-Route::put('/settings/menus/{id}', [MenuManagementController::class, 'update'])->name('settings.menus.update');
-Route::post('/settings/menus/{id}/toggle', [MenuManagementController::class, 'toggle'])->name('settings.menus.toggle');
-Route::post('/settings/menus/{id}/move', [MenuManagementController::class, 'move'])->name('settings.menus.move');
-Route::delete('/settings/menus/{id}', [MenuManagementController::class, 'destroy'])->name('settings.menus.delete');
-Route::post('/settings/menus/reset', [MenuManagementController::class, 'resetDefaults'])->name('settings.menus.reset');
+Route::get('/settings/menus', [MenuManagementController::class, 'index'])->middleware('module:roles_matrix_manage')->name('settings.menus');
+Route::post('/settings/menus', [MenuManagementController::class, 'store'])->middleware('module:roles_matrix_manage')->name('settings.menus.store');
+Route::put('/settings/menus/{id}', [MenuManagementController::class, 'update'])->middleware('module:roles_matrix_manage')->name('settings.menus.update');
+Route::post('/settings/menus/{id}/toggle', [MenuManagementController::class, 'toggle'])->middleware('module:roles_matrix_manage')->name('settings.menus.toggle');
+Route::post('/settings/menus/{id}/move', [MenuManagementController::class, 'move'])->middleware('module:roles_matrix_manage')->name('settings.menus.move');
+Route::delete('/settings/menus/{id}', [MenuManagementController::class, 'destroy'])->middleware('module:roles_matrix_manage')->name('settings.menus.delete');
+Route::post('/settings/menus/reset', [MenuManagementController::class, 'resetDefaults'])->middleware('module:roles_matrix_manage')->name('settings.menus.reset');
+
+});

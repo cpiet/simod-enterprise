@@ -29,21 +29,20 @@ Sistem beralih sepenuhnya ke model **Stateful Session-Based Tenant Switching**:
   X-CSRF-TOKEN: <token>
 
   {
-    "polda_id": 10
+    "code": "SULBAR"
   }
   ```
 - **Controller Pengaman (`TenantController.php`)**:
-  - Memverifikasi status login dan hak akses pengguna (`auth()->check()`).
-  - Memvalidasi keberadaan Polda di database (`exists:poldas,id`).
-  - **Pengecekan RBAC Ketat**: Personel daerah/satwil dilarang beralih ke tenant Mabes (`polda_id = 10` / `DIVHUMAS`) kecuali memiliki role komando Mabes (`super_admin_mabes`, `kadiv_humas`, `superadmin`).
-  - Menyimpan ID tenant aktif ke dalam sesi terenkripsi server: `session(['active_polda_id' => $poldaId])`.
-  - Mengarahkan kembali pengguna ke URL bersih tanpa parameter query tambahan (`return back()`).
+  - Memvalidasi payload `code` (string wajib, maks 50 karakter). Kode `ALL`/`DIVHUMAS` dipetakan ke tenant Divhumas Mabes; kode lain dicari pada `poldas` yang aktif.
+  - **Pengecekan RBAC Ketat**: personel kewilayahan (bukan `super_admin_mabes`/`kadiv_humas`/`superadmin`, dengan `polda_id` terisi) hanya boleh memilih kode Polda miliknya. Permintaan lain ditolak **HTTP 403** (JSON) atau flash error (non-JSON). Dengan demikian personel daerah tidak dapat berpindah ke tenant Mabes.
+  - Menyimpan tenant aktif ke sesi server: `active_polda_code` dan `active_polda_id`.
+  - Mengarahkan kembali pengguna ke URL bersih tanpa parameter query tambahan (`return back()`), atau mengembalikan JSON `{ success, selected_code, polda_name }`.
 
 ### 1.3. Uji Keamanan Otomatis
 Diuji melalui test suite `tests/Feature/TenantSecurityTest.php`:
 - Memastikan perpindahan tenant via POST berhasil menyimpan sesi.
 - Memastikan pengguna non-admin dicegah mengakses tenant Mabes (HTTP 403 Forbidden).
-- Memastikan query parameter `?polda=...` diabaikan atau dibersihkan secara otomatis.
+- Memastikan personel kewilayahan tetap terkunci ke Polda-nya walaupun `?polda=...` dikirim. (Untuk Mabes/Super Admin parameter ini masih dibaca server sebagai fallback kompatibilitas; **jangan dipakai di UI**.)
 
 ---
 

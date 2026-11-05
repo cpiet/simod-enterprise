@@ -40,6 +40,8 @@ class NewsCleanupTest extends TestCase
 
     public function test_prune_command_and_cleanup_page(): void
     {
+        $this->actingAsSuperAdmin();
+
         $a = Polda::create(['code' => 'AAA', 'name' => 'Polda A', 'region' => 'A', 'timezone' => 'Asia/Makassar', 'is_active' => true]);
         $this->article($a, 'u1', 200);
         $this->article($a, 'u2', 200, true);
@@ -53,6 +55,8 @@ class NewsCleanupTest extends TestCase
 
     public function test_bookmark_toggle_persists(): void
     {
+        $this->actingAsSuperAdmin();
+
         $a = Polda::create(['code' => 'AAA', 'name' => 'Polda A', 'region' => 'A', 'timezone' => 'Asia/Makassar', 'is_active' => true]);
         $art = $this->article($a, 'u1', 1);
 

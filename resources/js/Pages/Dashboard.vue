@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed } from 'vue';
-import { Link } from '@inertiajs/vue3';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { Link, usePage } from '@inertiajs/vue3';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
 import {
   Shield,
@@ -35,6 +35,7 @@ import {
   Eye,
   Play,
   Share2,
+  SlidersHorizontal,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -60,6 +61,17 @@ const props = defineProps({
 });
 
 // Map Scope: 'national' (Peta Nusantara / 34 Polda) vs 'regional' (Peta Satwil / 6 Polres)
+// Izin pengguna menentukan aksi cepat yang tampil di hero
+const page = usePage();
+const canCreateIssue = computed(() => !!page.props.auth?.permissions?.issues_create);
+const canExportReports = computed(() => !!page.props.auth?.permissions?.reports_export);
+
+// Panel opsi peta (wilayah & layer) -- tertutup saat klik di luar
+const showMapOptions = ref(false);
+const closeMapOptions = () => { showMapOptions.value = false; };
+onMounted(() => document.addEventListener('click', closeMapOptions));
+onUnmounted(() => document.removeEventListener('click', closeMapOptions));
+
 const mapScope = ref(props.selectedCode === 'ALL' || props.isNational ? 'national' : 'regional');
 
 // View mode: 'map' (Peta Interaktif) or 'cards' (Matriks Kartu)
@@ -179,98 +191,71 @@ const layerLapangan = ref(true);
     <!-- ========================================================================= -->
     <!-- 1. HERO BANNER: COMMAND CENTER PRESISI                                    -->
     <!-- ========================================================================= -->
-    <div class="rounded-3xl bg-gradient-to-r from-[#0d182e] via-[#0b1426] to-[#070d1d] border border-slate-800 p-6 md:p-8 shadow-2xl relative overflow-hidden">
+    <div class="rounded-3xl bg-gradient-to-r from-[#0d182e] via-[#0b1426] to-[#070d1d] border border-slate-800 p-5 md:p-6 shadow-2xl relative overflow-hidden">
       <div class="absolute top-0 right-0 -mt-10 -mr-10 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
-        <div class="space-y-3">
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500/20 text-rose-400 border border-rose-500/40">
-              Klasifikasi: Rahasia Terbatas / Command Center
-            </span>
-
-            <!-- Dynamic Situation Status Badge -->
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-5 relative z-10">
+        <div class="space-y-3 min-w-0">
+          <!-- Status situasi (satu-satunya lencana di hero) -->
+          <span
+            class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border transition"
+            :class="{
+              'bg-rose-500/20 text-rose-300 border-rose-500/40': overallSituation?.color === 'rose',
+              'bg-amber-400/20 text-amber-300 border-amber-400/40': overallSituation?.color === 'amber',
+              'bg-emerald-500/20 text-emerald-300 border-emerald-500/40': overallSituation?.color === 'emerald',
+            }"
+          >
             <span
-              class="flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-bold border transition"
+              class="w-2 h-2 rounded-full"
               :class="{
-                'bg-rose-500/20 text-rose-300 border-rose-500/40': overallSituation?.color === 'rose',
-                'bg-amber-400/20 text-amber-300 border-amber-400/40': overallSituation?.color === 'amber',
-                'bg-emerald-500/20 text-emerald-300 border-emerald-500/40': overallSituation?.color === 'emerald',
+                'bg-rose-400 animate-ping': overallSituation?.color === 'rose',
+                'bg-amber-400 animate-ping': overallSituation?.color === 'amber',
+                'bg-emerald-400': overallSituation?.color === 'emerald',
               }"
-            >
-              <span
-                class="w-2 h-2 rounded-full"
-                :class="{
-                  'bg-rose-400 animate-ping': overallSituation?.color === 'rose',
-                  'bg-amber-400 animate-ping': overallSituation?.color === 'amber',
-                  'bg-emerald-400': overallSituation?.color === 'emerald',
-                }"
-              ></span>
-              {{ overallSituation?.text || 'SITUASI KONDUSIF & TERKENDALI' }}
-            </span>
+            ></span>
+            {{ overallSituation?.text || 'SITUASI KONDUSIF & TERKENDALI' }}
+          </span>
+
+          <div>
+            <h1 class="text-2xl md:text-3xl font-black text-white tracking-tight">Command Center</h1>
+            <p class="text-xs md:text-sm text-slate-400 mt-1">
+              {{ selectedCode === 'ALL' ? 'Divhumas Polri (Nasional)' : selectedPolda?.name }}
+            </p>
           </div>
 
-          <h1 class="text-2xl md:text-4xl font-black text-white tracking-tight">
-            Dashboard Media Intelligence & Kamtibmas
-          </h1>
-          <p class="text-xs md:text-sm text-slate-300 max-w-2xl leading-relaxed">
-            Monitoring terpadu pemberitaan 29 portal media online, radar 4 platform media sosial (𝕏, TikTok, Instagram, YouTube), laporan lapangan Satwil, dan orkestrasi sentimen pimpinan <strong>{{ selectedCode === 'ALL' ? 'Divhumas Polri (Nasional)' : selectedPolda?.name }}</strong>.
-          </p>
-
-          <!-- Quick Action Buttons -->
-          <div class="flex flex-wrap items-center gap-2.5 pt-2">
+          <!-- Aksi cepat (maks. 2, mengikuti izin) -->
+          <div v-if="canCreateIssue || canExportReports" class="flex flex-wrap items-center gap-2.5">
             <Link
+              v-if="canCreateIssue"
               href="/issues/create"
               class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 text-xs font-black transition shadow-lg shadow-amber-500/20"
             >
               <PlusCircle class="w-4 h-4" />
-              <span>+ Buat Laporan / Disposisi Cepat</span>
+              <span>Buat Laporan</span>
             </Link>
 
             <Link
-              href="/social-intelligence"
-              class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold transition"
-            >
-              <Radio class="w-4 h-4 text-amber-400" />
-              <span>Radar Medsos ({{ socialStats?.total_posts || 0 }}) &rarr;</span>
-            </Link>
-
-            <Link
-              href="/media-intelligence"
-              class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold transition"
-            >
-              <Newspaper class="w-4 h-4 text-sky-400" />
-              <span>Radar Media Online ({{ kpi?.total_articles || 0 }}) &rarr;</span>
-            </Link>
-
-            <Link
+              v-if="canExportReports"
               href="/reports"
               class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold transition"
             >
               <FileBarChart2 class="w-4 h-4 text-emerald-400" />
               <span>Unduh Rekap</span>
             </Link>
-
-            <Link
-              href="/verification-queue"
-              class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold transition"
-            >
-              <CheckCircle2 class="w-4 h-4 text-amber-400" />
-              <span>Verifikasi ({{ kpi?.pending_verify || 0 }})</span>
-            </Link>
           </div>
         </div>
 
-        <!-- Right: Public Sentiment Gauge Dynamic -->
-        <div class="p-6 rounded-3xl bg-[#091122]/90 border border-amber-400/30 shadow-2xl flex flex-col items-center text-center space-y-2 shrink-0">
-          <span class="text-[10px] font-black uppercase tracking-wider text-slate-400">Indeks Citra Publik Terpadu</span>
+        <!-- Indeks citra publik: angka besar + selisih (tanpa nilai bawaan palsu) -->
+        <div class="p-5 rounded-3xl bg-[#091122]/90 border border-amber-400/30 shadow-2xl flex flex-col items-center text-center space-y-2 shrink-0">
+          <span class="text-[10px] font-black uppercase tracking-wider text-slate-400">Indeks Citra Publik</span>
           <div class="flex items-baseline gap-2">
-            <span class="text-5xl font-black text-amber-400 tracking-tight">{{ publicIndex?.score || 78 }}%</span>
-            <span class="text-xs font-bold text-emerald-400 flex items-center">
-              <TrendingUp class="w-3.5 h-3.5 mr-0.5" /> {{ publicIndex?.change || '+6%' }}
+            <span class="text-5xl font-black text-amber-400 tracking-tight">{{ publicIndex?.score != null ? publicIndex.score + '%' : '—' }}</span>
+            <span v-if="publicIndex?.change" class="text-xs font-bold text-emerald-400 flex items-center">
+              <TrendingUp class="w-3.5 h-3.5 mr-0.5" /> {{ publicIndex.change }}
             </span>
           </div>
           <span
+            v-if="publicIndex?.status"
             class="px-3 py-1 rounded-full text-[10px] font-black uppercase border"
             :class="{
               'bg-emerald-500/20 text-emerald-300 border-emerald-500/40': publicIndex?.score >= 70,
@@ -278,7 +263,7 @@ const layerLapangan = ref(true);
               'bg-rose-500/20 text-rose-300 border-rose-500/40': publicIndex?.score < 50,
             }"
           >
-            Kategori: {{ publicIndex?.status || 'Positif' }}
+            {{ publicIndex.status }}
           </span>
           <p class="text-[10px] text-slate-400 font-medium">Media Online + Medsos (7 Hari)</p>
         </div>
@@ -398,9 +383,6 @@ const layerLapangan = ref(true);
       <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800/90 pb-4 relative z-10">
         <div class="space-y-1">
           <div class="flex items-center gap-2 flex-wrap">
-            <span class="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
-              PRESISI COMMAND INTELLIGENCE HUB
-            </span>
             <span class="text-xs font-mono text-slate-400">
               {{ selectedCode === 'ALL' ? 'Mabes Polri (Skala Nasional)' : (selectedPolda?.name || 'Polda') }}
             </span>
@@ -410,11 +392,8 @@ const layerLapangan = ref(true);
             </span>
           </div>
           <h2 class="text-lg md:text-2xl font-black text-white tracking-tight flex items-center gap-2 flex-wrap">
-            <span>Sintesis Analisis Intelijen Komando Pimpinan</span>
+            <span>Briefing Intelijen Pimpinan</span>
           </h2>
-          <p class="text-xs text-slate-300 max-w-2xl leading-relaxed">
-            Pusat sintesis intelijen komprehensif memadukan pemantauan media siber (29/33 portal) dan patroli opini publik warganet 4 platform medsos (𝕏, TikTok, IG, YT) berstandar Divisi Humas Polri.
-          </p>
         </div>
 
         <!-- Engine Switcher Tab Bar -->
@@ -853,7 +832,7 @@ const layerLapangan = ref(true);
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
-            <!-- Scope Switch: Peta Indonesia (Nasional) vs Peta Satwil (Sulbar) -->
+            <!-- Cakupan: Nasional vs Satwil -->
             <div class="inline-flex rounded-xl bg-slate-900 border border-slate-800 p-0.5 text-xs font-bold">
               <button
                 type="button"
@@ -862,85 +841,102 @@ const layerLapangan = ref(true);
                 :class="mapScope === 'national' ? 'bg-amber-400 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'"
                 title="Tampilkan Peta Kepulauan Nusantara (Nasional RI)"
               >
-                <span>🇮🇩 Peta Nasional</span>
+                <span>Nasional</span>
               </button>
               <button
                 type="button"
                 @click="mapScope = 'regional'; selectedSatwilCode = 'ALL'; activePin = null;"
                 class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition"
                 :class="mapScope === 'regional' ? 'bg-amber-400 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'"
-                title="Tampilkan Peta Wilayah Hukum Satwil (Sulbar 6 Polres)"
+                title="Tampilkan Peta Wilayah Hukum Satwil"
               >
-                <span>🏛️ Peta Satwil</span>
+                <span>Satwil</span>
               </button>
             </div>
 
-            <!-- View Mode Toggle: Map vs Cards -->
+            <!-- Tampilan: Peta vs Matriks (ikon) -->
             <div class="inline-flex rounded-xl bg-slate-900 border border-slate-800 p-0.5 text-xs font-bold">
               <button
                 type="button"
                 @click="viewMode = 'map'"
-                class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition"
-                :class="viewMode === 'map' ? 'bg-amber-400 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'"
+                class="p-1.5 rounded-lg transition"
+                :class="viewMode === 'map' ? 'bg-amber-400 text-slate-950 shadow' : 'text-slate-400 hover:text-white'"
+                title="Tampilan peta" aria-label="Tampilan peta"
               >
-                <MapIcon class="w-3.5 h-3.5" />
-                <span>Peta</span>
+                <MapIcon class="w-4 h-4" />
               </button>
               <button
                 type="button"
                 @click="viewMode = 'cards'"
-                class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition"
-                :class="viewMode === 'cards' ? 'bg-amber-400 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'"
+                class="p-1.5 rounded-lg transition"
+                :class="viewMode === 'cards' ? 'bg-amber-400 text-slate-950 shadow' : 'text-slate-400 hover:text-white'"
+                title="Tampilan matriks kartu" aria-label="Tampilan matriks kartu"
               >
-                <Grid class="w-3.5 h-3.5" />
-                <span>Matriks</span>
+                <Grid class="w-4 h-4" />
               </button>
             </div>
 
-            <!-- Satwil / Wilayah Filter Select -->
-            <select
-              v-model="selectedSatwilCode"
-              class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-bold text-slate-300 focus:outline-none focus:border-amber-400"
-            >
-              <template v-if="mapScope === 'national'">
-                <option value="ALL">Semua Sentra Nusantara (11 Polda)</option>
-                <option v-for="p in nationalMapData" :key="p.id" :value="p.code">
-                  {{ p.name }} ({{ p.articles_count }} Berita)
-                </option>
-              </template>
-              <template v-else>
-                <option value="ALL">{{ selectedCode === 'ALL' ? 'Semua Jajaran Satwil' : 'Semua Satwil (6 Polres)' }}</option>
-                <option v-for="p in polresStatuses" :key="p.id" :value="p.code">
-                  {{ p.name }} ({{ p.status }})
-                </option>
-              </template>
-            </select>
+            <!-- Opsi peta: wilayah & layer -->
+            <div class="relative">
+              <button
+                type="button"
+                @click.stop="showMapOptions = !showMapOptions"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-600 text-xs font-bold text-slate-300 hover:text-white transition cursor-pointer"
+                title="Filter wilayah dan layer pantauan"
+              >
+                <SlidersHorizontal class="w-3.5 h-3.5" />
+                <span>Opsi</span>
+              </button>
+              <div
+                v-if="showMapOptions"
+                @click.stop
+                class="absolute right-0 top-full mt-2 z-30 w-[min(92vw,20rem)] rounded-2xl bg-[#0b1426] border border-slate-700 shadow-2xl p-4 space-y-3"
+              >
+                <label class="block space-y-1">
+                  <span class="text-[11px] font-bold text-slate-400">Wilayah</span>
+                  <select
+                    v-model="selectedSatwilCode"
+                    class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-slate-200 focus:outline-none focus:border-amber-400"
+                  >
+                    <template v-if="mapScope === 'national'">
+                      <option value="ALL">Semua Sentra Nusantara (11 Polda)</option>
+                      <option v-for="p in nationalMapData" :key="p.id" :value="p.code">
+                        {{ p.name }} ({{ p.articles_count }} Berita)
+                      </option>
+                    </template>
+                    <template v-else>
+                      <option value="ALL">{{ selectedCode === 'ALL' ? 'Semua Jajaran Satwil' : 'Semua Satwil (6 Polres)' }}</option>
+                      <option v-for="p in polresStatuses" :key="p.id" :value="p.code">
+                        {{ p.name }} ({{ p.status }})
+                      </option>
+                    </template>
+                  </select>
+                </label>
+
+                <div class="space-y-1.5">
+                  <span class="text-[11px] font-bold text-slate-400">Layer pantauan</span>
+                  <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer hover:text-white">
+                    <input type="checkbox" v-model="layerMedia" class="rounded bg-slate-800 border-slate-700 text-amber-500 focus:ring-0 w-3.5 h-3.5" />
+                    <span>Media RSS</span>
+                  </label>
+                  <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer hover:text-white">
+                    <input type="checkbox" v-model="layerMedsos" class="rounded bg-slate-800 border-slate-700 text-amber-500 focus:ring-0 w-3.5 h-3.5" />
+                    <span>Media Sosial</span>
+                  </label>
+                  <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer hover:text-white">
+                    <input type="checkbox" v-model="layerLapangan" class="rounded bg-slate-800 border-slate-700 text-amber-500 focus:ring-0 w-3.5 h-3.5" />
+                    <span>Laporan Lapangan</span>
+                  </label>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Layer Checkboxes -->
-        <div class="flex flex-wrap items-center justify-between text-xs text-slate-400 gap-2 pb-1">
-          <div class="flex items-center gap-3">
-            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Layer Pantauan:</span>
-            <label class="inline-flex items-center gap-1.5 cursor-pointer hover:text-white transition">
-              <input type="checkbox" v-model="layerMedia" class="rounded bg-slate-800 border-slate-700 text-amber-500 focus:ring-0 w-3.5 h-3.5" />
-              <span>Media RSS</span>
-            </label>
-            <label class="inline-flex items-center gap-1.5 cursor-pointer hover:text-white transition">
-              <input type="checkbox" v-model="layerMedsos" class="rounded bg-slate-800 border-slate-700 text-amber-500 focus:ring-0 w-3.5 h-3.5" />
-              <span>Media Sosial</span>
-            </label>
-            <label class="inline-flex items-center gap-1.5 cursor-pointer hover:text-white transition">
-              <input type="checkbox" v-model="layerLapangan" class="rounded bg-slate-800 border-slate-700 text-amber-500 focus:ring-0 w-3.5 h-3.5" />
-              <span>Laporan Lapangan</span>
-            </label>
-          </div>
-
-          <span class="text-xs font-mono text-emerald-400 flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            {{ mapScope === 'national' ? '11 Sentra Komando Nasional Terpantau' : (selectedCode === 'ALL' ? 'Komando Nasional Terpantau Aktif' : '6 Satwil Terpantau Aktif') }}
-          </span>
-        </div>
+        <p class="text-[11px] font-mono text-emerald-400 flex items-center gap-1.5 -mt-1">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          {{ mapScope === 'national' ? '11 Sentra Komando Nasional Terpantau' : (selectedCode === 'ALL' ? 'Komando Nasional Terpantau Aktif' : '6 Satwil Terpantau Aktif') }}
+        </p>
 
         <!-- ========================================================================= -->
         <!-- VIEW 1: INTERACTIVE GEOSPATIAL VECTOR MAP (Nasional RI / Sulbar)          -->

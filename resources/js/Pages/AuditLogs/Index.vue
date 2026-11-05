@@ -242,7 +242,7 @@ const formatMetadata = (meta) => {
                   </span>
                 </td>
                 <td class="px-6 py-4 text-slate-300 font-semibold">
-                  {{ entry.polres?.name || entry.polda?.name || 'Polda Sulbar' }}
+                  {{ entry.polres?.name || entry.polda?.name || '-' }}
                 </td>
                 <td class="px-6 py-4 font-mono text-slate-400">{{ entry.ip_address || '127.0.0.1' }}</td>
                 <td class="px-6 py-4">

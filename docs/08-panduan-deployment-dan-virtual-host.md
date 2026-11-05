@@ -7,10 +7,10 @@ Panduan konfigurasi domain lokal Laragon (`simod-enterprise.test`) dan prosedur 
 ## 1. Setup Domain Lokal Laragon (`simod-enterprise.test`)
 
 Virtual host Apache untuk SIMOD Enterprise telah dibuat pada:
-`D:\Foto\laragon\etc\apache2\sites-enabled\auto.simod-enterprise.test.conf`
+`D:\laragon\etc\apache2\sites-enabled\auto.simod-enterprise.test.conf`
 
 ```apache
-define ROOT "D:/Foto/laragon/www/simod-enterprise/public"
+define ROOT "D:/laragon/www/simod-enterprise/public"
 define SITE "simod-enterprise.test"
 
 <VirtualHost *:80> 

@@ -26,7 +26,7 @@ Seluruh 7 tab lama dikonsolidasikan secara elegan menjadi **4 Pilar Terpadu** ya
 | Pilar | Label Navigasi | Badge | Deskripsi & Cakupan Data |
 | :--- | :--- | :--- | :--- |
 | **01** | `01. Berita Online (Live RSS)` | `LIVE` | Agregasi 29/33 portal media, Smart Dossier Topik Atensi, Ingesti Google News Live, filter Zona Merah, dan pagination berita. |
-| **02** | `02. Executive Briefing & Sentimen` | `ANALISIS` | **Pusat Komando Eksekutif 1-Layar**: Ringkasan eksekutif 200 kata, Barometer Sentimen Nasional & Kewilayahan, Top Concern, Matriks Respons Taktis Bertahap (0-2 Jam, 2-6 Jam, 24 Jam), Kajian Risiko & Doktrin Humas, Isu Strategis Nasional & Wilayah, serta Terminal Naskah WhatsApp Resmi Siap Kirim (lengkap tombol salin, cetak A4, unduh .txt). |
+| **02** | `02. Executive Briefing & Sentimen` | `ANALISIS` | **Pusat Komando Eksekutif 1-Layar**: Ringkasan eksekutif 200 kata, Barometer Sentimen Nasional & Kewilayahan, Top Concern, Matriks Respons Taktis Bertahap (0-2 Jam, 2-6 Jam, 24 Jam), Kajian Risiko & Doktrin Humas, Isu Strategis Nasional & Wilayah, serta Terminal Naskah WhatsApp Resmi Siap Kirim (lengkap tombol salin, unduh .txt). |
 | **03** | `03. Early Warning System (EWS)` | `EWS` | Khusus mengisolasi isu beresiko krisis reputasi (Level MERAH / KUNING), kajian dampak fatal tanpa mitigasi (6–24 jam), penunjukan PIC satker, dan Rencana Aksi Darurat 3-Tahap. |
 | **04** | `04. Strategi Humas & Aksi` | `AKSI` | **Pedoman Tindakan Nyata**: Ide Konten Kreatif Viralisasi Positif (Tribratanews, Instagram, TikTok, X), Rekomendasi Komunikasi Publik & Panduan Juru Bicara, serta Orkestrasi Diseminasi Satwil (34 Polda / Polres jajaran). |
 
@@ -95,5 +95,5 @@ Sebagai bagian dari orkestrasi kecerdasan buatan terpadu, sistem dilengkapi deng
 ## 🧪 6. Verifikasi & Integritas Pengujian
 
 - **Kompilasi Frontend**: `npm run build` sukses mengompilasi seluruh chunk Vite tanpa peringatan.
-- **Automated Test Suite**: Seluruh **92 tests (522 assertions)** pada `php artisan test` lulus 100% hijau, menjamin tidak adanya regresi pada multi-tenant scoping, RBAC roles, maupun ingesti data media.
+- **Automated Test Suite**: Seluruh **92 tests (522 assertions; snapshot historis, baseline terkini 108/680)** pada `php artisan test` lulus 100% hijau, menjamin tidak adanya regresi pada multi-tenant scoping, RBAC roles, maupun ingesti data media.
 

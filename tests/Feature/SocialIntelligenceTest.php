@@ -39,6 +39,7 @@ class SocialIntelligenceTest extends TestCase
 
         $this->user = User::factory()->create([
             'polda_id' => $this->polda->id,
+            'role'     => 'polda_leader',
         ]);
     }
 
