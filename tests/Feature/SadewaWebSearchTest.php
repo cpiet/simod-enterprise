@@ -117,6 +117,33 @@ class SadewaWebSearchTest extends TestCase
         $this->assertCount(1, $this->payloads);
     }
 
+    public function test_search_quota_rejection_pauses_web_search_without_blocking_other_ai(): void
+    {
+        $this->payloads = [];
+        Http::fake(function (HttpRequest $request) {
+            $this->payloads[] = $request->data();
+            if (empty($request->data()['tools'])) {
+                return Http::response(['candidates' => [['content' => ['parts' => [['text' => '[[CARI_WEB]]']]]]]], 200);
+            }
+
+            return Http::response(['error' => ['message' => 'You exceeded your current quota']], 429);
+        });
+
+        $res = $this->actingAs($this->leader)->postJson('/sadewa/chat', ['message' => 'Siapa juara MotoGP Qatar?'])->assertOk();
+        $this->assertFalse($res->json('from_web'));
+        $this->assertStringContainsString('Google menolak permintaan pencarian', $res->json('reply'));
+
+        // Fitur AI lain tidak ditahan (sebelumnya finish() memasang penahanan 10 menit untuk seluruh Polda).
+        $this->assertFalse(app(\App\Services\AiQuota::class)->isBlocked($this->polda->id));
+        $this->assertNotNull(Cache::get(\App\Http\Controllers\SadewaController::WEB_SEARCH_ISSUE_KEY));
+
+        // Pertanyaan berikutnya tidak mencoba pencarian lagi selama masa istirahat.
+        $calls = count($this->payloads);
+        $next = $this->actingAs($this->leader)->postJson('/sadewa/chat', ['message' => 'Kabar terbaru gempa?'])->assertOk();
+        $this->assertStringContainsString('sementara tidak tersedia', $next->json('reply'));
+        $this->assertCount($calls + 1, $this->payloads, 'hanya panggilan data SIMOD, tanpa pencarian');
+    }
+
     public function test_answer_from_simod_data_does_not_trigger_web(): void
     {
         Http::fake(fn () => Http::response(['candidates' => [['content' => ['parts' => [['text' => 'Ada satu isu aktif [I1].']]]]]], 200));

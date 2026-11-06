@@ -1139,6 +1139,8 @@ ATURAN:
 PROMPT;
 
         $lastError = 'Pencarian internet SADEWA gagal.';
+        $attempts = 0;
+        $rateLimited = 0;
         foreach ($keysPool as $keyIndex => $currentKey) {
             foreach ($this->modelChain($model ?: $this->getModel($polda->id)) as $m) {
                 try {
@@ -1164,12 +1166,24 @@ PROMPT;
                         continue;
                     }
 
+                    $attempts++;
+                    $rateLimited += $response->status() === 429 ? 1 : 0;
                     $lastError = "Model {$m} (Key #{$keyIndex}): " . ($response->json('error.message') ?? $response->body());
                     $this->logHttpFailure('pencarian internet SADEWA', $m, $response->status(), (string) ($response->json('error.message') ?? $response->body()));
                 } catch (\Throwable $e) {
+                    $attempts++;
                     $lastError = "Exception Model {$m} (Key #{$keyIndex}): " . $this->redactSecrets($e->getMessage());
                 }
             }
+        }
+
+        // Semua percobaan ditolak 429: kuota Google Search (grounding) kunci ini habis atau tidak termasuk paket.
+        if ($attempts > 0 && $rateLimited === $attempts) {
+            return [
+                'success' => false,
+                'status'  => 'search_quota',
+                'message' => 'Google menolak permintaan pencarian (kuota Google Search pada kunci API habis atau tidak termasuk paket gratis).',
+            ];
         }
 
         return ['success' => false, 'status' => 'error', 'message' => $this->friendlyAiError($lastError)];

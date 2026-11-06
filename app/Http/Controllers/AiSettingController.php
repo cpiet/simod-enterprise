@@ -105,6 +105,7 @@ class AiSettingController extends Controller
                 'gemini_model'              => $activeModel,
                 'daily_user_limit'          => (int) ($aiSetting->daily_user_limit ?? \App\Services\AiQuota::DEFAULT_LIMIT),
                 'web_search_enabled'        => (bool) ($aiSetting->web_search_enabled ?? true),
+                'web_search_issue'          => \Illuminate\Support\Facades\Cache::get(\App\Http\Controllers\SadewaController::WEB_SEARCH_ISSUE_KEY),
                 'temperature'               => (float) ($aiSetting->temperature ?? 0.20),
                 'custom_prompt_template'    => $customPrompt,
                 'default_prompt_template'   => $defaultPrompt,

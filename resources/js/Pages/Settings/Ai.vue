@@ -819,6 +819,10 @@ const submitSettings = () => {
                   dan memakai 1 permintaan tambahan dari batas harian.
                 </span>
               </label>
+              <p v-if="props.setting?.web_search_issue" class="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200 leading-relaxed" role="status">
+                Pencarian internet sedang diistirahatkan sampai {{ props.setting.web_search_issue.retry_at }}: {{ props.setting.web_search_issue.reason }}
+                Bila terus berulang, pakai kunci API dengan penagihan aktif atau matikan opsi ini.
+              </p>
             </div>
 
             <div class="lg:col-span-2 rounded-2xl bg-slate-900/70 border border-slate-800 p-4 space-y-3">

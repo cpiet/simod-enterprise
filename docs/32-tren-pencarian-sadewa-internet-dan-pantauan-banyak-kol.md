@@ -39,6 +39,9 @@ Alur (`SadewaController::chat`):
 5. Kuota: pencarian internet dicatat sebagai fitur `chat_web` di `ai_usage_logs` dan melewati `AiQuota::denial()`; bila batas harian habis, SADEWA menjelaskan bahwa pencarian tidak dijalankan.
 6. Dapat dimatikan admin: kolom `ai_settings.web_search_enabled` (migrasi `2026_11_10_090000`, bawaan aktif), kotak centang di Keamanan & Pemeliharaan → Mesin Intelijen AI.
 7. Pertanyaan internal yang datanya kosong tetap dijawab jujur "datanya belum ada" (tidak dicari di internet).
+8. **Bila Google menolak (429 di semua model/kunci):** pencarian diistirahatkan 60 menit (cache `simod.sadewa_web_issue`), SADEWA menjelaskan penyebabnya, dan halaman Mesin Intelijen AI menampilkan statusnya. Kegagalan pencarian dicatat `chat_web/error` dan **tidak** memasang penahanan AI 10 menit (chat dan analisis lain tetap jalan).
+
+**Status produksi 6 Nov 2026:** uji langsung dengan kunci API produksi ditolak 429 di semua model, sementara chat dan analisis biasa pada hari yang sama berhasil. Kemungkinan besar kuota Google Search (grounding) tidak termasuk paket gratis kunci tersebut. Fitur akan berjalan begitu memakai kunci dengan penagihan aktif. Sampai saat itu SADEWA menjawab jujur bahwa pencarian internet belum tersedia.
 
 ## 4. Pantau Akun Instagram untuk banyak KOL
 - Strip ringkasan: akun dipantau, unggahan 7 hari, unggahan menonjol, akun dengan keterlibatan tertinggi.

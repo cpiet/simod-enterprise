@@ -35,6 +35,11 @@ class SadewaController extends Controller
 
     private const MAX_CONVERSATIONS = 30;
 
+    /** Cache: pencarian internet diistirahatkan setelah Google menolak (429) semua percobaan. Dibaca halaman Mesin AI. */
+    public const WEB_SEARCH_ISSUE_KEY = 'simod.sadewa_web_issue';
+
+    private const WEB_SEARCH_PAUSE_MINUTES = 60;
+
     /** Lingkup yang boleh dipakai pengguna ini. */
     private function allowedScopes(Request $request): array
     {
@@ -188,17 +193,28 @@ class SadewaController extends Controller
             $fallback = 'Data SIMOD pada lingkup ' . $scopeLabel . ' belum memuat jawaban untuk pertanyaan ini.';
             if (! \App\Models\AiSetting::webSearchEnabled($selectedPolda?->id)) {
                 $reply = $fallback . ' Pencarian internet SADEWA sedang dinonaktifkan administrator.';
+            } elseif ($issue = \Illuminate\Support\Facades\Cache::get(self::WEB_SEARCH_ISSUE_KEY)) {
+                $reply = $fallback . ' Pencarian internet sementara tidak tersedia: ' . $issue['reason'] . ' Dicoba lagi otomatis setelah ' . $issue['retry_at'] . '.';
             } elseif ($denied = $quota->denial($user, $selectedPolda?->id)) {
                 $reply = $fallback . ' Pencarian internet tidak dijalankan: ' . $denied;
             } else {
                 $previousQuestions = collect($history)->where('role', 'user')->pluck('content')->all();
                 $web = $gemini->searchWebSadewa($selectedPolda, (string) $request->input('message'), $previousQuestions);
-                $quota->finish($user, $selectedPolda?->id, 'chat_web', $web);
                 if ($web['success']) {
+                    $quota->finish($user, $selectedPolda?->id, 'chat_web', $web);
                     $reply = $web['reply'];
                     $sources = $web['sources'];
                     $fromWeb = true;
                 } else {
+                    // Kegagalan pencarian TIDAK boleh menahan seluruh fitur AI (finish() akan memasang penahanan 10 menit).
+                    $quota->log($user, $selectedPolda?->id, 'chat_web', 'error');
+                    if (($web['status'] ?? '') === 'search_quota') {
+                        \Illuminate\Support\Facades\Cache::put(self::WEB_SEARCH_ISSUE_KEY, [
+                            'reason'   => $web['message'],
+                            'at'       => now()->toIso8601String(),
+                            'retry_at' => now('Asia/Jakarta')->addMinutes(self::WEB_SEARCH_PAUSE_MINUTES)->format('H.i') . ' WIB',
+                        ], now()->addMinutes(self::WEB_SEARCH_PAUSE_MINUTES));
+                    }
                     $reply = $fallback . ' Pencarian internet gagal: ' . ($web['message'] ?? 'coba lagi nanti.');
                 }
             }
