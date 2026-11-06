@@ -70,7 +70,6 @@ const props = defineProps({
   trendingHashtags: Array,
   trendingByPlatform: Object,
   publicTrends: Object,
-  supportedActors: Array,
   spikeTimeline: Object,
   wordCloud: Object,
   peakHours: Object,
@@ -154,6 +153,68 @@ const monitorKol = (kol) => {
   document.getElementById('instagram-monitor-username')?.focus();
 };
 const instagramDate = (date) => date ? new Date(date).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : 'Waktu tidak tersedia';
+
+// Daftar akun ringkas: banyak akun tidak membuat halaman memanjang. Satu akun → langsung terbuka.
+const igSearch = ref('');
+const igSort = ref('latest');
+const igHighlightOnly = ref(false);
+const igExpanded = ref(new Set());
+const igShowAll = ref(new Set());
+const IG_PREVIEW = 4;
+const DAY_MS = 86400000;
+const igLatestTime = (account) => Math.max(0, ...(account.posts || []).map((p) => (p.posted_at ? new Date(p.posted_at).getTime() : 0)));
+const igEngagement = (account) => {
+  const vals = (account.posts || []).map((p) => (p.likes ?? 0) + (p.comments ?? 0)).filter((v) => v > 0);
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+};
+const igHighlights = (account) => (account.posts || []).filter((p) => p.highlight);
+const igIsNew = (account) => igLatestTime(account) > 0 && Date.now() - igLatestTime(account) < DAY_MS;
+const igAccounts = computed(() => {
+  const q = igSearch.value.trim().toLowerCase().replace(/^@/, '');
+  const list = props.monitoredInstagramAccounts.filter((a) => {
+    if (igHighlightOnly.value && !igHighlights(a).length) return false;
+    return !q || a.username.toLowerCase().includes(q) || (a.display_name || '').toLowerCase().includes(q);
+  });
+  const sorters = {
+    latest: (a, b) => igLatestTime(b) - igLatestTime(a),
+    engagement: (a, b) => igEngagement(b) - igEngagement(a),
+    highlights: (a, b) => igHighlights(b).length - igHighlights(a).length || igLatestTime(b) - igLatestTime(a),
+    name: (a, b) => (a.display_name || a.username).localeCompare(b.display_name || b.username, 'id'),
+  };
+  return [...list].sort(sorters[igSort.value] || sorters.latest);
+});
+const igSummary = computed(() => {
+  const accounts = props.monitoredInstagramAccounts;
+  const weekAgo = Date.now() - 7 * DAY_MS;
+  const top = [...accounts].filter((a) => igEngagement(a) > 0).sort((a, b) => igEngagement(b) - igEngagement(a))[0];
+  return {
+    accounts: accounts.length,
+    week: accounts.reduce((n, a) => n + (a.posts || []).filter((p) => p.posted_at && new Date(p.posted_at).getTime() >= weekAgo).length, 0),
+    highlights: accounts.reduce((n, a) => n + igHighlights(a).length, 0),
+    errors: accounts.filter((a) => a.last_error).length,
+    top: top ? `@${top.username}` : null,
+  };
+});
+const igIsOpen = (account) => props.monitoredInstagramAccounts.length === 1 || igExpanded.value.has(account.id);
+const igToggle = (account) => {
+  const next = new Set(igExpanded.value);
+  next.has(account.id) ? next.delete(account.id) : next.add(account.id);
+  igExpanded.value = next;
+};
+const igToggleAll = (account) => {
+  const next = new Set(igShowAll.value);
+  next.has(account.id) ? next.delete(account.id) : next.add(account.id);
+  igShowAll.value = next;
+};
+// Unggahan menonjol di urutan teratas, lalu sesuai waktu; dibatasi IG_PREVIEW kecuali "lihat semua".
+const igVisiblePosts = (account) => {
+  const posts = [...(account.posts || [])].sort((a, b) => (!!b.highlight - !!a.highlight) || (new Date(b.posted_at || 0) - new Date(a.posted_at || 0)));
+  return igShowAll.value.has(account.id) ? posts : posts.slice(0, IG_PREVIEW);
+};
+const igHighlightText = (h) => [
+  h?.ratio ? `Keterlibatan ${String(h.ratio).replace('.', ',')}× median akun` : null,
+  h?.keywords?.length ? `Menyebut: ${h.keywords.join(', ')}` : null,
+].filter(Boolean).join(' · ');
 
 // Pimpinan & Polda mendarat di Briefing; peran lain di Radar Percakapan
 const activeTab = ref(props.filters?.tab || (['kadiv_humas', 'polda_leader'].includes(page.props.auth?.role) ? 'briefing' : 'radar'));
@@ -535,77 +596,64 @@ const filterByTrend = (trend) => {
   handleFilter();
 };
 
-// Dual-Mode Lens for Trends Tab ('kamtibmas' vs 'public')
-const trendLensMode = ref('kamtibmas');
-const selectedPublicPlatform = ref('all');
-const securityOnly = ref(false);
-const searchTrendQuery = ref('');
+// Tab Tren: tren pencarian Google Indonesia (nyata, nasional) + jam ramai dari unggahan tersimpan.
+const trendSearch = ref('');
+const trendKamtibmasOnly = ref(false);
 const isSyncingTrends = ref(false);
-
-const publicPlatformTabs = [
-  { id: 'all', label: 'Semua Platform' },
-  { id: 'x', label: '𝕏 (Twitter)' },
-  { id: 'youtube', label: 'YouTube' },
-  { id: 'instagram', label: 'Instagram' },
-  { id: 'tiktok', label: 'TikTok' },
-  { id: 'facebook', label: 'Facebook' },
-];
-
-const currentPublicTrendsList = computed(() => {
-  const platform = selectedPublicPlatform.value;
-  const list = props.publicTrends?.platforms?.[platform] || props.publicTrends?.platforms?.all || [];
-  
-  return list.filter((item) => {
-    if (securityOnly.value && !item.is_security_relevant) {
-      return false;
-    }
-    if (searchTrendQuery.value) {
-      const q = searchTrendQuery.value.toLowerCase();
-      const matchName = item.name?.toLowerCase().includes(q);
-      const matchCat = item.category?.toLowerCase().includes(q);
-      const matchType = item.relevance_type?.toLowerCase().includes(q);
-      const matchNote = item.relevance_note?.toLowerCase().includes(q);
-      return matchName || matchCat || matchType || matchNote;
-    }
-    return true;
+const googleTrends = computed(() => props.publicTrends?.items || []);
+const googleTrendsKamtibmasCount = computed(() => googleTrends.value.filter((t) => t.kamtibmas?.length).length);
+const filteredGoogleTrends = computed(() => {
+  const q = trendSearch.value.trim().toLowerCase();
+  return googleTrends.value.filter((t) => {
+    if (trendKamtibmasOnly.value && !t.kamtibmas?.length) return false;
+    if (!q) return true;
+    return t.title.toLowerCase().includes(q) || (t.news || []).some((n) => n.title?.toLowerCase().includes(q));
   });
 });
-
-const securityRelevantPublicCount = computed(() => {
-  const platform = selectedPublicPlatform.value;
-  const list = props.publicTrends?.platforms?.[platform] || props.publicTrends?.platforms?.all || [];
-  return list.filter(item => item.is_security_relevant).length;
-});
+const formatTrendTime = (iso) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+};
 
 const triggerSyncTrends = () => {
   isSyncingTrends.value = true;
   router.post('/social-intelligence/sync-trends', {}, {
     preserveScroll: true,
+    only: ['publicTrends', 'flash'],
     onFinish: () => {
       isSyncingTrends.value = false;
     },
   });
 };
 
-const filterByPublicTrend = (item) => {
-  searchQuery.value = item.name.replace(/^#/, '');
-  if (item.platform && item.platform !== 'all') {
-    selectedPlatform.value = item.platform;
-  }
+const filterByGoogleTrend = (item) => {
+  searchQuery.value = item.title;
+  selectedPlatform.value = 'all';
   activeTab.value = 'radar';
   handleFilter();
 };
 
 const getEscalationUrl = (item) => {
+  const news = (item.news || [])[0];
   const params = new URLSearchParams({
-    title: item.escalation?.title || `Atensi Isu Tren: ${item.name}`,
-    category: item.escalation?.category || '📱 Isu Medsos & Opini Publik',
-    summary: item.escalation?.description || `${item.relevance_note || ''} (Volume: ${item.volume})`,
-    source_media: item.platform_label || item.platform?.toUpperCase(),
-    source_url: item.sample_url || '',
-    priority: item.is_security_relevant ? 'high' : 'medium',
+    title: `Atensi tren pencarian: ${item.title}`,
+    category: '📱 Isu Medsos & Opini Publik',
+    summary: `Topik "${item.title}" sedang naik di pencarian Google Indonesia${item.traffic ? ` (sekitar ${item.traffic} pencarian)` : ''}.`
+      + (item.kamtibmas?.length ? ` Memuat kata kunci kamtibmas: ${item.kamtibmas.join(', ')}.` : '')
+      + (news ? ` Berita terkait: ${news.title}${news.source ? ` (${news.source})` : ''}.` : ''),
+    source_media: 'Google Trends',
+    source_url: news?.url || item.explore_url || '',
+    priority: item.kamtibmas?.length ? 'high' : 'medium',
   });
   return `/issues/create?${params.toString()}`;
+};
+
+// Jam ramai: batang 24 jam dari data nyata; jendela ramai disorot.
+const peakHourMax = computed(() => Math.max(1, ...(props.peakHours?.hours || [0])));
+const isPeakHour = (h) => {
+  const start = props.peakHours?.peak?.start;
+  return start !== undefined && start !== null && (h === start || h === (start + 1) % 24);
 };
 
 // --- PILIHAN C: MULTI-LINE SPIKE CHART REACTIVE MATH ---
@@ -768,23 +816,6 @@ const submitTrackKeyword = () => {
       showTrackModal.value = false;
     },
   });
-};
-
-const getPublicPlatformBadge = (platform) => {
-  switch (platform) {
-    case 'x':
-      return { label: '𝕏', class: 'bg-black text-white border border-slate-700' };
-    case 'youtube':
-      return { label: 'YouTube', class: 'bg-red-600 text-white' };
-    case 'instagram':
-      return { label: 'Instagram', class: 'bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 text-white' };
-    case 'tiktok':
-      return { label: 'TikTok', class: 'bg-slate-900 text-white border border-rose-500/30' };
-    case 'facebook':
-      return { label: 'Facebook', class: 'bg-blue-600 text-white' };
-    default:
-      return { label: (platform || 'SEMUA').toUpperCase(), class: 'bg-slate-800 text-slate-300' };
-  }
 };
 
 const openSadewa = (subject = '') => window.dispatchEvent(new CustomEvent('open-sadewa-copilot', { detail: { scope: 'social', subject } }));
@@ -2257,53 +2288,98 @@ const getBuzzerRiskClass = (level) => {
         <p v-if="instagramMessage" role="status" class="text-xs font-semibold" :class="instagramError ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'">{{ instagramMessage }}</p>
         <p v-if="!monitoredInstagramAccounts.length" class="rounded-xl bg-slate-50 dark:bg-slate-900 p-4 text-sm text-slate-600 dark:text-slate-400">Belum ada akun dalam daftar pantauan wilayah ini. Tambahkan username publik, mis. <span class="font-mono">@mohmahfudmd</span>.</p>
 
-        <article v-for="account in monitoredInstagramAccounts" :key="account.id" class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="flex items-center gap-3 min-w-0">
-              <div class="w-11 h-11 rounded-full bg-linear-to-tr from-amber-400 to-rose-400 text-slate-950 font-black flex items-center justify-center shrink-0">{{ (account.display_name || account.username).charAt(0).toUpperCase() }}</div>
-              <div class="min-w-0">
-                <h3 class="font-bold text-slate-900 dark:text-white truncate">{{ account.display_name || 'Akun Instagram' }}</h3>
-                <a :href="`https://www.instagram.com/${account.username}/`" target="_blank" rel="noopener noreferrer" class="text-xs font-mono text-slate-600 dark:text-slate-400 hover:text-amber-600">@{{ account.username }} ↗</a>
+        <!-- Ringkasan & alat bantu: muncul bila sudah ada akun -->
+        <div v-if="monitoredInstagramAccounts.length" class="grid grid-cols-2 lg:grid-cols-4 gap-2 text-center">
+          <div class="rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2.5"><p class="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">Akun dipantau</p><p class="text-base font-black text-slate-900 dark:text-white">{{ igSummary.accounts }}</p></div>
+          <div class="rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2.5"><p class="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">Unggahan 7 hari</p><p class="text-base font-black text-slate-900 dark:text-white">{{ igSummary.week }}</p></div>
+          <div class="rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2.5"><p class="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">Unggahan menonjol</p><p class="text-base font-black" :class="igSummary.highlights ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'">{{ igSummary.highlights }}</p></div>
+          <div class="rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2.5"><p class="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">Keterlibatan tertinggi</p><p class="text-sm font-black text-slate-900 dark:text-white truncate">{{ igSummary.top ?? '—' }}</p></div>
+        </div>
+        <p v-if="monitoredInstagramAccounts.length" class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+          <strong class="text-slate-700 dark:text-slate-300">Menonjol</strong> = keterlibatan (suka + komentar) minimal 2× median unggahan akun itu sendiri (perlu ≥ 4 unggahan bermetrik), atau keterangan unggahan memuat kata kunci kamtibmas. Bukan penilaian AI; tetap perlu ditinjau.
+        </p>
+
+        <div v-if="monitoredInstagramAccounts.length > 1" class="flex flex-wrap items-center gap-2">
+          <div class="relative flex-1 min-w-[180px]">
+            <Search class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
+            <input v-model="igSearch" type="search" placeholder="Cari akun…" aria-label="Cari akun Instagram" class="w-full pl-8 pr-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-400" />
+          </div>
+          <label class="sr-only" for="ig-sort">Urutkan akun</label>
+          <select id="ig-sort" v-model="igSort" class="py-1.5 px-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-amber-400">
+            <option value="latest">Unggahan terbaru</option>
+            <option value="highlights">Paling banyak menonjol</option>
+            <option value="engagement">Keterlibatan tertinggi</option>
+            <option value="name">Nama (A–Z)</option>
+          </select>
+          <button type="button" @click="igHighlightOnly = !igHighlightOnly" :aria-pressed="igHighlightOnly" class="px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer" :class="igHighlightOnly ? 'bg-rose-500 text-white border-rose-500' : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-rose-400'">
+            Hanya yang menonjol
+          </button>
+          <span class="text-[11px] text-slate-500 dark:text-slate-400">{{ igAccounts.length }} dari {{ monitoredInstagramAccounts.length }} akun</span>
+        </div>
+        <p v-if="monitoredInstagramAccounts.length && !igAccounts.length" class="text-xs text-slate-500 dark:text-slate-400 p-3">Tidak ada akun yang cocok dengan filter.</p>
+
+        <article v-for="account in igAccounts" :key="account.id" class="rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <!-- Baris ringkas: klik untuk membuka -->
+          <div class="flex flex-wrap items-center gap-3 p-3.5" :class="igIsOpen(account) ? 'border-b border-slate-200 dark:border-slate-800' : ''">
+            <button type="button" @click="igToggle(account)" :aria-expanded="igIsOpen(account)" :disabled="monitoredInstagramAccounts.length === 1" class="flex items-center gap-3 min-w-0 flex-1 text-left cursor-pointer disabled:cursor-default">
+              <div class="w-10 h-10 rounded-full bg-linear-to-tr from-amber-400 to-rose-400 text-slate-950 font-black flex items-center justify-center shrink-0">{{ (account.display_name || account.username).charAt(0).toUpperCase() }}</div>
+              <div class="min-w-0 flex-1">
+                <p class="flex items-center gap-1.5 flex-wrap">
+                  <span class="font-bold text-sm text-slate-900 dark:text-white truncate">{{ account.display_name || 'Akun Instagram' }}</span>
+                  <span class="text-[11px] font-mono text-slate-500 dark:text-slate-400">@{{ account.username }}</span>
+                  <span v-if="igIsNew(account)" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">Baru 24 jam</span>
+                  <span v-if="igHighlights(account).length" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-300">{{ igHighlights(account).length }} menonjol</span>
+                  <span v-if="account.last_error" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">Sinkron gagal</span>
+                </p>
+                <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
+                  {{ account.posts?.length ?? 0 }} unggahan
+                  · rata-rata suka {{ instagramStats(account).avgLikes === null ? '—' : formatNumber(instagramStats(account).avgLikes) }}
+                  · komentar {{ instagramStats(account).avgComments === null ? '—' : formatNumber(instagramStats(account).avgComments) }}
+                  · terbaru {{ instagramStats(account).latest }}
+                </p>
               </div>
-            </div>
-            <div v-if="canSync" class="flex gap-2">
-              <button type="button" :disabled="instagramBusy || !instagramReady" @click="syncInstagram(account)" class="rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs font-bold text-slate-800 dark:text-slate-200 hover:border-amber-400 disabled:opacity-50 cursor-pointer">{{ instagramBusy ? 'Memproses...' : 'Sinkronkan' }}</button>
-              <button type="button" :disabled="instagramBusy" @click="removeInstagram(account)" class="rounded-lg border border-rose-200 dark:border-rose-900 px-3 py-1.5 text-xs font-bold text-rose-700 dark:text-rose-400 cursor-pointer">Hapus</button>
+              <ChevronDown v-if="monitoredInstagramAccounts.length > 1" class="w-4 h-4 text-slate-400 shrink-0 transition-transform" :class="igIsOpen(account) ? 'rotate-180' : ''" />
+            </button>
+            <div class="flex items-center gap-2">
+              <a :href="`https://www.instagram.com/${account.username}/`" target="_blank" rel="noopener noreferrer" class="rounded-lg border border-slate-300 dark:border-slate-700 px-2.5 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:border-amber-400" :aria-label="`Buka profil @${account.username} di Instagram`">Profil ↗</a>
+              <template v-if="canSync">
+                <button type="button" :disabled="instagramBusy || !instagramReady" @click="syncInstagram(account)" class="rounded-lg border border-slate-300 dark:border-slate-700 px-2.5 py-1.5 text-xs font-bold text-slate-800 dark:text-slate-200 hover:border-amber-400 disabled:opacity-50 cursor-pointer">{{ instagramBusy ? 'Memproses...' : 'Sinkronkan' }}</button>
+                <button type="button" :disabled="instagramBusy" @click="removeInstagram(account)" class="rounded-lg border border-rose-200 dark:border-rose-900 px-2.5 py-1.5 text-xs font-bold text-rose-700 dark:text-rose-400 cursor-pointer">Hapus</button>
+              </template>
             </div>
           </div>
 
-          <p class="text-xs text-slate-600 dark:text-slate-400">
-            {{ account.last_synced_at ? `Terakhir berhasil: ${instagramDate(account.last_synced_at)}` : 'Belum ada sinkronisasi berhasil' }}
-          </p>
-          <p v-if="account.last_error" class="rounded-lg bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 px-3 py-2 text-xs font-semibold text-rose-700 dark:text-rose-300">Sinkronisasi terakhir gagal: {{ account.last_error }}</p>
+          <div v-if="igIsOpen(account)" class="p-3.5 space-y-3">
+            <p class="text-xs text-slate-600 dark:text-slate-400">
+              {{ account.last_synced_at ? `Terakhir berhasil: ${instagramDate(account.last_synced_at)}` : 'Belum ada sinkronisasi berhasil' }}
+            </p>
+            <p v-if="account.last_error" class="rounded-lg bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 px-3 py-2 text-xs font-semibold text-rose-700 dark:text-rose-300">Sinkronisasi terakhir gagal: {{ account.last_error }}</p>
 
-          <dl v-if="account.posts?.length" class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-            <div class="rounded-xl bg-slate-50 dark:bg-slate-900 p-2.5"><dt class="text-[10px] font-bold uppercase text-slate-500">Unggahan</dt><dd class="text-sm font-black text-slate-900 dark:text-white">{{ account.posts.length }}</dd></div>
-            <div class="rounded-xl bg-slate-50 dark:bg-slate-900 p-2.5"><dt class="text-[10px] font-bold uppercase text-slate-500">Rata-rata suka</dt><dd class="text-sm font-black text-slate-900 dark:text-white">{{ instagramStats(account).avgLikes === null ? '—' : formatNumber(instagramStats(account).avgLikes) }}</dd></div>
-            <div class="rounded-xl bg-slate-50 dark:bg-slate-900 p-2.5"><dt class="text-[10px] font-bold uppercase text-slate-500">Rata-rata komentar</dt><dd class="text-sm font-black text-slate-900 dark:text-white">{{ instagramStats(account).avgComments === null ? '—' : formatNumber(instagramStats(account).avgComments) }}</dd></div>
-            <div class="rounded-xl bg-slate-50 dark:bg-slate-900 p-2.5"><dt class="text-[10px] font-bold uppercase text-slate-500">Unggahan terbaru</dt><dd class="text-sm font-black text-slate-900 dark:text-white">{{ instagramStats(account).latest }}</dd></div>
-          </dl>
-
-          <p v-if="!account.posts?.length" class="text-xs text-slate-600 dark:text-slate-400">Belum ada unggahan yang dapat ditampilkan.</p>
-          <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-            <a v-for="post in account.posts" :key="post.url" :href="post.url" target="_blank" rel="noopener noreferrer" class="flex gap-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 hover:border-amber-400 transition">
-              <div class="w-20 h-20 rounded-lg bg-slate-200 dark:bg-slate-800 shrink-0 overflow-hidden flex items-center justify-center text-slate-500">
-                <img v-if="post.thumb" :src="post.thumb" alt="" referrerpolicy="no-referrer" loading="lazy" class="w-full h-full object-cover" @error="$event.target.style.display = 'none'" />
-                <Play v-else-if="post.type === 'video'" class="w-5 h-5" />
-                <Share2 v-else class="w-5 h-5" />
-              </div>
-              <div class="min-w-0 flex-1">
-                <p class="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
-                  {{ instagramDate(post.posted_at) }}
-                  <span v-if="post.type" class="ml-1 px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-[10px] font-bold uppercase">{{ { image: 'Foto', video: 'Video', sidecar: 'Album' }[post.type] }}</span>
-                </p>
-                <p class="mt-1 text-sm text-slate-800 dark:text-slate-200 line-clamp-3">{{ post.caption || 'Unggahan tanpa keterangan teks.' }}</p>
-                <p class="mt-1.5 text-[11px] text-slate-600 dark:text-slate-400">
-                  Suka: {{ post.likes == null ? 'Tidak tersedia' : formatNumber(post.likes) }} · Komentar: {{ post.comments == null ? 'Tidak tersedia' : formatNumber(post.comments) }}<span v-if="post.views != null"> · Tayang: {{ formatNumber(post.views) }}</span>
-                </p>
-                <p v-if="post.hashtags?.length" class="mt-1 text-[11px] text-amber-700 dark:text-amber-400 truncate">{{ post.hashtags.map((h) => '#' + h.replace(/^#/, '')).join(' ') }}</p>
-              </div>
-            </a>
+            <p v-if="!account.posts?.length" class="text-xs text-slate-600 dark:text-slate-400">Belum ada unggahan yang dapat ditampilkan.</p>
+            <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              <a v-for="post in igVisiblePosts(account)" :key="post.url" :href="post.url" target="_blank" rel="noopener noreferrer" class="flex gap-3 rounded-xl border p-3 hover:border-amber-400 transition" :class="post.highlight ? 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-300 dark:border-rose-900/70' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800'">
+                <div class="w-20 h-20 rounded-lg bg-slate-200 dark:bg-slate-800 shrink-0 overflow-hidden flex items-center justify-center text-slate-500">
+                  <img v-if="post.thumb" :src="post.thumb" alt="" referrerpolicy="no-referrer" loading="lazy" class="w-full h-full object-cover" @error="$event.target.style.display = 'none'" />
+                  <Play v-else-if="post.type === 'video'" class="w-5 h-5" />
+                  <Share2 v-else class="w-5 h-5" />
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                    {{ instagramDate(post.posted_at) }}
+                    <span v-if="post.type" class="ml-1 px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-[10px] font-bold uppercase">{{ { image: 'Foto', video: 'Video', sidecar: 'Album' }[post.type] }}</span>
+                  </p>
+                  <p v-if="post.highlight" class="mt-1 text-[11px] font-bold text-rose-700 dark:text-rose-300">Menonjol: {{ igHighlightText(post.highlight) }}</p>
+                  <p class="mt-1 text-sm text-slate-800 dark:text-slate-200 line-clamp-3">{{ post.caption || 'Unggahan tanpa keterangan teks.' }}</p>
+                  <p class="mt-1.5 text-[11px] text-slate-600 dark:text-slate-400">
+                    Suka: {{ post.likes == null ? 'Tidak tersedia' : formatNumber(post.likes) }} · Komentar: {{ post.comments == null ? 'Tidak tersedia' : formatNumber(post.comments) }}<span v-if="post.views != null"> · Tayang: {{ formatNumber(post.views) }}</span>
+                  </p>
+                  <p v-if="post.hashtags?.length" class="mt-1 text-[11px] text-amber-700 dark:text-amber-400 truncate">{{ post.hashtags.map((h) => '#' + h.replace(/^#/, '')).join(' ') }}</p>
+                </div>
+              </a>
+            </div>
+            <button v-if="(account.posts?.length ?? 0) > IG_PREVIEW" type="button" @click="igToggleAll(account)" class="text-xs font-bold text-amber-700 dark:text-amber-400 hover:underline cursor-pointer">
+              {{ igShowAll.has(account.id) ? 'Tampilkan lebih sedikit' : `Lihat semua ${account.posts.length} unggahan` }}
+            </button>
           </div>
         </article>
       </section>
@@ -2378,65 +2454,12 @@ const getBuzzerRiskClass = (level) => {
       </div>
     </div>
 
-    <!-- TAB 04: TREN TAGAR & KERAWANAN SIBER (DUAL-MODE ARCHITECTURE) -->
+    <!-- TAB 04: TREN & JAM RAMAI -->
     <div v-if="activeTab === 'trends'" class="space-y-5">
-      <!-- DUAL-MODE LENS SWITCHER -->
-      <div class="p-2 rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-2 shadow-sm">
-        <!-- MODE 1: LENSA KAMTIBMAS POLRI -->
-        <button
-          type="button"
-          @click="trendLensMode = 'kamtibmas'"
-          class="flex items-start gap-3.5 p-3.5 rounded-xl transition text-left cursor-pointer border-2"
-          :class="trendLensMode === 'kamtibmas'
-            ? 'bg-amber-400/10 dark:bg-amber-400/10 border-amber-400 text-slate-900 dark:text-white shadow-sm'
-            : 'hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-600 dark:text-slate-400 border-transparent'"
-        >
-          <div
-            class="p-2 rounded-xl shrink-0 mt-0.5"
-            :class="trendLensMode === 'kamtibmas' ? 'bg-amber-400 text-slate-950 font-black shadow' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'"
-          >
-            <Shield class="w-5 h-5" />
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-xs font-black tracking-wider uppercase">01. Lensa Kamtibmas & Humas Polri</span>
-              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-400 text-slate-950">Fokus Dinas</span>
-            </div>
-            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-              Monitoring tagar kepolisian, cyber patrol, penegakan hukum, citra Polri, dan isu viral kewilayahan/nasional.
-            </p>
-          </div>
-        </button>
-
-        <!-- MODE 2: LENSA TREN PUBLIK MEDIA SOSIAL INDONESIA -->
-        <button
-          type="button"
-          @click="trendLensMode = 'public'"
-          class="flex items-start gap-3.5 p-3.5 rounded-xl transition text-left cursor-pointer border-2"
-          :class="trendLensMode === 'public'
-            ? 'bg-rose-500/10 dark:bg-rose-500/10 border-rose-500 text-slate-900 dark:text-white shadow-sm'
-            : 'hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-600 dark:text-slate-400 border-transparent'"
-        >
-          <div
-            class="p-2 rounded-xl shrink-0 mt-0.5"
-            :class="trendLensMode === 'public' ? 'bg-rose-500 text-white font-black shadow' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'"
-          >
-            <Flame class="w-5 h-5" />
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-xs font-black tracking-wider uppercase">02. Lensa Tren Publik Medsos Indonesia</span>
-              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500 text-white animate-pulse">Live Multi-Platform</span>
-            </div>
-            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-              Tren warganet Indonesia (𝕏, YouTube, Instagram, TikTok, Facebook) dengan deteksi kerawanan siber & EWS.
-            </p>
-          </div>
-        </button>
-      </div>
-
-      <!-- VIEW 1: LENSA KAMTIBMAS & HUMAS POLRI -->
-      <div v-if="trendLensMode === 'kamtibmas'" class="space-y-4">
+      <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+        Dua sumber berbeda: <strong class="text-slate-800 dark:text-slate-200">tagar, kata, dan jam ramai</strong> dihitung dari unggahan media sosial yang tersimpan untuk wilayah aktif;
+        <strong class="text-slate-800 dark:text-slate-200">tren pencarian Google</strong> menggambarkan isu yang sedang dicari publik se-Indonesia.
+      </p>
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Leaderboard Tagar Viral -->
         <div class="lg:col-span-2 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4">
@@ -2530,44 +2553,47 @@ const getBuzzerRiskClass = (level) => {
           </div>
         </div>
 
-        <!-- Info Card: Jam Puncak Obrolan -->
+        <!-- Jam ramai unggahan (data nyata, zona waktu tenant) -->
         <div class="rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4">
           <div class="border-b border-slate-200 dark:border-slate-800 pb-3">
             <h3 class="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
               <Clock class="w-4 h-4 text-amber-500" />
-              <span>Jam Puncak Obrolan Netizen</span>
+              <span>Jam Ramai Unggahan</span>
             </h3>
             <p class="text-[11px] text-slate-500 dark:text-slate-400">
-              Waktu {{ peakHours?.timezone || (isNational ? 'WIB' : 'WITA') }} paling aktif warganet {{ isNational ? 'nasional' : (selectedPolda?.name || 'wilayah') }}
+              Sebaran jam unggahan tersimpan ({{ peakHours?.timezone ?? '—' }}), {{ formatNumber(peakHours?.sample ?? 0) }} unggahan bertanggal.
             </p>
           </div>
 
-          <div class="space-y-3 text-xs">
+          <template v-if="peakHours?.peak">
             <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-              <div class="flex items-center justify-between mb-0.5">
-                <span class="text-[10px] text-slate-500 font-bold block">Puncak Siang:</span>
-                <span class="text-[10px] font-mono text-amber-600 dark:text-amber-400 font-bold">{{ peakHours?.afternoon_pct || 34 }}% Trafik</span>
+              <span class="text-[10px] text-slate-500 dark:text-slate-400 font-bold block">Paling ramai</span>
+              <p class="font-black text-amber-600 dark:text-amber-400 text-base">{{ peakHours.peak.window }}</p>
+              <p class="text-[11px] text-slate-600 dark:text-slate-400">{{ formatNumber(peakHours.peak.count) }} unggahan ({{ peakHours.peak.pct }}% dari semua unggahan bertanggal)</p>
+            </div>
+            <div>
+              <div class="flex items-end gap-px h-20" role="img" :aria-label="`Sebaran unggahan per jam, paling ramai ${peakHours.peak.window}`">
+                <div
+                  v-for="(count, h) in (peakHours.hours || [])"
+                  :key="h"
+                  class="flex-1 rounded-t-sm"
+                  :class="isPeakHour(h) ? 'bg-amber-400' : 'bg-slate-300 dark:bg-slate-700'"
+                  :style="{ height: `${Math.max(2, (count / peakHourMax) * 100)}%` }"
+                  :title="`${String(h).padStart(2, '0')}.00: ${count} unggahan`"
+                ></div>
               </div>
-              <p class="font-black text-slate-900 dark:text-white text-sm">{{ peakHours?.afternoon_window || (isNational ? '11.30 – 13.30 WIB' : '11.30 – 13.30 WITA') }}</p>
-              <p class="text-[10px] text-slate-500">{{ peakHours?.afternoon_desc || 'Isu keluhan pelayanan & lalin siang hari' }}</p>
-            </div>
-
-            <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-              <div class="flex items-center justify-between mb-0.5">
-                <span class="text-[10px] text-slate-500 font-bold block">Puncak Malam:</span>
-                <span class="text-[10px] font-mono text-amber-600 dark:text-amber-400 font-bold">{{ peakHours?.evening_pct || 48 }}% Trafik</span>
+              <div class="flex justify-between text-[9px] font-mono text-slate-500 dark:text-slate-400 mt-1">
+                <span>00</span><span>06</span><span>12</span><span>18</span><span>23</span>
               </div>
-              <p class="font-black text-amber-500 text-sm">{{ peakHours?.evening_window || (isNational ? '19.00 – 22.00 WIB' : '19.00 – 22.00 WITA') }}</p>
-              <p class="text-[10px] text-slate-500">{{ peakHours?.evening_desc || 'Puncak viralisasi video TikTok & opini medsos X' }}</p>
             </div>
-
-            <div class="p-4 rounded-2xl bg-amber-50 dark:bg-amber-400/10 border border-amber-300 dark:border-amber-400/30 text-[11px] text-amber-900 dark:text-amber-200 space-y-1">
-              <p class="font-bold">💡 Rekomendasi Jam Rilis Konter Narasi:</p>
-              <p class="leading-relaxed">
-                Rilis siaran pers atau infografis klarifikasi paling efektif didistribusikan pada pukul <strong>{{ peakHours?.recommended_release_siang || (isNational ? '12.00 WIB' : '12.00 WITA') }}</strong> atau <strong>{{ peakHours?.recommended_release_malam || (isNational ? '19.30 WIB' : '19.30 WITA') }}</strong> agar menjangkau {{ peakHours?.active_audience_pct || 70 }}% pengguna aktif.
-              </p>
+            <div class="p-3 rounded-2xl bg-amber-50 dark:bg-amber-400/10 border border-amber-300 dark:border-amber-400/30 text-[11px] text-amber-900 dark:text-amber-200 leading-relaxed">
+              <p class="font-bold">Saran waktu rilis konter narasi</p>
+              <p>Sekitar pukul <strong>{{ peakHours.peak.release_at }}</strong>, satu jam sebelum jam ramai. Disimpulkan dari pola jam unggahan, bukan jumlah pembaca.</p>
             </div>
-          </div>
+          </template>
+          <p v-else class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            Belum cukup data untuk menyimpulkan jam ramai: perlu minimal {{ peakHours?.min_sample ?? 20 }} unggahan bertanggal (saat ini {{ formatNumber(peakHours?.sample ?? 0) }}).
+          </p>
         </div>
       </div>
 
@@ -2577,18 +2603,18 @@ const getBuzzerRiskClass = (level) => {
           <div>
             <div class="flex items-center gap-2">
               <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950">
-                Semantic NLP Engine
+                Awan Kata
               </span>
               <span class="text-xs text-slate-500 dark:text-slate-400 font-mono">
-                {{ (wordCloud?.words || []).length }} Topik Turunan Teridentifikasi
+                {{ (wordCloud?.words || []).length }} kata teratas dari {{ formatNumber(wordCloud?.total_unique ?? 0) }} kata unik
               </span>
             </div>
             <h3 class="text-base font-black text-slate-900 dark:text-white flex items-center gap-2 mt-1">
               <Cloud class="w-5 h-5 text-sky-500" />
-              <span>Visual Word Cloud & Klaster Kata Terkait</span>
+              <span>Kata yang Paling Sering Muncul</span>
             </h3>
             <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Representasi visual kata/frasa yang paling sering muncul berdampingan dengan kata kunci kepolisian. Ukuran kata mencerminkan frekuensi penyebutan. <strong>Klik kata mana saja untuk memfilter percakapan di Radar secara instan.</strong>
+              Dihitung dari isi unggahan tersimpan (tanpa kata sambung). Ukuran = frekuensi; warna = sentimen yang paling sering menyertai kata itu. <strong>Klik kata untuk memfilter Radar.</strong>
             </p>
           </div>
 
@@ -2607,7 +2633,8 @@ const getBuzzerRiskClass = (level) => {
         </div>
 
         <!-- Word Cloud Floating Tag Cloud -->
-        <div class="p-6 rounded-2xl bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 min-h-[220px] flex flex-wrap items-center justify-center gap-3 select-none">
+        <p v-if="!(wordCloud?.words || []).length" class="p-8 text-center text-xs text-slate-500 dark:text-slate-400">Belum ada data: awan kata muncul setelah ada unggahan tersimpan untuk wilayah ini.</p>
+        <div v-else class="p-6 rounded-2xl bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 min-h-[220px] flex flex-wrap items-center justify-center gap-3 select-none">
           <button
             v-for="(w, wIdx) in (wordCloud?.words || [])"
             :key="wIdx"
@@ -2625,480 +2652,134 @@ const getBuzzerRiskClass = (level) => {
           </button>
         </div>
       </div>
-      </div>
 
-      <!-- VIEW 2: LENSA TREN PUBLIK MEDSOS INDONESIA (MULTI-PLATFORM) -->
-      <div v-else-if="trendLensMode === 'public'" class="space-y-4">
-        <!-- Header Tren Publik -->
-        <div class="p-6 rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white border border-slate-700/60 shadow-lg relative overflow-hidden">
-          <div class="absolute -right-12 -top-12 w-48 h-48 bg-rose-500/10 rounded-full blur-2xl pointer-events-none"></div>
-          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10">
-            <div>
-              <div class="flex items-center gap-2 mb-1.5 flex-wrap">
-                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white">
-                  🇮🇩 WOEID: 23424846 (Indonesia)
-                </span>
-                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-slate-300">
-                  Lintas 5 Platform (𝕏, YouTube, Instagram, TikTok, Facebook)
-                </span>
-                <span class="text-[11px] text-slate-400">
-                  Update: <strong class="text-amber-400">{{ publicTrends?.meta?.last_updated || 'belum tersedia' }}</strong>
-                </span>
+      <!-- Tren pencarian Google Indonesia (sumber nyata, nasional) -->
+      <section class="rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-4">
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+          <div>
+            <h3 class="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <TrendingUp class="w-5 h-5 text-rose-500" />
+              <span>Tren Pencarian Google Indonesia</span>
+            </h3>
+            <p class="text-xs text-slate-600 dark:text-slate-400 mt-0.5 max-w-3xl leading-relaxed">
+              Topik yang sedang naik di pencarian Google se-Indonesia (sumber: Google Trends, berlaku nasional, diperbarui otomatis tiap jam).
+              Ini tren <strong>pencarian</strong>, bukan jumlah unggahan media sosial. Penanda kamtibmas hanya kecocokan kata kunci, perlu ditinjau analis.
+            </p>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+              Diperbarui: <strong class="text-slate-800 dark:text-slate-200">{{ publicTrends?.fetched_at ? formatTrendTime(publicTrends.fetched_at) : 'belum pernah' }}</strong>
+            </p>
+            <p v-if="publicTrends?.last_error" class="mt-2 px-3 py-2 rounded-xl bg-amber-400/10 border border-amber-400/40 text-[11px] text-amber-800 dark:text-amber-200" role="status">
+              Pembaruan terakhir gagal: {{ publicTrends.last_error }}
+            </p>
+          </div>
+          <button
+            v-if="canSync"
+            type="button"
+            @click="triggerSyncTrends"
+            :disabled="isSyncingTrends"
+            class="shrink-0 px-4 py-2 rounded-xl text-xs font-bold bg-amber-400 hover:bg-amber-300 text-slate-950 transition shadow-sm flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+          >
+            <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': isSyncingTrends }" />
+            <span>{{ isSyncingTrends ? 'Memperbarui…' : 'Perbarui sekarang' }}</span>
+          </button>
+        </div>
+
+        <div v-if="googleTrends.length" class="flex flex-wrap items-center gap-2">
+          <div class="relative min-w-[220px] flex-1 sm:flex-initial">
+            <Search class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
+            <input
+              v-model="trendSearch"
+              type="search"
+              placeholder="Cari tren atau judul berita…"
+              aria-label="Cari tren pencarian"
+              class="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-400"
+            />
+          </div>
+          <button
+            type="button"
+            @click="trendKamtibmasOnly = !trendKamtibmasOnly"
+            :aria-pressed="trendKamtibmasOnly"
+            class="px-3 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer flex items-center gap-1.5"
+            :class="trendKamtibmasOnly
+              ? 'bg-rose-500 text-white border-rose-500'
+              : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'"
+          >
+            <AlertTriangle class="w-3.5 h-3.5" :class="trendKamtibmasOnly ? 'text-white' : 'text-rose-500'" />
+            <span>Terkait kamtibmas saja</span>
+            <span class="px-1.5 rounded-full text-[10px]" :class="trendKamtibmasOnly ? 'bg-white/20' : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'">{{ googleTrendsKamtibmasCount }}</span>
+          </button>
+          <span class="text-[11px] text-slate-500 dark:text-slate-400">{{ filteredGoogleTrends.length }} dari {{ googleTrends.length }} tren</span>
+        </div>
+
+        <div v-if="filteredGoogleTrends.length" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <article
+            v-for="item in filteredGoogleTrends"
+            :key="item.rank + item.title"
+            class="rounded-2xl border p-4 space-y-2.5 flex flex-col"
+            :class="item.kamtibmas?.length ? 'border-rose-300 dark:border-rose-900/70 bg-rose-50/40 dark:bg-rose-950/10' : 'border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40'"
+          >
+            <div class="flex items-start gap-3">
+              <span class="w-7 h-7 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center font-black text-xs shrink-0">{{ item.rank }}</span>
+              <div class="min-w-0 flex-1">
+                <h4 class="font-black text-sm text-slate-900 dark:text-white leading-snug break-words">{{ item.title }}</h4>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  <span v-if="item.traffic">±{{ item.traffic }} pencarian</span><span v-else>Volume tidak tersedia</span>
+                  · mulai naik {{ formatTrendTime(item.started_at) }}
+                </p>
               </div>
-              <h2 class="text-xl md:text-2xl font-black tracking-tight text-white flex items-center gap-2">
-                <span>Tren Publik Media Sosial Indonesia</span>
-                <Flame class="w-6 h-6 text-rose-500 shrink-0" />
-              </h2>
-              <p class="text-xs text-slate-300 mt-1 max-w-3xl leading-relaxed">
-                Pemantauan tren warganet Indonesia secara holistik. Menangkap fenomena percakapan viral di ruang publik sekaligus menyaring potensi kejahatan siber, phishing, disinformasi, dan kerawanan kamtibmas sebelum meluas.
-              </p>
-              <p v-if="publicTrends?.meta?.available === false" class="mt-2 px-3 py-2 rounded-xl bg-amber-400/10 border border-amber-400/40 text-[11px] text-amber-200 max-w-3xl" role="status">{{ publicTrends.meta.note }}</p>
             </div>
-
-            <div class="flex items-center gap-2.5 shrink-0">
+            <p v-if="item.kamtibmas?.length" class="text-[11px] font-bold text-rose-700 dark:text-rose-300 flex items-center gap-1.5">
+              <AlertTriangle class="w-3.5 h-3.5 shrink-0" />
+              <span>Memuat kata kunci kamtibmas: {{ item.kamtibmas.join(', ') }}</span>
+            </p>
+            <ul v-if="item.news?.length" class="space-y-1">
+              <li v-for="n in item.news.slice(0, 2)" :key="n.url" class="text-[11px] leading-snug">
+                <a :href="n.url" target="_blank" rel="noopener noreferrer" class="text-slate-700 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 hover:underline">
+                  {{ n.title }}
+                </a>
+                <span v-if="n.source" class="text-slate-500 dark:text-slate-500"> — {{ n.source }}</span>
+              </li>
+            </ul>
+            <div class="mt-auto pt-2 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center gap-1.5">
               <button
                 type="button"
-                @click="triggerSyncTrends"
-                :disabled="isSyncingTrends"
-                class="px-4 py-2.5 rounded-xl text-xs font-bold bg-amber-400 hover:bg-amber-300 text-slate-950 transition shadow flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                @click="filterByGoogleTrend(item)"
+                class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition cursor-pointer"
               >
-                <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': isSyncingTrends }" />
-                <span>{{ isSyncingTrends ? 'Memperbarui Tren...' : '⚡ Refresh Tren Publik (Apify)' }}</span>
+                <Search class="w-3 h-3" />
+                <span>Cari di Radar</span>
               </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Filter & Search Toolbar -->
-        <div class="p-4 rounded-2xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 shadow-sm">
-          <!-- Platform Tabs -->
-          <div class="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
-            <button
-              v-for="p in publicPlatformTabs"
-              :key="p.id"
-              @click="selectedPublicPlatform = p.id"
-              type="button"
-              class="px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer select-none whitespace-nowrap"
-              :class="selectedPublicPlatform === p.id
-                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-950 font-black shadow'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'"
-            >
-              {{ p.label }}
-              <span class="ml-1 opacity-70 text-[10px]">
-                ({{ (publicTrends?.platforms?.[p.id] || []).length }})
-              </span>
-            </button>
-          </div>
-
-          <!-- Right Controls: Search & Security Only Toggle -->
-          <div class="flex flex-wrap items-center gap-2">
-            <!-- Search -->
-            <div class="relative min-w-[220px] flex-1 sm:flex-initial">
-              <Search class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
-              <input
-                v-model="searchTrendQuery"
-                type="text"
-                placeholder="Cari topik / isu / catatan..."
-                class="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-400"
-              />
-            </div>
-
-            <!-- Security Filter Toggle -->
-            <button
-              type="button"
-              @click="securityOnly = !securityOnly"
-              class="px-3 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer select-none flex items-center gap-1.5"
-              :class="securityOnly
-                ? 'bg-rose-500 text-white font-black border-rose-500 shadow-sm'
-                : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-100'"
-            >
-              <AlertTriangle class="w-3.5 h-3.5" :class="securityOnly ? 'text-white' : 'text-rose-500'" />
-              <span>🚨 Relevan Kamtibmas Saja</span>
-              <span class="px-1.5 py-0.2 rounded-full text-[10px]" :class="securityOnly ? 'bg-white/20 text-white' : 'bg-rose-500/20 text-rose-500 font-bold'">
-                {{ securityRelevantPublicCount }}
-              </span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Trends Grid List -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div
-            v-for="(item, idx) in currentPublicTrendsList"
-            :key="idx"
-            class="rounded-3xl bg-white dark:bg-[#0b1426] border transition p-5 shadow-sm space-y-3 relative flex flex-col justify-between"
-            :class="item.is_security_relevant
-              ? 'border-rose-400/80 dark:border-rose-900/80 ring-1 ring-rose-400/20'
-              : 'border-slate-200 dark:border-slate-800 hover:border-amber-400/70'"
-          >
-            <div>
-              <!-- Top Row: Rank, Platform Badge, Category, Velocity -->
-              <div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
-                <div class="flex items-center gap-2">
-                  <!-- Rank Badge -->
-                  <span
-                    class="w-6 h-6 rounded-lg flex items-center justify-center font-black text-xs shrink-0"
-                    :class="item.rank === 1
-                      ? 'bg-amber-400 text-slate-950 shadow-sm'
-                      : item.rank === 2
-                      ? 'bg-slate-300 text-slate-900'
-                      : item.rank === 3
-                      ? 'bg-amber-700 text-white'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'"
-                  >
-                    #{{ item.rank }}
-                  </span>
-
-                  <!-- Platform Pill -->
-                  <span class="px-2 py-0.5 rounded text-[10px] font-black" :class="getPublicPlatformBadge(item.platform).class">
-                    {{ getPublicPlatformBadge(item.platform).label }}
-                  </span>
-
-                  <!-- Category -->
-                  <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                    {{ item.category }}
-                  </span>
-                </div>
-
-                <!-- Velocity / Speed -->
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
-                  {{ item.velocity }}
-                </span>
-              </div>
-
-              <!-- Trend Name / Title -->
-              <div class="space-y-1">
-                <h3
-                  @click="filterByPublicTrend(item)"
-                  class="font-black text-slate-900 dark:text-white text-sm hover:text-amber-500 cursor-pointer transition leading-snug"
-                >
-                  {{ item.name }}
-                </h3>
-                <p class="text-xs text-slate-500 dark:text-slate-400 font-mono">
-                  Volume / Penayangan: <strong class="text-slate-900 dark:text-slate-200">{{ item.volume }}</strong>
-                </p>
-              </div>
-
-              <!-- Security Relevance Banner (Atensi Intelijen Siber / Kamtibmas) -->
-              <div
-                v-if="item.is_security_relevant"
-                class="mt-3 p-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-900 dark:text-rose-200 space-y-1 text-xs"
+              <Link
+                v-if="canCreateIssue"
+                :href="getEscalationUrl(item)"
+                class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-rose-500 hover:bg-rose-600 text-white transition"
               >
-                <div class="flex items-center gap-1.5 font-black text-rose-600 dark:text-rose-400 text-[11px]">
-                  <AlertTriangle class="w-3.5 h-3.5 shrink-0" />
-                  <span>ATENSI KAMTIBMAS & SIBER: {{ item.relevance_type }}</span>
-                </div>
-                <p class="text-[11px] leading-relaxed text-slate-700 dark:text-slate-300">
-                  {{ item.relevance_note }}
-                </p>
-              </div>
-              <div
-                v-else
-                class="mt-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 text-[11px] leading-relaxed"
-              >
-                <span class="font-bold text-slate-800 dark:text-slate-200">Konteks Isu:</span> {{ item.relevance_note }}
-              </div>
-            </div>
-
-            <!-- Action Buttons Footer -->
-            <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 mt-2">
-              <div class="flex items-center gap-1.5">
-                <!-- Direct 1-Click Escalation -->
-                <Link
-                  :href="getEscalationUrl(item)"
-                  class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-black bg-rose-500 hover:bg-rose-600 text-white transition shadow-sm"
-                  title="Eskalasi langsung topik tren ini ke formulir Laporan Isu Baru"
-                >
-                  <AlertTriangle class="w-3 h-3" />
-                  <span>🚨 Eskalasi Jadi Isu</span>
-                </Link>
-
-                <!-- Filter in Radar Tab -->
-                <button
-                  type="button"
-                  @click="filterByPublicTrend(item)"
-                  class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition"
-                  title="Filter postingan dengan kata kunci ini di Tab 01 Radar"
-                >
-                  <Search class="w-3 h-3 text-slate-500" />
-                  <span>Pantau di Radar</span>
-                </button>
-              </div>
-
-              <!-- Open Source URL -->
+                <AlertTriangle class="w-3 h-3" />
+                <span>Jadikan laporan isu</span>
+              </Link>
               <a
-                v-if="item.sample_url"
-                :href="item.sample_url"
+                :href="item.explore_url"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="p-1.5 rounded-lg bg-slate-100 hover:bg-amber-400 hover:text-slate-950 dark:bg-slate-800 dark:hover:bg-amber-400 dark:hover:text-slate-950 text-slate-500 transition"
-                title="Buka topik di platform aslinya"
+                class="ml-auto inline-flex items-center gap-1 text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-400"
               >
-                <ExternalLink class="w-3.5 h-3.5" />
+                <span>Google Trends</span>
+                <ExternalLink class="w-3 h-3" />
               </a>
             </div>
-          </div>
+          </article>
         </div>
-
-        <!-- Empty State -->
-        <div
-          v-if="!currentPublicTrendsList || currentPublicTrendsList.length === 0"
-          class="p-12 text-center text-xs text-slate-500 dark:text-slate-400 space-y-2 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800"
-        >
-          <Flame class="w-8 h-8 mx-auto text-slate-400 opacity-50" />
-          <p class="font-bold text-slate-700 dark:text-slate-300">Tidak ada tren publik yang sesuai dengan filter.</p>
-          <p class="text-[11px]">Coba ubah kata kunci pencarian atau matikan filter "Relevan Kamtibmas Saja".</p>
+        <div v-else class="p-8 text-center text-xs text-slate-500 dark:text-slate-400 space-y-1">
+          <TrendingUp class="w-6 h-6 mx-auto text-slate-400 opacity-60" />
+          <p v-if="googleTrends.length" class="font-bold text-slate-700 dark:text-slate-300">Tidak ada tren yang cocok dengan filter.</p>
+          <template v-else>
+            <p class="font-bold text-slate-700 dark:text-slate-300">Belum ada data tren pencarian.</p>
+            <p>{{ canSync ? 'Klik "Perbarui sekarang", atau tunggu pembaruan otomatis tiap jam.' : 'Data diperbarui otomatis tiap jam oleh penjadwal.' }}</p>
+          </template>
         </div>
-      </div>
+      </section>
     </div>
 
-    <!-- TAB 04: KONFIGURASI APIFY & KATA KUNCI (ADMIN ONLY - HIDDEN FROM OPERATOR) -->
-    <div v-if="false" class="space-y-4">
-      <div class="max-w-3xl rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-6 md:p-8 shadow-sm space-y-6">
-        <div class="border-b border-slate-200 dark:border-slate-800 pb-4">
-          <div class="flex items-center gap-2">
-            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500 text-white">
-              Apify Free Tier Ready
-            </span>
-            <h2 class="text-base font-black text-slate-900 dark:text-white">
-              {{ isNational ? 'Pengaturan Integrasi Apify Scraper Nasional (Divhumas Polri)' : 'Pengaturan Integrasi Apify Scraper & Kata Kunci Pelacakan' }}
-            </h2>
-          </div>
-          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            {{ isNational
-              ? 'Konfigurasi crawler skala nasional untuk pemantauan citra Polri, akun kedinasan pimpinan, dan narasi kamtibmas kewilayahan.'
-              : 'Gunakan paket gratis Apify (gratis $5/bulan) untuk scraping data X, TikTok, Instagram, dan YouTube.'
-            }}
-          </p>
-        </div>
-
-        <form @submit.prevent="saveSettings" class="space-y-5 text-xs">
-          <!-- Banner Pengelolaan Kredensial Apify Terpusat (Admin Governance) -->
-          <div class="p-4 rounded-2xl bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 space-y-3">
-            <div class="flex items-start justify-between gap-3 flex-wrap">
-              <div class="flex items-center gap-2.5">
-                <div class="w-8 h-8 rounded-xl bg-amber-400/10 flex items-center justify-center shrink-0 border border-amber-400/30">
-                  <Shield class="w-4 h-4 text-amber-500" />
-                </div>
-                <div>
-                  <h3 class="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
-                    Kredensial API Apify Dikelola Tersentralisasi
-                  </h3>
-                  <p class="text-[11px] text-slate-500 dark:text-slate-400">
-                    Untuk keamanan kredensial dinas dan rotasi kuota, Personal API Token Apify dikelola khusus oleh Administrator pada menu:
-                    <strong class="text-slate-800 dark:text-slate-200"> Keamanan &amp; Pemeliharaan &rarr; Mesin Intelijen AI</strong>.
-                  </p>
-                </div>
-              </div>
-
-              <!-- Status Badge -->
-              <span
-                class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 border flex items-center gap-1.5"
-                :class="settings?.apify_token_set ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30'"
-              >
-                <span class="w-1.5 h-1.5 rounded-full" :class="settings?.apify_token_set ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"></span>
-                <span>{{ settings?.apify_token_set ? 'Token Aktif & Terhubung' : 'Token Belum Diatur' }}</span>
-              </span>
-            </div>
-
-            <div class="flex items-center justify-between text-[11px] pt-2 border-t border-slate-200 dark:border-slate-800 flex-wrap gap-2">
-              <span class="text-slate-500 dark:text-slate-400 font-mono">
-                Status Integrasi: <strong class="text-slate-700 dark:text-slate-300">{{ settings?.apify_token_set ? 'Multi-API Failover Pool Siaga' : 'Memerlukan Konfigurasi Admin' }}</strong>
-              </span>
-
-              <Link
-                href="/settings/ai"
-                class="text-amber-600 dark:text-amber-400 font-bold hover:underline inline-flex items-center gap-1"
-              >
-                <span>Kelola Kredensial di Admin</span>
-                <ExternalLink class="w-3 h-3" />
-              </Link>
-            </div>
-          </div>
-
-          <!-- Kata Kunci Pelacakan -->
-          <div>
-            <label class="block font-black text-slate-800 dark:text-slate-200 mb-1.5 uppercase tracking-wider text-[11px]">
-              {{ isNational ? 'KATA KUNCI PEMANTAUAN NASIONAL (PISAHKAN DENGAN KOMA)' : 'KATA KUNCI PEMANTAUAN WILAYAH (PISAHKAN DENGAN KOMA)' }}
-            </label>
-            <textarea
-              v-model="settingsForm.keywords_tracked"
-              rows="2"
-              class="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-medium placeholder-slate-400 focus:outline-none focus:border-amber-400 leading-relaxed"
-            ></textarea>
-            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-              {{ isNational
-                ? 'Contoh: Divhumas Polri, Kapolri, Mabes Polri, Humas Polri, Bareskrim, Korlantas Polri, Propam Polri, Polisi Presisi, Dumas Presisi'
-                : 'Contoh: Polda Sulbar, Polresta Mamuju, Polisi Sulbar, Polres Majene, Polres Polman, Lantas Sulbar'
-              }}
-            </p>
-          </div>
-
-          <!-- Akun Target Pantauan Khusus -->
-          <div>
-            <label class="block font-black text-slate-800 dark:text-slate-200 mb-1.5 uppercase tracking-wider text-[11px]">
-              {{ isNational ? 'AKUN TARGET PANTAUAN NASIONAL (KANAL RESMI POLRI & PIMPINAN)' : 'AKUN TARGET PANTAUAN KHUSUS (PROFIL PUBLIK / INSTAGRAM / 𝕏 / TIKTOK / YOUTUBE)' }}
-            </label>
-            <textarea
-              v-model="settingsForm.accounts_tracked"
-              rows="2"
-              :placeholder="isNational ? '@divisihumaspri, @humaspolri, @polripresisi, @halo_polisi, @ccicpolri, @bareskrim_polri' : '@poldasulbar, @polresta_mamuju_official, @tribratanews_sulbar, @sulbar_update'"
-              class="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono placeholder-slate-400 focus:outline-none focus:border-amber-400 leading-relaxed"
-            ></textarea>
-            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-              {{ isNational
-                ? 'Masukkan username akun publik nasional yang wajib dipantau secara berkala oleh mesin pencari crawler Divhumas Polri.'
-                : 'Masukkan username akun publik yang wajib dipantau (pisahkan dengan koma). Crawler akan memprioritaskan penarikan dari akun-akun ini dan menandainya sebagai pantauan prioritas.'
-              }}
-            </p>
-          </div>
-
-          <!-- Frekuensi Sinkronisasi -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label class="block font-black text-slate-800 dark:text-slate-200 mb-1.5 uppercase tracking-wider text-[11px]">
-                INTERVAL PENARIKAN OTOMATIS
-              </label>
-              <select
-                v-model="settingsForm.sync_frequency"
-                class="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-bold outline-none focus:border-amber-400"
-              >
-                <option value="every_1_hour">Setiap 1 Jam</option>
-                <option value="every_3_hours">Setiap 3 Jam (Direkomendasikan)</option>
-                <option value="every_6_hours">Setiap 6 Jam</option>
-                <option value="daily">Sekali Sehari (Pukul 08.00 WITA)</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block font-black text-slate-800 dark:text-slate-200 mb-1.5 uppercase tracking-wider text-[11px]">
-                STATUS OTOMASI
-              </label>
-              <div class="flex items-center gap-3 p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 mt-0.5">
-                <input
-                  id="auto_sync"
-                  type="checkbox"
-                  v-model="settingsForm.auto_sync_enabled"
-                  class="w-4 h-4 rounded text-amber-500 focus:ring-amber-400"
-                />
-                <label for="auto_sync" class="font-bold text-slate-800 dark:text-slate-200 cursor-pointer">
-                  Aktifkan Sinkronisasi Background Otomatis
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <!-- Feedback Notifikasi Simpan -->
-          <div v-if="saveFeedback" class="p-3.5 rounded-xl text-xs font-bold flex items-center gap-2.5" :class="saveFeedback.type === 'success' ? 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-700 dark:text-emerald-300' : 'bg-rose-500/15 border border-rose-500/40 text-rose-700 dark:text-rose-300'">
-            <CheckCircle2 v-if="saveFeedback.type === 'success'" class="w-4 h-4 text-emerald-500 shrink-0" />
-            <AlertTriangle v-else class="w-4 h-4 text-rose-500 shrink-0" />
-            <span>{{ saveFeedback.message }}</span>
-          </div>
-
-          <div class="flex items-center justify-between gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
-            <button
-              type="button"
-              @click="triggerSync"
-              :disabled="isSyncing || !settings?.apify_token_set"
-              class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 transition disabled:opacity-40 cursor-pointer"
-            >
-              <RefreshCw :class="['w-3.5 h-3.5', isSyncing ? 'animate-spin' : '']" />
-              <span>{{ isSyncing ? 'Sedang Menarik Data...' : '⚡ Tarik Data Live Apify Sekarang' }}</span>
-            </button>
-
-            <button
-              type="submit"
-              :disabled="isSavingSettings"
-              class="px-6 py-2.5 rounded-xl text-xs font-black bg-amber-400 hover:bg-amber-300 text-slate-950 transition shadow disabled:opacity-50 cursor-pointer"
-            >
-              {{ isSavingSettings ? 'Menyimpan...' : 'Simpan Konfigurasi Apify' }}
-            </button>
-          </div>
-        </form>
-      </div>
-
-      <!-- KATALOG FORMAT TREN & REKOMENDASI ACTOR APIFY PER PLATFORM -->
-      <div class="max-w-4xl rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-6 md:p-8 shadow-sm space-y-6">
-        <div class="border-b border-slate-200 dark:border-slate-800 pb-4">
-          <div class="flex items-center gap-2">
-            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-indigo-500 text-white">
-              Arsitektur Multi-Platform
-            </span>
-            <h2 class="text-base font-black text-slate-900 dark:text-white">
-              Format Tren yang Didukung & Rekomendasi Actor Apify per Platform
-            </h2>
-          </div>
-          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Masing-masing media sosial memiliki format tren dan struktur data yang berbeda. Gunakan panduan resmi ini untuk memahami cara scraper Apify mengekstrak data tren dari masing-masing platform secara legal dan efisien.
-          </p>
-        </div>
-
-        <div class="space-y-4">
-          <div
-            v-for="(actor, aIdx) in (supportedActors || [])"
-            :key="aIdx"
-            class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-3"
-          >
-            <!-- Platform Header -->
-            <div class="flex items-center justify-between gap-2 flex-wrap">
-              <div class="flex items-center gap-2.5">
-                <span class="px-2.5 py-1 rounded-xl text-xs font-black" :class="actor.badge_class">
-                  {{ actor.platform_label }}
-                </span>
-                <span class="text-xs font-black text-slate-900 dark:text-white">
-                  {{ actor.trend_format }}
-                </span>
-              </div>
-              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                ✓ {{ actor.status_label }}
-              </span>
-            </div>
-
-            <!-- Actors Recommendations -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-              <div
-                v-for="(rec, rIdx) in actor.recommended_actors"
-                :key="rIdx"
-                class="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col justify-between"
-              >
-                <div>
-                  <div class="flex items-center justify-between gap-1 mb-1">
-                    <span class="font-mono font-bold text-xs text-amber-600 dark:text-amber-400">
-                      {{ rec.id }}
-                    </span>
-                    <span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                      {{ rec.badge }}
-                    </span>
-                  </div>
-                  <p class="font-bold text-slate-900 dark:text-white text-xs">{{ rec.name }}</p>
-                  <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                    {{ rec.description }}
-                  </p>
-                </div>
-                <div class="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                  <span class="text-[10px] text-slate-400">Creator: @{{ rec.author }}</span>
-                  <a
-                    :href="rec.apify_url"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="text-[10px] font-bold text-sky-600 hover:text-sky-500 dark:text-sky-400 inline-flex items-center gap-1"
-                  >
-                    <span>Apify Store</span>
-                    <ExternalLink class="w-3 h-3" />
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            <!-- Output Data Schema -->
-            <div class="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/60 text-[11px] text-slate-600 dark:text-slate-300 font-mono flex items-start gap-2">
-              <span class="font-bold text-slate-900 dark:text-white shrink-0">Output Data:</span>
-              <span class="break-words">{{ actor.output_data }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
     <!-- MODAL ON-DEMAND KEYWORD TRACKER (CRAWL TOPIK BARU INSTAN) -->
     <div
       v-if="showTrackModal"

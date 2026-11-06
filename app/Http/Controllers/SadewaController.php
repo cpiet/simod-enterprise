@@ -180,17 +180,40 @@ class SadewaController extends Controller
         }
 
         $reply = $result['reply'];
+        $sources = [];
+        $fromWeb = false;
 
-        // Hanya sumber yang benar-benar dirujuk dalam jawaban yang dikirim ke klien.
-        preg_match_all('/\[([MSIE]\d{1,3})\]/', $reply, $m);
-        $sources = collect(array_unique($m[1]))
-            ->filter(fn ($code) => isset($sourceMap[$code]))
-            ->map(fn ($code) => ['code' => $code] + $sourceMap[$code])->values()->all();
+        if (str_contains($reply, $gemini->webSearchMarker())) {
+            // Data SIMOD tidak memuat jawaban. Cari di internet hanya dengan pertanyaan pengguna (tanpa data internal).
+            $fallback = 'Data SIMOD pada lingkup ' . $scopeLabel . ' belum memuat jawaban untuk pertanyaan ini.';
+            if (! \App\Models\AiSetting::webSearchEnabled($selectedPolda?->id)) {
+                $reply = $fallback . ' Pencarian internet SADEWA sedang dinonaktifkan administrator.';
+            } elseif ($denied = $quota->denial($user, $selectedPolda?->id)) {
+                $reply = $fallback . ' Pencarian internet tidak dijalankan: ' . $denied;
+            } else {
+                $previousQuestions = collect($history)->where('role', 'user')->pluck('content')->all();
+                $web = $gemini->searchWebSadewa($selectedPolda, (string) $request->input('message'), $previousQuestions);
+                $quota->finish($user, $selectedPolda?->id, 'chat_web', $web);
+                if ($web['success']) {
+                    $reply = $web['reply'];
+                    $sources = $web['sources'];
+                    $fromWeb = true;
+                } else {
+                    $reply = $fallback . ' Pencarian internet gagal: ' . ($web['message'] ?? 'coba lagi nanti.');
+                }
+            }
+        } else {
+            // Hanya sumber yang benar-benar dirujuk dalam jawaban yang dikirim ke klien.
+            preg_match_all('/\[([MSIE]\d{1,3})\]/', $reply, $m);
+            $sources = collect(array_unique($m[1]))
+                ->filter(fn ($code) => isset($sourceMap[$code]))
+                ->map(fn ($code) => ['code' => $code] + $sourceMap[$code])->values()->all();
+        }
 
         $now = now()->toIso8601String();
         $messages = $conversation?->messages ?? [];
         $messages[] = ['role' => 'user', 'text' => (string) $request->input('message'), 'time' => $now];
-        $messages[] = ['role' => 'assistant', 'text' => $reply, 'time' => $now, 'sources' => $sources];
+        $messages[] = ['role' => 'assistant', 'text' => $reply, 'time' => $now, 'sources' => $sources, 'from_web' => $fromWeb];
         $messages = array_slice($messages, -SadewaConversation::MAX_MESSAGES);
 
         if ($conversation) {
@@ -214,6 +237,7 @@ class SadewaController extends Controller
             'success'         => true,
             'reply'           => $reply,
             'sources'         => $sources,
+            'from_web'        => $fromWeb,
             'conversation_id' => $conversation->id,
             'title'           => $conversation->title,
             'time'            => $now,

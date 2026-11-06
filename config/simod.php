@@ -15,6 +15,9 @@ return [
     // Fallback medsos berisi data buatan (postingan sintetis, tren publik statis). Nonaktif: radar hanya berisi data nyata.
     'social_synthetic_fallback' => (bool) env('SIMOD_SOCIAL_SYNTHETIC', false),
 
+    // Sinkron otomatis radar medsos lapis gratis (sindikasi Google News, tanpa Apify) tiap 30 menit lewat penjadwal.
+    'social_auto_sync' => (bool) env('SIMOD_SOCIAL_AUTO_SYNC', true),
+
     // Token statis untuk endpoint API ingest (worker Python). Kosong = API ingest ditolak (fail-closed).
     'ingest_token' => env('INGEST_API_TOKEN', ''),
 ];

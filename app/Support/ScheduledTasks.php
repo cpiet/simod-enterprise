@@ -33,6 +33,17 @@ class ScheduledTasks
                 'why' => 'Membuat cadangan sesuai jadwal dan menghapus cadangan lama.',
             ],
             [
+                'key' => 'social_free_sync', 'label' => 'Sinkron radar medsos (lapis gratis)', 'command' => 'social:sync-free',
+                'cadence' => 'Setiap 30 menit', 'every' => 30, 'freq' => ['everyThirtyMinutes'], 'overlap' => 25,
+                'enabled' => fn () => (bool) config('simod.social_auto_sync'),
+                'why' => 'Menambah percakapan medsos dari sindikasi Google News tanpa biaya. Apify berbayar tetap manual.',
+            ],
+            [
+                'key' => 'public_trends', 'label' => 'Tren pencarian publik (Google Trends)', 'command' => 'social:trends-refresh',
+                'cadence' => 'Setiap jam', 'every' => 60, 'freq' => ['hourly'], 'overlap' => 10,
+                'why' => 'Memperbarui tren pencarian Indonesia di Radar Media Sosial → Tren (gratis, tanpa Apify).',
+            ],
+            [
                 'key' => 'audit_prune', 'label' => 'Pemangkasan log audit', 'command' => 'audit:prune',
                 'cadence' => 'Harian 02:30', 'every' => 1440, 'freq' => ['dailyAt', '02:30'],
                 'why' => 'Menghapus log audit lebih lama dari retensi (diatur di Audit Log).',

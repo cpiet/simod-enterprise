@@ -1094,6 +1094,132 @@ PROMPT;
         return implode("\n", $lines);
     }
 
+    /** Penanda dari SADEWA bahwa data SIMOD tidak memuat jawaban dan pencarian internet diperlukan. */
+    public function webSearchMarker(): string
+    {
+        return '[[CARI_WEB]]';
+    }
+
+    /**
+     * SADEWA: jawab dari internet (Google Search grounding) bila data SIMOD tidak memuat jawaban.
+     *
+     * Kerahasiaan: yang dikirim HANYA pertanyaan pengguna (dan maks. 2 pertanyaan sebelumnya untuk konteks),
+     * tidak pernah data internal SIMOD. Sumber diambil dari groundingMetadata; kutipan [W1].. disisipkan
+     * di akhir kalimat yang didukung sumber.
+     *
+     * @param array<int, string> $previousQuestions pertanyaan pengguna sebelumnya (tanpa jawaban SADEWA)
+     * @return array{success: bool, reply?: string, sources?: array, model?: string, message?: string}
+     */
+    public function searchWebSadewa(Polda $polda, string $question, array $previousQuestions = [], ?string $apiKey = null, ?string $model = null): array
+    {
+        $keysPool = $apiKey ? $this->parseApiKeys($apiKey) : $this->getAllApiKeys($polda->id);
+        if (empty($keysPool)) {
+            return ['success' => false, 'status' => 'missing_api_key', 'message' => 'Google Gemini API Key belum dikonfigurasi pada Pengaturan AI.'];
+        }
+
+        $context = '';
+        $prev = array_values(array_filter(array_map(fn ($q) => mb_substr(trim((string) $q), 0, 300), array_slice($previousQuestions, -2))));
+        if ($prev) {
+            $context = "Pertanyaan sebelumnya dari pengguna yang sama (untuk memahami rujukan seperti \"dia\" atau \"kasus itu\"):\n- " . implode("\n- ", $prev) . "\n\n";
+        }
+        $today = now('Asia/Jakarta')->translatedFormat('d F Y');
+
+        $prompt = <<<PROMPT
+Anda adalah "SADEWA", asisten analis media dan opini publik untuk Humas Polri. Data internal SIMOD tidak memuat jawaban untuk pertanyaan ini, jadi gunakan pencarian Google.
+Tanggal hari ini: {$today}.
+
+{$context}PERTANYAAN: "{$question}"
+
+ATURAN:
+1. Jawab hanya dari hasil pencarian. Bila hasil tidak memadai atau saling bertentangan, katakan terus terang.
+2. Sebutkan tanggal peristiwa bila ada, dan bedakan fakta yang dikonfirmasi pihak resmi dari klaim/kabar yang belum terverifikasi.
+3. Bahasa Indonesia ringkas, gaya staf analis kepada pimpinan; butir poin seperlunya, tanpa tanda pagar '#'.
+4. Bila relevan, akhiri dengan satu saran tindak lanjut kehumasan.
+5. Jangan menyebut nama model atau teknologi AI. Identitas Anda hanya "SADEWA".
+PROMPT;
+
+        $lastError = 'Pencarian internet SADEWA gagal.';
+        foreach ($keysPool as $keyIndex => $currentKey) {
+            foreach ($this->modelChain($model ?: $this->getModel($polda->id)) as $m) {
+                try {
+                    $response = $this->client($currentKey, 60)->post(
+                        "https://generativelanguage.googleapis.com/v1beta/models/{$m}:generateContent",
+                        [
+                            'contents'         => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
+                            'tools'            => [['google_search' => (object) []]],
+                            'generationConfig' => ['temperature' => 0.2, 'maxOutputTokens' => 1500],
+                        ]
+                    );
+
+                    if ($response->successful()) {
+                        $candidate = $response->json('candidates.0') ?? [];
+                        $text = implode('', array_map(fn ($p) => (string) ($p['text'] ?? ''), $candidate['content']['parts'] ?? []));
+                        if (trim($text) !== '') {
+                            [$reply, $sources] = $this->applyGrounding($text, $candidate['groundingMetadata'] ?? []);
+
+                            return ['success' => true, 'reply' => trim($reply), 'sources' => $sources, 'model' => $m];
+                        }
+                        $lastError = "Model {$m} (Key #{$keyIndex}): jawaban kosong";
+
+                        continue;
+                    }
+
+                    $lastError = "Model {$m} (Key #{$keyIndex}): " . ($response->json('error.message') ?? $response->body());
+                    $this->logHttpFailure('pencarian internet SADEWA', $m, $response->status(), (string) ($response->json('error.message') ?? $response->body()));
+                } catch (\Throwable $e) {
+                    $lastError = "Exception Model {$m} (Key #{$keyIndex}): " . $this->redactSecrets($e->getMessage());
+                }
+            }
+        }
+
+        return ['success' => false, 'status' => 'error', 'message' => $this->friendlyAiError($lastError)];
+    }
+
+    /**
+     * Sisipkan kutipan [Wn] dari groundingSupports (indeks byte UTF-8) dan susun daftar sumber web.
+     *
+     * @return array{0: string, 1: array<int, array<string, mixed>>}
+     */
+    private function applyGrounding(string $text, array $meta): array
+    {
+        $sources = [];
+        $codeFor = [];
+        foreach ($meta['groundingChunks'] ?? [] as $i => $chunk) {
+            $uri = $chunk['web']['uri'] ?? null;
+            if (! $uri || ! preg_match('#^https?://#i', $uri)) {
+                continue;
+            }
+            $code = 'W' . (count($sources) + 1);
+            $codeFor[$i] = $code;
+            $title = trim((string) ($chunk['web']['title'] ?? '')) ?: parse_url($uri, PHP_URL_HOST);
+            $sources[] = ['code' => $code, 'type' => 'web', 'title' => mb_substr($title, 0, 120), 'label' => 'Internet', 'url' => $uri, 'external' => true];
+        }
+
+        $inserts = [];
+        foreach ($meta['groundingSupports'] ?? [] as $support) {
+            $end = $support['segment']['endIndex'] ?? null;
+            $codes = array_values(array_unique(array_filter(array_map(fn ($idx) => $codeFor[$idx] ?? null, $support['groundingChunkIndices'] ?? []))));
+            if ($end === null || ! $codes || $end > strlen($text)) {
+                continue;
+            }
+            $inserts[(int) $end] = array_values(array_unique(array_merge($inserts[(int) $end] ?? [], $codes)));
+        }
+        krsort($inserts);
+        foreach ($inserts as $end => $codes) {
+            // indeks byte: substr PHP bekerja per byte sehingga cocok dengan offset UTF-8 dari Gemini
+            $text = substr($text, 0, $end) . ' ' . implode(' ', array_map(fn ($c) => "[{$c}]", array_slice($codes, 0, 3))) . substr($text, $end);
+        }
+
+        // Hanya sumber yang benar-benar dikutip; bila tidak ada kutipan sama sekali, tampilkan semua sumber.
+        preg_match_all('/\[(W\d{1,2})\]/', $text, $m);
+        $cited = array_unique($m[1]);
+        if ($cited) {
+            $sources = array_values(array_filter($sources, fn ($s) => in_array($s['code'], $cited, true)));
+        }
+
+        return [$text, $sources];
+    }
+
     /**
      * SADEWA AI - asisten percakapan multi-sumber (media online, media sosial, isu internal).
      *
@@ -1150,7 +1276,9 @@ PERTANYAAN / INSTRUKSI SAAT INI:
 "{$userMessage}"
 
 ATURAN WAJIB:
-1. **Hanya dari data**: jawab berdasarkan data di atas. Jika data tidak memuat jawabannya atau lingkup data tidak mencakup topik yang ditanyakan, katakan terus terang bahwa datanya belum ada. Jangan mengarang angka, nama, kutipan, atau peristiwa.
+1. **Hanya dari data**: jawab berdasarkan data di atas. Jangan mengarang angka, nama, kutipan, atau peristiwa.
+   - Jika data SAMA SEKALI tidak memuat jawabannya DAN pertanyaan menyangkut fakta, peristiwa, tokoh, atau informasi publik yang dapat dicari di internet, balas HANYA dengan teks {$this->webSearchMarker()} tanpa kata lain.
+   - Jika pertanyaan menyangkut hal internal (isu/laporan internal, tugas, data satuan) dan datanya tidak ada, katakan terus terang bahwa datanya belum ada.
 2. **Rujuk sumber**: setiap fakta penting diakhiri kode rujukan sesuai data, misalnya [M3], [S2], [I1]. Gunakan hanya kode yang benar-benar ada di data. Sebutkan juga nama portal atau akun yang memberitakan.
 3. **Bahasa Indonesia natural dan ringkas**: gaya staf analis senior kepada pimpinan. Mulai langsung ke inti; salam dinas singkat hanya jika ini pesan pertama. Dilarang menyelipkan kata Inggris dalam kurung.
 4. **Format**: gunakan penomoran atau butir poin seperlunya, tanpa tanda pagar '#' dan tanpa tumpukan simbol bintang ganda. Akhiri dengan satu rekomendasi tindak lanjut bila relevan.

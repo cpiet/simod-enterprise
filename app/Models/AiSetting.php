@@ -23,6 +23,7 @@ class AiSetting extends Model
         'scheduled_times',
         'temperature',
         'daily_user_limit',
+        'web_search_enabled',
         'custom_prompt_template',
         'last_analyzed_at',
         'last_status',
@@ -36,6 +37,7 @@ class AiSetting extends Model
         'is_auto_analyze'  => 'boolean',
         'temperature'      => 'float',
         'daily_user_limit' => 'integer',
+        'web_search_enabled' => 'boolean',
         'last_analyzed_at' => 'datetime',
     ];
 
@@ -47,6 +49,19 @@ class AiSetting extends Model
     /**
      * Get or create setting for specific Polda (or global when null).
      */
+    /**
+     * Apakah SADEWA boleh mencari di internet untuk Polda ini (pengaturan Polda → global → bawaan aktif).
+     */
+    public static function webSearchEnabled(?int $poldaId): bool
+    {
+        $v = $poldaId ? static::where('polda_id', $poldaId)->value('web_search_enabled') : null;
+        if ($v === null) {
+            $v = static::whereNull('polda_id')->value('web_search_enabled');
+        }
+
+        return $v === null ? true : (bool) $v;
+    }
+
     public static function forPolda(?int $poldaId = null): self
     {
         return static::firstOrCreate(

@@ -74,7 +74,6 @@ class SocialIntelligenceTest extends TestCase
             ->has('metrics')
             ->where('metrics.total_posts', 1)
             ->has('publicTrends')
-            ->has('supportedActors')
             ->has('spikeTimeline')
             ->has('wordCloud')
         );
@@ -240,13 +239,15 @@ class SocialIntelligenceTest extends TestCase
         ]);
     }
 
-    public function test_sync_public_trends_endpoint(): void
+    public function test_sync_public_trends_endpoint_pulls_google_trends(): void
     {
-        $response = $this->actingAs($this->user)->post('/social-intelligence/sync-trends');
-        $response->assertRedirect();
-        $this->assertDatabaseHas('audit_logs', [
-            'action' => 'apify.trends_sync',
+        \Illuminate\Support\Facades\Http::fake([
+            'trends.google.com/*' => \Illuminate\Support\Facades\Http::response(\Tests\Feature\PublicTrendsTest::FEED, 200),
         ]);
+
+        $response = $this->actingAs($this->user)->post('/social-intelligence/sync-trends');
+        $response->assertRedirect()->assertSessionHas('success');
+        $this->assertCount(2, \Illuminate\Support\Facades\Cache::get(\App\Services\PublicTrendsService::CACHE_KEY)['items']);
     }
 
     public function test_track_keyword_on_demand_endpoint(): void

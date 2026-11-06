@@ -67,6 +67,7 @@ const form = useForm({
   raw_api_keys_text: props.setting?.raw_api_keys_text || '',
   gemini_model: props.setting?.gemini_model || 'gemini-3.5-flash-lite',
   daily_user_limit: props.setting?.daily_user_limit ?? 40,
+  web_search_enabled: props.setting?.web_search_enabled ?? true,
   temperature: props.setting?.temperature ?? 0.20,
   apply_to_all_poldas: true,
 });
@@ -810,6 +811,14 @@ const submitSettings = () => {
                 <li>Analisis yang datanya tidak berubah sejak analisis terakhir <b>dilewati</b> dan tidak memakai kuota.</li>
                 <li>Saat kuota Google habis, permintaan baru ditahan 10 menit agar sisa jatah per menit tidak terbuang.</li>
               </ul>
+              <label class="flex items-start gap-2.5 pt-2 cursor-pointer">
+                <input type="checkbox" v-model="form.web_search_enabled" class="mt-0.5 w-4 h-4 accent-amber-400" />
+                <span class="text-[11px] text-slate-300 leading-relaxed">
+                  <b class="text-slate-100">SADEWA boleh mencari di internet</b> bila data SIMOD tidak memuat jawaban.
+                  Yang dikirim ke Google hanya pertanyaan pengguna, bukan data internal. Jawaban diberi label "dari internet" beserta tautan sumbernya,
+                  dan memakai 1 permintaan tambahan dari batas harian.
+                </span>
+              </label>
             </div>
 
             <div class="lg:col-span-2 rounded-2xl bg-slate-900/70 border border-slate-800 p-4 space-y-3">

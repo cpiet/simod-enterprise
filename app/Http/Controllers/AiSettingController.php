@@ -104,6 +104,7 @@ class AiSettingController extends Controller
                 'total_keys'                => count($allKeys),
                 'gemini_model'              => $activeModel,
                 'daily_user_limit'          => (int) ($aiSetting->daily_user_limit ?? \App\Services\AiQuota::DEFAULT_LIMIT),
+                'web_search_enabled'        => (bool) ($aiSetting->web_search_enabled ?? true),
                 'temperature'               => (float) ($aiSetting->temperature ?? 0.20),
                 'custom_prompt_template'    => $customPrompt,
                 'default_prompt_template'   => $defaultPrompt,
@@ -141,6 +142,7 @@ class AiSettingController extends Controller
             'api_keys_pool'           => 'nullable',
             'gemini_model'            => 'required|string|in:gemini-3.5-flash-lite,gemini-flash-lite-latest,gemini-3.8-flash,gemini-3.1-pro-preview,gemini-2.5-pro,gemini-1.5-pro,gemini-2.5-flash,gemini-1.5-flash',
             'daily_user_limit'        => 'nullable|integer|min:0|max:1000',
+            'web_search_enabled'      => 'nullable|boolean',
             'temperature'             => 'nullable|numeric|min:0.0|max:1.0',
             'custom_prompt_template'  => 'nullable|string',
             'reset_prompt_to_default' => 'nullable|boolean',
@@ -165,6 +167,7 @@ class AiSettingController extends Controller
             'gemini_model'     => $validated['gemini_model'],
             'daily_user_limit' => (int) ($validated['daily_user_limit'] ?? \App\Services\AiQuota::DEFAULT_LIMIT),
             'temperature'      => (float) ($validated['temperature'] ?? 0.20),
+            'web_search_enabled' => $request->has('web_search_enabled') ? $request->boolean('web_search_enabled') : (bool) ($aiSetting->web_search_enabled ?? true),
         ];
 
         // Custom Prompt Template Handling
@@ -208,6 +211,7 @@ class AiSettingController extends Controller
                 'polda_code'          => $selectedPolda->code,
                 'gemini_model'        => $validated['gemini_model'],
                 'daily_user_limit'    => $updateData['daily_user_limit'],
+                'web_search_enabled'  => $updateData['web_search_enabled'],
                 'keys_count'          => $keysCount,
                 'has_custom_prompt'   => !empty($updateData['custom_prompt_template']),
                 'apply_to_all_poldas' => (bool) ($validated['apply_to_all_poldas'] ?? false),

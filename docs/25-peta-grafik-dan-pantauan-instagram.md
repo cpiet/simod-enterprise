@@ -38,3 +38,6 @@ Jalankan `php artisan test` dengan SQLite in-memory sesuai `phpunit.xml`, dan `n
 - **Kecepatan.** Sembilan query metrik digabung menjadi satu query agregat, dan analitik berat (KOL, tagar, jam puncak, lonjakan, awan kata, tren publik) kini prop lazy sehingga reload sebagian (mis. setelah sinkron akun) tidak menghitung ulang semuanya.
 - **Pengujian:** `InstagramAccountMonitoringTest`, `NavigationSweepTest` (menu semua peran terbuka tanpa 403, semua rute GET tanpa parameter tidak 500, token tidak bocor/terhapus).
 - **Deployment:** jalankan `php artisan migrate --force` (kolom `last_error`) dan bersihkan cache (`php artisan optimize:clear`).
+
+## Addendum 6 Nov 2026 (2): banyak akun & unggahan menonjol
+Tampilan ringkas per akun, cari/urut/saring, dan penanda unggahan menonjol (`App\Support\InstagramHighlights`). Grafik 7 hari kini memakai tanggal zona waktu tenant. Detail: doc 32.

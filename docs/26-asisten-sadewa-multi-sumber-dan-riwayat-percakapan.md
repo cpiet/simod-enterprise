@@ -79,3 +79,6 @@ Diuji secara komprehensif pada [`tests/Feature/SadewaChatTest.php`](../tests/Fea
 7. Validasi masukan pesan kosong dan lingkup tidak dikenal (HTTP 422).
 
 Baseline pengujian sistem saat ini: **151 passed (905 assertions)**.
+
+## Addendum 6 Nov 2026: pencarian internet
+Bila data SIMOD tidak memuat jawaban, SADEWA dapat mencari lewat Google Search (hanya pertanyaan pengguna yang dikirim), diberi label "dari internet" dan sumber `[W1]..`, dihitung kuota (`chat_web`), dan dapat dimatikan admin (`ai_settings.web_search_enabled`). Detail: doc 32 §3.

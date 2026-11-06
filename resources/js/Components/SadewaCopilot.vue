@@ -11,7 +11,7 @@ import { Link, usePage } from '@inertiajs/vue3';
 import { Marked } from 'marked';
 import {
   Bot, X, Send, Square, MoreHorizontal, Plus, History, Volume2, VolumeX, Copy, Check,
-  RotateCcw, Trash2, ArrowLeft, ExternalLink, MessageSquareText, Newspaper, Share2, ClipboardList, ChevronRight,
+  RotateCcw, Trash2, ArrowLeft, ExternalLink, MessageSquareText, Newspaper, Share2, ClipboardList, ChevronRight, Globe,
 } from 'lucide-vue-next';
 
 // Parser markdown terisolasi dan aman: HTML mentah dari model/data dilepas, hanya tautan http(s) yang aktif.
@@ -228,7 +228,7 @@ const send = async (text = null) => {
     if (res.data?.success) {
       conversationId.value = res.data.conversation_id;
       if (res.data.usage) usage.value = res.data.usage;
-      messages.value.push({ role: 'assistant', text: res.data.reply, sources: res.data.sources || [], time: res.data.time });
+      messages.value.push({ role: 'assistant', text: res.data.reply, sources: res.data.sources || [], from_web: !!res.data.from_web, time: res.data.time });
       if (autoSpeak.value) speak(res.data.reply, messages.value.length - 1);
     } else {
       pushError('Jawaban tidak dapat diproses. Silakan coba lagi.');
@@ -522,6 +522,9 @@ const sourceTypeLabel = { media: 'Media', social: 'Medsos', issue: 'Isu', ews: '
               <div v-else class="flex gap-2.5">
                 <span class="w-7 h-7 shrink-0 rounded-full bg-[#0b1426] text-amber-400 flex items-center justify-center"><Bot class="w-4 h-4" /></span>
                 <div class="min-w-0 flex-1">
+                  <p v-if="m.from_web" class="mb-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-300 dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/40">
+                    <Globe class="w-3 h-3" /> Dari internet, di luar data SIMOD. Periksa sumbernya.
+                  </p>
                   <div class="text-[12px] text-slate-700 dark:text-slate-200 leading-relaxed sadewa-markdown-body" v-html="renderMarkdown(m.text)"></div>
 
                   <div v-if="m.sources?.length" class="mt-2.5">

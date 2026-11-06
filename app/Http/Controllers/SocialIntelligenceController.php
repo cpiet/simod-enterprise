@@ -11,6 +11,7 @@ use App\Models\SocialInvestigationCase;
 use App\Models\SocialPost;
 use App\Models\SocialSetting;
 use App\Services\ApifySyncService;
+use App\Services\PublicTrendsService;
 use App\Services\GeminiService;
 use App\Services\InstagramAccountMonitoringService;
 use App\Services\SocialSyndicationService;
@@ -23,7 +24,7 @@ class SocialIntelligenceController extends Controller
     /**
      * Display the Social Intelligence Dashboard (Multi-Platform Radar).
      */
-    public function index(Request $request, ApifySyncService $service): Response
+    public function index(Request $request): Response
     {
         $allPoldas = Polda::withCount('polres')->where('is_active', true)->get();
         [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
@@ -95,7 +96,9 @@ class SocialIntelligenceController extends Controller
         $timelineQuery = clone $query;
         $postDate = $request->validate(['post_date' => ['nullable', 'date_format:Y-m-d']])['post_date'] ?? null;
         if ($postDate) {
-            $query->whereDate('posted_at', $postDate);
+            // Tanggal lokal tenant (sama dengan pengelompokan grafik 7 hari), dikonversi ke rentang UTC.
+            $dayStart = \Carbon\Carbon::createFromFormat('Y-m-d', $postDate, $this->tenantTimezone($selectedPolda, $isNational)[0])->startOfDay();
+            $query->where('posted_at', '>=', $dayStart->copy()->utc())->where('posted_at', '<', $dayStart->copy()->addDay()->utc());
         }
 
         // Sorting
@@ -338,11 +341,12 @@ class SocialIntelligenceController extends Controller
             'selectedCase'        => $selectedCase,
             'metrics'             => $metrics,
             'kolProfiles'         => $kolProfiles,
-            'monitoredInstagramAccounts' => MonitoredInstagramAccount::where('polda_id', $poldaId)->orderBy('username')->get(),
+            'monitoredInstagramAccounts' => MonitoredInstagramAccount::where('polda_id', $poldaId)->orderBy('username')->get()
+                ->map(fn ($account) => array_merge($account->toArray(), ['posts' => \App\Support\InstagramHighlights::annotate($account->posts ?? [])]))
+                ->values(),
             'trendingHashtags'    => fn () => $trending()['trendingHashtags'],
             'trendingByPlatform'  => fn () => $trending()['trendingByPlatform'],
-            'publicTrends'        => fn () => $service->getPublicTrendsData(),
-            'supportedActors'     => fn () => $service->getSupportedTrendActors(),
+            'publicTrends'        => fn () => app(PublicTrendsService::class)->cached(),
             'spikeTimeline'       => fn () => $this->getSentimentSpikeTimeline($timelineQuery, $selectedPolda, $isNational),
             'wordCloud'           => fn () => $this->getWordCloudData($poldaScope, $selectedPolda),
             'peakHours'           => $peakHours,
@@ -536,13 +540,14 @@ class SocialIntelligenceController extends Controller
     /**
      * Refresh multi-platform public trends.
      */
-    public function syncTrends(Request $request, ApifySyncService $service)
+    /**
+     * Perbarui tren pencarian publik Indonesia (Google Trends, gratis). Data nasional, sama untuk semua tenant.
+     */
+    public function syncTrends(Request $request, PublicTrendsService $trends)
     {
-        $result = $service->syncPublicTrends($this->resolveApifyToken($this->resolveActiveTenant($request)[2]));
+        $result = $trends->refresh();
 
-        $ok = (bool) ($result['success'] ?? true);
-
-        return redirect()->back()->with($ok ? 'success' : 'error', ($ok ? '✓ ' : '') . $result['message']);
+        return redirect()->back()->with($result['success'] ? 'success' : 'error', $result['message']);
     }
 
     /**
@@ -654,9 +659,6 @@ class SocialIntelligenceController extends Controller
             usort($byPlatform[$plat], fn($a, $b) => $b['count'] <=> $a['count']);
         }
 
-        // Ensure minimum fallback tags if DB is empty or has very few tags
-        $byPlatform = $this->supplementFallbackHashtags($byPlatform, $isNational, $selectedPolda);
-
         // Select active list
         $activeList = $byPlatform[$platformFilter] ?? $byPlatform['all'];
 
@@ -712,155 +714,74 @@ class SocialIntelligenceController extends Controller
         return $map[$lower] ?? ('#' . ltrim($tag, '#'));
     }
 
-    /**
-     * Supplement realistic intelligence templates if a platform has limited tags.
-     */
-    protected function supplementFallbackHashtags(array $byPlatform, bool $isNational, ?Polda $selectedPolda): array
-    {
-        $poldaName = $selectedPolda?->code === 'SULBAR' ? 'Sulbar' : ($selectedPolda?->name ?? 'Wilayah');
-
-        $nationalTemplates = [
-            'instagram' => [
-                ['tag' => '#PolriPresisi', 'count' => 148500, 'posts_count' => 28, 'sentiment' => 'positif'],
-                ['tag' => '#DivisiHumasPolri', 'count' => 92400, 'posts_count' => 19, 'sentiment' => 'positif'],
-                ['tag' => '#TertibLantas', 'count' => 84200, 'posts_count' => 16, 'sentiment' => 'positif'],
-                ['tag' => '#RaziaKnalpotBrong', 'count' => 76500, 'posts_count' => 14, 'sentiment' => 'netral'],
-                ['tag' => '#CekFakta', 'count' => 68900, 'posts_count' => 15, 'sentiment' => 'netral'],
-                ['tag' => '#StopHoaks', 'count' => 54100, 'posts_count' => 12, 'sentiment' => 'positif'],
-                ['tag' => '#PolriBerprestasi', 'count' => 48200, 'posts_count' => 9, 'sentiment' => 'positif'],
-                ['tag' => '#KamtibmasKondusif', 'count' => 36900, 'posts_count' => 8, 'sentiment' => 'positif'],
-            ],
-            'tiktok' => [
-                ['tag' => '#PolisiHumanis', 'count' => 210500, 'posts_count' => 32, 'sentiment' => 'positif'],
-                ['tag' => '#PolriPresisi', 'count' => 185400, 'posts_count' => 26, 'sentiment' => 'positif'],
-                ['tag' => '#StopHoaks', 'count' => 98200, 'posts_count' => 18, 'sentiment' => 'positif'],
-                ['tag' => '#CekFakta', 'count' => 84500, 'posts_count' => 15, 'sentiment' => 'netral'],
-                ['tag' => '#SahabatWarga', 'count' => 62100, 'posts_count' => 11, 'sentiment' => 'positif'],
-                ['tag' => '#TertibLantas', 'count' => 45600, 'posts_count' => 9, 'sentiment' => 'netral'],
-            ],
-            'x' => [
-                ['tag' => '#CekFakta', 'count' => 166400, 'posts_count' => 29, 'sentiment' => 'netral'],
-                ['tag' => '#StopHoaks', 'count' => 142100, 'posts_count' => 24, 'sentiment' => 'netral'],
-                ['tag' => '#PolriPresisi', 'count' => 124500, 'posts_count' => 22, 'sentiment' => 'positif'],
-                ['tag' => '#Kapolri', 'count' => 98300, 'posts_count' => 18, 'sentiment' => 'netral'],
-                ['tag' => '#SiberPolri', 'count' => 65200, 'posts_count' => 12, 'sentiment' => 'positif'],
-                ['tag' => '#TertibLantas', 'count' => 48900, 'posts_count' => 10, 'sentiment' => 'negatif'],
-            ],
-            'youtube' => [
-                ['tag' => '#CekFakta', 'count' => 245000, 'posts_count' => 21, 'sentiment' => 'netral'],
-                ['tag' => '#StopHoaks', 'count' => 198000, 'posts_count' => 17, 'sentiment' => 'netral'],
-                ['tag' => '#PolriPresisi', 'count' => 154000, 'posts_count' => 14, 'sentiment' => 'positif'],
-                ['tag' => '#CegahKarhutla', 'count' => 98000, 'posts_count' => 8, 'sentiment' => 'positif'],
-                ['tag' => '#MudikAman2026', 'count' => 82000, 'posts_count' => 7, 'sentiment' => 'positif'],
-                ['tag' => '#TribrataNews', 'count' => 64000, 'posts_count' => 6, 'sentiment' => 'positif'],
-            ],
-        ];
-
-        $regionalTemplates = [
-            'instagram' => [
-                ['tag' => "#Polda{$poldaName}", 'count' => 18920, 'posts_count' => 12, 'sentiment' => 'positif'],
-                ['tag' => '#PolriPresisi', 'count' => 14250, 'posts_count' => 10, 'sentiment' => 'positif'],
-                ['tag' => '#PolrestaMamuju', 'count' => 9820, 'posts_count' => 8, 'sentiment' => 'positif'],
-                ['tag' => '#TertibLantas', 'count' => 8410, 'posts_count' => 7, 'sentiment' => 'positif'],
-                ['tag' => '#CekFakta', 'count' => 6900, 'posts_count' => 6, 'sentiment' => 'netral'],
-                ['tag' => '#StopHoaks', 'count' => 5400, 'posts_count' => 5, 'sentiment' => 'positif'],
-            ],
-            'tiktok' => [
-                ['tag' => "#Polda{$poldaName}", 'count' => 24500, 'posts_count' => 14, 'sentiment' => 'positif'],
-                ['tag' => '#PolisiHumanis', 'count' => 19800, 'posts_count' => 11, 'sentiment' => 'positif'],
-                ['tag' => '#PolriPresisi', 'count' => 15200, 'posts_count' => 9, 'sentiment' => 'positif'],
-                ['tag' => '#StopHoaks', 'count' => 8900, 'posts_count' => 6, 'sentiment' => 'positif'],
-                ['tag' => '#PolrestaMamuju', 'count' => 7200, 'posts_count' => 5, 'sentiment' => 'positif'],
-            ],
-            'x' => [
-                ['tag' => '#CekFakta', 'count' => 14200, 'posts_count' => 9, 'sentiment' => 'netral'],
-                ['tag' => '#StopHoaks', 'count' => 11800, 'posts_count' => 8, 'sentiment' => 'netral'],
-                ['tag' => "#Polda{$poldaName}", 'count' => 10400, 'posts_count' => 7, 'sentiment' => 'positif'],
-                ['tag' => '#PolriPresisi', 'count' => 8900, 'posts_count' => 6, 'sentiment' => 'positif'],
-                ['tag' => '#AntreanSolarMamuju', 'count' => 7410, 'posts_count' => 5, 'sentiment' => 'negatif'],
-                ['tag' => '#TertibLantas', 'count' => 5120, 'posts_count' => 4, 'sentiment' => 'positif'],
-            ],
-            'youtube' => [
-                ['tag' => '#CekFakta', 'count' => 32000, 'posts_count' => 8, 'sentiment' => 'netral'],
-                ['tag' => '#StopHoaks', 'count' => 28000, 'posts_count' => 7, 'sentiment' => 'netral'],
-                ['tag' => "#Polda{$poldaName}", 'count' => 18500, 'posts_count' => 5, 'sentiment' => 'positif'],
-                ['tag' => '#PolriPresisi', 'count' => 14200, 'posts_count' => 4, 'sentiment' => 'positif'],
-            ],
-        ];
-
-        $templates = $isNational ? $nationalTemplates : $regionalTemplates;
-
-        foreach ($templates as $plat => $items) {
-            $existingTags = array_column($byPlatform[$plat], 'tag');
-            foreach ($items as $item) {
-                if (!in_array($item['tag'], $existingTags)) {
-                    $byPlatform[$plat][] = array_merge($item, [
-                        'platform'     => $plat,
-                        'platforms'    => [$plat => ['posts' => $item['posts_count'], 'reach' => $item['count'], 'sentiments' => [$item['sentiment'] => $item['posts_count']]]],
-                        'virality_avg' => 75,
-                    ]);
-                }
-            }
-            usort($byPlatform[$plat], fn($a, $b) => $b['count'] <=> $a['count']);
-        }
-
-        // If 'all' is empty or has few items, merge unique across platforms
-        $existingAllTags = array_column($byPlatform['all'], 'tag');
-        foreach (['instagram', 'tiktok', 'x', 'youtube'] as $plat) {
-            foreach ($byPlatform[$plat] as $pItem) {
-                if (!in_array($pItem['tag'], $existingAllTags)) {
-                    $existingAllTags[] = $pItem['tag'];
-                    $byPlatform['all'][] = $pItem;
-                }
-            }
-        }
-        usort($byPlatform['all'], fn($a, $b) => $b['count'] <=> $a['count']);
-
-        return $byPlatform;
-    }
 
     /**
-     * Compute dynamic peak hours of citizen social conversations.
+     * Sebaran jam unggahan (zona waktu tenant) dari unggahan tersimpan. Tidak ada angka bawaan:
+     * bila unggahan bertanggal < PEAK_MIN_SAMPLE, `peak` bernilai null dan UI menampilkan "Belum cukup data".
      */
     protected function getDynamicPeakHours($poldaScope, ?Polda $selectedPolda, bool $isNational): array
     {
-        $tz = $isNational ? 'Asia/Jakarta' : ($selectedPolda->timezone ?? 'Asia/Makassar');
-        $tzAbbr = $isNational ? 'WIB' : ($tz === 'Asia/Jayapura' ? 'WIT' : ($tz === 'Asia/Jakarta' ? 'WIB' : 'WITA'));
+        [$tz, $tzAbbr] = $this->tenantTimezone($selectedPolda, $isNational);
 
-        $posts = (clone $poldaScope)->select('posted_at', 'views_count', 'likes_count', 'shares_count', 'comments_count')->get();
+        $hours = array_fill(0, 24, 0);
+        (clone $poldaScope)->whereNotNull('posted_at')->select('id', 'posted_at')
+            ->orderBy('id')->chunk(2000, function ($posts) use (&$hours, $tz) {
+                foreach ($posts as $post) {
+                    $hours[(int) $post->posted_at->copy()->setTimezone($tz)->format('G')]++;
+                }
+            });
 
-        $hourVolume = array_fill(0, 24, 0);
-        $totalEngagements = 0;
-
-        foreach ($posts as $post) {
-            if ($post->posted_at) {
-                $hour = (int) $post->posted_at->setTimezone($tz)->format('H');
-                $eng = (int) ($post->views_count ?: 1000) + ($post->likes_count * 5) + ($post->shares_count * 15);
-                $hourVolume[$hour] += $eng;
-                $totalEngagements += $eng;
+        $sample = array_sum($hours);
+        $peak = null;
+        if ($sample >= self::PEAK_MIN_SAMPLE) {
+            // Jendela 2 jam berturut-turut dengan unggahan terbanyak.
+            $bestStart = 0;
+            $bestCount = -1;
+            for ($h = 0; $h < 24; $h++) {
+                $count = $hours[$h] + $hours[($h + 1) % 24];
+                // Seri: utamakan jendela yang jam pertamanya paling ramai.
+                if ($count > $bestCount || ($count === $bestCount && $hours[$h] > $hours[$bestStart])) {
+                    $bestCount = $count;
+                    $bestStart = $h;
+                }
             }
+            $release = ($bestStart + 23) % 24; // satu jam sebelum jendela ramai
+            $peak = [
+                'start'       => $bestStart,
+                'window'      =>sprintf('%02d.00 – %02d.00 %s', $bestStart, ($bestStart + 2) % 24, $tzAbbr),
+                'count'       => $bestCount,
+                'pct'         => (int) round($bestCount / $sample * 100),
+                'release_at'  => sprintf('%02d.00 %s', $release, $tzAbbr),
+            ];
         }
 
-        // Afternoon window (11:00 - 14:00)
-        $afternoonEng = $hourVolume[11] + $hourVolume[12] + $hourVolume[13] + $hourVolume[14];
-        $afternoonPct = $totalEngagements > 0 ? round(($afternoonEng / $totalEngagements) * 100) : 34;
-
-        // Evening window (18:00 - 22:00)
-        $eveningEng = $hourVolume[18] + $hourVolume[19] + $hourVolume[20] + $hourVolume[21] + $hourVolume[22];
-        $eveningPct = $totalEngagements > 0 ? round(($eveningEng / $totalEngagements) * 100) : 48;
-
         return [
-            'timezone'                  => $tzAbbr,
-            'afternoon_window'          => "11.30 – 13.30 {$tzAbbr}",
-            'afternoon_desc'            => 'Isu keluhan pelayanan & lalin siang hari',
-            'afternoon_pct'             => max(25, min(45, (int) $afternoonPct)),
-            'evening_window'            => "19.00 – 22.00 {$tzAbbr}",
-            'evening_desc'              => 'Puncak viralisasi video TikTok & opini medsos X',
-            'evening_pct'               => max(38, min(65, (int) $eveningPct)),
-            'recommended_release_siang' => "12.00 {$tzAbbr}",
-            'recommended_release_malam' => "19.30 {$tzAbbr}",
-            'active_audience_pct'       => min(92, max(65, (int) ($afternoonPct + $eveningPct))),
+            'timezone'   => $tzAbbr,
+            'hours'      => $hours,
+            'sample'     => $sample,
+            'min_sample' => self::PEAK_MIN_SAMPLE,
+            'peak'       => $peak,
         ];
+    }
+
+    /** Minimal unggahan bertanggal sebelum jam ramai disimpulkan. */
+    private const PEAK_MIN_SAMPLE = 20;
+
+    /**
+     * Zona waktu tampilan: nasional → WIB; daerah → zona Polda (bawaan WITA).
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function tenantTimezone(?Polda $selectedPolda, bool $isNational): array
+    {
+        $tz = $isNational ? 'Asia/Jakarta' : ($selectedPolda->timezone ?? 'Asia/Makassar');
+        $abbr = match ($tz) {
+            'Asia/Jakarta', 'Asia/Pontianak' => 'WIB',
+            'Asia/Jayapura' => 'WIT',
+            default => 'WITA',
+        };
+
+        return [$tz, $abbr];
     }
 
     /**
@@ -1165,12 +1086,14 @@ class SocialIntelligenceController extends Controller
      */
     protected function getSentimentSpikeTimeline($poldaScope, ?Polda $selectedPolda, bool $isNational): array
     {
-        $today = now()->startOfDay();
+        // Tanggal dihitung di zona waktu tenant (WIB/WITA/WIT), bukan UTC, agar unggahan pagi tidak jatuh ke hari sebelumnya.
+        [$tz, $tzAbbr] = $this->tenantTimezone($selectedPolda, $isNational);
+        $today = now($tz)->startOfDay();
         // Enam hari sebelumnya diperlukan sebagai pembanding untuk hari pertama grafik.
-        $posts = (clone $poldaScope)->where('posted_at', '>=', $today->copy()->subDays(12))
-            ->where('posted_at', '<', $today->copy()->addDay())
+        $posts = (clone $poldaScope)->where('posted_at', '>=', $today->copy()->subDays(12)->utc())
+            ->where('posted_at', '<', $today->copy()->addDay()->utc())
             ->select('sentiment', 'posted_at', 'post_id')->get();
-        $byDate = $posts->groupBy(fn ($post) => $post->posted_at->format('Y-m-d'));
+        $byDate = $posts->groupBy(fn ($post) => $post->posted_at->copy()->setTimezone($tz)->format('Y-m-d'));
         $days = [];
         $totalPos = $totalNet = $totalNeg = $totalUnknown = $syntheticCount = 0;
         $peakNegativeDay = null;
@@ -1212,7 +1135,8 @@ class SocialIntelligenceController extends Controller
         return [
             'days' => $days,
             'summary' => [
-                'calculated_at' => now()->format('d M Y H:i T'),
+                'calculated_at' => now($tz)->translatedFormat('d M Y H:i') . ' ' . $tzAbbr,
+                'timezone' => $tzAbbr,
                 'total_7d' => $total, 'positive_7d' => $totalPos, 'neutral_7d' => $totalNet,
                 'negative_7d' => $totalNeg, 'unknown_7d' => $totalUnknown,
                 'synthetic_identified' => $syntheticCount,
@@ -1273,14 +1197,7 @@ class SocialIntelligenceController extends Controller
         $topTokens = array_slice($wordFreq, 0, 36, true);
 
         if (empty($topTokens)) {
-            $topTokens = [
-                'pelayanan' => 45, 'presisi' => 40, 'patroli' => 38, 'kamtibmas' => 35,
-                'humanis' => 32, 'lalin' => 28, 'klarifikasi' => 26, 'aman' => 24,
-                'siber' => 22, 'edukasi' => 20, 'cegah' => 18, 'terpadu' => 16,
-            ];
-            foreach ($topTokens as $k => $v) {
-                $wordSentiment[$k] = ['positif' => (int)($v*0.6), 'netral' => (int)($v*0.3), 'negatif' => (int)($v*0.1)];
-            }
+            return ['words' => [], 'total_unique' => 0, 'top_keyword' => null];
         }
 
         $maxCount = max($topTokens) ?: 1;
@@ -1320,7 +1237,7 @@ class SocialIntelligenceController extends Controller
         return [
             'words'         => $words,
             'total_unique'  => count($wordFreq),
-            'top_keyword'   => $words[0]['text'] ?? 'Polri',
+            'top_keyword'   => $words[0]['text'] ?? null,
         ];
     }
 }

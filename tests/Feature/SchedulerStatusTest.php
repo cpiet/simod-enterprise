@@ -36,7 +36,7 @@ class SchedulerStatusTest extends TestCase
         $this->page()->assertInertia(fn (Assert $p) => $p
             ->where('scheduler.active', false)
             ->where('scheduler.last_tick', null)
-            ->where('scheduler.tasks', fn ($t) => count($t) === 4 && collect($t)->every(fn ($x) => $x['status'] === 'never'))
+            ->where('scheduler.tasks', fn ($t) => count($t) === count(\App\Support\ScheduledTasks::definitions()) && collect($t)->every(fn ($x) => $x['status'] === 'never'))
             ->where('scheduler.suggestions', fn ($s) => collect($s)->pluck('key')->sort()->values()->all() === ['linux', 'windows']
                 && str_contains(collect($s)->firstWhere('key', 'linux')['command'], 'schedule:run')
                 && str_contains(collect($s)->firstWhere('key', 'linux')['command'], base_path()))

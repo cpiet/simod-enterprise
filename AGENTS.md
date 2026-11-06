@@ -51,7 +51,7 @@ Catatan Windows:
 - PowerShell dapat memblokir `npm` (execution policy). Selalu pakai `npm.cmd`.
 - `php` Laragon ada di `<laragon>\bin\php\php-8.2.x\php.exe`. Bila `php` tidak dikenal di terminal, pakai terminal Laragon.
 
-Scheduler (`routes/console.php`): `rss:sync --scheduled` tiap menit, `db:backup --type=scheduled` tiap 10 menit, `media:prune` harian 02:00 (bila `MEDIA_RETENTION_DAYS > 0`). **Tidak ada** penjadwalan otomatis untuk analisis AI maupun sinkron Apify.
+Scheduler (sumber tunggal `app/Support/ScheduledTasks.php`, didaftarkan `routes/console.php`): `rss:sync --scheduled` tiap menit, `db:backup --type=scheduled` tiap 10 menit, `social:sync-free` tiap 30 menit (sindikasi gratis, `SIMOD_SOCIAL_AUTO_SYNC`), `social:trends-refresh` tiap jam (Google Trends), `audit:prune` 02:30, `media:prune` harian 02:00 (bila `MEDIA_RETENTION_DAYS > 0`). **Tidak ada** penjadwalan otomatis untuk analisis AI maupun sinkron Apify berbayar.
 
 ---
 
@@ -220,6 +220,7 @@ Daftar lengkap ada di [`docs/README.md`](docs/README.md). Yang paling sering dib
 | Pencarian server, kesegaran data, matriks Satwil, Command Center data nyata | [29](docs/29-radar-media-pencarian-server-dan-command-center-data-nyata.md) |
 | Audit Log, keamanan, kesiapan hosting, arsip/hapus laporan | [30](docs/30-audit-log-keamanan-hosting-dan-arsip-hapus-laporan.md) |
 | Demo Divhumas + Sulbar, deploy Hostinger | [31](docs/31-demo-divhumas-sulbar-dan-panduan-deploy-hostinger.md) |
+| Tren pencarian, SADEWA cari internet, pantauan banyak KOL | [32](docs/32-tren-pencarian-sadewa-internet-dan-pantauan-banyak-kol.md) |
 | Radar Media Online, RSS, Topik Atensi | [03](docs/03-modul-media-intelligence-dan-rss.md), [10](docs/10-daftar-rss-feed-resmi-sulbar.md), [14](docs/14-katalog-rss-media-online-nasional.md), [18](docs/18-optimalisasi-ux-dossier-dan-arsitektur-4-pilar-media-intelligence.md), [23](docs/23-optimalisasi-performa-dan-ux-radar-media-online.md) |
 | Radar Media Sosial | [11](docs/11-modul-radar-media-sosial-apify.md), [19](docs/19-optimalisasi-radar-media-sosial-dan-sintesis-ai-sadewa.md), [25](docs/25-peta-grafik-dan-pantauan-instagram.md) |
 | Isu, tugas, publikasi, administrasi | [24](docs/24-penyederhanaan-isu-tugas-publikasi-dan-administrasi.md), [04](docs/04-modul-manajemen-isu-dan-ews.md), [05](docs/05-modul-publikasi-dan-siaran-pers.md), [06](docs/06-modul-disposisi-tugas-dan-audit-trail.md) |
