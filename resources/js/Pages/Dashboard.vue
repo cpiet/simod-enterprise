@@ -123,7 +123,7 @@ const openSatwil = (row) => {
 
 // Helper formatters
 const formatNumber = (num) => {
-  if (!num && num !== 0) return '0';
+  if (num === null || num === undefined) return '\u2014';
   if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
   if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
   return num.toString();
@@ -894,7 +894,7 @@ const getPlatformBadge = (platform) => {
                 </div>
                 <span class="font-mono text-[10px] text-rose-400 font-black bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20 shrink-0 flex items-center gap-0.5">
                   <Flame class="w-2.5 h-2.5 text-rose-400" />
-                  {{ post.virality_score }}%
+                  {{ post.virality_score ?? '—' }}{{ post.virality_score != null ? '%' : '' }}
                 </span>
               </div>
 

@@ -193,6 +193,7 @@ class MediaIntelligenceController extends Controller
         ];
 
         return Inertia::render('MediaIntelligence/Index', [
+            'sentimentLexicon' => fn () => \App\Support\NewsSentiment::lexicon(),
             'allPoldas'        => $allPoldas,
             'selectedPolda'    => $selectedPolda,
             'selectedCode'     => $selectedCode,

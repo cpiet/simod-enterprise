@@ -264,173 +264,41 @@ class ApifySyncService
                     $platform = 'x';
                 }
 
-                // Full context for analysis
-                $fullText = $title . ' ' . $websiteTitle . ' ' . $url . ' ' . $desc;
 
-                // Extract or infer authentic author name & handle
-                $authorName = '';
+                if ($url === '') {
+                    continue; // tanpa tautan sumber, hasil tidak dapat diverifikasi
+                }
+
+                // Penulis HANYA dari data nyata: @handle tertulis di judul/URL, atau nama akun di path URL.
+                // Tanpa itu dipakai nama situs/judul situs apa adanya; tidak pernah mengatribusikan ke akun resmi.
                 $handle = '';
-                $isKol = false;
-                $kolCategory = null;
+                if (preg_match('/(?:instagram\.com|tiktok\.com\/@|x\.com|twitter\.com|youtube\.com\/@)\/?@?([a-zA-Z0-9_.]+)/i', $url, $uMatches)
+                    && !in_array(strtolower($uMatches[1]), ['p', 'reel', 'reels', 'tv', 'explore', 'video', 'watch', 'status', 'channel', 'shorts', 'search', 'hashtag', 'i'], true)) {
+                    $handle = '@' . strtolower($uMatches[1]);
+                } elseif (preg_match('/\(@([a-zA-Z0-9_.]+)\)/', $title, $m)) {
+                    $handle = '@' . $m[1];
+                }
+                $authorName = $handle !== '' ? $handle : (trim($websiteTitle) ?: (parse_url($url, PHP_URL_HOST) ?: 'Sumber tidak diketahui'));
 
-                // Priority 1: Institutional & Verified Media Handles
-                if (preg_match('/(?:turnbackhoax|cekfakta|cek fakta|mafindo)/i', $fullText)) {
-                    $authorName = 'TurnBackHoax Indonesia (Mafindo)';
-                    $handle = '@turnbackhoaxid';
-                    $isKol = true;
-                    $kolCategory = 'Pemeriksa Fakta & Anti Hoaks';
-                } elseif (preg_match('/(?:divisi humas|divhumas)/i', $fullText)) {
-                    $authorName = 'Divisi Humas Polri';
-                    $handle = '@divisihumaspri';
-                    $isKol = true;
-                    $kolCategory = 'Humas Kedinasan Polri';
-                } elseif (preg_match('/(?:korlantas|ntmc)/i', $fullText)) {
-                    $authorName = 'Korlantas Polri NTMC';
-                    $handle = '@korlantaspolri.ntmc';
-                    $isKol = true;
-                    $kolCategory = 'Humas Kedinasan Polri';
-                } elseif (preg_match('/(?:humas polri|humaspolri)/i', $fullText)) {
-                    $authorName = 'Humas Polri Official';
-                    $handle = '@humaspolri';
-                    $isKol = true;
-                    $kolCategory = 'Humas Kedinasan Polri';
-                } elseif (preg_match('/(?:siber polri|ccic|bareskrim)/i', $fullText)) {
-                    $authorName = 'Direktorat Siber Bareskrim Polri';
-                    $handle = '@ccicpolri';
-                    $isKol = true;
-                    $kolCategory = 'Penegakan Hukum Siber';
-                } elseif (preg_match('/(?:kompas)/i', $fullText)) {
-                    $authorName = 'Kompas Cek Fakta';
-                    $handle = '@kompascom';
-                    $isKol = true;
-                    $kolCategory = 'Media Massa & Cek Fakta';
-                } elseif (preg_match('/(?:detik)/i', $fullText)) {
-                    $authorName = 'detikcom News';
-                    $handle = '@detikcom';
-                    $isKol = true;
-                    $kolCategory = 'Media Massa Nasional';
-                } elseif (preg_match('/(?:tribratanews)/i', $fullText)) {
-                    $authorName = 'Tribrata News Official';
-                    $handle = '@tribratanews';
-                    $isKol = true;
-                    $kolCategory = 'Media Kedinasan Polri';
-                } elseif (preg_match('/(?:polda sulbar|polresta mamuju)/i', $fullText)) {
-                    $authorName = 'Bidang Humas Polda Sulbar';
-                    $handle = '@poldasulbar';
-                    $isKol = true;
-                    $kolCategory = 'Humas Kedinasan Wilayah';
-                } elseif (preg_match('/(?:polda sumsel)/i', $fullText)) {
-                    $authorName = 'Bidang Humas Polda Sumsel';
-                    $handle = '@poldasumsel';
-                    $isKol = true;
-                    $kolCategory = 'Humas Kedinasan Wilayah';
-                }
+                // Sentimen: aturan tunggal SIMOD (NewsSentiment, varian medsos).
+                $content = !empty($desc) ? $title . ' — ' . $desc : $title;
+                $sentiment = \App\Support\NewsSentiment::detectSocial($content);
 
-                // Priority 2: Extract explicit handle from URL or title if still empty
-                if (empty($handle)) {
-                    if (preg_match('/@([a-zA-Z0-9_.]+)/', $title . ' ' . $websiteTitle . ' ' . $url, $m)) {
-                        $handle = '@' . ltrim($m[1], '@');
-                        $authorName = ucwords(str_replace(['_', '.'], ' ', $m[1]));
-                    } elseif (preg_match('/(?:instagram\.com|tiktok\.com\/@|x\.com|twitter\.com)\/([a-zA-Z0-9_.]+)/i', $url, $uMatches)) {
-                        $raw = strtolower($uMatches[1]);
-                        if (!in_array($raw, ['p', 'reel', 'tv', 'explore', 'video', 'watch', 'status', 'channel'])) {
-                            $handle = '@' . $raw;
-                            $authorName = ucwords(str_replace(['_', '.'], ' ', $raw));
-                        }
-                    }
-                }
+                $postId = 'apify_' . md5($url);
 
-                // Priority 3: Fallback authentic handles per platform
-                if (empty($handle)) {
-                    $cleanTitle = trim(preg_replace('/\(@[a-zA-Z0-9_.]+\)/', '', $title));
-                    if (strlen($cleanTitle) > 30 || str_contains($cleanTitle, '...') || str_contains($cleanTitle, 'http')) {
-                        if ($platform === 'instagram') {
-                            $authorName = 'Warganet Instagram';
-                            $handle = '@warga_instagram';
-                        } elseif ($platform === 'tiktok') {
-                            $authorName = 'Kreator TikTok Edukasi';
-                            $handle = '@kreator_tiktok_id';
-                        } elseif ($platform === 'youtube') {
-                            $authorName = 'Kanal Warga Presisi';
-                            $handle = '@siber_citizen_id';
-                        } else {
-                            $authorName = 'Opini Publik X (Twitter)';
-                            $handle = '@suara_warganet';
-                        }
-                    } else {
-                        $authorName = $cleanTitle ?: 'Warganet Cerdas';
-                        $handle = '@' . strtolower(preg_replace('/[^a-zA-Z0-9]/', '_', $authorName));
-                    }
-                }
-
-                // Sentiment heuristic
-                $sentiment = 'netral';
-                if (preg_match('/(selamat|presisi|berhasil|prestasi|aman|damai|humanis|bantu|kegiatan positif|penghargaan|sinergi|pangan murah|bakti sosial|juara|emas)/i', $fullText)) {
-                    $sentiment = 'positif';
-                } elseif (preg_match('/(komplain|antrean|macet|rusak|ribut|korupsi|demo|kecewa|rugi|kriminal|tangkap)/i', $fullText)) {
-                    $sentiment = 'negatif';
-                }
-
-                // Engagement estimates
-                $views = $platform === 'youtube' ? rand(5000, 85000) : rand(1500, 45000);
-                $likes = (int) round($views * (rand(4, 10) / 100));
-                $shares = (int) round($likes * (rand(12, 35) / 100));
-                $comments = (int) round($likes * (rand(5, 18) / 100));
-                $virality = min(98, max(45, (int) round(($views / 600) + rand(20, 45))));
-
-                // Content & Hashtags Enrichment
-                $content = !empty($desc) ? $desc : $title;
-                $tagsToAdd = [];
-                if (preg_match('/(hoak|cek fakta|salah|palsu|klarifikasi)/i', $fullText)) {
-                    $tagsToAdd[] = '#CekFakta';
-                    $tagsToAdd[] = '#StopHoaks';
-                }
-                if (preg_match('/(presisi)/i', $fullText)) {
-                    $tagsToAdd[] = '#PolriPresisi';
-                }
-                if (preg_match('/(razia|knalpot|brong|tertib|lalin|lantas|zebra|tilang)/i', $fullText)) {
-                    $tagsToAdd[] = '#TertibLantas';
-                    $tagsToAdd[] = '#RaziaKnalpotBrong';
-                }
-                if (preg_match('/(bulutangkis|juara|prestasi|medali|emas)/i', $fullText)) {
-                    $tagsToAdd[] = '#PolriBerprestasi';
-                    $tagsToAdd[] = '#HumasPolri';
-                }
-                if (preg_match('/(karhutla|kebakaran|hutan)/i', $fullText)) {
-                    $tagsToAdd[] = '#CegahKarhutla';
-                }
-                if (preg_match('/(mudik|lebaran)/i', $fullText)) {
-                    $tagsToAdd[] = '#MudikAman2026';
-                }
-                if (preg_match('/(humanis|bantu|seberangkan|lansia|peduli)/i', $fullText)) {
-                    $tagsToAdd[] = '#PolisiHumanis';
-                }
-                if (preg_match('/(kapolri|mabes)/i', $fullText)) {
-                    $tagsToAdd[] = '#Kapolri';
-                }
-
-                foreach ($tagsToAdd as $t) {
-                    if (stripos($content, $t) === false) {
-                        $content .= ' ' . $t;
-                    }
-                }
-
-                $postId = 'apify_' . md5($url ?: ($title . $idx . $platform));
-
-                // Extract or generate thumbnail for rich visual cards
+                // Thumbnail hanya bila nyata (ID video YouTube); tidak ada gambar stok.
                 $thumbnailUrl = null;
-                if ($platform === 'youtube') {
-                    if (preg_match('/(?:v=|\/watch\?v=|\/embed\/|\/shorts\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/', $url, $ytMatches)) {
-                        $thumbnailUrl = "https://img.youtube.com/vi/{$ytMatches[1]}/hqdefault.jpg";
-                    } else {
-                        $thumbnailUrl = "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=600&q=80";
+                if ($platform === 'youtube' && preg_match('/(?:v=|\/embed\/|\/shorts\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/', $url, $ytMatches)) {
+                    $thumbnailUrl = "https://img.youtube.com/vi/{$ytMatches[1]}/hqdefault.jpg";
+                }
+
+                $postedAt = null;
+                if (!empty($item['date'])) {
+                    try {
+                        $postedAt = \Carbon\Carbon::parse($item['date']);
+                    } catch (\Throwable) {
+                        $postedAt = null;
                     }
-                } elseif ($platform === 'instagram') {
-                    $thumbnailUrl = "https://images.unsplash.com/photo-1611262588024-d12430b98920?auto=format&fit=crop&w=600&q=80";
-                } elseif ($platform === 'tiktok') {
-                    $thumbnailUrl = "https://images.unsplash.com/photo-1611605698335-8b1569810432?auto=format&fit=crop&w=600&q=80";
-                } elseif ($platform === 'x') {
-                    $thumbnailUrl = "https://images.unsplash.com/photo-1611605698323-b1e99cfd37ea?auto=format&fit=crop&w=600&q=80";
                 }
 
                 SocialPost::updateOrCreate(
@@ -440,20 +308,21 @@ class ApifySyncService
                     ],
                     [
                         'platform'       => $platform,
-                        'author_name'    => $authorName,
+                        'author_name'    => mb_substr($authorName, 0, 150),
                         'author_handle'  => $handle,
-                        'is_kol'         => $isKol,
-                        'kol_category'   => $kolCategory,
+                        'is_kol'         => false,
+                        'kol_category'   => null,
                         'content'        => $content,
-                        'post_url'       => $url ?: "https://www.youtube.com/results?search_query=" . urlencode($primary),
+                        'post_url'       => $url,
                         'thumbnail_url'  => $thumbnailUrl,
-                        'likes_count'    => $likes,
-                        'shares_count'   => $shares,
-                        'comments_count' => $comments,
-                        'views_count'    => $views,
+                        // Hasil pencarian Google tidak membawa metrik keterlibatan: null = tidak diketahui.
+                        'likes_count'    => null,
+                        'shares_count'   => null,
+                        'comments_count' => null,
+                        'views_count'    => null,
                         'sentiment'      => $sentiment,
-                        'virality_score' => $virality,
-                        'posted_at'      => now()->subHours(rand(1, 48)),
+                        'virality_score' => null,
+                        'posted_at'      => $postedAt,
                     ]
                 );
 
@@ -602,15 +471,19 @@ class ApifySyncService
                                 continue;
                             }
 
-                            $sentiment = 'netral';
-                            if (preg_match('/(bagus|mantap|terima kasih|apresiasi|hebat|keren|sigap|humanis|aman|tertib|positif|berhasil)/i', $content)) {
-                                $sentiment = 'positif';
-                            } elseif (preg_match('/(pungli|rusak|macet|kecewa|parah|bohong|lambat|bahaya|waspada|penipuan|bodong|hoaks|viral)/i', $content)) {
-                                $sentiment = 'negatif';
+                            if ($url === '') {
+                                continue; // tanpa tautan sumber, hasil tidak dapat diverifikasi
                             }
 
-                            $postId = 'ondemand_' . md5($url ?: ($cleanKeyword . $pulledCount . $platform));
-                            
+                            $sentiment = \App\Support\NewsSentiment::detectSocial($content);
+                            $handle = '';
+                            if (preg_match('/(?:instagram\.com|tiktok\.com\/@|x\.com|twitter\.com|youtube\.com\/@)\/?@?([a-zA-Z0-9_.]+)/i', $url, $uMatches)
+                                && !in_array(strtolower($uMatches[1]), ['p', 'reel', 'reels', 'tv', 'explore', 'video', 'watch', 'status', 'channel', 'shorts', 'search', 'hashtag', 'i'], true)) {
+                                $handle = '@' . strtolower($uMatches[1]);
+                            }
+
+                            $postId = 'ondemand_' . md5($url);
+
                             SocialPost::updateOrCreate(
                                 [
                                     'polda_id' => $poldaId,
@@ -619,19 +492,21 @@ class ApifySyncService
                                 [
                                     'case_id'        => $caseId,
                                     'platform'       => $platform,
-                                    'author_name'    => 'Netizen Indonesia',
-                                    'author_handle'  => '@warga_' . substr(md5($url), 0, 7),
+                                    // Penulis hanya dari URL; tidak diketahui → nama situs (bukan akun karangan).
+                                    'author_name'    => $handle !== '' ? $handle : (parse_url($url, PHP_URL_HOST) ?: 'Sumber tidak diketahui'),
+                                    'author_handle'  => $handle,
                                     'is_kol'         => false,
-                                    'kol_category'   => 'Warga Viral',
-                                    'content'        => $content . ' #' . str_replace(' ', '', ucwords($cleanKeyword)),
-                                    'post_url'       => $url ?: "https://www.google.com/search?q=" . urlencode($cleanKeyword),
-                                    'likes_count'    => rand(120, 3500),
-                                    'shares_count'   => rand(15, 800),
-                                    'comments_count' => rand(10, 420),
-                                    'views_count'    => rand(2500, 48000),
+                                    'kol_category'   => null,
+                                    'content'        => $content,
+                                    'post_url'       => $url,
+                                    // Metrik & waktu tidak dibawa hasil pencarian: null = tidak diketahui.
+                                    'likes_count'    => null,
+                                    'shares_count'   => null,
+                                    'comments_count' => null,
+                                    'views_count'    => null,
                                     'sentiment'      => $sentiment,
-                                    'virality_score' => rand(55, 92),
-                                    'posted_at'      => now()->subMinutes(rand(5, 720)),
+                                    'virality_score' => null,
+                                    'posted_at'      => null,
                                 ]
                             );
 

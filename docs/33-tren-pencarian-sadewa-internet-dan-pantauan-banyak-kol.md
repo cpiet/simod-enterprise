@@ -1,4 +1,4 @@
-# 32. Tren Pencarian, SADEWA Cari Internet, dan Pantauan Banyak KOL
+# 33. Tren Pencarian, SADEWA Cari Internet, dan Pantauan Banyak KOL
 
 Tanggal: 6 November 2026. Lingkup: Radar Media Sosial (tab Tren dan tab KOL), SADEWA AI, penjadwal.
 
@@ -60,3 +60,5 @@ Alur (`SadewaController::chat`):
 
 ## 7. Deployment
 `php artisan migrate --force` (kolom `web_search_enabled`), `php artisan optimize:clear`, lalu `php artisan social:trends-refresh` sekali agar tren langsung tampil.
+
+> Lanjutan: metodologi sentimen, popup alasan per item, dan pembersihan data medsos karangan ada di [doc 34](34-metodologi-sentimen-dan-data-medsos-jujur.md).

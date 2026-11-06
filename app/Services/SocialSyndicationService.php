@@ -232,24 +232,21 @@ class SocialSyndicationService
                     $snippet  = mb_substr($desc, 0, 200);
                     $content .= ' — ' . $snippet;
                 }
-                $content .= ' #' . str_replace([' ', '-'], '', ucwords(str_replace('-', ' ', $keyword)));
-
-                // Basic sentiment detection
-                $sentiment = $this->detectSentiment($content);
+                // Sentimen: aturan tunggal SIMOD (NewsSentiment, varian medsos). Tidak menyisipkan tagar ke isi.
+                $sentiment = \App\Support\NewsSentiment::detectSocial($content);
 
                 // Build stable post ID
                 $postId = 'syndication_' . md5($link ?: ($title . $platform . $poldaId));
 
-                // Parse pub date safely
+                // Tanggal terbit dari sumber; tidak diketahui → null (tidak dikarang).
                 $postedAt = null;
                 if (!empty($pubDate)) {
                     try {
                         $postedAt = \Carbon\Carbon::parse($pubDate);
                     } catch (\Throwable $e) {
-                        $postedAt = now()->subMinutes(rand(30, 480));
+                        $postedAt = null;
                     }
                 }
-                $postedAt = $postedAt ?? now()->subMinutes(rand(30, 480));
 
                 // Determine if source looks like KOL (news agency, verified account)
                 $isKol = $this->isLikelyKol($source, $title);
@@ -265,12 +262,13 @@ class SocialSyndicationService
                         'kol_category'   => $isKol ? 'Media & Jurnalis' : 'Warganet Umum',
                         'content'        => $content,
                         'post_url'       => $link ?: "https://news.google.com/search?q=" . urlencode($keyword),
-                        'likes_count'    => rand(80, 2800),
-                        'shares_count'   => rand(10, 650),
-                        'comments_count' => rand(5, 380),
-                        'views_count'    => rand(1500, 42000),
+                        // Sindikasi berita tidak membawa metrik keterlibatan: null = tidak diketahui (bukan 0, bukan acak).
+                        'likes_count'    => null,
+                        'shares_count'   => null,
+                        'comments_count' => null,
+                        'views_count'    => null,
                         'sentiment'      => $sentiment,
-                        'virality_score' => rand(45, 88),
+                        'virality_score' => null,
                         'posted_at'      => $postedAt,
                     ]
                 );
@@ -380,37 +378,6 @@ class SocialSyndicationService
         if (str_contains($url, 'youtube.com') || str_contains($url, 'youtu.be')) return 'youtube';
         if (str_contains($url, 'facebook.com') || str_contains($url, 'fb.com')) return 'facebook';
         return 'x'; // default fallback to 𝕏
-    }
-
-    /**
-     * Basic Indonesian sentiment detection from text.
-     */
-    private function detectSentiment(string $text): string
-    {
-        $lower = mb_strtolower($text);
-
-        $positiveWords = ['apresiasi', 'bagus', 'mantap', 'keren', 'hebat', 'aman', 'kondusif', 'berhasil',
-            'sigap', 'humanis', 'tertib', 'terpuji', 'terima kasih', 'baik', 'selamat', 'positif',
-            'profesional', 'presisi', 'sukses', 'terbaik', 'membantu', 'bijak', 'adil'];
-
-        $negativeWords = ['kecewa', 'marah', 'pungli', 'bohong', 'kasar', 'rusak', 'parah', 'gagal',
-            'lambat', 'tidak becus', 'semena', 'arogan', 'sewenang', 'pelanggaran', 'brutal',
-            'provokasi', 'hoaks', 'bohong', 'bodong', 'penipuan', 'korupsi', 'suap', 'waspada',
-            'kritis', 'darurat', 'krisis', 'ancaman', 'bahaya', 'kerusuhan', 'anarkis'];
-
-        $posScore = 0;
-        $negScore = 0;
-
-        foreach ($positiveWords as $w) {
-            if (str_contains($lower, $w)) $posScore++;
-        }
-        foreach ($negativeWords as $w) {
-            if (str_contains($lower, $w)) $negScore++;
-        }
-
-        if ($negScore > $posScore && $negScore >= 2) return 'negatif';
-        if ($posScore > $negScore && $posScore >= 1) return 'positif';
-        return 'netral';
     }
 
     /**

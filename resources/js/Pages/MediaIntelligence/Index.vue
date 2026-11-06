@@ -5,6 +5,7 @@ import AiQuotaBadge from '../../Components/AiQuotaBadge.vue';
 import { router, usePage } from '@inertiajs/vue3';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
 import MediaSituationCard from '@/Components/MediaSituationCard.vue';
+import SentimentInfo from '@/Components/SentimentInfo.vue';
 import {
   Shield,
   Building2,
@@ -63,6 +64,7 @@ import {
 } from 'lucide-vue-next';
 
 const props = defineProps({
+  sentimentLexicon: { type: Object, default: null },
   allPoldas: Array,
   selectedPolda: Object,
   selectedCode: String,
@@ -1264,14 +1266,15 @@ const whatsappReportText = computed(() => {
   s += `━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
   s += `*1. Sentimen Pemberitaan*\n\n`;
   s += `🇮🇩 *Nasional*\n`;
-  s += `• Positif: ${r.sentiment_national?.positif ?? 65}%\n`;
-  s += `• Netral : ${r.sentiment_national?.netral ?? 25}%\n`;
-  s += `• Negatif: ${r.sentiment_national?.negatif ?? 10}%\n\n`;
+  const pctText = (v) => (v === null || v === undefined || v === '' ? 'belum ada data' : `${v}%`);
+  s += `• Positif: ${pctText(r.sentiment_national?.positif)}\n`;
+  s += `• Netral : ${pctText(r.sentiment_national?.netral)}\n`;
+  s += `• Negatif: ${pctText(r.sentiment_national?.negatif)}\n\n`;
 
   s += `📍 *${isDiv ? 'Sentimen Kewilayahan (34 Polda Jajaran)' : poldaShort}*\n`;
-  s += `• Positif: ${(r.sentiment_satwil || r.sentiment_sulbar)?.positif ?? (isDiv ? 60 : 55)}%\n`;
-  s += `• Netral : ${(r.sentiment_satwil || r.sentiment_sulbar)?.netral ?? 30}%\n`;
-  s += `• Negatif: ${(r.sentiment_satwil || r.sentiment_sulbar)?.negatif ?? (isDiv ? 10 : 15)}%\n\n`;
+  s += `• Positif: ${pctText((r.sentiment_satwil || r.sentiment_sulbar)?.positif)}\n`;
+  s += `• Netral : ${pctText((r.sentiment_satwil || r.sentiment_sulbar)?.netral)}\n`;
+  s += `• Negatif: ${pctText((r.sentiment_satwil || r.sentiment_sulbar)?.negatif)}\n\n`;
 
   s += `*Analisis Perkembangan:*\n`;
   if (isDiv && (r.snapshot_satwil_desc || r.snapshot_sulbar_desc)) {
@@ -1281,16 +1284,14 @@ const whatsappReportText = computed(() => {
   } else if (r.executive_brief) {
     s += `${r.executive_brief}\n\n`;
   } else {
-    s += isDiv
-      ? `Berdasarkan pemantauan intelijen media siber dan 22 portal berita online nasional terverifikasi, situasi kamtibmas di seluruh wilayah hukum 34 Polda jajaran terpantau relatif aman dan kondusif dengan dominasi sentimen positif atas akselerasi program Presisi, transparansi penegakan hukum, dan pelayanan publik kepolisian.\n\n`
-      : `Berdasarkan pemantauan media siber dan 29 portal berita resmi terverifikasi, situasi kamtibmas di wilayah hukum ${poldaShort} terpantau relatif aman dan kondusif dengan dominasi sentimen positif atas akselerasi patroli presisi dan pelayanan prima kepolisian.\n\n`;
+    s += `Belum ada ringkasan analisis AI untuk periode ini. Jalankan analisis di Radar Media Online untuk mengisi bagian ini.\n\n`;
   }
 
   // SECTION I.B: ISU STRATEGIS NASIONAL POLRI
   const nationalIssues = r.national_issues && r.national_issues.length > 0 ? r.national_issues : [];
   if (nationalIssues.length > 0) {
     s += `🇮🇩 *ISU STRATEGIS NASIONAL POLRI*\n`;
-    s += `Status Isu Nasional: *${r.snapshot_national_status || 'HIJAU - KONDUSIF'}*\n\n`;
+    s += `Status Isu Nasional: *${r.snapshot_national_status || 'belum dinilai'}*\n\n`;
     nationalIssues.forEach((iss, nIdx) => {
       s += `*A.${nIdx + 1}. ${iss.title}*\n`;
       s += `• Fakta: ${iss.fact}\n`;
@@ -1307,47 +1308,10 @@ const whatsappReportText = computed(() => {
     ? r.regional_issues.slice(0, 4)
     : (r.sulbar_issues && r.sulbar_issues.length > 0)
       ? r.sulbar_issues.slice(0, 4)
-      : isDiv
-        ? [
-            {
-              title: 'Polda Metro Jaya & Bareskrim Ungkap Sindikat Penipuan Daring Lintas Negara',
-              fact: 'Polda Metro Jaya bersama Bareskrim Polri berhasil mengungkap jaringan penipuan daring internasional dan menyelamatkan aset korban, menuai apresiasi luas dari publik.',
-              source: 'Antara News & Detikcom',
-              sentiment: 'Positif',
-            },
-            {
-              title: 'Polda Jabar Pastikan Pengamanan Jalur Vital dan Kamtibmas Kondusif',
-              fact: 'Jajaran Polda Jawa Barat meningkatkan patroli presisi di titik rawan kamtibmas dan jalur logistik nasional, situasi terpantau aman dan tertib.',
-              source: 'CNN Indonesia & Humas Jabar',
-              sentiment: 'Positif',
-            },
-            {
-              title: 'Divhumas Salurkan Asistensi Digital & Counter Hoaks ke 34 Bidhumas Polda',
-              fact: 'Biro Penmas Divhumas mengonsolidasikan narasi satu pintu dan asistensi konten edukasi ke seluruh jajaran Polda se-Indonesia.',
-              source: 'Tribrata News Mabes',
-              sentiment: 'Positif',
-            },
-          ]
-        : [
-            {
-              title: 'Pengamanan Intensif Tahapan Pilkada Serentak di Mamuju',
-              fact: 'Satgas Operasi Mantap Praja Polresta Mamuju memperketat pengamanan 24 jam di Kantor KPU Sulbar dan Bawaslu, menjaga stabilitas pesta demokrasi.',
-              source: 'Humas Polri & Radar Sulbar',
-              sentiment: 'Positif',
-            },
-            {
-              title: 'Klarifikasi Tim Siber atas Hoaks Isu Begal di Tarailu',
-              fact: 'Subdit Siber Ditreskrimsus dan Humas Mateng mengonfirmasi video beredar merupakan insiden tahun 2021 di luar provinsi dan jalur trans dipatroli rutin aman.',
-              source: 'Subdit Siber & WhatsApp',
-              sentiment: 'Positif',
-            },
-            {
-              title: 'Penertiban Jukir Liar di Kawasan Pantai Manakarra',
-              fact: 'Merespons keluhan video warga di media sosial, Polresta Mamuju bersama Dishub menertibkan jukir liar untuk menjamin kenyamanan ruang publik.',
-              source: 'TikTok & Media Siber',
-              sentiment: 'Netral',
-            },
-          ];
+      : [];
+  if (regionalIssues.length === 0) {
+    s += `Belum ada isu kewilayahan pada laporan analisis terakhir.\n\n`;
+  }
 
   let issueNum = 2;
   regionalIssues.forEach((iss) => {
@@ -1388,9 +1352,7 @@ const whatsappReportText = computed(() => {
       s += `• Dampak Fatal Jika Tanpa Mitigasi: ${ew.unmitigated_risk || ew.risk || 'Keterlambatan klarifikasi berisiko memicu framing sepihak netizen dan mobilisasi massa.'}\n\n`;
     });
   } else {
-    s += `• *Dampak Jangka Pendek (0–6 Jam):* Terjadi kekosongan informasi (information vacuum) yang diisi spekulasi liar dan framing negatif buzzer di media sosial.\n\n`;
-    s += `• *Dampak Eskalasi Kamtibmas (6–24 Jam):* Masuknya liputan kritis media arus utama nasional, potensi provokasi berkembang menjadi aksi unjuk rasa atau gesekan fisik kewilayahan.\n\n`;
-    s += `• *Doktrin Mitigasi Humanis & Transparan:* Mengakui fakta riil secara jujur (tanpa defensif), menyampaikan empati mendalam pada korban/warga, serta merilis kronologi 5W+1H berbasis bukti empiris dalam 2 jam pertama.\n\n`;
+    s += `Belum ada peringatan dini pada laporan analisis terakhir.\n\n`;
   }
 
   // SECTION III: SARAN LANGKAH TINDAK LANJUT
@@ -1740,7 +1702,7 @@ const submitIssue = () => {
       </button>
 
       <div class="p-4 space-y-1.5">
-        <p class="text-[11px] font-bold text-slate-400 flex items-center gap-1.5"><TrendingUp class="w-3.5 h-3.5 text-emerald-400" /> Sentimen Positif</p>
+        <p class="text-[11px] font-bold text-slate-400 flex items-center gap-1.5"><TrendingUp class="w-3.5 h-3.5 text-emerald-400" /> Sentimen Positif <SentimentInfo variant="icon" kind="media" :lexicon="sentimentLexicon" /></p>
         <p class="text-2xl font-black text-emerald-400 leading-none">{{ sentimentPositive === null ? '\u2014' : sentimentPositive + '%' }}</p>
         <p class="text-[11px] text-slate-400">{{ isDivhumas ? 'Cakupan nasional' : 'Cakupan wilayah' }}</p>
       </div>
@@ -2797,6 +2759,7 @@ const submitIssue = () => {
               <div class="space-y-2">
                 <!-- Category Badge & Topic Atensi Badges -->
                 <div class="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  <SentimentInfo :sentiment="article.sentiment" :reason="article.sentiment_reason" kind="media" :lexicon="sentimentLexicon" />
                   <span class="px-2.5 py-0.5 rounded-md text-[9px] font-extrabold uppercase bg-slate-900/90 text-slate-300 border border-slate-700/80 tracking-wider">
                     {{ article.category_badge || article.category || (isDivhumas ? 'NASIONAL & MABES' : 'REGIONAL') }}
                   </span>
@@ -2964,6 +2927,7 @@ const submitIssue = () => {
                 <template v-for="(seg, i) in highlightParts(article.title)" :key="i"><mark v-if="seg.hit" class="bg-amber-400/30 text-inherit rounded px-0.5">{{ seg.t }}</mark><template v-else>{{ seg.t }}</template></template>
               </a>
               <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-slate-400">
+                <SentimentInfo :sentiment="article.sentiment" :reason="article.sentiment_reason" kind="media" :lexicon="sentimentLexicon" />
                 <span class="font-black text-amber-400/90 uppercase tracking-wide">{{ article.source_name }}</span>
                 <span>{{ article.pub_date }}</span>
                 <span class="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 text-[10px] font-bold uppercase text-slate-300">{{ article.category_badge || article.category }}</span>
@@ -3177,15 +3141,15 @@ const submitIssue = () => {
 
           <div class="flex items-center justify-around py-2">
             <div class="text-center">
-              <span class="text-2xl md:text-3xl font-black text-emerald-400 font-mono">{{ report?.sentiment_national?.positif || 60 }}%</span>
+              <span class="text-2xl md:text-3xl font-black text-emerald-400 font-mono">{{ report?.sentiment_national?.positif ?? '—' }}{{ report?.sentiment_national?.positif != null ? '%' : '' }}</span>
               <p class="text-[11px] text-slate-400 font-bold mt-0.5">Positif</p>
             </div>
             <div class="text-center">
-              <span class="text-2xl md:text-3xl font-black text-amber-400 font-mono">{{ report?.sentiment_national?.netral || 30 }}%</span>
+              <span class="text-2xl md:text-3xl font-black text-amber-400 font-mono">{{ report?.sentiment_national?.netral ?? '—' }}{{ report?.sentiment_national?.netral != null ? '%' : '' }}</span>
               <p class="text-[11px] text-slate-400 font-bold mt-0.5">Netral</p>
             </div>
             <div class="text-center">
-              <span class="text-2xl md:text-3xl font-black text-rose-400 font-mono">{{ report?.sentiment_national?.negatif || 10 }}%</span>
+              <span class="text-2xl md:text-3xl font-black text-rose-400 font-mono">{{ report?.sentiment_national?.negatif ?? '—' }}{{ report?.sentiment_national?.negatif != null ? '%' : '' }}</span>
               <p class="text-[11px] text-slate-400 font-bold mt-0.5">Negatif</p>
             </div>
           </div>
@@ -3193,24 +3157,24 @@ const submitIssue = () => {
           <!-- Proportional Progress Bar -->
           <div class="h-2.5 w-full rounded-full bg-slate-800 overflow-hidden flex shadow-inner">
             <div
-              :style="{ width: (report?.sentiment_national?.positif || 60) + '%' }"
+              :style="{ width: (report?.sentiment_national?.positif ?? 0) + '%' }"
               class="bg-emerald-500 transition-all duration-500"
-              :title="'Positif: ' + (report?.sentiment_national?.positif || 60) + '%'"
+              :title="'Positif: ' + (report?.sentiment_national?.positif ?? 0) + '%'"
             ></div>
             <div
-              :style="{ width: (report?.sentiment_national?.netral || 30) + '%' }"
+              :style="{ width: (report?.sentiment_national?.netral ?? 0) + '%' }"
               class="bg-amber-400 transition-all duration-500"
-              :title="'Netral: ' + (report?.sentiment_national?.netral || 30) + '%'"
+              :title="'Netral: ' + (report?.sentiment_national?.netral ?? 0) + '%'"
             ></div>
             <div
-              :style="{ width: (report?.sentiment_national?.negatif || 10) + '%' }"
+              :style="{ width: (report?.sentiment_national?.negatif ?? 0) + '%' }"
               class="bg-rose-500 transition-all duration-500"
-              :title="'Negatif: ' + (report?.sentiment_national?.negatif || 10) + '%'"
+              :title="'Negatif: ' + (report?.sentiment_national?.negatif ?? 0) + '%'"
             ></div>
           </div>
 
           <p class="text-xs text-slate-300 leading-relaxed italic border-l-2 border-slate-700 pl-3">
-            {{ report?.snapshot_national_desc || 'Dinamika isu nasional Polri stabil dengan pengawasan intensif ruang siber dan keterbukaan informasi.' }}
+            {{ report?.snapshot_national_desc || 'Belum ada ringkasan analisis nasional.' }}
           </p>
         </div>
 
@@ -3229,19 +3193,19 @@ const submitIssue = () => {
           <div class="flex items-center justify-around py-2">
             <div class="text-center">
               <span class="text-2xl md:text-3xl font-black text-emerald-400 font-mono">
-                {{ (report?.sentiment_satwil || report?.sentiment_sulbar)?.positif || (isDivhumas ? 60 : 55) }}%
+                {{ (report?.sentiment_satwil || report?.sentiment_sulbar)?.positif ?? '—' }}{{ (report?.sentiment_satwil || report?.sentiment_sulbar)?.positif != null ? '%' : '' }}
               </span>
               <p class="text-[11px] text-slate-400 font-bold mt-0.5">Positif</p>
             </div>
             <div class="text-center">
               <span class="text-2xl md:text-3xl font-black text-amber-400 font-mono">
-                {{ (report?.sentiment_satwil || report?.sentiment_sulbar)?.netral || 30 }}%
+                {{ (report?.sentiment_satwil || report?.sentiment_sulbar)?.netral ?? '—' }}{{ (report?.sentiment_satwil || report?.sentiment_sulbar)?.netral != null ? '%' : '' }}
               </span>
               <p class="text-[11px] text-slate-400 font-bold mt-0.5">Netral</p>
             </div>
             <div class="text-center">
               <span class="text-2xl md:text-3xl font-black text-rose-400 font-mono">
-                {{ (report?.sentiment_satwil || report?.sentiment_sulbar)?.negatif || (isDivhumas ? 10 : 15) }}%
+                {{ (report?.sentiment_satwil || report?.sentiment_sulbar)?.negatif ?? '—' }}{{ (report?.sentiment_satwil || report?.sentiment_sulbar)?.negatif != null ? '%' : '' }}
               </span>
               <p class="text-[11px] text-slate-400 font-bold mt-0.5">Negatif</p>
             </div>
@@ -3250,19 +3214,19 @@ const submitIssue = () => {
           <!-- Proportional Progress Bar -->
           <div class="h-2.5 w-full rounded-full bg-slate-800 overflow-hidden flex shadow-inner">
             <div
-              :style="{ width: ((report?.sentiment_satwil || report?.sentiment_sulbar)?.positif || (isDivhumas ? 60 : 55)) + '%' }"
+              :style="{ width: ((report?.sentiment_satwil || report?.sentiment_sulbar)?.positif ?? 0) + '%' }"
               class="bg-emerald-500 transition-all duration-500"
-              :title="'Positif: ' + ((report?.sentiment_satwil || report?.sentiment_sulbar)?.positif || (isDivhumas ? 60 : 55)) + '%'"
+              :title="'Positif: ' + ((report?.sentiment_satwil || report?.sentiment_sulbar)?.positif ?? 0) + '%'"
             ></div>
             <div
-              :style="{ width: ((report?.sentiment_satwil || report?.sentiment_sulbar)?.netral || 30) + '%' }"
+              :style="{ width: ((report?.sentiment_satwil || report?.sentiment_sulbar)?.netral ?? 0) + '%' }"
               class="bg-amber-400 transition-all duration-500"
-              :title="'Netral: ' + ((report?.sentiment_satwil || report?.sentiment_sulbar)?.netral || 30) + '%'"
+              :title="'Netral: ' + ((report?.sentiment_satwil || report?.sentiment_sulbar)?.netral ?? 0) + '%'"
             ></div>
             <div
-              :style="{ width: ((report?.sentiment_satwil || report?.sentiment_sulbar)?.negatif || (isDivhumas ? 10 : 15)) + '%' }"
+              :style="{ width: ((report?.sentiment_satwil || report?.sentiment_sulbar)?.negatif ?? 0) + '%' }"
               class="bg-rose-500 transition-all duration-500"
-              :title="'Negatif: ' + ((report?.sentiment_satwil || report?.sentiment_sulbar)?.negatif || (isDivhumas ? 10 : 15)) + '%'"
+              :title="'Negatif: ' + ((report?.sentiment_satwil || report?.sentiment_sulbar)?.negatif ?? 0) + '%'"
             ></div>
           </div>
 
@@ -3414,7 +3378,7 @@ const submitIssue = () => {
                         : 'bg-slate-700/60 text-slate-300 border border-slate-600'
                   ]"
                 >
-                  {{ iss.sentiment || 'Positif' }}
+                  {{ iss.sentiment || 'Belum dinilai' }}
                 </span>
               </div>
               <p class="text-slate-300 leading-relaxed">{{ iss.fact }}</p>
@@ -3491,7 +3455,7 @@ const submitIssue = () => {
                         : 'bg-slate-700/60 text-slate-300 border border-slate-600'
                   ]"
                 >
-                  {{ iss.sentiment || 'Positif' }}
+                  {{ iss.sentiment || 'Belum dinilai' }}
                 </span>
               </div>
               <p class="text-slate-300 leading-relaxed">{{ iss.fact }}</p>

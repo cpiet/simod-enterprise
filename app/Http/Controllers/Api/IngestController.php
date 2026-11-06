@@ -40,7 +40,6 @@ class IngestController extends Controller
         $existing = MediaArticle::where('polda_id', $polda->id)->where('url', $validated['url'])->first();
         if ($existing) {
             $existing->update([
-                'virality_score' => $validated['virality_score'] ?? $existing->virality_score,
                 'sentiment'      => $validated['sentiment'] ?? $existing->sentiment,
             ]);
 
@@ -62,7 +61,6 @@ class IngestController extends Controller
             'category'        => $validated['category'] ?? 'Harkamtibmas',
             'sentiment'       => $validated['sentiment'] ?? \App\Support\NewsSentiment::detect($validated['title'], $validated['summary'] ?? null),
             'sentiment_score' => $validated['sentiment_score'] ?? 0.00,
-            'virality_score'  => $validated['virality_score'] ?? rand(30, 80),
             'pub_date'        => now(),
         ]);
 
@@ -95,7 +93,6 @@ class IngestController extends Controller
                     'category'        => $item['category'] ?? 'Harkamtibmas',
                     'sentiment'       => $item['sentiment'] ?? \App\Support\NewsSentiment::detect($item['title'] ?? '', $item['summary'] ?? null),
                     'sentiment_score' => $item['sentiment_score'] ?? 0.00,
-                    'virality_score'  => $item['virality_score'] ?? rand(40, 75),
                     'pub_date'        => now(),
                 ]
             );

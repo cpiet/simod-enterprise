@@ -368,6 +368,8 @@ class MediaArticleListing
                 'image_url' => $a->image_url,
                 'link' => $a->url,
                 'sentiment' => $a->sentiment ?: 'netral',
+                // Alasan label (kata/pola yang cocok) untuk popup; aturan sama dengan NewsSentiment::detect().
+                'sentiment_reason' => \App\Support\NewsSentiment::explain($a->title, $a->summary),
                 'is_bookmarked' => (bool) $a->is_bookmarked,
                 'feed_id' => $a->feed_id,
                 'source_id' => $a->feed_id ?? 0,

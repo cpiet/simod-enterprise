@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { router, Link, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import AiQuotaBadge from '../../Components/AiQuotaBadge.vue';
+import SentimentInfo from '@/Components/SentimentInfo.vue';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
 import {
   Bot,
@@ -54,6 +55,7 @@ import {
 } from 'lucide-vue-next';
 
 const props = defineProps({
+  sentimentLexicon: { type: Object, default: null },
   allPoldas: Array,
   selectedPolda: Object,
   selectedCode: String,
@@ -155,6 +157,16 @@ const monitorKol = (kol) => {
 const instagramDate = (date) => date ? new Date(date).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : 'Waktu tidak tersedia';
 
 // Daftar akun ringkas: banyak akun tidak membuat halaman memanjang. Satu akun → langsung terbuka.
+// Direktori KOL: saring per platform; jumlah dihitung dari data yang dimuat (paritas angka = kartu).
+const kolPlatform = ref('all');
+const kolPlatformTabs = computed(() => {
+  const counts = {};
+  for (const k of props.kolProfiles || []) counts[k.platform] = (counts[k.platform] || 0) + 1;
+  return [{ id: 'all', label: 'Semua', count: (props.kolProfiles || []).length },
+    ...Object.keys(counts).sort().map((id) => ({ id, label: getPlatformBadge(id).label, count: counts[id] }))];
+});
+const visibleKols = computed(() => (props.kolProfiles || []).filter((k) => kolPlatform.value === 'all' || k.platform === kolPlatform.value));
+
 const igSearch = ref('');
 const igSort = ref('latest');
 const igHighlightOnly = ref(false);
@@ -339,7 +351,7 @@ const getCaseEscalationUrl = (c) => {
     title: `[Medsos Atensi] ${c.title}`,
     category: '📱 Isu Medsos & Opini Publik (Cyber Patrol)',
     priority: c.priority === 'urgent' ? 'urgent' : 'high',
-    summary: `Hasil pemantauan berkas kasus intelijen siber "${c.title}". Total himpunan ${c.posts_count || 0} percakapan warganet dengan estimasi jangkauan ${formatNumber(c.total_views || 0)} views. Polarisasi sentimen: ${c.sentiment_breakdown?.neg_pct || 0}% negatif dan ${c.sentiment_breakdown?.pos_pct || 0}% positif. Rekomendasi Humas: ${c.intelligence_notes || ''}`,
+    summary: `Hasil pemantauan berkas kasus intelijen siber "${c.title}". Total himpunan ${c.posts_count || 0} percakapan warganet dengan estimasi jangkauan ${formatNumber(c.total_views)} views. Polarisasi sentimen: ${c.sentiment_breakdown?.neg_pct || 0}% negatif dan ${c.sentiment_breakdown?.pos_pct || 0}% positif. Rekomendasi Humas: ${c.intelligence_notes || ''}`,
     source_media: 'Multi-Platform Medsos',
   });
   return `/issues/create?${params.toString()}`;
@@ -543,7 +555,9 @@ const getSentimentBadge = (sentiment) => {
   }
 };
 
+// null/undefined = metrik tidak diketahui dari sumber → '—' (bukan 0).
 const formatNumber = (num) => {
+  if (num === null || num === undefined) return '\u2014';
   if (!num) return '0';
   if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
   if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
@@ -1062,7 +1076,7 @@ const getBuzzerRiskClass = (level) => {
       </div>
 
       <div class="p-4 space-y-1.5">
-        <p class="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5"><Activity class="w-3.5 h-3.5 text-emerald-500" /> Sentimen Publik</p>
+        <p class="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5"><Activity class="w-3.5 h-3.5 text-emerald-500" /> Sentimen Publik <SentimentInfo variant="icon" kind="social" :lexicon="sentimentLexicon" /></p>
         <div class="flex items-end justify-between gap-2">
           <p class="text-2xl font-black text-emerald-600 dark:text-emerald-400 leading-none">{{ metrics?.positive_pct ?? 0 }}%<span class="text-[11px] font-bold text-slate-500 dark:text-slate-400 ml-1">positif</span></p>
           <svg v-if="spikeTimelineDays.length > 1" viewBox="0 0 100 28" preserveAspectRatio="none" class="w-20 h-7 text-rose-500" aria-hidden="true" title="Tren negatif 7 hari">
@@ -1085,7 +1099,7 @@ const getBuzzerRiskClass = (level) => {
       >
         <p class="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5"><UserCheck class="w-3.5 h-3.5 text-amber-500" /> Tokoh Kritis &amp; KOL</p>
         <p class="text-2xl font-black text-amber-600 dark:text-amber-400 leading-none">{{ metrics?.kol_count || 0 }}</p>
-        <p class="text-[11px] text-slate-500 dark:text-slate-400">Pengamat, LBH &amp; aktivis aktif</p>
+        <p class="text-[11px] text-slate-500 dark:text-slate-400">Unggahan dari akun berpengaruh</p>
       </button>
 
       <button
@@ -1358,11 +1372,11 @@ const getBuzzerRiskClass = (level) => {
             </div>
             <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
               <span class="text-[10px] font-bold text-slate-400">Estimasi Jangkauan (Views)</span>
-              <p class="text-xl font-black text-indigo-400 mt-0.5">{{ formatNumber(selectedCase.total_views || 0) }}</p>
+              <p class="text-xl font-black text-indigo-400 mt-0.5">{{ formatNumber(selectedCase.total_views) }}</p>
             </div>
             <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
               <span class="text-[10px] font-bold text-slate-400">Total Interaksi Warganet</span>
-              <p class="text-xl font-black text-emerald-400 mt-0.5">{{ formatNumber(selectedCase.total_engagements || 0) }}</p>
+              <p class="text-xl font-black text-emerald-400 mt-0.5">{{ formatNumber(selectedCase.total_engagements) }}</p>
             </div>
             <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
               <span class="text-[10px] font-bold text-slate-400">Polarisasi Negatif</span>
@@ -1686,13 +1700,8 @@ const getBuzzerRiskClass = (level) => {
                 </span>
               </div>
 
-              <!-- Sentiment Pill -->
-              <span
-                class="px-2 py-0.5 rounded-lg text-[10px] font-extrabold capitalize"
-                :class="getSentimentClass(post.sentiment)"
-              >
-                {{ post.sentiment }}
-              </span>
+              <!-- Sentiment Pill: klik untuk alasan & metodologi -->
+              <SentimentInfo :sentiment="post.sentiment" :reason="post.sentiment_reason" kind="social" :lexicon="sentimentLexicon" />
             </div>
 
             <!-- Author Profile -->
@@ -1766,8 +1775,12 @@ const getBuzzerRiskClass = (level) => {
               </span>
             </div>
 
+            <p v-if="post.views_count == null && post.likes_count == null && post.shares_count == null && post.comments_count == null" class="text-[10px] text-slate-500 dark:text-slate-400">
+              Metrik keterlibatan tidak tersedia dari sumber ini (hasil pencarian/sindikasi berita).
+            </p>
             <!-- Virality Progress Bar -->
-            <div>
+            <p v-if="post.virality_score == null" class="text-[10px] text-slate-500 dark:text-slate-400"><span class="font-bold">Skor Viralisasi:</span> belum diketahui</p>
+            <div v-else>
               <div class="flex items-center justify-between text-[10px] mb-1">
                 <span class="text-slate-500 dark:text-slate-400 font-bold">Skor Viralisasi:</span>
                 <span
@@ -2266,8 +2279,12 @@ const getBuzzerRiskClass = (level) => {
       <section class="rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm space-y-4">
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div class="min-w-0">
-            <h2 class="text-base font-black text-slate-900 dark:text-white">Pantau Akun Instagram</h2>
-            <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">Unggahan publik terbaru dari akun tokoh atau KOL pilihan (hingga 12 unggahan per sinkronisasi, diambil lewat Apify, dilakukan manual). Hanya data publik; suka/komentar yang tidak tersedia ditampilkan apa adanya.</p>
+            <h2 class="text-base font-black text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
+              <span>Pantau Akun</span>
+              <span class="px-2 py-0.5 rounded-md text-[11px] font-black text-white bg-linear-to-r from-pink-500 via-rose-500 to-amber-500">Instagram</span>
+            </h2>
+            <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">Unggahan publik terbaru dari akun <b>Instagram</b> tokoh atau KOL pilihan (hingga 12 unggahan per sinkronisasi, diambil lewat Apify, dilakukan manual). Hanya data publik; suka/komentar yang tidak tersedia ditampilkan apa adanya.</p>
+            <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Pantauan per akun baru tersedia untuk Instagram. Unggahan dari X, TikTok, YouTube, dan Facebook masuk lewat <b>Radar Percakapan</b> dan Direktori KOL di bawah, lengkap dengan label platformnya.</p>
           </div>
           <button v-if="canSync && instagramReady && monitoredInstagramAccounts.length > 1" type="button" :disabled="instagramBusy" @click="syncAllInstagram" class="shrink-0 rounded-xl border border-slate-300 dark:border-slate-700 px-3.5 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 hover:border-amber-400 disabled:opacity-50 cursor-pointer">
             {{ instagramBusy ? 'Memproses...' : `Sinkronkan semua (${monitoredInstagramAccounts.length})` }}
@@ -2280,7 +2297,7 @@ const getBuzzerRiskClass = (level) => {
 
         <form v-if="canSync" class="flex flex-col sm:flex-row gap-2" @submit.prevent="syncInstagram()">
           <label for="instagram-monitor-username" class="sr-only">Username Instagram</label>
-          <input id="instagram-monitor-username" v-model="instagramUsername" maxlength="31" autocomplete="off" placeholder="Contoh: @mohmahfudmd" class="flex-1 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-400" />
+          <input id="instagram-monitor-username" v-model="instagramUsername" maxlength="31" autocomplete="off" placeholder="Username Instagram, contoh: @mohmahfudmd" class="flex-1 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-400" />
           <button type="submit" :disabled="instagramBusy || !instagramReady || !instagramUsername.trim()" class="rounded-xl bg-amber-400 hover:bg-amber-300 px-4 py-2 text-sm font-bold text-slate-950 disabled:opacity-50 cursor-pointer">{{ instagramBusy ? 'Menyinkronkan...' : 'Tambah & sinkronkan' }}</button>
         </form>
         <p v-else class="text-xs text-slate-500 dark:text-slate-400">Menambah atau menyinkronkan akun memerlukan izin sinkron Radar Media Sosial. Anda dapat melihat hasil yang sudah ada.</p>
@@ -2326,6 +2343,7 @@ const getBuzzerRiskClass = (level) => {
               <div class="min-w-0 flex-1">
                 <p class="flex items-center gap-1.5 flex-wrap">
                   <span class="font-bold text-sm text-slate-900 dark:text-white truncate">{{ account.display_name || 'Akun Instagram' }}</span>
+                  <span class="px-1.5 py-0.5 rounded text-[10px] font-black text-white bg-linear-to-r from-pink-500 via-rose-500 to-amber-500">Instagram</span>
                   <span class="text-[11px] font-mono text-slate-500 dark:text-slate-400">@{{ account.username }}</span>
                   <span v-if="igIsNew(account)" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">Baru 24 jam</span>
                   <span v-if="igHighlights(account).length" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-300">{{ igHighlights(account).length }} menonjol</span>
@@ -2341,7 +2359,7 @@ const getBuzzerRiskClass = (level) => {
               <ChevronDown v-if="monitoredInstagramAccounts.length > 1" class="w-4 h-4 text-slate-400 shrink-0 transition-transform" :class="igIsOpen(account) ? 'rotate-180' : ''" />
             </button>
             <div class="flex items-center gap-2">
-              <a :href="`https://www.instagram.com/${account.username}/`" target="_blank" rel="noopener noreferrer" class="rounded-lg border border-slate-300 dark:border-slate-700 px-2.5 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:border-amber-400" :aria-label="`Buka profil @${account.username} di Instagram`">Profil ↗</a>
+              <a :href="`https://www.instagram.com/${account.username}/`" target="_blank" rel="noopener noreferrer" class="rounded-lg border border-slate-300 dark:border-slate-700 px-2.5 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:border-amber-400" :aria-label="`Buka profil @${account.username} di Instagram`">Instagram ↗</a>
               <template v-if="canSync">
                 <button type="button" :disabled="instagramBusy || !instagramReady" @click="syncInstagram(account)" class="rounded-lg border border-slate-300 dark:border-slate-700 px-2.5 py-1.5 text-xs font-bold text-slate-800 dark:text-slate-200 hover:border-amber-400 disabled:opacity-50 cursor-pointer">{{ instagramBusy ? 'Memproses...' : 'Sinkronkan' }}</button>
                 <button type="button" :disabled="instagramBusy" @click="removeInstagram(account)" class="rounded-lg border border-rose-200 dark:border-rose-900 px-2.5 py-1.5 text-xs font-bold text-rose-700 dark:text-rose-400 cursor-pointer">Hapus</button>
@@ -2387,20 +2405,29 @@ const getBuzzerRiskClass = (level) => {
         <div class="border-b border-slate-200 dark:border-slate-800 pb-3">
           <h2 class="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
             <UserCheck class="w-5 h-5 text-amber-500" />
-            <span>{{ isNational ? 'Direktori Tokoh Kritis & Key Opinion Leader (KOL) Skala Nasional' : 'Direktori Tokoh Kritis, Pengamat Hukum & KOL Wilayah' }}</span>
+            <span>Direktori KOL &amp; Akun Berpengaruh (semua platform)</span>
           </h2>
           <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            {{ isNational
-              ? 'Akun-akun nasional berpengaruh (pengawas eksternal kepolisian, LSM HAM, jurnalis investigasi, dan analis pertahanan/keamanan) yang menyoroti kebijakan dan isu strategis Polri secara luas.'
-              : `Akun-akun yang memiliki daya jangkau tinggi (*high amplification*) dan secara berkala menyoroti kinerja penegakan hukum dan kamtibmas di ${selectedPolda?.name || 'wilayah jajaran'}.`
-            }}
+            Disusun dari unggahan tersimpan {{ isNational ? 'lingkup nasional' : (selectedPolda?.name || 'wilayah ini') }} yang penulisnya ditandai berpengaruh. Setiap kartu menunjukkan platform asal unggahan; akun yang sama di platform lain dihitung terpisah.
           </p>
+        </div>
+
+        <div v-if="kolPlatformTabs.length > 2" class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Saring KOL per platform">
+          <button
+            v-for="t in kolPlatformTabs"
+            :key="t.id"
+            type="button"
+            @click="kolPlatform = t.id"
+            :aria-pressed="kolPlatform === t.id"
+            class="px-2.5 py-1 rounded-xl text-xs font-bold transition cursor-pointer"
+            :class="kolPlatform === t.id ? 'bg-amber-400 text-slate-950' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'"
+          >{{ t.label }} ({{ t.count }})</button>
         </div>
 
         <p v-if="!kolProfiles?.length" class="rounded-xl bg-slate-50 dark:bg-slate-900 p-4 text-sm text-slate-600 dark:text-slate-400">Belum ada tokoh/KOL terdeteksi dari data yang tersimpan. Daftar terisi dari unggahan akun berpengaruh pada Radar Percakapan; Anda juga dapat memantau akun tertentu pada kotak di atas.</p>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div
-            v-for="(kol, idx) in kolProfiles"
+            v-for="(kol, idx) in visibleKols"
             :key="idx"
             class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-3"
           >
@@ -2409,10 +2436,10 @@ const getBuzzerRiskClass = (level) => {
                 class="px-2 py-0.5 rounded text-[10px] font-black uppercase"
                 :class="getPlatformBadge(kol.platform).class"
               >
-                {{ kol.platform.toUpperCase() }}
+                {{ getPlatformBadge(kol.platform).label }}
               </span>
               <span class="text-[10px] font-bold text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-400/10">
-                {{ kol.kol_category || 'Tokoh Kritis' }}
+                {{ kol.kol_category || 'Akun berpengaruh' }}
               </span>
             </div>
 

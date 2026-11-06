@@ -40,4 +40,4 @@ Jalankan `php artisan test` dengan SQLite in-memory sesuai `phpunit.xml`, dan `n
 - **Deployment:** jalankan `php artisan migrate --force` (kolom `last_error`) dan bersihkan cache (`php artisan optimize:clear`).
 
 ## Addendum 6 Nov 2026 (2): banyak akun & unggahan menonjol
-Tampilan ringkas per akun, cari/urut/saring, dan penanda unggahan menonjol (`App\Support\InstagramHighlights`). Grafik 7 hari kini memakai tanggal zona waktu tenant. Detail: doc 32.
+Tampilan ringkas per akun, cari/urut/saring, dan penanda unggahan menonjol (`App\Support\InstagramHighlights`). Grafik 7 hari kini memakai tanggal zona waktu tenant. Detail: doc 33. Pembedaan platform di tab KOL: doc 34 §5.

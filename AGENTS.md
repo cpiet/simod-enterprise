@@ -115,7 +115,7 @@ Scheduler (sumber tunggal `app/Support/ScheduledTasks.php`, didaftarkan `routes/
 
 ### 3.8. Daftar berita Radar Media Online
 - Pencarian, filter, penggabungan berita ganda, dan paginasi dilakukan di server lewat `App\Services\MediaArticleListing`; jangan mengirim ribuan artikel ke browser. Facet dihitung dengan semua filter aktif kecuali dirinya sendiri (paritas angka dropdown = jumlah kartu).
-- Sentimen berita ditentukan `App\Support\NewsSentiment` (konteks Polri), pencarian oleh `App\Support\NewsSearch`. Jangan menulis ulang aturan sentimen di tempat lain. Setelah mengubah aturan, jalankan `php artisan media:reindex`.
+- Sentimen berita ditentukan `App\Support\NewsSentiment` (konteks Polri), unggahan medsos oleh `NewsSentiment::detectSocial()` (aturan sama + ungkapan warganet), pencarian oleh `App\Support\NewsSearch`. Jangan menulis ulang aturan sentimen di tempat lain. Alasan label untuk UI dari `explain()`/`explainSocial()` (popup `SentimentInfo.vue`). Metrik medsos yang tidak diketahui disimpan `null`, bukan 0/acak (doc 34). Setelah mengubah aturan, jalankan `php artisan media:reindex`.
 - Aksi pada berita/topik (bookmark, topik, tag, analisis, crawl) wajib memanggil `authorizeTenantRecord()`.
 
 ### 3.9. Audit Log, Laporan Isu, dan data yang dihapus
@@ -220,7 +220,8 @@ Daftar lengkap ada di [`docs/README.md`](docs/README.md). Yang paling sering dib
 | Pencarian server, kesegaran data, matriks Satwil, Command Center data nyata | [29](docs/29-radar-media-pencarian-server-dan-command-center-data-nyata.md) |
 | Audit Log, keamanan, kesiapan hosting, arsip/hapus laporan | [30](docs/30-audit-log-keamanan-hosting-dan-arsip-hapus-laporan.md) |
 | Demo Divhumas + Sulbar, deploy Hostinger | [31](docs/31-demo-divhumas-sulbar-dan-panduan-deploy-hostinger.md) |
-| Tren pencarian, SADEWA cari internet, pantauan banyak KOL | [32](docs/32-tren-pencarian-sadewa-internet-dan-pantauan-banyak-kol.md) |
+| Tren pencarian, SADEWA cari internet, pantauan banyak KOL | [33](docs/33-tren-pencarian-sadewa-internet-dan-pantauan-banyak-kol.md) |
+| Metodologi sentimen, popup alasan, data medsos jujur | [34](docs/34-metodologi-sentimen-dan-data-medsos-jujur.md) |
 | Radar Media Online, RSS, Topik Atensi | [03](docs/03-modul-media-intelligence-dan-rss.md), [10](docs/10-daftar-rss-feed-resmi-sulbar.md), [14](docs/14-katalog-rss-media-online-nasional.md), [18](docs/18-optimalisasi-ux-dossier-dan-arsitektur-4-pilar-media-intelligence.md), [23](docs/23-optimalisasi-performa-dan-ux-radar-media-online.md) |
 | Radar Media Sosial | [11](docs/11-modul-radar-media-sosial-apify.md), [19](docs/19-optimalisasi-radar-media-sosial-dan-sintesis-ai-sadewa.md), [25](docs/25-peta-grafik-dan-pantauan-instagram.md) |
 | Isu, tugas, publikasi, administrasi | [24](docs/24-penyederhanaan-isu-tugas-publikasi-dan-administrasi.md), [04](docs/04-modul-manajemen-isu-dan-ews.md), [05](docs/05-modul-publikasi-dan-siaran-pers.md), [06](docs/06-modul-disposisi-tugas-dan-audit-trail.md) |

@@ -110,7 +110,7 @@ class SocialIntelligenceController extends Controller
                 $query->orderBy('views_count', 'desc');
                 break;
             case 'engagement':
-                $query->orderByRaw('(likes_count + shares_count + comments_count) DESC');
+                $query->orderByRaw('(COALESCE(likes_count,0) + COALESCE(shares_count,0) + COALESCE(comments_count,0)) DESC');
                 break;
             case 'latest':
             default:
@@ -118,7 +118,9 @@ class SocialIntelligenceController extends Controller
                 break;
         }
 
-        $posts = $query->paginate(12)->withQueryString();
+        $posts = $query->paginate(12)->withQueryString()
+            // Alasan label sentimen per unggahan (aturan tunggal NewsSentiment, varian medsos) untuk popup.
+            ->through(fn ($p) => $p->setAttribute('sentiment_reason', \App\Support\NewsSentiment::explainSocial($p->content)));
 
         // High-level Metrics (National or Regional)
         $poldaScope = SocialPost::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))
@@ -126,18 +128,19 @@ class SocialIntelligenceController extends Controller
 
         // Satu query agregat (sebelumnya 9 query terpisah pada setiap pembukaan halaman).
         $agg = (clone $poldaScope)->selectRaw(
-            "COUNT(*) AS c, COALESCE(SUM(likes_count),0) AS l, COALESCE(SUM(shares_count),0) AS sh, COALESCE(SUM(comments_count),0) AS cm, "
-            . "COALESCE(SUM(views_count),0) AS v, COALESCE(SUM(CASE WHEN is_bookmarked = 1 THEN 1 ELSE 0 END),0) AS bm, "
+            "COUNT(*) AS c, SUM(likes_count) AS l, SUM(shares_count) AS sh, SUM(comments_count) AS cm, "
+            . "SUM(views_count) AS v, COALESCE(SUM(CASE WHEN is_bookmarked = 1 THEN 1 ELSE 0 END),0) AS bm, "
             . "COALESCE(SUM(CASE WHEN is_kol = 1 THEN 1 ELSE 0 END),0) AS kol, COALESCE(SUM(CASE WHEN virality_score >= 75 THEN 1 ELSE 0 END),0) AS viral, "
             . "COALESCE(SUM(CASE WHEN sentiment = 'positif' THEN 1 ELSE 0 END),0) AS pos, COALESCE(SUM(CASE WHEN sentiment = 'netral' THEN 1 ELSE 0 END),0) AS neu, "
             . "COALESCE(SUM(CASE WHEN sentiment = 'negatif' THEN 1 ELSE 0 END),0) AS neg"
         )->first();
         $totalCount = (int) $agg->c;
         $bookmarkedCount = (int) $agg->bm;
-        $totalLikes = (int) $agg->l;
-        $totalShares = (int) $agg->sh;
-        $totalComments = (int) $agg->cm;
-        $totalViews = (int) $agg->v;
+        // Metrik keterlibatan: null bila tidak satu pun unggahan membawa angka itu (bukan 0).
+        $totalLikes = $agg->l === null ? null : (int) $agg->l;
+        $totalShares = $agg->sh === null ? null : (int) $agg->sh;
+        $totalComments = $agg->cm === null ? null : (int) $agg->cm;
+        $totalViews = $agg->v === null ? null : (int) $agg->v;
         $positiveCount = (int) $agg->pos;
         $neutralCount = (int) $agg->neu;
         $negativeCount = (int) $agg->neg;
@@ -145,7 +148,7 @@ class SocialIntelligenceController extends Controller
         $metrics = [
             'total_posts'        => $totalCount,
             'total_views'        => $totalViews,
-            'total_engagements'  => $totalLikes + $totalShares + $totalComments,
+            'total_engagements'  => ($totalLikes === null && $totalShares === null && $totalComments === null) ? null : (int) $totalLikes + (int) $totalShares + (int) $totalComments,
             'kol_count'          => (int) $agg->kol,
             'viral_count'        => (int) $agg->viral,
             'positive_pct'       => $totalCount > 0 ? round(($positiveCount / $totalCount) * 100) : 0,
@@ -334,6 +337,7 @@ class SocialIntelligenceController extends Controller
             'selectedCode'        => $selectedCode,
             'isNational'          => $isNational,
             'posts'               => $posts,
+            'sentimentLexicon'    => fn () => \App\Support\NewsSentiment::lexicon(),
             'casePosts'           => $posts,
             'totalPostsCount'     => $totalCount,
             'bookmarkedCount'     => $bookmarkedCount,
@@ -564,7 +568,8 @@ class SocialIntelligenceController extends Controller
             preg_match_all('/#([a-zA-Z0-9_\x{0080}-\x{ffff}]+)/u', $post->content, $matches);
             $tags = array_unique(array_map('trim', $matches[0] ?? []));
             
-            $reach = (int) ($post->views_count ?: ($post->likes_count * 10 + $post->shares_count * 25 + $post->comments_count * 15 + 1500));
+            // Jangkauan = tayangan bila diketahui, selain itu jumlah interaksi yang diketahui; tidak ada angka dasar karangan.
+            $reach = (int) ($post->views_count ?? ((int) $post->likes_count + (int) $post->shares_count + (int) $post->comments_count));
             $platform = strtolower($post->platform);
             $sentiment = strtolower($post->sentiment ?: 'netral');
             if (!in_array($sentiment, ['positif', 'netral', 'negatif'])) {
@@ -581,6 +586,7 @@ class SocialIntelligenceController extends Controller
                         'total_reach'  => 0,
                         'posts_count'  => 0,
                         'virality_sum' => 0,
+                        'virality_n'   => 0,
                         'sentiments'   => ['positif' => 0, 'netral' => 0, 'negatif' => 0],
                         'platforms'    => [
                             'instagram' => ['reach' => 0, 'posts' => 0, 'sentiments' => ['positif' => 0, 'netral' => 0, 'negatif' => 0]],
@@ -593,7 +599,10 @@ class SocialIntelligenceController extends Controller
 
                 $tagStats[$normalizedTag]['total_reach'] += $reach;
                 $tagStats[$normalizedTag]['posts_count'] += 1;
-                $tagStats[$normalizedTag]['virality_sum'] += (int) ($post->virality_score ?: 60);
+                if ($post->virality_score !== null) {
+                    $tagStats[$normalizedTag]['virality_sum'] += (int) $post->virality_score;
+                    $tagStats[$normalizedTag]['virality_n']++;
+                }
                 $tagStats[$normalizedTag]['sentiments'][$sentiment] += 1;
 
                 if (in_array($platform, $validPlatforms)) {
@@ -631,7 +640,7 @@ class SocialIntelligenceController extends Controller
                 'sentiment'    => $dominantSentiment,
                 'platform'     => $dominantPlatform,
                 'platforms'    => $data['platforms'],
-                'virality_avg' => round($data['virality_sum'] / max(1, $data['posts_count'])),
+                'virality_avg' => $data['virality_n'] ? (int) round($data['virality_sum'] / $data['virality_n']) : null,
             ];
         }
         usort($byPlatform['all'], fn($a, $b) => $b['count'] <=> $a['count']);
@@ -652,7 +661,7 @@ class SocialIntelligenceController extends Controller
                         'sentiment'    => $dominantSentiment,
                         'platform'     => $plat,
                         'platforms'    => $data['platforms'],
-                        'virality_avg' => round($data['virality_sum'] / max(1, $data['posts_count'])),
+                        'virality_avg' => $data['virality_n'] ? (int) round($data['virality_sum'] / $data['virality_n']) : null,
                     ];
                 }
             }
@@ -797,19 +806,7 @@ class SocialIntelligenceController extends Controller
             ->get()
             ->toArray();
 
-        if ($isNational) {
-            $nationalKols = [
-                ['author_name' => 'Kompolnas RI Official', 'author_handle' => '@kompolnas_ri', 'platform' => 'x', 'kol_category' => 'Pengawas Eksternal Kepolisian', 'posts_count' => 8, 'total_views' => 184500],
-                ['author_name' => 'Indonesia Police Watch (IPW)', 'author_handle' => '@ipw_watch', 'platform' => 'x', 'kol_category' => 'LSM Pemantau Kepolisian', 'posts_count' => 6, 'total_views' => 142000],
-                ['author_name' => 'Dewan Pers Indonesia', 'author_handle' => '@dewanpers_ri', 'platform' => 'instagram', 'kol_category' => 'Lembaga Etika & Media', 'posts_count' => 5, 'total_views' => 98400],
-                ['author_name' => 'KontraS Nasional', 'author_handle' => '@kontras_update', 'platform' => 'x', 'kol_category' => 'Lembaga Advokasi HAM', 'posts_count' => 7, 'total_views' => 112000],
-                ['author_name' => 'Najwa Shihab / Narasi Newsroom', 'author_handle' => '@narasinewsroom', 'platform' => 'youtube', 'kol_category' => 'Media & Jurnalis Investigasi', 'posts_count' => 12, 'total_views' => 450000],
-                ['author_name' => 'ISESS (Institute for Security Studies)', 'author_handle' => '@isess_official', 'platform' => 'tiktok', 'kol_category' => 'Pengamat Keamanan Nasional', 'posts_count' => 4, 'total_views' => 87000],
-            ];
-
-            return collect(array_merge($dbKols, $nationalKols))->unique('author_handle')->values()->all();
-        }
-
+        // Hanya dari unggahan tersimpan (sebelumnya mode nasional menambah 6 tokoh dengan angka karangan).
         return $dbKols;
     }
 

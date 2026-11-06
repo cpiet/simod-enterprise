@@ -304,7 +304,7 @@ class SadewaController extends Controller
                 ->orderByDesc('virality_score')->limit(20)->get();
             foreach ($posts as $i => $p) {
                 $code = 'S' . ($i + 1);
-                $lines[] = "[{$code}] {$p->platform} @{$p->author_handle}" . ($p->is_kol ? ' (tokoh/KOL)' : '') . " | {$p->sentiment} | viralitas {$p->virality_score} | suka {$p->likes_count}, bagi {$p->shares_count} | " . $trim($p->content, 220);
+                $lines[] = "[{$code}] {$p->platform} @{$p->author_handle}" . ($p->is_kol ? ' (tokoh/KOL)' : '') . " | {$p->sentiment} | viralitas " . ($p->virality_score ?? 'tidak diketahui') . ' | suka ' . ($p->likes_count ?? 'tidak diketahui') . ', bagi ' . ($p->shares_count ?? 'tidak diketahui') . ' | ' . $trim($p->content, 220);
                 $map[$code] = ['type' => 'social', 'title' => $trim($p->content, 110), 'label' => $p->platform . ' @' . $p->author_handle, 'url' => $p->post_url, 'external' => true];
             }
             $blocks[] = "== MEDIA SOSIAL ==\n" . ($lines ? implode("\n", $lines) : 'Belum ada data media sosial.');
