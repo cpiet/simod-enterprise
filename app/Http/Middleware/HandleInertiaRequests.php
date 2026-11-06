@@ -148,6 +148,8 @@ class HandleInertiaRequests extends Middleware
                     'role'  => $activeRole,
                     'real_role' => $user->role,
                     'can_simulate_role' => $user->isSuperAdmin(),
+                    // Sama dengan aturan TenantController: personel daerah terkunci ke Polda-nya.
+                    'can_switch_tenant' => $user->isSuperAdmin() || ! $user->polda_id,
                     'polda' => $user->polda ?? null,
                 ] : null,
                 'role'        => $activeRole,

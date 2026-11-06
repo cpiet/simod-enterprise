@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class MonitoredInstagramAccount extends Model
 {
-    protected $fillable = ['polda_id', 'username', 'display_name', 'posts', 'last_synced_at', 'sync_status'];
+    protected $fillable = ['polda_id', 'username', 'display_name', 'posts', 'last_synced_at', 'sync_status', 'last_error'];
 
     protected $casts = ['posts' => 'array', 'last_synced_at' => 'datetime'];
 }

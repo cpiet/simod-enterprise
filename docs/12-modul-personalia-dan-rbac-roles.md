@@ -120,3 +120,20 @@ Cakupan pengujian:
 5. `test_can_delete_personnel_with_protections`: Memastikan penghapusan akun non-master berjalan dan akun master terlindungi.
 6. `test_regional_admin_cannot_promote_to_mabes_or_edit_mabes_personnel`: Memastikan pembatasan wilayah (admin polda tidak bisa membuat/mengedit akun Mabes).
 
+
+## Addendum: Perbaikan modal Personalia (7 Nov 2026)
+- **Modal tidak lagi menutup saat seleksi/drag mouse**: semua latar modal memakai `@mousedown.self` (bukan `@click.self`), sehingga menekan di dalam kolom lalu melepas di luar tidak menutup formulir.
+- **Galat validasi terlihat**: toast Personalia kini `fixed z-[100]` (sebelumnya tertutup modal) dan pesan galat server juga ditampilkan di dalam modal Tambah Personel.
+- **Kebijakan kata sandi seragam**: buat, ubah, dan reset oleh admin kini minimal 10 karakter (sama dengan ganti sandi sendiri); formulir menampilkan "Minimal 10 karakter".
+- Test: `PersonaliaAuthorityTest::test_admin_created_account_requires_strong_password_and_returns_error_to_form`.
+
+## Addendum: Daftar Personel per lingkup (7 Nov 2026)
+- Super Admin/Kadivhumas di tampilan Divhumas (nasional) kini melihat **semua akun** (termasuk yang terdaftar di Polda lain, mis. akun Sulbar yang dibuat dari Mabes); sebelumnya akun berpolda_id Polda lain tidak tampil sehingga terkesan tidak tersimpan.
+- Di lingkup satu Polda, dan untuk personel daerah, hanya akun Polda itu yang tampil; akun tingkat Mabes (polda_id kosong) tidak lagi tampil bagi personel daerah.
+- Test: `QuickPinLoginTest::test_super_admin_sees_accounts_of_all_poldas_in_divhumas_view`.
+
+## Addendum 6 Nov 2026: menu hanya menampilkan yang boleh diakses
+
+- **Menu = server.** `RolePermission::getPermissionsForRole()` kini melengkapi kunci yang tidak tercatat di baris matriks dengan standar peran bawaan, persis seperti `isGranted()` (dipakai middleware `module:`). Sebelumnya kunci yang hilang dianggap "boleh" oleh menu sehingga tab (mis. Hak Akses) tampil tetapi berujung 403.
+- **Pemilih wilayah.** Props bersama `auth.user.can_switch_tenant` bernilai benar hanya untuk Super Admin/Kadivhumas (atau akun tanpa Polda), sama dengan aturan `TenantController`. Personel daerah melihat nama Polda-nya sebagai label saja (tanpa dropdown), dan kartu/tab "Pindah Komando" di Pengaturan Satwil disembunyikan.
+- Test: `tests/Feature/MenuMatchesAuthorityTest.php`.

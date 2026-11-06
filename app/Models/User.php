@@ -29,6 +29,21 @@ class User extends Authenticatable
         'remember_token',
     ];
 
+    public function trustedDevices(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(TrustedDevice::class);
+    }
+
+    protected static function booted(): void
+    {
+        // Kata sandi diganti/di-reset atau akun dinonaktifkan: seluruh perangkat tepercaya (PIN) dicabut.
+        static::saved(function (User $user) {
+            if ($user->wasChanged('password') || ($user->wasChanged('is_active') && ! $user->is_active)) {
+                $user->trustedDevices()->delete();
+            }
+        });
+    }
+
     protected function casts(): array
     {
         return [

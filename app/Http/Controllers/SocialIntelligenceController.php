@@ -121,23 +121,30 @@ class SocialIntelligenceController extends Controller
         $poldaScope = SocialPost::when(!$isNational && $selectedPolda, fn($q) => $q->where('polda_id', $selectedPolda->id))
             ->when($isNational && $satwil !== 'all', fn($q) => $q->where('polda_id', $satwil));
 
-        $totalCount = (clone $poldaScope)->count();
-        $bookmarkedCount = (clone $poldaScope)->where('is_bookmarked', true)->count();
-        $totalLikes = (clone $poldaScope)->sum('likes_count');
-        $totalShares = (clone $poldaScope)->sum('shares_count');
-        $totalComments = (clone $poldaScope)->sum('comments_count');
-        $totalViews = (clone $poldaScope)->sum('views_count');
-
-        $positiveCount = (clone $poldaScope)->where('sentiment', 'positif')->count();
-        $neutralCount = (clone $poldaScope)->where('sentiment', 'netral')->count();
-        $negativeCount = (clone $poldaScope)->where('sentiment', 'negatif')->count();
+        // Satu query agregat (sebelumnya 9 query terpisah pada setiap pembukaan halaman).
+        $agg = (clone $poldaScope)->selectRaw(
+            "COUNT(*) AS c, COALESCE(SUM(likes_count),0) AS l, COALESCE(SUM(shares_count),0) AS sh, COALESCE(SUM(comments_count),0) AS cm, "
+            . "COALESCE(SUM(views_count),0) AS v, COALESCE(SUM(CASE WHEN is_bookmarked = 1 THEN 1 ELSE 0 END),0) AS bm, "
+            . "COALESCE(SUM(CASE WHEN is_kol = 1 THEN 1 ELSE 0 END),0) AS kol, COALESCE(SUM(CASE WHEN virality_score >= 75 THEN 1 ELSE 0 END),0) AS viral, "
+            . "COALESCE(SUM(CASE WHEN sentiment = 'positif' THEN 1 ELSE 0 END),0) AS pos, COALESCE(SUM(CASE WHEN sentiment = 'netral' THEN 1 ELSE 0 END),0) AS neu, "
+            . "COALESCE(SUM(CASE WHEN sentiment = 'negatif' THEN 1 ELSE 0 END),0) AS neg"
+        )->first();
+        $totalCount = (int) $agg->c;
+        $bookmarkedCount = (int) $agg->bm;
+        $totalLikes = (int) $agg->l;
+        $totalShares = (int) $agg->sh;
+        $totalComments = (int) $agg->cm;
+        $totalViews = (int) $agg->v;
+        $positiveCount = (int) $agg->pos;
+        $neutralCount = (int) $agg->neu;
+        $negativeCount = (int) $agg->neg;
 
         $metrics = [
             'total_posts'        => $totalCount,
             'total_views'        => $totalViews,
             'total_engagements'  => $totalLikes + $totalShares + $totalComments,
-            'kol_count'          => (clone $poldaScope)->where('is_kol', true)->count(),
-            'viral_count'        => (clone $poldaScope)->where('virality_score', '>=', 75)->count(),
+            'kol_count'          => (int) $agg->kol,
+            'viral_count'        => (int) $agg->viral,
             'positive_pct'       => $totalCount > 0 ? round(($positiveCount / $totalCount) * 100) : 0,
             'neutral_pct'        => $totalCount > 0 ? round(($neutralCount / $totalCount) * 100) : 0,
             'negative_pct'       => $totalCount > 0 ? round(($negativeCount / $totalCount) * 100) : 0,
@@ -145,13 +152,16 @@ class SocialIntelligenceController extends Controller
         ];
 
         // Dynamic Key Opinion Leaders list (National vs Polda)
-        $kolProfiles = $this->getDynamicKolProfiles($poldaScope, $selectedPolda, $isNational);
+        $kolProfiles = fn () => $this->getDynamicKolProfiles($poldaScope, $selectedPolda, $isNational);
 
         // Dynamic Trending Hashtags & Platform Breakdown (Instagram, TikTok, X, YouTube)
-        $trendingData = $this->getDynamicTrendingData($poldaScope, $selectedPolda, $isNational, $platform);
+        $trendingData = null;
+        $trending = function () use (&$trendingData, $poldaScope, $selectedPolda, $isNational, $platform) {
+            return $trendingData ??= $this->getDynamicTrendingData($poldaScope, $selectedPolda, $isNational, $platform);
+        };
 
         // Dynamic Peak Hours of Citizen Social Activity
-        $peakHours = $this->getDynamicPeakHours($poldaScope, $selectedPolda, $isNational);
+        $peakHours = fn () => $this->getDynamicPeakHours($poldaScope, $selectedPolda, $isNational);
 
         // Resolve default / global token across environment or database
         $globalTokenFallback = SocialSetting::whereNotNull('apify_api_token')->where('apify_api_token', '!=', '')->value('apify_api_token') 
@@ -177,7 +187,7 @@ class SocialIntelligenceController extends Controller
                     'accounts_tracked'  => '@humaspolri, @polripresisi, @halo_polisi',
                     'sync_frequency'    => 'every_3_hours',
                     'auto_sync_enabled' => true,
-                    'last_synced_at'    => now()->subMinutes(15),
+                    'last_synced_at'    => null,
                 ]
             );
             if (empty($settings->apify_api_token) && !empty($globalTokenFallback)) {
@@ -329,14 +339,15 @@ class SocialIntelligenceController extends Controller
             'metrics'             => $metrics,
             'kolProfiles'         => $kolProfiles,
             'monitoredInstagramAccounts' => MonitoredInstagramAccount::where('polda_id', $poldaId)->orderBy('username')->get(),
-            'trendingHashtags'    => $trendingData['trendingHashtags'],
-            'trendingByPlatform'  => $trendingData['trendingByPlatform'],
-            'publicTrends'        => $service->getPublicTrendsData(),
-            'supportedActors'     => $service->getSupportedTrendActors(),
-            'spikeTimeline'       => $this->getSentimentSpikeTimeline($timelineQuery, $selectedPolda, $isNational),
-            'wordCloud'           => $this->getWordCloudData($poldaScope, $selectedPolda),
+            'trendingHashtags'    => fn () => $trending()['trendingHashtags'],
+            'trendingByPlatform'  => fn () => $trending()['trendingByPlatform'],
+            'publicTrends'        => fn () => $service->getPublicTrendsData(),
+            'supportedActors'     => fn () => $service->getSupportedTrendActors(),
+            'spikeTimeline'       => fn () => $this->getSentimentSpikeTimeline($timelineQuery, $selectedPolda, $isNational),
+            'wordCloud'           => fn () => $this->getWordCloudData($poldaScope, $selectedPolda),
             'peakHours'           => $peakHours,
-            'settings'            => $settings,
+            'settings'            => $this->publicSettings($settings),
+            'instagramReady'      => $this->resolveApifyToken($poldaId) !== null,
             'latestReport'        => $latestReport,
             'reportHistory'       => $reportHistory,
             'satwils'             => $satwils,
@@ -353,6 +364,29 @@ class SocialIntelligenceController extends Controller
                 'post_date'  => $postDate,
             ],
         ]);
+    }
+
+    /** Token Apify tersimpan (tenant ini, lalu cadangan global/.env); null bila belum ada. Tidak pernah dikirim ke browser. */
+    private function resolveApifyToken(?int $poldaId): ?string
+    {
+        $raw = SocialSetting::where('polda_id', $poldaId)->value('apify_api_token')
+            ?: SocialSetting::whereNotNull('apify_api_token')->where('apify_api_token', '!=', '')->value('apify_api_token')
+            ?: config('services.apify.token', env('APIFY_API_TOKEN', ''));
+
+        return $raw ?: null;
+    }
+
+    /** Pengaturan untuk browser: token mentah dibuang, diganti status dan petunjuk tersamar. */
+    private function publicSettings($settings): array
+    {
+        $apify = app(ApifySyncService::class);
+        $tokens = $apify->parseTokens($settings->apify_api_token ?? '');
+
+        return [
+            ...collect($settings->toArray())->except(['apify_api_token'])->all(),
+            'apify_token_set'  => $tokens !== [],
+            'apify_token_hint' => $tokens ? count($tokens).' token · '.$apify->maskToken($tokens[0]) : null,
+        ];
     }
 
     public function addInstagramAccount(Request $request, InstagramAccountMonitoringService $monitor, ApifySyncService $apify)
@@ -412,7 +446,6 @@ class SocialIntelligenceController extends Controller
 
         $validated = $request->validate([
             'polda_id'          => 'required|exists:poldas,id',
-            'apify_api_token'   => 'nullable|string|max:1000',
             'keywords_tracked'  => 'nullable|string|max:1000',
             'accounts_tracked'  => 'nullable|string|max:1000',
             'sync_frequency'    => 'required|string',
@@ -423,13 +456,6 @@ class SocialIntelligenceController extends Controller
             ['polda_id' => $validated['polda_id']],
             $validated
         );
-
-        // If updated from National scope (DIVHUMAS) or single-tenant host, propagate token to any empty polda
-        if (!empty($validated['apify_api_token']) && ($selectedCode === 'ALL' || Polda::where('id', $poldaId)->value('code') === 'DIVHUMAS')) {
-            SocialSetting::where(function ($q) {
-                $q->whereNull('apify_api_token')->orWhere('apify_api_token', '');
-            })->update(['apify_api_token' => $validated['apify_api_token']]);
-        }
 
         AuditLog::create([
             'polda_id'     => $validated['polda_id'],
@@ -451,8 +477,7 @@ class SocialIntelligenceController extends Controller
      */
     public function testConnection(Request $request, ApifySyncService $service)
     {
-        $token = $request->input('apify_api_token');
-        $result = $service->testConnection($token);
+        $result = $service->testConnection($this->resolveApifyToken($this->resolveActiveTenant($request)[2]));
 
         return response()->json($result);
     }
@@ -513,8 +538,7 @@ class SocialIntelligenceController extends Controller
      */
     public function syncTrends(Request $request, ApifySyncService $service)
     {
-        $token = $request->input('apify_api_token');
-        $result = $service->syncPublicTrends($token);
+        $result = $service->syncPublicTrends($this->resolveApifyToken($this->resolveActiveTenant($request)[2]));
 
         $ok = (bool) ($result['success'] ?? true);
 

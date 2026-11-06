@@ -27,7 +27,15 @@ class AuthController extends Controller
         }
 
         // Tanpa daftar Polda/akun ke klien: halaman masuk tidak membocorkan struktur organisasi maupun nama akun.
-        return Inertia::render('Auth/Login');
+        // Satu-satunya pengecualian: perangkat ini sudah didaftarkan pemiliknya (cookie perangkat sah) -> tawarkan masuk dengan PIN.
+        $device = QuickLoginController::deviceFrom($request);
+
+        return Inertia::render('Auth/Login', [
+            'quickUser' => $device ? [
+                'name'     => $device->user->name,
+                'username' => QuickLoginController::maskUsername($device->user->username),
+            ] : null,
+        ]);
     }
 
     /**
@@ -92,7 +100,17 @@ class AuthController extends Controller
         }
 
         RateLimiter::clear($lockKey);
-        Auth::login($user, $request->boolean('remember', false));
+
+        return $this->completeLogin($request, $user, 'auth.login', $request->boolean('remember', false));
+    }
+
+    /**
+     * Penyelesaian masuk yang dipakai bersama oleh login kata sandi dan login PIN perangkat tepercaya:
+     * sesi baru, tenant ditentukan akun, dan catatan audit.
+     */
+    public function completeLogin(Request $request, User $user, string $auditAction, bool $remember = false)
+    {
+        Auth::login($user, $remember);
 
         // Clear explicit logout lock & regenerate session ID to prevent session fixation
         $request->session()->forget('simod_logged_out');
@@ -110,14 +128,14 @@ class AuthController extends Controller
         $request->session()->put('active_polda_code', $targetCode);
 
         AuditLog::create([
-            'polda_id'     => $user?->polda_id ?? $request->session()->get('active_polda_id'),
-            'user_id'      => $user?->id,
-            'action'       => 'auth.login',
+            'polda_id'     => $user->polda_id ?? $request->session()->get('active_polda_id'),
+            'user_id'      => $user->id,
+            'action'       => $auditAction,
             'subject_type' => 'user',
-            'subject_id'   => (string) ($user?->id ?? $username),
+            'subject_id'   => (string) $user->id,
             'ip_address'   => $request->ip(),
             'user_agent'   => substr((string) $request->userAgent(), 0, 250),
-            'metadata'     => ['username' => $username, 'tenant' => $targetCode],
+            'metadata'     => ['username' => $user->username, 'tenant' => $targetCode],
             'created_at'   => now(),
         ]);
 

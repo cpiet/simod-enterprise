@@ -18,6 +18,8 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1')->name('login.post');
+    Route::post('/login/pin', [\App\Http\Controllers\Auth\QuickLoginController::class, 'login'])->middleware('throttle:10,1')->name('login.pin');
+    Route::post('/login/forget-device', [\App\Http\Controllers\Auth\QuickLoginController::class, 'forget'])->middleware('throttle:10,1')->name('login.forget-device');
 });
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
@@ -126,6 +128,8 @@ Route::post('/audit-logs/purge', [\App\Http\Controllers\AuditLogController::clas
 Route::post('/audit-logs/retention', [\App\Http\Controllers\AuditLogController::class, 'updateRetention'])->middleware('module:security_center')->name('audit-logs.retention');
 Route::get('/profile', [SystemModuleController::class, 'profile'])->name('profile.index');
 Route::post('/profile/password', [SystemModuleController::class, 'updatePassword'])->middleware('throttle:6,1')->name('profile.password');
+Route::post('/profile/pin', [\App\Http\Controllers\Auth\QuickLoginController::class, 'enroll'])->middleware('throttle:6,1')->name('profile.pin.enroll');
+Route::delete('/profile/pin', [\App\Http\Controllers\Auth\QuickLoginController::class, 'revoke'])->middleware('throttle:6,1')->name('profile.pin.revoke');
 Route::get('/settings/polda', [SystemModuleController::class, 'poldaSettings'])->middleware('module:polda_settings')->name('settings.polda');
 Route::post('/settings/polda/update', [SystemModuleController::class, 'updatePolda'])->middleware('module:polda_settings')->name('settings.polda.update');
 Route::post('/settings/polda/create', [SystemModuleController::class, 'storePolda'])->middleware('module:polda_settings')->name('settings.polda.create');

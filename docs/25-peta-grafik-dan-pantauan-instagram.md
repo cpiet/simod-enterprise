@@ -27,3 +27,14 @@ Setelah memperbarui kode pada lingkungan tujuan, jalankan migrasi Laravel yang t
 ### Pengujian
 
 Jalankan `php artisan test` dengan SQLite in-memory sesuai `phpunit.xml`, dan `npm.cmd run build` pada Windows Laragon. Tes pantauan Instagram menggunakan respons Apify tiruan untuk memeriksa penyaringan penulis/URL, metrik yang hilang, kegagalan, dan isolasi tenant; pengujian tersebut tidak menjamin layanan eksternal selalu tersedia.
+
+## Addendum 6 Nov 2026: pantauan Instagram dibuat siap produksi
+
+- **Token tidak pernah ke browser.** Props halaman Radar Media Sosial kini hanya memuat `settings.apify_token_set` dan `settings.apify_token_hint` (jumlah token + empat karakter terakhir). Token mentah hanya dikelola administrator di Keamanan & Pemeliharaan → Mesin Intelijen AI (`/settings/ai`). Form pengaturan sosial tidak lagi menulis token (sebelumnya form yang kosong dapat menghapusnya); uji koneksi dan tarik tren memakai token tersimpan di server.
+- **Status jujur.** Prop `instagramReady` menampilkan banner "Token Apify belum diatur" dan menonaktifkan tombol sinkron bila token belum ada. Pengguna tanpa izin `social_intelligence_sync` melihat hasil yang sudah ada beserta keterangan izin, bukan formulir yang hilang tanpa penjelasan.
+- **Alasan gagal tersimpan** di kolom `monitored_instagram_accounts.last_error` (migrasi `2026_11_09_090000`): token ditolak (401/403), saldo/batas habis (402), dibatasi (429), akun tidak ditemukan/privat, timeout. Snapshot sukses terakhir tetap dipertahankan.
+- **Data lebih kaya:** hingga 12 unggahan per sinkron (batas biaya Actor US$0,05), jenis (foto/video/album), tayangan, hashtag, dan thumbnail (hanya dari domain CDN Instagram, dimuat tanpa referrer; bila gagal dimuat ditampilkan ikon). Ringkasan per akun (jumlah unggahan, rata-rata suka/komentar, unggahan terbaru) dihitung dari data tersimpan dan mengabaikan metrik yang tidak tersedia.
+- **Alur kerja:** tombol "Pantau akun" pada kartu KOL Instagram mengisi formulir; "Sinkronkan semua" memproses akun satu per satu. Tetap manual dan berbiaya Apify.
+- **Kecepatan.** Sembilan query metrik digabung menjadi satu query agregat, dan analitik berat (KOL, tagar, jam puncak, lonjakan, awan kata, tren publik) kini prop lazy sehingga reload sebagian (mis. setelah sinkron akun) tidak menghitung ulang semuanya.
+- **Pengujian:** `InstagramAccountMonitoringTest`, `NavigationSweepTest` (menu semua peran terbuka tanpa 403, semua rute GET tanpa parameter tidak 500, token tidak bocor/terhapus).
+- **Deployment:** jalankan `php artisan migrate --force` (kolom `last_error`) dan bersihkan cache (`php artisan optimize:clear`).

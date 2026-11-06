@@ -181,7 +181,7 @@ class SocialIntelligenceTest extends TestCase
     {
         $response = $this->actingAs($this->user)->post('/social-intelligence/settings', [
             'polda_id'          => $this->polda->id,
-            'apify_api_token'   => 'apify_test_token_123',
+            'apify_api_token'   => 'apify_test_token_123', // diabaikan: token hanya dikelola admin di Mesin Intelijen AI
             'keywords_tracked'  => 'Polda Sulbar, Mamuju Kritis',
             'sync_frequency'    => 'every_1_hour',
             'auto_sync_enabled' => true,
@@ -191,7 +191,8 @@ class SocialIntelligenceTest extends TestCase
 
         $setting = SocialSetting::where('polda_id', $this->polda->id)->first();
         $this->assertNotNull($setting);
-        $this->assertEquals('apify_test_token_123', $setting->apify_api_token);
+        $this->assertNotEquals('apify_test_token_123', $setting->apify_api_token, 'Form pengaturan tidak boleh menulis token.');
+        $this->assertSame('Polda Sulbar, Mamuju Kritis', $setting->keywords_tracked);
         $this->assertDatabaseHas('audit_logs', [
             'polda_id' => $this->polda->id,
             'action'   => 'social_settings.update',
@@ -209,10 +210,9 @@ class SocialIntelligenceTest extends TestCase
 
     public function test_apify_test_connection_endpoint(): void
     {
-        // 1. Missing token
-        $responseEmpty = $this->actingAs($this->user)->postJson('/social-intelligence/test-connection', [
-            'apify_api_token' => '',
-        ]);
+        // 1. Missing token (tidak ada token tersimpan)
+        SocialSetting::query()->update(['apify_api_token' => null]);
+        $responseEmpty = $this->actingAs($this->user)->postJson('/social-intelligence/test-connection');
         $responseEmpty->assertStatus(200);
         $responseEmpty->assertJson(['success' => false, 'status' => 'missing_token']);
 
@@ -228,9 +228,8 @@ class SocialIntelligenceTest extends TestCase
             ], 200),
         ]);
 
-        $responseValid = $this->actingAs($this->user)->postJson('/social-intelligence/test-connection', [
-            'apify_api_token' => 'apify_api_valid_mock_token',
-        ]);
+        SocialSetting::updateOrCreate(['polda_id' => $this->polda->id], ['apify_api_token' => 'apify_api_valid_mock_token']);
+        $responseValid = $this->actingAs($this->user)->postJson('/social-intelligence/test-connection');
         $responseValid->assertStatus(200);
         $responseValid->assertJson([
             'success' => true,

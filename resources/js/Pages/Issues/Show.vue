@@ -1094,7 +1094,7 @@ const formatWita = (dateStr) => {
     <div
       v-if="isLightboxOpen && activeMedia"
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md"
-      @click.self="isLightboxOpen = false"
+      @mousedown.self="isLightboxOpen = false"
     >
       <div class="w-full max-w-4xl rounded-3xl bg-[#0b1426] border border-slate-700 shadow-2xl overflow-hidden">
         <div class="p-4 bg-slate-950 flex items-center justify-between border-b border-slate-800">

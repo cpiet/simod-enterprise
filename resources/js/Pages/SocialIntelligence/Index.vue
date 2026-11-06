@@ -75,6 +75,7 @@ const props = defineProps({
   wordCloud: Object,
   peakHours: Object,
   settings: Object,
+  instagramReady: { type: Boolean, default: false },
   latestReport: { type: Object, default: null },
   reportHistory: { type: Array, default: () => [] },
   satwils: { type: Array, default: () => [] },
@@ -118,6 +119,39 @@ const removeInstagram = async (account) => {
     instagramError.value = true;
     instagramMessage.value = 'Akun tidak dapat dihapus.';
   }
+};
+const syncAllInstagram = async () => {
+  if (instagramBusy.value) return;
+  instagramBusy.value = true;
+  instagramMessage.value = '';
+  let ok = 0;
+  let failed = 0;
+  for (const account of props.monitoredInstagramAccounts) {
+    try {
+      await axios.post(`/social-intelligence/instagram-accounts/${account.id}/sync`);
+      ok++;
+    } catch {
+      failed++;
+    }
+  }
+  instagramError.value = failed > 0 && ok === 0;
+  instagramMessage.value = `${ok} akun berhasil disinkronkan${failed ? `, ${failed} gagal (lihat keterangan pada tiap akun)` : ''}.`;
+  router.reload({ only: ['monitoredInstagramAccounts'], preserveScroll: true });
+  instagramBusy.value = false;
+};
+// Ringkasan dihitung dari unggahan tersimpan; metrik yang tidak tersedia tidak ikut dirata-rata.
+const instagramStats = (account) => {
+  const avg = (key) => {
+    const vals = (account.posts || []).map((p) => p[key]).filter((v) => typeof v === 'number');
+    return vals.length ? Math.round(vals.reduce((x, y) => x + y, 0) / vals.length) : null;
+  };
+  const latest = (account.posts || []).find((p) => p.posted_at)?.posted_at;
+  return { avgLikes: avg('likes'), avgComments: avg('comments'), latest: latest ? new Date(latest).toLocaleDateString('id-ID', { dateStyle: 'medium' }) : '—' };
+};
+const monitorKol = (kol) => {
+  instagramUsername.value = String(kol.author_handle || '').replace(/^@/, '');
+  activeTab.value = 'kol';
+  document.getElementById('instagram-monitor-username')?.focus();
 };
 const instagramDate = (date) => date ? new Date(date).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : 'Waktu tidak tersedia';
 
@@ -275,7 +309,6 @@ const saveFeedback = ref(null);
 
 const settingsForm = ref({
   polda_id: props.selectedPolda?.id || props.settings?.polda_id || props.allPoldas?.[0]?.id || 1,
-  apify_api_token: props.settings?.apify_api_token || '',
   keywords_tracked: props.settings?.keywords_tracked || 'Polri, Humas Polri, Polisi Presisi, Dumas Presisi',
   accounts_tracked: props.settings?.accounts_tracked || '@divisihumaspri, @humaspolri, @polripresisi, @halo_polisi',
   sync_frequency: props.settings?.sync_frequency || 'every_3_hours',
@@ -288,9 +321,6 @@ watch(
   ([newSettings, newPolda]) => {
     if (newSettings || newPolda) {
       settingsForm.value.polda_id = newPolda?.id || newSettings?.polda_id || props.allPoldas?.[0]?.id || 1;
-      if (newSettings?.apify_api_token !== undefined) {
-        settingsForm.value.apify_api_token = newSettings.apify_api_token || '';
-      }
       if (newSettings?.keywords_tracked !== undefined) {
         settingsForm.value.keywords_tracked = newSettings.keywords_tracked || '';
       }
@@ -342,10 +372,10 @@ const isTestingConnection = ref(false);
 const testConnectionResult = ref(null);
 
 const testConnection = async () => {
-  if (!settingsForm.value.apify_api_token) {
+  if (!props.settings?.apify_token_set) {
     testConnectionResult.value = {
       success: false,
-      message: 'Masukkan Personal API Token Apify terlebih dahulu sebelum melakukan pengujian koneksi.',
+      message: 'Token Apify belum diatur. Administrator mengisinya di Keamanan & Pemeliharaan → Mesin Intelijen AI.',
     };
     return;
   }
@@ -354,9 +384,7 @@ const testConnection = async () => {
   testConnectionResult.value = null;
 
   try {
-    const res = await axios.post('/social-intelligence/test-connection', {
-      apify_api_token: settingsForm.value.apify_api_token,
-    });
+    const res = await axios.post('/social-intelligence/test-connection');
     testConnectionResult.value = res.data;
   } catch (err) {
     testConnectionResult.value = {
@@ -551,9 +579,7 @@ const securityRelevantPublicCount = computed(() => {
 
 const triggerSyncTrends = () => {
   isSyncingTrends.value = true;
-  router.post('/social-intelligence/sync-trends', {
-    apify_api_token: settingsForm.value.apify_api_token,
-  }, {
+  router.post('/social-intelligence/sync-trends', {}, {
     preserveScroll: true,
     onFinish: () => {
       isSyncingTrends.value = false;
@@ -2207,34 +2233,76 @@ const getBuzzerRiskClass = (level) => {
     <!-- TAB 03: RADAR KOL & AKUN KRITIS -->
     <div v-if="activeTab === 'kol'" class="space-y-4">
       <section class="rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm space-y-4">
-        <div>
-          <h2 class="text-base font-black text-slate-900 dark:text-white">Pantau Akun Instagram</h2>
-          <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">Unggahan publik dari akun terpilih, diambil melalui Apify. Sinkronisasi dilakukan secara manual dan mengambil hingga 5 unggahan; biaya Apify dapat berlaku.</p>
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div class="min-w-0">
+            <h2 class="text-base font-black text-slate-900 dark:text-white">Pantau Akun Instagram</h2>
+            <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">Unggahan publik terbaru dari akun tokoh atau KOL pilihan (hingga 12 unggahan per sinkronisasi, diambil lewat Apify, dilakukan manual). Hanya data publik; suka/komentar yang tidak tersedia ditampilkan apa adanya.</p>
+          </div>
+          <button v-if="canSync && instagramReady && monitoredInstagramAccounts.length > 1" type="button" :disabled="instagramBusy" @click="syncAllInstagram" class="shrink-0 rounded-xl border border-slate-300 dark:border-slate-700 px-3.5 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 hover:border-amber-400 disabled:opacity-50 cursor-pointer">
+            {{ instagramBusy ? 'Memproses...' : `Sinkronkan semua (${monitoredInstagramAccounts.length})` }}
+          </button>
         </div>
+
+        <div v-if="!instagramReady" class="rounded-xl border border-amber-300/60 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-3.5 text-xs text-amber-900 dark:text-amber-200">
+          <strong>Token Apify belum diatur.</strong> Sinkronisasi akun belum dapat dijalankan. Administrator mengisinya di <em>Keamanan &amp; Pemeliharaan → Mesin Intelijen AI</em>.
+        </div>
+
         <form v-if="canSync" class="flex flex-col sm:flex-row gap-2" @submit.prevent="syncInstagram()">
           <label for="instagram-monitor-username" class="sr-only">Username Instagram</label>
-          <input id="instagram-monitor-username" v-model="instagramUsername" maxlength="31" placeholder="Contoh: @mohmahfudmd" class="flex-1 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-white" />
-          <button type="submit" :disabled="instagramBusy || !instagramUsername.trim()" class="rounded-xl bg-amber-400 px-4 py-2 text-sm font-bold text-slate-950 disabled:opacity-50">{{ instagramBusy ? 'Menyinkronkan...' : 'Tambah & sinkronkan' }}</button>
+          <input id="instagram-monitor-username" v-model="instagramUsername" maxlength="31" autocomplete="off" placeholder="Contoh: @mohmahfudmd" class="flex-1 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-400" />
+          <button type="submit" :disabled="instagramBusy || !instagramReady || !instagramUsername.trim()" class="rounded-xl bg-amber-400 hover:bg-amber-300 px-4 py-2 text-sm font-bold text-slate-950 disabled:opacity-50 cursor-pointer">{{ instagramBusy ? 'Menyinkronkan...' : 'Tambah & sinkronkan' }}</button>
         </form>
+        <p v-else class="text-xs text-slate-500 dark:text-slate-400">Menambah atau menyinkronkan akun memerlukan izin sinkron Radar Media Sosial. Anda dapat melihat hasil yang sudah ada.</p>
+
         <p v-if="instagramMessage" role="status" class="text-xs font-semibold" :class="instagramError ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'">{{ instagramMessage }}</p>
-        <p v-if="!monitoredInstagramAccounts.length" class="rounded-xl bg-slate-50 dark:bg-slate-900 p-4 text-sm text-slate-600 dark:text-slate-400">Belum ada akun Instagram dalam daftar pantauan tenant ini.</p>
+        <p v-if="!monitoredInstagramAccounts.length" class="rounded-xl bg-slate-50 dark:bg-slate-900 p-4 text-sm text-slate-600 dark:text-slate-400">Belum ada akun dalam daftar pantauan wilayah ini. Tambahkan username publik, mis. <span class="font-mono">@mohmahfudmd</span>.</p>
+
         <article v-for="account in monitoredInstagramAccounts" :key="account.id" class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
           <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h3 class="font-bold text-slate-900 dark:text-white">{{ account.display_name || 'Akun Instagram' }} <span class="text-slate-600 dark:text-slate-400">@{{ account.username }}</span></h3>
-              <p class="text-xs text-slate-600 dark:text-slate-400">{{ account.last_synced_at ? `Terakhir berhasil: ${instagramDate(account.last_synced_at)}` : 'Belum ada sinkronisasi berhasil' }}<span v-if="account.sync_status === 'error'"> · Sinkronisasi terakhir gagal</span><span v-else-if="account.sync_status === 'empty'"> · Tidak ada hasil yang dapat diverifikasi</span></p>
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-11 h-11 rounded-full bg-linear-to-tr from-amber-400 to-rose-400 text-slate-950 font-black flex items-center justify-center shrink-0">{{ (account.display_name || account.username).charAt(0).toUpperCase() }}</div>
+              <div class="min-w-0">
+                <h3 class="font-bold text-slate-900 dark:text-white truncate">{{ account.display_name || 'Akun Instagram' }}</h3>
+                <a :href="`https://www.instagram.com/${account.username}/`" target="_blank" rel="noopener noreferrer" class="text-xs font-mono text-slate-600 dark:text-slate-400 hover:text-amber-600">@{{ account.username }} ↗</a>
+              </div>
             </div>
             <div v-if="canSync" class="flex gap-2">
-              <button type="button" :disabled="instagramBusy" @click="syncInstagram(account)" class="rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs font-bold text-slate-800 dark:text-slate-200 disabled:opacity-50">{{ instagramBusy ? 'Memproses...' : 'Sinkronkan' }}</button>
-              <button type="button" :disabled="instagramBusy" @click="removeInstagram(account)" class="rounded-lg border border-rose-200 dark:border-rose-900 px-3 py-1.5 text-xs font-bold text-rose-700 dark:text-rose-400">Hapus</button>
+              <button type="button" :disabled="instagramBusy || !instagramReady" @click="syncInstagram(account)" class="rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs font-bold text-slate-800 dark:text-slate-200 hover:border-amber-400 disabled:opacity-50 cursor-pointer">{{ instagramBusy ? 'Memproses...' : 'Sinkronkan' }}</button>
+              <button type="button" :disabled="instagramBusy" @click="removeInstagram(account)" class="rounded-lg border border-rose-200 dark:border-rose-900 px-3 py-1.5 text-xs font-bold text-rose-700 dark:text-rose-400 cursor-pointer">Hapus</button>
             </div>
           </div>
+
+          <p class="text-xs text-slate-600 dark:text-slate-400">
+            {{ account.last_synced_at ? `Terakhir berhasil: ${instagramDate(account.last_synced_at)}` : 'Belum ada sinkronisasi berhasil' }}
+          </p>
+          <p v-if="account.last_error" class="rounded-lg bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 px-3 py-2 text-xs font-semibold text-rose-700 dark:text-rose-300">Sinkronisasi terakhir gagal: {{ account.last_error }}</p>
+
+          <dl v-if="account.posts?.length" class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+            <div class="rounded-xl bg-slate-50 dark:bg-slate-900 p-2.5"><dt class="text-[10px] font-bold uppercase text-slate-500">Unggahan</dt><dd class="text-sm font-black text-slate-900 dark:text-white">{{ account.posts.length }}</dd></div>
+            <div class="rounded-xl bg-slate-50 dark:bg-slate-900 p-2.5"><dt class="text-[10px] font-bold uppercase text-slate-500">Rata-rata suka</dt><dd class="text-sm font-black text-slate-900 dark:text-white">{{ instagramStats(account).avgLikes === null ? '—' : formatNumber(instagramStats(account).avgLikes) }}</dd></div>
+            <div class="rounded-xl bg-slate-50 dark:bg-slate-900 p-2.5"><dt class="text-[10px] font-bold uppercase text-slate-500">Rata-rata komentar</dt><dd class="text-sm font-black text-slate-900 dark:text-white">{{ instagramStats(account).avgComments === null ? '—' : formatNumber(instagramStats(account).avgComments) }}</dd></div>
+            <div class="rounded-xl bg-slate-50 dark:bg-slate-900 p-2.5"><dt class="text-[10px] font-bold uppercase text-slate-500">Unggahan terbaru</dt><dd class="text-sm font-black text-slate-900 dark:text-white">{{ instagramStats(account).latest }}</dd></div>
+          </dl>
+
           <p v-if="!account.posts?.length" class="text-xs text-slate-600 dark:text-slate-400">Belum ada unggahan yang dapat ditampilkan.</p>
-          <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <a v-for="post in account.posts" :key="post.url" :href="post.url" target="_blank" rel="noopener noreferrer" class="block rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 hover:border-amber-400">
-              <p class="text-xs font-semibold text-slate-600 dark:text-slate-400">{{ instagramDate(post.posted_at) }} · Buka Instagram ↗</p>
-              <p class="mt-1 text-sm text-slate-800 dark:text-slate-200 line-clamp-3">{{ post.caption || 'Unggahan tanpa keterangan teks.' }}</p>
-              <p class="mt-2 text-xs text-slate-600 dark:text-slate-400">Suka: {{ post.likes === null ? 'Tidak tersedia' : formatNumber(post.likes) }} · Komentar: {{ post.comments === null ? 'Tidak tersedia' : formatNumber(post.comments) }}</p>
+          <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+            <a v-for="post in account.posts" :key="post.url" :href="post.url" target="_blank" rel="noopener noreferrer" class="flex gap-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 hover:border-amber-400 transition">
+              <div class="w-20 h-20 rounded-lg bg-slate-200 dark:bg-slate-800 shrink-0 overflow-hidden flex items-center justify-center text-slate-500">
+                <img v-if="post.thumb" :src="post.thumb" alt="" referrerpolicy="no-referrer" loading="lazy" class="w-full h-full object-cover" @error="$event.target.style.display = 'none'" />
+                <Play v-else-if="post.type === 'video'" class="w-5 h-5" />
+                <Share2 v-else class="w-5 h-5" />
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                  {{ instagramDate(post.posted_at) }}
+                  <span v-if="post.type" class="ml-1 px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-[10px] font-bold uppercase">{{ { image: 'Foto', video: 'Video', sidecar: 'Album' }[post.type] }}</span>
+                </p>
+                <p class="mt-1 text-sm text-slate-800 dark:text-slate-200 line-clamp-3">{{ post.caption || 'Unggahan tanpa keterangan teks.' }}</p>
+                <p class="mt-1.5 text-[11px] text-slate-600 dark:text-slate-400">
+                  Suka: {{ post.likes == null ? 'Tidak tersedia' : formatNumber(post.likes) }} · Komentar: {{ post.comments == null ? 'Tidak tersedia' : formatNumber(post.comments) }}<span v-if="post.views != null"> · Tayang: {{ formatNumber(post.views) }}</span>
+                </p>
+                <p v-if="post.hashtags?.length" class="mt-1 text-[11px] text-amber-700 dark:text-amber-400 truncate">{{ post.hashtags.map((h) => '#' + h.replace(/^#/, '')).join(' ') }}</p>
+              </div>
             </a>
           </div>
         </article>
@@ -2253,6 +2321,7 @@ const getBuzzerRiskClass = (level) => {
           </p>
         </div>
 
+        <p v-if="!kolProfiles?.length" class="rounded-xl bg-slate-50 dark:bg-slate-900 p-4 text-sm text-slate-600 dark:text-slate-400">Belum ada tokoh/KOL terdeteksi dari data yang tersimpan. Daftar terisi dari unggahan akun berpengaruh pada Radar Percakapan; Anda juga dapat memantau akun tertentu pada kotak di atas.</p>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div
             v-for="(kol, idx) in kolProfiles"
@@ -2297,6 +2366,12 @@ const getBuzzerRiskClass = (level) => {
                 <span>Lihat Riwayat Postingan</span>
                 <ChevronRight class="w-3.5 h-3.5" />
               </button>
+              <button
+                v-if="canSync && kol.platform === 'instagram' && kol.author_handle"
+                @click="monitorKol(kol)"
+                type="button"
+                class="text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-amber-600 cursor-pointer"
+              >Pantau akun</button>
             </div>
           </div>
         </div>
@@ -2819,16 +2894,16 @@ const getBuzzerRiskClass = (level) => {
               <!-- Status Badge -->
               <span
                 class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 border flex items-center gap-1.5"
-                :class="(settings?.apify_api_token || settingsForm.apify_api_token) ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30'"
+                :class="settings?.apify_token_set ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30'"
               >
-                <span class="w-1.5 h-1.5 rounded-full" :class="(settings?.apify_api_token || settingsForm.apify_api_token) ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"></span>
-                <span>{{ (settings?.apify_api_token || settingsForm.apify_api_token) ? 'Token Aktif & Terhubung' : 'Token Belum Diatur' }}</span>
+                <span class="w-1.5 h-1.5 rounded-full" :class="settings?.apify_token_set ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"></span>
+                <span>{{ settings?.apify_token_set ? 'Token Aktif & Terhubung' : 'Token Belum Diatur' }}</span>
               </span>
             </div>
 
             <div class="flex items-center justify-between text-[11px] pt-2 border-t border-slate-200 dark:border-slate-800 flex-wrap gap-2">
               <span class="text-slate-500 dark:text-slate-400 font-mono">
-                Status Integrasi: <strong class="text-slate-700 dark:text-slate-300">{{ (settings?.apify_api_token || settingsForm.apify_api_token) ? 'Multi-API Failover Pool Siaga' : 'Memerlukan Konfigurasi Admin' }}</strong>
+                Status Integrasi: <strong class="text-slate-700 dark:text-slate-300">{{ settings?.apify_token_set ? 'Multi-API Failover Pool Siaga' : 'Memerlukan Konfigurasi Admin' }}</strong>
               </span>
 
               <Link
@@ -2924,7 +2999,7 @@ const getBuzzerRiskClass = (level) => {
             <button
               type="button"
               @click="triggerSync"
-              :disabled="isSyncing || !settingsForm.apify_api_token"
+              :disabled="isSyncing || !settings?.apify_token_set"
               class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 transition disabled:opacity-40 cursor-pointer"
             >
               <RefreshCw :class="['w-3.5 h-3.5', isSyncing ? 'animate-spin' : '']" />

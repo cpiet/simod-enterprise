@@ -438,6 +438,8 @@ const availableRoles = [
 ];
 
 const canSimulateRole = computed(() => !!page.props.auth?.user?.can_simulate_role);
+// Hanya Super Admin/Kadivhumas (atau akun Mabes tanpa Polda) yang boleh berpindah wilayah; sama dengan TenantController.
+const canSwitchTenant = computed(() => page.props.auth?.user?.can_switch_tenant !== false);
 
 const activeRoleObj = computed(() => {
   const meta = availableRoles.find(r => r.key === activeUserRole.value) || {
@@ -726,7 +728,12 @@ const switchRole = (newRole) => {
           </button>
 
           <!-- Tenant Switcher Dropdown (Polda Switcher) -->
-          <div class="relative">
+          <!-- Personel daerah terkunci ke Polda-nya: tampil sebagai label saja, tanpa pilihan yang pasti ditolak server. -->
+          <div v-if="!canSwitchTenant" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700 text-xs font-bold text-slate-200 shadow-sm" title="Wilayah komando Anda">
+            <Building2 class="w-3.5 h-3.5 text-amber-400" />
+            <span class="truncate max-w-[140px] sm:max-w-[220px]">{{ selectedPolda?.name || 'Wilayah komando' }}</span>
+          </div>
+          <div v-else class="relative">
             <button
               @click="isTenantMenuOpen = !isTenantMenuOpen"
               class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-slate-200 transition shadow-sm hover:border-amber-400/50"

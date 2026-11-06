@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
-import { Key, Building2, Phone, Mail, BadgeCheck, Save, UserCheck } from 'lucide-vue-next';
+import { Key, Building2, Phone, Mail, BadgeCheck, Save, UserCheck, Smartphone } from 'lucide-vue-next';
 
 const props = defineProps({
   allPoldas: Array,
@@ -10,6 +10,7 @@ const props = defineProps({
   selectedCode: String,
   metrics: Object,
   profile: Object,
+  pin: { type: Object, default: () => ({ this_device: false, devices: 0 }) },
   errors: { type: Object, default: () => ({}) },
 });
 
@@ -37,6 +38,23 @@ const submit = () => {
     onSuccess: () => { form.value = { current_password: '', password: '', password_confirmation: '' }; },
     onFinish: () => { isSaving.value = false; },
   });
+};
+
+const pinForm = ref({ current_password: '', pin: '', pin_confirmation: '' });
+const pinSaving = ref(false);
+const pinValid = computed(() => pinForm.value.current_password && /^\d{6}$/.test(pinForm.value.pin) && pinForm.value.pin === pinForm.value.pin_confirmation);
+const onlyDigits = (key) => { pinForm.value[key] = pinForm.value[key].replace(/\D/g, '').slice(0, 6); };
+const savePin = () => {
+  pinSaving.value = true;
+  router.post('/profile/pin', pinForm.value, {
+    preserveScroll: true,
+    onSuccess: () => { pinForm.value = { current_password: '', pin: '', pin_confirmation: '' }; },
+    onFinish: () => { pinSaving.value = false; },
+  });
+};
+const revokePin = (all = false) => {
+  if (!confirm(all ? 'Cabut PIN dari SEMUA perangkat Anda?' : 'Cabut PIN dari perangkat ini?')) return;
+  router.delete('/profile/pin', { data: { all }, preserveScroll: true });
 };
 
 const field = 'w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-sm text-slate-900 dark:text-white outline-none focus:border-amber-400';
@@ -114,6 +132,48 @@ const field = 'w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 borde
             </button>
           </div>
         </form>
+      </section>
+
+      <section class="lg:col-span-5 rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm space-y-4">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-sky-100 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center"><Smartphone class="w-4 h-4" /></div>
+          <div>
+            <h2 class="text-sm font-black text-slate-900 dark:text-white">Masuk cepat dengan PIN (perangkat ini)</h2>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400">
+              Setelah dipasang, di perangkat ini Anda cukup mengetik PIN 6 angka (tombol angka tersedia di layar). PIN hanya berlaku bersama perangkat yang didaftarkan; lima PIN salah mencabutnya, dan mengganti kata sandi mencabut semua perangkat.
+            </p>
+          </div>
+        </div>
+
+        <p class="text-[11px] font-bold" :class="pin.this_device ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'">
+          {{ pin.this_device ? 'PIN aktif di perangkat ini.' : 'PIN belum aktif di perangkat ini.' }}
+          <span v-if="pin.devices"> Total perangkat terdaftar: {{ pin.devices }}.</span>
+        </p>
+
+        <form @submit.prevent="savePin" class="grid grid-cols-1 md:grid-cols-4 gap-3.5 items-end">
+          <label class="block space-y-1">
+            <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">Kata sandi saat ini</span>
+            <input v-model="pinForm.current_password" type="password" autocomplete="current-password" :class="field" />
+            <span v-if="errors.current_password" class="text-[11px] font-bold text-rose-500">{{ errors.current_password }}</span>
+          </label>
+          <label class="block space-y-1">
+            <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">PIN baru (6 angka)</span>
+            <input v-model="pinForm.pin" @input="onlyDigits('pin')" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" :class="field" />
+            <span v-if="errors.pin" class="text-[11px] font-bold text-rose-500">{{ errors.pin }}</span>
+          </label>
+          <label class="block space-y-1">
+            <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">Ulangi PIN</span>
+            <input v-model="pinForm.pin_confirmation" @input="onlyDigits('pin_confirmation')" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" :class="field" />
+          </label>
+          <button type="submit" :disabled="pinSaving || !pinValid" class="px-5 py-2.5 rounded-xl text-xs font-black bg-amber-400 hover:bg-amber-300 text-slate-950 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+            {{ pinSaving ? 'Menyimpan…' : pin.this_device ? 'Ganti PIN' : 'Aktifkan PIN' }}
+          </button>
+        </form>
+
+        <div v-if="pin.devices" class="flex flex-wrap gap-2 pt-1">
+          <button v-if="pin.this_device" type="button" @click="revokePin(false)" class="px-3.5 py-2 rounded-xl text-[11px] font-black border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 cursor-pointer">Cabut dari perangkat ini</button>
+          <button type="button" @click="revokePin(true)" class="px-3.5 py-2 rounded-xl text-[11px] font-black border border-rose-300 dark:border-rose-500/40 text-rose-600 dark:text-rose-400 cursor-pointer">Cabut dari semua perangkat</button>
+        </div>
       </section>
     </div>
   </EnterpriseLayout>

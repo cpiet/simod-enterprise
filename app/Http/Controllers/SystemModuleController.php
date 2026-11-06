@@ -358,11 +358,11 @@ class SystemModuleController extends Controller
 
         $query = User::with(['polres', 'polda']);
 
-        if (!$isNational && $selectedPolda) {
-            $query->where(function ($q) use ($selectedPolda) {
-                $q->where('polda_id', $selectedPolda->id)
-                  ->orWhereNull('polda_id');
-            });
+        // Super Admin di lingkup Divhumas/nasional mengelola SEMUA akun (termasuk yang terdaftar di Polda lain);
+        // di lingkup satu Polda (dan untuk personel daerah) hanya akun Polda itu; akun tingkat Mabes tidak terdaftar bagi mereka.
+        $seeAllAccounts = $isNational || ($request->user()->isSuperAdmin() && in_array($selectedCode, ['ALL', 'DIVHUMAS'], true));
+        if (! $seeAllAccounts && $selectedPolda) {
+            $query->where('polda_id', $selectedPolda->id);
         }
 
         if ($roleFilter !== 'all') {
@@ -471,7 +471,7 @@ class SystemModuleController extends Controller
             'badge_number' => 'nullable|string|max:50',
             'role'         => 'required|string',
             'phone'        => 'nullable|string|max:50',
-            'password'     => 'required|string|min:6',
+            'password'     => 'required|string|min:10|max:100',
             'is_active'    => 'nullable|boolean',
         ]);
 
@@ -539,7 +539,7 @@ class SystemModuleController extends Controller
             'polda_id'     => 'nullable|exists:poldas,id',
             'polres_id'    => 'nullable|exists:polres,id',
             'phone'        => 'nullable|string|max:50',
-            'password'     => 'nullable|string|min:6',
+            'password'     => 'nullable|string|min:10|max:100',
             'is_active'    => 'nullable|boolean',
         ]);
 
@@ -649,7 +649,7 @@ class SystemModuleController extends Controller
         }
 
         $validated = $request->validate([
-            'new_password' => 'required|string|min:6',
+            'new_password' => 'required|string|min:10|max:100',
         ]);
 
         $user->password = Hash::make($validated['new_password']);
@@ -741,6 +741,10 @@ class SystemModuleController extends Controller
                 'role'         => $user->role,
                 'polda'        => $user->polda?->name,
                 'polres'       => $user->polres?->name,
+            ],
+            'pin' => [
+                'this_device' => (\App\Http\Controllers\Auth\QuickLoginController::deviceFrom($request)?->user_id === $user->id),
+                'devices'     => $user->trustedDevices()->where('expires_at', '>', now())->count(),
             ],
         ]);
     }

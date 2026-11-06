@@ -32,7 +32,7 @@ class InstagramAccountMonitoringTest extends TestCase
         $this->assertCount(1, $account->posts);
         $this->assertNull($account->posts[0]['likes']);
         $this->assertSame(9, $account->posts[0]['comments']);
-        Http::assertSent(fn ($request) => str_contains($request->url(), 'maxTotalChargeUsd=0.03') && $request['resultsLimit'] === 5);
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'maxTotalChargeUsd=0.05') && $request['resultsLimit'] === 12);
     }
 
     public function test_failed_sync_preserves_previous_data_and_cross_tenant_access_is_denied(): void

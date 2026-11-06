@@ -112,3 +112,12 @@ Tab **Penjadwal** di Audit Log (dan banner kuning di atas halaman bila tidak akt
 - `Auth/Login.vue` tidak lagi memuat pemilih Polda maupun tombol "Pilih Akun" (kadivhumas/superadmin/kabid_sulbar) yang membuat username mudah ditebak. Hanya username/NRP + kata sandi.
 - `AuthController::showLogin` tidak mengirim daftar Polda ke klien; `login()` mengabaikan `polda_id`/`polda_code` dari formulir. Tenant ditentukan akun: personel daerah terkunci ke Polda-nya, Super Admin/Kadivhumas masuk ke lingkup Divhumas lalu berpindah lewat `POST /tenant/switch`.
 - Test: `ProductionHardeningTest::test_login_page_leaks_no_tenant_or_account_hints_and_ignores_tenant_input`.
+
+## Addendum: Masuk cepat dengan PIN di perangkat tepercaya (7 Nov 2026)
+- **Urutan wajib**: (1) masuk dengan nama pengguna + kata sandi yang benar; (2) di Profil pasang PIN 6 angka dengan konfirmasi kata sandi, yang mendaftarkan perangkat (`trusted_devices`); (3) barulah halaman masuk di perangkat itu menawarkan PIN dengan tombol angka virtual. PIN saja tidak cukup: harus bersama cookie `simod_device` (httpOnly, terenkripsi) yang hanya ada di perangkat terdaftar.
+- Penyimpanan: token perangkat disimpan sebagai hash SHA-256, PIN sebagai hash bcrypt. Token diputar setiap dipakai; masa berlaku 90 hari (diperpanjang saat dipakai).
+- Penegakan: PIN lemah (angka kembar/berurutan) ditolak; 5 PIN salah mencabut perangkat; ganti/reset kata sandi atau penonaktifan akun mencabut semua perangkat (`User::booted`); `throttle:10,1` pada `/login/pin`; aksi tercatat (`auth.pin_enabled`, `auth.login_pin`, `auth.pin_failed`, `auth.pin_revoked`, `auth.pin_disabled`).
+- Halaman masuk hanya menampilkan nama + username tersamar bila cookie perangkat sah; tamu tanpa cookie tidak melihat apa pun. "Bukan Anda? Lupakan perangkat ini" menghapus pendaftaran tanpa login.
+- Login: tombol "Masuk" dan kotak "Ingat saya di perangkat ini" (bawaan tidak tercentang).
+- Rute `/login/pin` dan `/login/forget-device` dikecualikan dari pengalihan `PreventBackHistory` pasca-logout.
+- Test: `QuickPinLoginTest` (9 test). Kode: `Auth\QuickLoginController`, `Models\TrustedDevice`, migrasi `create_trusted_devices_table`.

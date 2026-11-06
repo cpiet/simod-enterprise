@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { router, Link } from '@inertiajs/vue3';
+import { router, Link, usePage } from '@inertiajs/vue3';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
 import {
   Building2,
@@ -32,6 +32,9 @@ const props = defineProps({
 });
 
 const isNational = computed(() => props.selectedCode === 'ALL');
+// Personel daerah terkunci ke Polda-nya; pilihan pindah wilayah hanya untuk yang berwenang (sama dengan server).
+const sharedPage = usePage();
+const canSwitchTenant = computed(() => sharedPage.props.auth?.user?.can_switch_tenant !== false);
 const activeTab = ref('identity'); // 'identity', 'polres', 'tenants'
 const isSaved = ref(false);
 const isSubmitting = ref(false);
@@ -271,6 +274,7 @@ const switchTenant = (code) => {
       </button>
 
       <button
+        v-if="canSwitchTenant"
         @click="activeTab = 'tenants'"
         class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer"
         :class="activeTab === 'tenants'
@@ -351,8 +355,8 @@ const switchTenant = (code) => {
         </form>
       </div>
 
-      <!-- Quick Switcher Sidebar Card -->
-      <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
+      <!-- Quick Switcher Sidebar Card (hanya untuk yang berwenang berpindah wilayah) -->
+      <div v-if="canSwitchTenant" class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
         <div class="border-b border-slate-800 pb-3 flex items-center justify-between">
           <div>
             <h3 class="text-sm font-black text-white uppercase tracking-wider">Pindah Komando / Tenant</h3>
@@ -682,7 +686,7 @@ const switchTenant = (code) => {
     <div
       v-if="showAddPoldaModal"
       class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
-      @click.self="showAddPoldaModal = false"
+      @mousedown.self="showAddPoldaModal = false"
     >
       <div class="relative w-full max-w-lg bg-[#091122] border border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col">
         <div class="px-6 py-4 border-b border-slate-800 bg-[#0b1426] flex items-center justify-between">
@@ -749,7 +753,7 @@ const switchTenant = (code) => {
     <div
       v-if="showAddPolresModal"
       class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
-      @click.self="showAddPolresModal = false"
+      @mousedown.self="showAddPolresModal = false"
     >
       <div class="relative w-full max-w-lg bg-[#091122] border border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col">
         <div class="px-6 py-4 border-b border-slate-800 bg-[#0b1426] flex items-center justify-between">

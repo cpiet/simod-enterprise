@@ -334,6 +334,18 @@ class RolePermission extends Model
         return false;
     }
 
+    /** Standar peran bawaan untuk satu modul (false bila peran tidak dikenal). */
+    private static function defaultGrant(string $roleKey, string $moduleKey): bool
+    {
+        foreach (static::defaultRoles() as $def) {
+            if ($def['role_key'] === $roleKey) {
+                return !empty($def['all_granted']) || in_array($moduleKey, $def['granted_keys'] ?? [], true);
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Ambil seluruh permissions (array associative key => bool) untuk suatu role.
      */
@@ -352,11 +364,20 @@ class RolePermission extends Model
                 ->first();
         }
 
+        $allModules = array_column(static::defaultModules(), 'key');
+
         if ($rec && is_array($rec->permissions)) {
-            return $rec->permissions;
+            // Samakan dengan isGranted(): kunci yang tidak tercatat di matriks jatuh ke standar peran bawaan
+            // (bukan dianggap "boleh"), supaya menu yang tampil selalu sama dengan yang diizinkan server.
+            $perms = $rec->permissions;
+            foreach ($allModules as $k) {
+                if (!array_key_exists($k, $perms)) {
+                    $perms[$k] = static::defaultGrant($roleKey, $k);
+                }
+            }
+            return $perms;
         }
 
-        $allModules = array_column(static::defaultModules(), 'key');
         $perms = [];
         foreach (static::defaultRoles() as $def) {
             if ($def['role_key'] === $roleKey) {

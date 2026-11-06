@@ -18,7 +18,7 @@ class PreventBackHistory
     {
         // If user explicitly logged out and has not re-authenticated, redirect to login
         if (
-            !$request->routeIs('login', 'login.post', 'logout') &&
+            !$request->routeIs('login', 'login.post', 'login.pin', 'login.forget-device', 'logout') &&
             $request->hasSession() &&
             $request->session()->get('simod_logged_out') === true &&
             !Auth::check()

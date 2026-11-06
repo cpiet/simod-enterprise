@@ -377,7 +377,7 @@ const formatDateWita = (dateStr) => {
     <div
       v-if="isLightboxOpen && activeMedia"
       class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-6"
-      @click.self="closeLightbox"
+      @mousedown.self="closeLightbox"
     >
       <div class="relative w-full max-w-4xl bg-[#091122] border border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
         <!-- Lightbox Header -->
@@ -457,7 +457,7 @@ const formatDateWita = (dateStr) => {
     <div
       v-if="isUploadModalOpen"
       class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
-      @click.self="isUploadModalOpen = false"
+      @mousedown.self="isUploadModalOpen = false"
     >
       <div class="relative w-full max-w-lg bg-[#091122] border border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col">
         <div class="px-6 py-4 border-b border-slate-800 bg-[#0b1426] flex items-center justify-between">

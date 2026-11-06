@@ -61,6 +61,7 @@ const showDeleteModal = ref(false);
 
 const selectedUserForAction = ref(null);
 const isSubmitting = ref(false);
+const formErrors = ref([]); // pesan galat validasi server untuk modal tambah/ubah
 
 // Form for Adding Personnel
 const addForm = ref({
@@ -215,6 +216,7 @@ const onAddNameChange = () => {
 
 const submitAddUser = () => {
   isSubmitting.value = true;
+  formErrors.value = [];
   router.post('/personalia', addForm.value, {
     preserveScroll: true,
     onSuccess: () => {
@@ -224,8 +226,8 @@ const submitAddUser = () => {
     },
     onError: (errs) => {
       isSubmitting.value = false;
-      const firstErr = Object.values(errs)[0] || 'Terjadi kesalahan validasi data.';
-      triggerToast(firstErr, 'error');
+      formErrors.value = Object.values(errs).map(String);
+      triggerToast(formErrors.value[0] || 'Terjadi kesalahan validasi data.', 'error');
     },
   });
 };
@@ -396,7 +398,7 @@ const modulesByPillar = computed(() => {
       >
         <div
           v-if="showToast"
-          class="p-4 rounded-2xl text-white shadow-2xl flex items-center justify-between gap-4 border"
+          class="fixed top-5 right-5 z-[100] max-w-md p-4 rounded-2xl text-white shadow-2xl flex items-center justify-between gap-4 border"
           :class="toastType === 'success' ? 'bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-800 border-emerald-400/40' : 'bg-gradient-to-r from-rose-600 via-rose-700 to-red-800 border-rose-400/40'"
         >
           <div class="flex items-center gap-3">
@@ -796,7 +798,7 @@ const modulesByPillar = computed(() => {
     <div
       v-if="showAddModal"
       class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
-      @click.self="showAddModal = false"
+      @mousedown.self="showAddModal = false"
     >
       <div class="relative w-full max-w-2xl bg-[#091122] border border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col my-8">
         <div class="px-6 py-4 border-b border-slate-800 bg-[#0b1426] flex items-center justify-between">
@@ -952,8 +954,9 @@ const modulesByPillar = computed(() => {
                 v-model="addForm.password"
                 type="password"
                 required
-                minlength="6"
-                placeholder="Minimal 6 karakter..."
+                minlength="10"
+                autocomplete="new-password"
+                placeholder="Minimal 10 karakter"
                 class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
               />
             </div>
@@ -972,6 +975,10 @@ const modulesByPillar = computed(() => {
           </div>
 
           <!-- Modal Action Buttons -->
+          <ul v-if="formErrors.length" class="rounded-xl border border-rose-500/40 bg-rose-500/10 px-3.5 py-2.5 text-rose-300 text-[11px] font-bold space-y-0.5 list-disc pl-6" role="alert">
+            <li v-for="(e, i) in formErrors" :key="i">{{ e }}</li>
+          </ul>
+
           <div class="pt-4 border-t border-slate-800 flex items-center justify-end gap-2.5">
             <button
               type="button"
@@ -999,7 +1006,7 @@ const modulesByPillar = computed(() => {
     <div
       v-if="showEditModal"
       class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
-      @click.self="showEditModal = false"
+      @mousedown.self="showEditModal = false"
     >
       <div class="relative w-full max-w-2xl bg-[#091122] border border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col my-8">
         <div class="px-6 py-4 border-b border-slate-800 bg-[#0b1426] flex items-center justify-between">
@@ -1152,7 +1159,7 @@ const modulesByPillar = computed(() => {
               <input
                 v-model="editForm.password"
                 type="password"
-                minlength="6"
+                minlength="10"
                 placeholder="Kosongkan jika tidak ingin mengubah..."
                 class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
               />
@@ -1200,7 +1207,7 @@ const modulesByPillar = computed(() => {
     <div
       v-if="showInspectModal && inspectUser"
       class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
-      @click.self="showInspectModal = false"
+      @mousedown.self="showInspectModal = false"
     >
       <div class="relative w-full max-w-2xl bg-[#091122] border border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col my-8">
         <div class="px-6 py-4 border-b border-slate-800 bg-[#0b1426] flex items-center justify-between">
@@ -1317,7 +1324,7 @@ const modulesByPillar = computed(() => {
     <div
       v-if="showResetPasswordModal"
       class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
-      @click.self="showResetPasswordModal = false"
+      @mousedown.self="showResetPasswordModal = false"
     >
       <div class="relative w-full max-w-md bg-[#091122] border border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col">
         <div class="px-6 py-4 border-b border-slate-800 bg-[#0b1426] flex items-center justify-between">
@@ -1347,8 +1354,8 @@ const modulesByPillar = computed(() => {
               v-model="resetPasswordForm.new_password"
               type="text"
               required
-              minlength="6"
-              placeholder="Minimal 6 karakter..."
+              minlength="10"
+              placeholder="Minimal 10 karakter..."
               class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-sky-400 font-mono"
             />
           </div>
@@ -1380,7 +1387,7 @@ const modulesByPillar = computed(() => {
     <div
       v-if="showDeleteModal && selectedUserForAction"
       class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
-      @click.self="showDeleteModal = false"
+      @mousedown.self="showDeleteModal = false"
     >
       <div class="relative w-full max-w-md bg-[#091122] border border-rose-500/30 rounded-3xl overflow-hidden shadow-2xl flex flex-col">
         <div class="px-6 py-4 border-b border-rose-500/20 bg-rose-950/40 flex items-center justify-between">

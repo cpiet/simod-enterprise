@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import {
   Shield,
@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Fingerprint,
+  Delete,
 } from 'lucide-vue-next';
 
 onMounted(() => {
@@ -18,16 +19,51 @@ onMounted(() => {
   document.documentElement.classList.remove('light');
 });
 
-defineProps({
+const props = defineProps({
   errors: Object,
+  // Diisi server hanya bila perangkat ini sudah didaftarkan pemiliknya (cookie perangkat sah).
+  quickUser: { type: Object, default: null },
 });
+
+// Mode masuk: 'pin' (perangkat tepercaya) atau 'password'. PIN hanya ditawarkan setelah perangkat didaftarkan
+// dari Profil (yang mewajibkan masuk dengan nama pengguna + kata sandi lebih dulu).
+const mode = ref(props.quickUser ? 'pin' : 'password');
+const pin = ref('');
+const pinBusy = ref(false);
+const pinError = computed(() => props.errors?.pin || '');
+const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
+
+const pressKey = (k) => {
+  if (pinBusy.value) return;
+  if (k === 'del') { pin.value = pin.value.slice(0, -1); return; }
+  if (k !== '' && pin.value.length < 6) pin.value += k;
+};
+
+const submitPin = () => {
+  if (pin.value.length !== 6 || pinBusy.value) return;
+  pinBusy.value = true;
+  router.post('/login/pin', { pin: pin.value }, {
+    onFinish: () => { pinBusy.value = false; pin.value = ''; },
+  });
+};
+watch(pin, (v) => { if (v.length === 6) submitPin(); });
+
+const onKeydown = (e) => {
+  if (mode.value !== 'pin') return;
+  if (/^[0-9]$/.test(e.key)) pressKey(e.key);
+  else if (e.key === 'Backspace') pressKey('del');
+};
+onMounted(() => window.addEventListener('keydown', onKeydown));
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
+
+const forgetDevice = () => router.post('/login/forget-device');
 
 const showPassword = ref(false);
 
 const form = ref({
   username: '',
   password: '',
-  remember: true,
+  remember: false,
 });
 
 const isSubmitting = ref(false);
@@ -87,7 +123,7 @@ const handleLogin = () => {
         </div>
 
         <!-- Form Login -->
-        <form @submit.prevent="handleLogin" class="space-y-4">
+        <form v-if="mode === 'password'" @submit.prevent="handleLogin" class="space-y-4">
           <div
             v-if="errors?.username"
             class="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs font-bold flex items-center gap-2"
@@ -143,6 +179,11 @@ const handleLogin = () => {
             </div>
           </div>
 
+          <label class="flex items-center gap-2.5 cursor-pointer select-none">
+            <input v-model="form.remember" type="checkbox" class="w-4 h-4 rounded border-slate-600 bg-slate-900 accent-amber-400" />
+            <span class="text-xs font-semibold text-slate-200">Ingat saya di perangkat ini</span>
+          </label>
+
           <!-- Submit Button -->
           <button
             type="submit"
@@ -150,9 +191,52 @@ const handleLogin = () => {
             class="w-full py-3.5 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-sm tracking-wide shadow-xl shadow-amber-400/20 flex items-center justify-center gap-2 transition duration-200 cursor-pointer disabled:opacity-50 mt-2"
           >
             <Shield class="w-4 h-4" />
-            <span>{{ isSubmitting ? 'Memverifikasi Akses...' : 'Masuk ke Portal Komando' }}</span>
+            <span>{{ isSubmitting ? 'Memverifikasi…' : 'Masuk' }}</span>
           </button>
         </form>
+
+        <!-- Masuk cepat dengan PIN di perangkat tepercaya -->
+        <div v-else class="space-y-4">
+          <div class="text-center space-y-0.5">
+            <p class="text-sm font-black text-white">Halo, {{ quickUser?.name }}</p>
+            <p class="text-[11px] font-mono text-slate-400">{{ quickUser?.username }}</p>
+          </div>
+
+          <div
+            v-if="pinError"
+            class="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs font-bold flex items-center gap-2"
+            role="alert"
+          >
+            <AlertCircle class="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{{ pinError }}</span>
+          </div>
+
+          <div class="flex items-center justify-center gap-3 py-1" aria-label="PIN 6 angka">
+            <span v-for="i in 6" :key="i" class="w-3.5 h-3.5 rounded-full border-2 transition" :class="i <= pin.length ? 'bg-amber-400 border-amber-400' : 'border-slate-500'"></span>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2.5 max-w-[17rem] mx-auto">
+            <template v-for="(k, idx) in KEYS" :key="idx">
+              <span v-if="k === ''" class="h-14"></span>
+              <button
+                v-else
+                type="button"
+                @click="pressKey(k)"
+                :disabled="pinBusy"
+                class="h-14 rounded-2xl bg-slate-900/90 border border-slate-700 hover:border-amber-400 active:bg-amber-400/20 text-white text-xl font-black flex items-center justify-center transition cursor-pointer disabled:opacity-50"
+                :aria-label="k === 'del' ? 'Hapus angka terakhir' : 'Angka ' + k"
+              >
+                <Delete v-if="k === 'del'" class="w-5 h-5 text-slate-300" />
+                <span v-else>{{ k }}</span>
+              </button>
+            </template>
+          </div>
+
+          <div class="flex items-center justify-between text-[11px] font-bold pt-1">
+            <button type="button" @click="mode = 'password'" class="text-amber-300 hover:text-amber-200 cursor-pointer">Gunakan kata sandi</button>
+            <button type="button" @click="forgetDevice" class="text-slate-400 hover:text-slate-200 cursor-pointer">Bukan Anda? Lupakan perangkat ini</button>
+          </div>
+        </div>
 
         <!-- Security Badge Footer -->
         <div class="pt-4 border-t border-slate-800 text-center space-y-2">

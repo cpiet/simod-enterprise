@@ -213,5 +213,17 @@ class PersonaliaAuthorityTest extends TestCase
             $editMabesRes->assertSessionHas('error');
         }
     }
-}
 
+    public function test_admin_created_account_requires_strong_password_and_returns_error_to_form(): void
+    {
+        $this->actingAs($this->superAdmin);
+
+        $payload = ['name' => 'Lutfi Alfandra', 'username' => 'lutfi_alfandra', 'email' => 'lutfi@polri.go.id', 'role' => 'super_admin_mabes', 'is_active' => true];
+
+        $this->post('/personalia', $payload + ['password' => 'pendek1'])->assertSessionHasErrors('password');
+        $this->assertDatabaseMissing('users', ['username' => 'lutfi_alfandra']);
+
+        $this->post('/personalia', $payload + ['password' => 'KataSandiPanjang#2026'])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('users', ['username' => 'lutfi_alfandra', 'role' => 'super_admin_mabes']);
+    }
+}

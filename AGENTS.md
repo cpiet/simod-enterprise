@@ -86,6 +86,7 @@ Scheduler (`routes/console.php`): `rss:sync --scheduled` tiap menit, `db:backup 
 3. API ingest (`/api/v1/ingest/*`, `/api/v1/poldas`) memakai middleware `ingest.token` (`INGEST_API_TOKEN`; bila kosong → 503).
 4. Akun yang kebal hapus/nonaktif **di kode**: `id = 1`, username `kadivhumas`, dan `superadmin` (`SystemModuleController`). Pengguna tidak boleh menghapus atau menonaktifkan akunnya sendiri.
 5. Jangan menulis kata sandi, token API, atau isi `.env` ke kode, dokumen, maupun commit.
+6. Rahasia (token Apify, kunci Gemini, kata sandi) **tidak boleh** masuk props Inertia/respons ke browser. Kirim status (`*_set`) dan petunjuk tersamar saja; token hanya dikelola admin di `/settings/ai`. Menu dan tab yang tampil harus sama dengan yang diizinkan middleware `module:` (`NavigationSweepTest`).
 
 ### 3.4. Frontend
 1. Hanya `<script setup>` (tanpa Options API). Navigasi internal pakai `<Link>` dari `@inertiajs/vue3`. Tautan eksternal pakai `<a target="_blank" rel="noopener noreferrer">`.
@@ -168,7 +169,7 @@ Sumber: `app/Models/MenuItem.php` (`seedDefaults`) + tabel `menu_items`, dapat d
    Profil Saya               /profile                  (cukup login)
 ```
 
-Halaman yang **sudah dihapus** dan jangan dibuat ulang tanpa penegakan nyata: `/settings/mail` (SMTP), `/maintenance` (mode pemeliharaan), PIN dinas/PIN cepat.
+Halaman yang **sudah dihapus** dan jangan dibuat ulang tanpa penegakan nyata: `/settings/mail` (SMTP), `/maintenance` (mode pemeliharaan), serta PIN dinas lama. (Masuk cepat PIN **perangkat tepercaya** kini ada dan benar-benar ditegakkan: lihat doc 30, addendum 7 Nov 2026.)
 
 **RBAC:** 20 kunci modul dan 6 peran bawaan (`kadiv_humas`, `super_admin_mabes` = semua modul; `polda_leader` 16; `verifikator` 12; `analis` 8; `operator` 7). Matriks dapat diubah per Polda di `/roles` (tabel `role_permissions`). `User::isSuperAdmin()` bernilai benar untuk `super_admin_mabes`, `kadiv_humas`, `superadmin`, dan peran ini selalu lolos `module:*`.
 
