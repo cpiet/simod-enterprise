@@ -108,3 +108,8 @@ php artisan simod:demo-prepare --force --keep-articles # pertahankan berita yang
   - `resources/js/app.js`: bila komponen/modul gagal dimuat, halaman dimuat ulang otomatis sekali (dijaga `sessionStorage` 30 detik agar tidak berulang); respons non-Inertia 429/5xx tampil sebagai notifikasi, bukan modal putih; 419 memuat ulang halaman.
   - `public/.htaccess`: aturan cache aset kini cocok untuk subfolder (`/build/assets/`).
 - **Aturan deploy:** jangan menghapus `public_html/<subfolder>/build` sebelum mengekstrak build baru. Ekstrak di atasnya agar tab yang masih terbuka dengan hash lama tetap memuat asetnya; bersihkan aset lama paling cepat beberapa hari kemudian.
+
+## Addendum: cadangan basis data di Hostinger (6 Nov 2026)
+- Temuan: `db:backup` di produksi **selalu gagal** ("Call to undefined function shell_exec()"), karena Hostinger menonaktifkan `shell_exec`. Di PHP 8 fungsi yang dinonaktifkan memicu galat fatal walau dipanggil dengan `@`, sehingga jalur cadangan PHP/PDO yang sudah ada tidak pernah tercapai. Folder `storage/app/backups` produksi kosong.
+- Perbaikan (`DatabaseBackupService`): `shell_exec` hanya dipanggil bila tersedia (`shell()`), dan biner `mysqldump`/`mysql` hanya dipakai bila `proc_open` tersedia (`canRunBinaries()`). Selain itu cadangan dan pemulihan memakai jalur PHP/PDO. Keputusan diambil sebelum proses dimulai, sehingga pemulihan tidak pernah berpindah jalur di tengah jalan.
+- Verifikasi setelah deploy: `php artisan db:backup --force` harus menghasilkan berkas di `storage/app/backups`, dan menu Backup Data menampilkannya.

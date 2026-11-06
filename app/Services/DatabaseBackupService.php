@@ -64,7 +64,7 @@ class DatabaseBackupService
 
         // Coba di sistem PATH
         $which = PHP_OS_FAMILY === 'Windows' ? 'where mysqldump' : 'which mysqldump';
-        $output = @shell_exec($which);
+        $output = $this->shell($which);
         if ($output) {
             $lines = explode("\n", trim($output));
             if (!empty($lines[0]) && File::exists(trim($lines[0]))) {
@@ -73,6 +73,26 @@ class DatabaseBackupService
         }
 
         return null;
+    }
+
+    /**
+     * Hosting bersama (mis. Hostinger) sering menonaktifkan shell_exec/proc_open. Di PHP 8 memanggil fungsi
+     * yang dinonaktifkan adalah galat fatal (operator @ tidak menahannya), jadi selalu periksa dulu.
+     */
+    private function shell(string $command): ?string
+    {
+        if (! function_exists('shell_exec')) {
+            return null;
+        }
+        $out = @shell_exec($command);
+
+        return is_string($out) ? $out : null;
+    }
+
+    /** Biner mysqldump/mysql hanya dapat dijalankan bila proc_open tersedia (dipakai Symfony Process). */
+    public function canRunBinaries(): bool
+    {
+        return function_exists('proc_open');
     }
 
     /**
@@ -93,7 +113,7 @@ class DatabaseBackupService
         }
 
         $which = PHP_OS_FAMILY === 'Windows' ? 'where mysql' : 'which mysql';
-        $output = @shell_exec($which);
+        $output = $this->shell($which);
         if ($output) {
             $lines = explode("\n", trim($output));
             if (!empty($lines[0]) && File::exists(trim($lines[0]))) {
@@ -122,7 +142,7 @@ class DatabaseBackupService
 
         try {
             if ($driver === 'mysql') {
-                $mysqldump = $this->findMysqldumpPath();
+                $mysqldump = $this->canRunBinaries() ? $this->findMysqldumpPath() : null;
                 if ($mysqldump) {
                     $this->dumpWithMysqldump($mysqldump, $rawSqlPath);
                 } else {
@@ -373,7 +393,7 @@ class DatabaseBackupService
         try {
             $driver = DB::getDriverName();
             if ($driver === 'mysql') {
-                $mysql = $this->findMysqlPath();
+                $mysql = $this->canRunBinaries() ? $this->findMysqlPath() : null;
                 if ($mysql) {
                     $this->restoreWithMysqlBinary($mysql, $sqlPath);
                 } else {
