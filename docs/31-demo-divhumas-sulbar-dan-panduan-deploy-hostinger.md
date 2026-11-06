@@ -98,3 +98,13 @@ php artisan simod:demo-prepare --force --keep-articles # pertahankan berita yang
 - Tombol "Tarik berita" manual (`crawl-live`) tetap sinkron karena menampilkan hasil langsung.
 - Galat 520 yang tetap muncul di jalur lain: cek log akses hPanel dan coba mode Cloudflare "DNS only" untuk memisahkan penyebab.
 - Test: `MediaTopicDossierTest::test_topic_creation_pulls_news_after_response_without_blocking` (memakai tiruan crawler, tanpa jaringan).
+
+## Addendum: cron terpasang, aset gagal dimuat (MIME ""), dan 429 (6 Nov 2026)
+- **Cron produksi aktif** (dibuat lewat API Hostinger, terlihat di hPanel → Cron Jobs): `* * * * * /usr/bin/php /home/<user>/domains/<domain>/simod-v2-app/artisan schedule:run`. Pakai bentuk ini (mode "PHP" hPanel). Bentuk `cd <folder> && php artisan ...` terdaftar tetapi **tidak pernah tereksekusi** di server ini. Bukti cron berjalan: denyut `simod.scheduler.tick` (lihat Otomasi Sinkron RSS) diperbarui tiap menit.
+- **Gejala keluhan klien:** konsol merah "Loading module ... blocked because of a disallowed MIME type ("")", modal putih kosong saat pindah halaman, dan halaman "429 Too Many Requests". Ketiganya respons **429 dari LiteSpeed/Hostinger** (pembatas per-IP), bukan dari Laravel (rute GET tidak di-throttle). Respons 429 tidak bertipe MIME sehingga modul JS ditolak, dan Inertia menampilkan respons non-Inertia sebagai modal.
+- **Perbaikan:**
+  - Tautan sidebar tidak lagi `prefetch`. Sebelumnya setiap kursor melewati menu memuat halaman penuh (PHP) di latar.
+  - `vite.config.js` `manualChunks` menyatukan pustaka & ikon (`vendor`, `vendor-icons`, `vendor-markdown`). Berkas aset turun dari 72 menjadi 41, dan per halaman sekitar 6 permintaan.
+  - `resources/js/app.js`: bila komponen/modul gagal dimuat, halaman dimuat ulang otomatis sekali (dijaga `sessionStorage` 30 detik agar tidak berulang); respons non-Inertia 429/5xx tampil sebagai notifikasi, bukan modal putih; 419 memuat ulang halaman.
+  - `public/.htaccess`: aturan cache aset kini cocok untuk subfolder (`/build/assets/`).
+- **Aturan deploy:** jangan menghapus `public_html/<subfolder>/build` sebelum mengekstrak build baru. Ekstrak di atasnya agar tab yang masih terbuka dengan hash lama tetap memuat asetnya; bersihkan aset lama paling cepat beberapa hari kemudian.

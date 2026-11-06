@@ -249,3 +249,4 @@ Baseline wajib sebelum dan sesudah perubahan: `php artisan test` → **284 passe
 3. Jangan menulis `?polda=` pada contoh tautan UI; gunakan `POST /tenant/switch` dengan payload `code`.
 4. Path proyek berbeda antar komputer (mis. `D:\Foto\laragon\www\simod-enterprise` atau `D:\laragon\www\simod-enterprise`). Jangan menulis path absolut atau tautan `file:///` di dokumen; gunakan tautan relatif.
 5. Perintah npm di Windows: `npm.cmd`.
+6. Aset frontend: `vite.config.js` memakai `manualChunks` (`vendor`, `vendor-icons`, `vendor-markdown`) dan sidebar tidak memakai `prefetch`, agar shared hosting tidak membalas 429. Pemulihan otomatis aset gagal dimuat ada di `resources/js/app.js`. Detail dan perintah cron produksi: doc 31, addendum 6 Nov 2026.

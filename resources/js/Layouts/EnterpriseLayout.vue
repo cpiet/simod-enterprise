@@ -507,7 +507,7 @@ const switchRole = (newRole) => {
           <!-- Nav Links -->
           <div v-for="item in group.items" :key="item.id || item.name" class="space-y-1">
             <Link
-              :href="item.href" prefetch cache-for="30s"
+              :href="item.href"
               class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition group relative"
               :class="isRouteActive(item)
                 ? 'bg-amber-400 text-slate-950 font-black shadow-md shadow-amber-400/20'
@@ -559,7 +559,7 @@ const switchRole = (newRole) => {
               <Link
                 v-for="sub in item.children"
                 :key="sub.id || sub.name"
-                :href="sub.href" prefetch cache-for="30s"
+                :href="sub.href"
                 class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition"
                 :class="isRouteActive(sub)
                   ? 'bg-amber-400/20 text-amber-300 font-bold border border-amber-400/30'
