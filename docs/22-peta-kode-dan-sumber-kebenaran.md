@@ -1,6 +1,6 @@
 # 🧭 22. Peta Kode & Sumber Kebenaran (Source of Truth)
 
-Dokumen ini adalah **peta tunggal** antara dokumentasi dan kode SIMOD Enterprise. Seluruh angka di sini diverifikasi langsung dari repositori pada **5 November 2026** (baseline `php artisan test`: **332 tests, 2716 assertions, PASS**; 129 rute; 39 tabel; 20 kunci RBAC).
+Dokumen ini adalah **peta tunggal** antara dokumentasi dan kode SIMOD Enterprise. Seluruh angka di sini diverifikasi langsung dari repositori pada **7 November 2026** (baseline `php artisan test`: **335 tests, 2728 assertions, PASS**; 130 rute; 39 tabel; 20 kunci RBAC).
 
 > [!IMPORTANT]
 > **Aturan emas:** bila dokumen lain bertentangan dengan dokumen ini atau dengan kode, **kode yang benar**. Perbarui dokumennya, bukan sebaliknya. Dokumen berstatus *snapshot historis* (angka test/berita lama) ditandai eksplisit di dokumennya masing-masing.
@@ -55,7 +55,7 @@ Dokumen ini adalah **peta tunggal** antara dokumentasi dan kode SIMOD Enterprise
 
 ---
 
-## 4. Peta Rute (129 rute aplikasi: 125 web + 4 API)
+## 4. Peta Rute (130 rute aplikasi: 126 web + 4 API)
 
 > Hitungan dari `php artisan route:list`, di luar rute bawaan framework (`/up`, `storage/{path}`, `_inertia/devtools/*`). Seluruh rute web (kecuali `/login` dan `/logout`) berada di grup `Route::middleware(['auth', 'idle'])`. Setiap rute modul juga memakai `->middleware('module:kunci')` (lihat bagian 7). `POST /login` dibatasi `throttle:10,1`.
 
@@ -177,7 +177,7 @@ Endpoint bertanda *(token)* memakai middleware `ingest.token`: header `Authoriza
 
 `User::isSuperAdmin()` bernilai benar untuk peran `super_admin_mabes`, `kadiv_humas`, `superadmin` dan peran ini selalu lolos `module:*`.
 
-**Penegakan server-side:** middleware `module:kunci` (pisahkan beberapa kunci dengan `|`, salah satu cukup) memeriksa `RolePermission::isGranted()`; kustomisasi per Polda di `/roles` berlaku seketika. Pelanggaran → HTTP 403 (JSON untuk AJAX). Pemetaan rute→kunci: `/` → `dashboard_view`; `/media-intelligence*` → `media_intelligence_view` (aksi AI/crawl → `media_intelligence_ai`); `/social-intelligence*` → `social_intelligence_view` (sync/track/settings/refresh → `social_intelligence_sync`); `/issues*` → `issues_view` (`create`/store → `issues_create`; clarify/verify/return/resolve/close/release & `/press-releases` → `issues_verify`; `/issues/{id}/task` → `tasks_disposition`); `/tasks*` → `tasks_execute\|tasks_disposition` (POST `/tasks` → `tasks_disposition`); `/publications` → `publications_manage`; `/gallery` → `gallery_access`; `/reports*` → `reports_export`; `/verification-queue` → `issues_view`; `/personalia*` → `personalia_manage`; `/settings/polda|polres` → `polda_settings`; `/security`, `/audit-logs`, `/settings/ai` → `security_center`; `/roles`, `/settings/menus` → `roles_matrix_manage`; `/database/backup*` → `database_backup`; `/maintenance*` → `maintenance_ops`. `/profile` dan `/tenant/switch` cukup login.
+**Penegakan server-side:** middleware `module:kunci` (pisahkan beberapa kunci dengan `|`, salah satu cukup) memeriksa `RolePermission::isGranted()`; kustomisasi per Polda di `/roles` berlaku seketika. Pelanggaran → HTTP 403 (JSON untuk AJAX). Pemetaan rute→kunci: `/` → `dashboard_view`; `/media-intelligence*` → `media_intelligence_view` (aksi AI/crawl → `media_intelligence_ai`); `/social-intelligence*` → `social_intelligence_view` (sync/track/settings/refresh → `social_intelligence_sync`); `/issues*` → `issues_view` (`create`/store → `issues_create`; clarify/verify/return/resolve/close/release & `/press-releases` → `issues_verify`; `/issues/{id}/task` → `tasks_disposition`); `/tasks*` → `tasks_execute\|tasks_disposition` (POST `/tasks` → `tasks_disposition`); `/publications` → `publications_manage`; `/gallery` → `gallery_access`; `/reports*` → `reports_export`; `/verification-queue` → `issues_view`; `/personalia*` → `personalia_manage`; `/settings/polda|polres` → `polda_settings`; `/security`, `/audit-logs`, `/settings/ai` → `security_center`; `/roles`, `/settings/menus` → `roles_matrix_manage`; `/database/backup*` → `database_backup`; `/maintenance*` → `maintenance_ops`. `/profile`, `/tenant/switch`, dan `/quick-search` (Pencarian Cepat, izin diperiksa per kelompok hasil; [doc 38](38-review-performa-ux-dan-pencarian-cepat.md)) cukup login.
 
 ---
 
@@ -233,7 +233,7 @@ Temuan saat menyelaraskan dokumen dengan kode (5 Nov 2026), beserta status perba
 
 `tests/Feature` memuat 36 berkas (plus `tests/Unit/ExampleTest.php`): `AiModelSelectionTest` (6), `AiQuotaAndSavingsTest` (9), `CommandCenterRefreshTest` (5), `GeminiQuotaFallbackTest` (2), `CommandCenterNationalMapAndKpiTest` (5 test), `DatabaseBackupTest`, `DivhumasNationalFeedsTest`, `DynamicMenuAndSecurityAuditTest`, `EndToEndAuditStressTest`, `EnterpriseFullSuiteTest`, `ExampleTest`, `GeminiMediaIntelligenceTest`, `InstagramAccountMonitoringTest` (2 test), `MediaTopicDossierTest`, `NewsCleanupTest`, `PersonaliaAuthorityTest` (6 test), `RolePermissionMatrixTest`, `RssSyncTest`, `SadewaChatTest` (7 test), `SecurityCenterTest`, `SocialIntelligenceTest` (12 test), `TenantSecurityTest` (3 test), `AdminSystemEnforcementTest` (4 test: lockout login, batas sesi, ganti kata sandi, halaman mock terhapus), `TenantOverrideProtectionTest` (4 test: tenant tidak dapat dialihkan klien), `AuthHardeningTest` (9 test: gerbang login, kredensial, simulasi peran, token ingest), `ModulePermissionEnforcementTest` (6 test: penegakan RBAC server-side).
 
-Baseline wajib sebelum dan sesudah perubahan: `php artisan test` → **332 passed (2716 assertions)** dan `npm.cmd run build` tanpa galat. Helper test: `$this->actingAsSuperAdmin()` (`tests/TestCase.php`).
+Baseline wajib sebelum dan sesudah perubahan: `php artisan test` → **335 passed (2728 assertions)** dan `npm.cmd run build` tanpa galat. Helper test: `$this->actingAsSuperAdmin()` (`tests/TestCase.php`).
 
 ---
 

@@ -30,10 +30,8 @@
 
     <link rel="icon" href="{{ asset('favicon.ico') }}">
 
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+    <!-- Font Plus Jakarta Sans di-host sendiri (variable font, dibundel Vite via @fontsource-variable):
+         tidak memblokir tampilan menunggu Google Fonts dan tidak membocorkan kunjungan ke pihak ketiga. -->
 
     <!-- Scripts & Styles -->
     @routes

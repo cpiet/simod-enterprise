@@ -3,6 +3,8 @@ import { stripBase } from '../utils/basePath';
 import { ref, computed, onMounted, watch } from 'vue';
 import { router, Link, usePage } from '@inertiajs/vue3';
 import SadewaCopilot from '@/Components/SadewaCopilot.vue';
+import { alertsState, loadAlerts, markAlertsSeen } from '@/utils/alertsStore';
+import QuickSearch from '@/Components/QuickSearch.vue';
 import {
   Shield,
   ShieldAlert,
@@ -118,24 +120,12 @@ const switchTenant = (code) => {
 
 // Panel notifikasi: antrean verifikasi + peringatan social listening (data nyata, per tenant, status baca per pengguna).
 const isBellOpen = ref(false);
-const alerts = ref({ unread: 0, items: [] });
+const alerts = alertsState; // bersama antar-navigasi (resources/js/utils/alertsStore.js)
 const canSeeSocial = computed(() => !!page.props.auth?.permissions?.social_intelligence_view);
-const loadAlerts = async () => {
-  if (!canSeeSocial.value || !window.axios) return;
-  try {
-    const { data } = await window.axios.get('/social-intelligence/alerts');
-    alerts.value = data;
-  } catch { /* panel tetap menampilkan antrean verifikasi */ }
-};
+const refreshAlerts = (force = false) => { if (canSeeSocial.value) loadAlerts(force); };
 const toggleBell = () => {
   isBellOpen.value = !isBellOpen.value;
-  if (isBellOpen.value) loadAlerts();
-};
-const markAlertsSeen = async () => {
-  try {
-    await window.axios.post('/social-intelligence/alerts/seen');
-    alerts.value = { unread: 0, items: alerts.value.items.map((a) => ({ ...a, unread: false })) };
-  } catch { /* abaikan */ }
+  if (isBellOpen.value) refreshAlerts(true);
 };
 const alertTime = (iso) => (iso ? new Date(iso).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
 const ALERT_TYPE = { kamtibmas: 'Kata kunci kamtibmas', topik: 'Topik Atensi', lonjakan: 'Lonjakan keterlibatan', komentar_negatif: 'Komentar negatif' };
@@ -222,7 +212,7 @@ watch(
 
 onMounted(() => {
   initTheme();
-  loadAlerts(); // hitungan peringatan belum dibaca untuk lencana lonceng
+  refreshAlerts(); // hitungan belum dibaca untuk lencana lonceng (di-cache 60 detik antar-navigasi)
   window.addEventListener('simod-toast', (e) => {
     if (e.detail?.message) {
       triggerToast(e.detail.message, e.detail.type || 'success');
@@ -732,9 +722,9 @@ const switchRole = (newRole) => {
     <!-- ========================================================================= -->
     <div class="flex-1 flex flex-col min-w-0 overflow-x-hidden">
       <!-- Sticky Top Header Bar -->
-      <header class="sticky top-0 z-30 backdrop-blur-xl bg-[#091122]/90 border-b border-slate-800/80 px-4 lg:px-8 py-2.5 flex items-center justify-between shadow-xl">
-        <!-- Left: Mobile Hamburger & Desktop Collapse Toggle & Polda Switcher -->
-        <div class="flex items-center gap-3">
+      <header class="sticky top-0 z-30 backdrop-blur-xl bg-[#091122]/90 border-b border-slate-800/80 px-3 sm:px-4 lg:px-8 py-2.5 flex items-center justify-between gap-2 shadow-xl">
+        <!-- Left: Mobile Hamburger & Desktop Collapse Toggle & Polda Switcher (boleh menyusut di ponsel) -->
+        <div class="flex items-center gap-2 sm:gap-3 min-w-0">
           <!-- Mobile Menu Toggle Button -->
           <button
             @click="isMobileSidebarOpen = true"
@@ -756,7 +746,7 @@ const switchRole = (newRole) => {
           <!-- Personel daerah terkunci ke Polda-nya: tampil sebagai label saja, tanpa pilihan yang pasti ditolak server. -->
           <div v-if="!canSwitchTenant" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700 text-xs font-bold text-slate-200 shadow-sm" title="Wilayah komando Anda">
             <Building2 class="w-3.5 h-3.5 text-amber-400" />
-            <span class="truncate max-w-[140px] sm:max-w-[220px]">{{ selectedPolda?.name || 'Wilayah komando' }}</span>
+            <span class="truncate max-w-[88px] min-[420px]:max-w-[140px] sm:max-w-[220px]">{{ selectedPolda?.name || 'Wilayah komando' }}</span>
           </div>
           <div v-else class="relative">
             <button
@@ -764,7 +754,7 @@ const switchRole = (newRole) => {
               class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-slate-200 transition shadow-sm hover:border-amber-400/50"
             >
               <Building2 class="w-3.5 h-3.5 text-amber-400" />
-              <span class="truncate max-w-[140px] sm:max-w-[220px]">
+              <span class="truncate max-w-[88px] min-[420px]:max-w-[140px] sm:max-w-[220px]">
                 {{ selectedCode === 'ALL' ? 'Divhumas Polri (Nasional)' : (selectedPolda?.name || 'Polda Sulawesi Barat') }}
               </span>
               <ChevronDown class="w-3 h-3 text-slate-400 transition duration-200" :class="{ 'rotate-180': isTenantMenuOpen }" />
@@ -818,7 +808,7 @@ const switchRole = (newRole) => {
         </div>
 
         <!-- Right: Live WITA Clock & Theme Toggle & Notification & User Profile -->
-        <div class="flex items-center gap-2 sm:gap-2.5">
+        <div class="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           <!-- Real-time WITA Clock -->
           <div class="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-mono text-slate-300 shadow-inner">
             <Clock class="w-3.5 h-3.5 text-amber-400" />
@@ -838,6 +828,9 @@ const switchRole = (newRole) => {
               {{ isDarkMode ? 'Mode Gelap' : 'Mode Terang' }}
             </span>
           </button>
+
+          <!-- Pencarian Cepat (Ctrl+K) lintas modul -->
+          <QuickSearch />
 
           <!-- Panel Notifikasi: antrean verifikasi + peringatan social listening -->
           <div class="relative">
@@ -1012,7 +1005,7 @@ const switchRole = (newRole) => {
       </header>
 
       <!-- Main Content Dynamic Slot -->
-      <main class="flex-1 p-4 lg:p-8 w-full max-w-7xl mx-auto space-y-8">
+      <main class="flex-1 min-w-0 p-4 lg:p-8 w-full max-w-7xl mx-auto space-y-8">
         <slot />
       </main>
 

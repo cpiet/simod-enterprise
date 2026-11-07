@@ -1,4 +1,5 @@
 import './bootstrap';
+import '@fontsource-variable/plus-jakarta-sans'; // font di-host sendiri (lihat app.blade.php)
 import '../css/app.css';
 
 import { createApp, h } from 'vue';

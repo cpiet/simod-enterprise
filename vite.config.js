@@ -33,6 +33,8 @@ export default defineConfig({
                 manualChunks(id) {
                     if (!id.includes('node_modules')) return undefined;
                     if (id.includes('lucide-vue-next')) return 'vendor-icons';
+                    // Leaflet hanya dipakai peta Command Center: chunk terpisah agar halaman lain tidak memuatnya.
+                    if (id.includes('leaflet')) return 'vendor-map';
                     if (id.includes('marked')) return 'vendor-markdown';
                     return 'vendor';
                 },

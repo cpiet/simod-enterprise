@@ -135,33 +135,37 @@ const resetFilter = () => {
 };
 
 // Role Badges and Metadata
-const getRoleMeta = (roleKey) => {
+const roleMetaBase = (roleKey) => {
   const match = (props.roleMatrix || []).find(r => r.role_key === roleKey);
   if (match) {
     return {
       name: match.role_name,
       badge: match.badge,
       description: match.description,
-      grantedCount: match.granted_count || 0,
-      totalCount: match.total_count || 17,
     };
   }
 
   switch (roleKey) {
     case 'kadiv_humas':
-      return { name: 'Kadivhumas Polri', badge: 'Mabes ⭐⭐', description: 'Pimpinan tertinggi kehumasan Mabes Polri', grantedCount: 17, totalCount: 17 };
+      return { name: 'Kadivhumas Polri', badge: 'Mabes ⭐⭐', description: 'Pimpinan tertinggi kehumasan Mabes Polri' };
     case 'super_admin_mabes':
-      return { name: 'Super Administrator Mabes', badge: 'Superadmin', description: 'Pengelola teknis nasional dan sistem', grantedCount: 17, totalCount: 17 };
+      return { name: 'Super Administrator Mabes', badge: 'Superadmin', description: 'Pengelola teknis nasional dan sistem' };
     case 'polda_leader':
-      return { name: 'Pimpinan Polda (Kabid Humas)', badge: 'Polda', description: 'Pimpinan kehumasan tingkat Polda', grantedCount: 17, totalCount: 17 };
+      return { name: 'Pimpinan Polda (Kabid Humas)', badge: 'Polda', description: 'Pimpinan kehumasan tingkat Polda' };
     case 'verifikator':
-      return { name: 'Verifikator (Penmas)', badge: 'Verifikator', description: 'Validasi fakta & klarifikasi hoaks', grantedCount: 12, totalCount: 17 };
+      return { name: 'Verifikator (Penmas)', badge: 'Verifikator', description: 'Validasi fakta & klarifikasi hoaks' };
     case 'analis':
-      return { name: 'Analis Intelijen Media', badge: 'Analis', description: 'Analisis sentimen siber & EWS', grantedCount: 8, totalCount: 17 };
+      return { name: 'Analis Intelijen Media', badge: 'Analis', description: 'Analisis sentimen siber & EWS' };
     case 'operator':
     default:
-      return { name: 'Operator Satwil (Polres)', badge: 'Operator', description: 'Operator lapangan & pelaksana tugas', grantedCount: 7, totalCount: 17 };
+      return { name: 'Operator Satwil (Polres)', badge: 'Operator', description: 'Operator lapangan & pelaksana tugas' };
   }
+};
+// Jumlah modul dihitung dari data server (matriks /roles), bukan angka tertulis mati.
+const getRoleMeta = (roleKey) => {
+  const match = (props.roleMatrix || []).find((r) => r.role_key === roleKey);
+  const total = match?.total_count ?? ((props.modules || []).length || null);
+  return { ...roleMetaBase(roleKey), grantedCount: match?.granted_count ?? null, totalCount: total };
 };
 
 const getRoleBadgeStyle = (roleKey) => {
@@ -661,7 +665,7 @@ const modulesByPillar = computed(() => {
                         title="Klik untuk melihat matriks izin 17 modul untuk peran ini"
                       >
                         <Eye class="w-3 h-3 text-amber-400" />
-                        <span>{{ getRoleMeta(u.role).grantedCount }} / {{ getRoleMeta(u.role).totalCount }} Modul Aktif</span>
+                        <span>{{ getRoleMeta(u.role).grantedCount ?? '—' }} / {{ getRoleMeta(u.role).totalCount ?? '—' }} Modul Aktif</span>
                       </button>
                     </div>
                   </div>
@@ -874,7 +878,7 @@ const modulesByPillar = computed(() => {
                   {{ getRoleMeta(addForm.role).description }}
                 </p>
                 <span class="inline-block font-mono text-[10px] text-amber-300 font-bold mt-1 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
-                  Diberikan izin pada {{ getRoleMeta(addForm.role).grantedCount }} dari {{ getRoleMeta(addForm.role).totalCount }} modul operasional di /roles
+                  Diberikan izin pada {{ getRoleMeta(addForm.role).grantedCount ?? '—' }} dari {{ getRoleMeta(addForm.role).totalCount ?? '—' }} modul operasional di /roles
                 </span>
               </div>
             </div>
@@ -1083,7 +1087,7 @@ const modulesByPillar = computed(() => {
                   {{ getRoleMeta(editForm.role).description }}
                 </p>
                 <span class="inline-block font-mono text-[10px] text-amber-300 font-bold mt-1 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
-                  Diberikan izin pada {{ getRoleMeta(editForm.role).grantedCount }} dari {{ getRoleMeta(editForm.role).totalCount }} modul di /roles
+                  Diberikan izin pada {{ getRoleMeta(editForm.role).grantedCount ?? '—' }} dari {{ getRoleMeta(editForm.role).totalCount ?? '—' }} modul di /roles
                 </span>
               </div>
             </div>

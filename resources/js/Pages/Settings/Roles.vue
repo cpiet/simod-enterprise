@@ -475,7 +475,7 @@ const getRoleColor = (roleKey) => {
                 class="px-3 py-3.5 text-center border-l border-slate-800/60 transition"
                 :class="r.permissions?.[mod.key] ? 'bg-amber-400/[0.02]' : ''"
               >
-                <label class="inline-flex items-center justify-center cursor-pointer select-none">
+                <label class="relative inline-flex items-center justify-center cursor-pointer select-none">
                   <input
                     type="checkbox"
                     :checked="!!r.permissions?.[mod.key]"

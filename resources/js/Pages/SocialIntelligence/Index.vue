@@ -1023,6 +1023,7 @@ const isCriticalSpike = (post) => {
 };
 
 const getSentimentStabilityClass = (score) => {
+  if (score === null || score === undefined) return 'text-slate-600 dark:text-slate-400';
   if (score >= 75) return 'text-emerald-600 dark:text-emerald-400';
   if (score >= 50) return 'text-amber-600 dark:text-amber-400';
   return 'text-rose-600 dark:text-rose-400';
@@ -2131,8 +2132,8 @@ const getBuzzerRiskClass = (level) => {
                   <div :style="{width: (socialAiReport.data?.sentiment_analysis?.netral || 0) + '%'}" class="bg-slate-400 dark:bg-slate-600 h-full"></div>
                   <div :style="{width: (socialAiReport.data?.sentiment_analysis?.negatif || 0) + '%'}" class="bg-rose-500 h-full"></div>
                 </div>
-                <p class="text-xs font-bold" :class="getSentimentStabilityClass(socialAiReport.data?.sentiment_analysis?.stability_index || 50)">
-                  Stabilitas Opini: {{ socialAiReport.data?.sentiment_analysis?.stability_label }} (Skor {{ socialAiReport.data?.sentiment_analysis?.stability_index }}/100)
+                <p class="text-xs font-bold" :class="getSentimentStabilityClass(socialAiReport.data?.sentiment_analysis?.stability_index ?? null)">
+                  Stabilitas Opini: {{ socialAiReport.data?.sentiment_analysis?.stability_label }} (Skor {{ socialAiReport.data?.sentiment_analysis?.stability_index ?? '—' }}/100)
                 </p>
               </div>
               <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">

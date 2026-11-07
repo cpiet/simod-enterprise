@@ -68,7 +68,7 @@ Route::post('/social-intelligence/accounts', [SocialIntelligenceController::clas
 Route::post('/social-intelligence/accounts/{id}/sync', [SocialIntelligenceController::class, 'syncMonitoredAccount'])->middleware(['module:social_intelligence_sync', 'throttle:10,1']);
 Route::delete('/social-intelligence/accounts/{id}', [SocialIntelligenceController::class, 'deleteMonitoredAccount'])->middleware('module:social_intelligence_sync');
 Route::post('/social-intelligence/accounts/{id}/auto', [SocialIntelligenceController::class, 'toggleAutoMonitor'])->middleware(['module:social_intelligence_sync', 'throttle:30,1']);
-Route::get('/social-intelligence/alerts', [SocialIntelligenceController::class, 'alerts'])->middleware(['module:social_intelligence_view', 'throttle:60,1']);
+Route::get('/social-intelligence/alerts', [SocialIntelligenceController::class, 'alerts'])->middleware(['module:social_intelligence_view', 'throttle:120,1']);
 Route::post('/social-intelligence/alerts/seen', [SocialIntelligenceController::class, 'markAlertsSeen'])->middleware('module:social_intelligence_view');
 Route::post('/social-intelligence/comments', [SocialIntelligenceController::class, 'fetchComments'])->middleware(['module:social_intelligence_sync', 'throttle:10,1']);
 Route::post('/social-intelligence/comments/{id}/summarize', [SocialIntelligenceController::class, 'summarizeComments'])->middleware(['module:social_intelligence_view', 'throttle:10,1']);
@@ -133,6 +133,8 @@ Route::get('/audit-logs/purge-preview', [\App\Http\Controllers\AuditLogControlle
 Route::post('/audit-logs/purge', [\App\Http\Controllers\AuditLogController::class, 'purge'])->middleware(['module:security_center', 'throttle:10,1'])->name('audit-logs.purge');
 Route::post('/audit-logs/retention', [\App\Http\Controllers\AuditLogController::class, 'updateRetention'])->middleware('module:security_center')->name('audit-logs.retention');
 Route::get('/profile', [SystemModuleController::class, 'profile'])->name('profile.index');
+// Pencarian Cepat lintas modul: izin diperiksa PER KELOMPOK hasil di controller (setara `module:`), terkunci tenant.
+Route::get('/quick-search', \App\Http\Controllers\QuickSearchController::class)->middleware('throttle:60,1')->name('quick-search');
 Route::post('/profile/password', [SystemModuleController::class, 'updatePassword'])->middleware('throttle:6,1')->name('profile.password');
 Route::post('/profile/pin', [\App\Http\Controllers\Auth\QuickLoginController::class, 'enroll'])->middleware('throttle:6,1')->name('profile.pin.enroll');
 Route::delete('/profile/pin', [\App\Http\Controllers\Auth\QuickLoginController::class, 'revoke'])->middleware('throttle:6,1')->name('profile.pin.revoke');
