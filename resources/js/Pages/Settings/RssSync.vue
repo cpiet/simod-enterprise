@@ -43,6 +43,7 @@ const props = defineProps({
   selectedCode: { type: String, default: 'SULBAR' },
   setting: { type: Object, default: () => ({}) },
   globalSetting: { type: Object, default: () => ({}) },
+  schedule: { type: Object, default: () => ({}) },
   telemetry: { type: Object, default: () => ({}) },
   recentLogs: { type: Array, default: () => [] },
   feeds: { type: Array, default: () => [] },
@@ -368,6 +369,9 @@ const categoryBadgeClass = (cat) => {
           </div>
           <p class="text-[11px] text-slate-400 truncate">
             Status: <strong class="text-amber-400 uppercase font-black">{{ setting.last_sync_status }}</strong> ({{ setting.last_articles_count }} berita)
+          </p>
+          <p class="text-[11px] text-slate-400 truncate">
+            Otomatis berikutnya: <strong class="text-emerald-300">{{ schedule?.next_run_at ?? 'tidak terjadwal' }}</strong>
           </p>
         </div>
       </div>
@@ -712,6 +716,21 @@ const categoryBadgeClass = (cat) => {
       <!-- TAB 2: OTOMASI PENJADWALAN & KESTABILAN SERVER                -->
       <!-- ============================================================== -->
       <div v-if="activeSubTab === 'scheduler'" class="space-y-6">
+        <div class="rounded-2xl border p-4 text-xs leading-relaxed space-y-1.5" :class="schedule?.scheduler_active ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-100' : 'bg-rose-500/10 border-rose-500/40 text-rose-100'" role="status">
+          <p class="font-black text-sm">
+            {{ schedule?.scheduler_active ? 'Penjadwal (cron) aktif' : 'Penjadwal (cron) TIDAK aktif' }}
+            <span class="font-semibold opacity-80">· denyut terakhir {{ schedule?.last_tick_at ?? 'belum ada' }}</span>
+          </p>
+          <p>
+            Sinkron otomatis berikutnya: <strong>{{ schedule?.next_run_at ?? 'tidak terjadwal (mode manual/otomasi nonaktif)' }}</strong>.
+            Terakhir: {{ globalSetting?.last_sync_at ?? '-' }}<span v-if="globalSetting?.last_sync_message"> ({{ globalSetting.last_sync_message }})</span>.
+          </p>
+          <p class="opacity-90">Jadwal ini <b>berlaku untuk seluruh Polda</b> karena satu mesin menyinkronkan semua feed. Jam pada mode jam dinas dibaca dalam <b>WIB</b>.</p>
+          <p v-if="form.sync_mode === 'interval' && form.interval_minutes >= 360" class="font-bold text-amber-200">
+            Perhatian: dengan interval {{ form.interval_minutes / 60 }} jam, berita di radar bisa tertinggal hingga {{ form.interval_minutes / 60 }} jam. Untuk pemantauan aktif disarankan 30–60 menit.
+          </p>
+          <p v-if="!schedule?.can_edit" class="font-bold">Hanya Super Admin yang dapat mengubah jadwal nasional; Anda tetap dapat mengubah batas &amp; retensi di bawah.</p>
+        </div>
         <form @submit.prevent="saveSettings" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <!-- Left: Scheduler Settings (2 cols) -->
           <div class="lg:col-span-2 space-y-6">
@@ -723,7 +742,7 @@ const categoryBadgeClass = (cat) => {
                 </div>
                 <div class="flex items-center gap-2">
                   <label class="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" v-model="form.is_active" class="sr-only peer">
+                    <input type="checkbox" v-model="form.is_active" :disabled="!schedule?.can_edit" class="sr-only peer">
                     <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
                     <span class="ml-2 text-xs font-bold text-slate-300">
                       {{ form.is_active ? 'Otomasi Aktif' : 'Otomasi Nonaktif' }}
@@ -743,6 +762,7 @@ const categoryBadgeClass = (cat) => {
                   type="radio"
                   value="manual"
                   v-model="form.sync_mode"
+                  :disabled="!schedule?.can_edit"
                   class="mt-1 text-amber-400 focus:ring-amber-400"
                 />
                 <div class="space-y-1">
@@ -767,6 +787,7 @@ const categoryBadgeClass = (cat) => {
                   type="radio"
                   value="interval"
                   v-model="form.sync_mode"
+                  :disabled="!schedule?.can_edit"
                   class="mt-1 text-amber-400 focus:ring-amber-400"
                 />
                 <div class="space-y-3 flex-1">
@@ -781,9 +802,10 @@ const categoryBadgeClass = (cat) => {
                   </p>
 
                   <!-- Interval Options Pills -->
-                  <div v-if="form.sync_mode === 'interval'" class="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2">
+                  <div v-if="form.sync_mode === 'interval'" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-2">
                     <button
                       v-for="opt in [
+                        { label: 'Tiap 30 Menit', val: 30, desc: 'Pantauan aktif' },
                         { label: 'Tiap 1 Jam', val: 60, desc: 'Breaking' },
                         { label: 'Tiap 3 Jam', val: 180, desc: 'Ideal' },
                         { label: 'Tiap 6 Jam', val: 360, desc: 'Shift' },
@@ -793,7 +815,8 @@ const categoryBadgeClass = (cat) => {
                       :key="opt.val"
                       type="button"
                       @click="form.interval_minutes = opt.val"
-                      class="p-2.5 rounded-xl border text-center transition cursor-pointer"
+                      :disabled="!schedule?.can_edit"
+                      class="p-2.5 rounded-xl border text-center transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
                       :class="form.interval_minutes === opt.val
                         ? 'bg-amber-400 text-slate-950 border-amber-400 font-black shadow-md'
                         : 'bg-slate-900 text-slate-300 border-slate-700 hover:bg-slate-800'"
@@ -816,6 +839,7 @@ const categoryBadgeClass = (cat) => {
                   type="radio"
                   value="scheduled_times"
                   v-model="form.sync_mode"
+                  :disabled="!schedule?.can_edit"
                   class="mt-1 text-amber-400 focus:ring-amber-400"
                 />
                 <div class="space-y-3 flex-1">
@@ -824,7 +848,7 @@ const categoryBadgeClass = (cat) => {
                     <span v-if="form.sync_mode === 'scheduled_times'" class="px-2 py-0.5 rounded text-[10px] bg-amber-400 text-slate-950 font-black">Dipilih</span>
                   </div>
                   <p class="text-xs text-slate-400 leading-relaxed">
-                    Menarik berita tepat pada jam-jam pergantian dinas atau sebelum briefing pimpinan (WITA/WIB).
+                    Menarik berita tepat pada jam-jam pergantian dinas atau sebelum briefing pimpinan (jam dalam WIB).
                   </p>
 
                   <div v-if="form.sync_mode === 'scheduled_times'" class="space-y-3 pt-2">

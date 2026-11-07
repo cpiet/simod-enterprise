@@ -113,3 +113,12 @@ php artisan simod:demo-prepare --force --keep-articles # pertahankan berita yang
 - Temuan: `db:backup` di produksi **selalu gagal** ("Call to undefined function shell_exec()"), karena Hostinger menonaktifkan `shell_exec`. Di PHP 8 fungsi yang dinonaktifkan memicu galat fatal walau dipanggil dengan `@`, sehingga jalur cadangan PHP/PDO yang sudah ada tidak pernah tercapai. Folder `storage/app/backups` produksi kosong.
 - Perbaikan (`DatabaseBackupService`): `shell_exec` hanya dipanggil bila tersedia (`shell()`), dan biner `mysqldump`/`mysql` hanya dipakai bila `proc_open` tersedia (`canRunBinaries()`). Selain itu cadangan dan pemulihan memakai jalur PHP/PDO. Keputusan diambil sebelum proses dimulai, sehingga pemulihan tidak pernah berpindah jalur di tengah jalan.
 - Verifikasi setelah deploy: `php artisan db:backup --force` harus menghasilkan berkas di `storage/app/backups`, dan menu Backup Data menampilkannya.
+
+## Addendum: sinkron RSS otomatis "tidak jalan" padahal cron aktif (7 Nov 2026)
+- Gejala: berita baru tidak masuk berjam-jam. Cron dan penjadwal sebenarnya jalan (denyut tiap menit, semua tugas tercatat), tetapi `rss:sync --scheduled` menolak jalan ("Bukan waktu eksekusi") karena **pengaturan global Otomasi Sinkron RSS = interval 720 menit (12 jam)**.
+- Bug yang ikut diperbaiki:
+  - Halaman menyimpan jadwal **per Polda**, padahal penjadwal hanya membaca **pengaturan global** (satu mesin menyinkronkan semua Polda), sehingga jadwal per Polda tidak pernah ditegakkan. Kini mode/interval/jam/aktif selalu disimpan ke global, dan hanya **Super Admin** yang dapat mengubahnya. Batas & retensi tetap per Polda.
+  - Mode "Jam Dinas Spesifik" membandingkan jam isian dengan jam **UTC** server (06:00 berjalan pukul 13:00 WIB). Kini dibaca dalam WIB (`RssSyncService::SCHEDULE_TZ`).
+  - Waktu "Sinkron terakhir" diberi label WITA padahal nilainya UTC (tertinggal 8 jam). Kini dikonversi ke zona tenant (WIB nasional, WITA Sulbar).
+- Halaman Otomasi Sinkron RSS kini menampilkan **sinkron otomatis berikutnya** (`RssSyncService::nextRunAt()`), status cron (denyut terakhir), dan peringatan bila interval ≥ 6 jam. Ada pilihan "Tiap 30 Menit".
+- Produksi disetel ke interval 30 menit (satu kali sinkron 62 feed ±12 detik).

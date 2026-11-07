@@ -116,11 +116,13 @@ class RssSyncTest extends TestCase
         $response->assertRedirect();
         $response->assertSessionHas('success');
 
+        // Batas & retensi tersimpan per Polda; JADWAL tersimpan di pengaturan global (satu-satunya yang ditegakkan).
         $setting = RssSyncSetting::where('polda_id', $this->polda->id)->first();
         $this->assertNotNull($setting);
-        $this->assertEquals('scheduled_times', $setting->sync_mode);
         $this->assertEquals(1200, $setting->max_retained_articles_per_polda);
-        $this->assertContains('21:00', $setting->scheduled_times);
+        $global = RssSyncSetting::whereNull('polda_id')->first();
+        $this->assertEquals('scheduled_times', $global->sync_mode);
+        $this->assertContains('21:00', $global->scheduled_times);
 
         $this->assertDatabaseHas('audit_logs', [
             'action' => 'UPDATE_RSS_SYNC_SETTINGS',

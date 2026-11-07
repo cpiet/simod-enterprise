@@ -306,6 +306,43 @@ class RssSyncService
         return $totalPruned;
     }
 
+    /** Zona waktu jam dinas pada mode "Jam Dinas Spesifik" (jadwal nasional). */
+    public const SCHEDULE_TZ = 'Asia/Jakarta';
+
+    /**
+     * Perkiraan waktu sinkron otomatis berikutnya menurut pengaturan GLOBAL (satu-satunya yang dibaca penjadwal).
+     * null = otomasi mati/manual. Tetap bergantung pada cron `schedule:run` yang berjalan tiap menit.
+     */
+    public function nextRunAt(?RssSyncSetting $setting = null): ?Carbon
+    {
+        $setting = $setting ?? RssSyncSetting::forPolda(null);
+        if (! $setting->is_active || $setting->sync_mode === 'manual') {
+            return null;
+        }
+
+        if ($setting->sync_mode === 'interval') {
+            $next = $setting->last_sync_at ? $setting->last_sync_at->copy()->addMinutes((int) $setting->interval_minutes) : now();
+
+            return $next->lessThan(now()) ? now()->addMinute()->startOfMinute() : $next;
+        }
+
+        $times = collect((array) ($setting->scheduled_times ?? []))->filter(fn ($t) => preg_match('/^\d{2}:\d{2}$/', (string) $t))->sort()->values();
+        if ($times->isEmpty()) {
+            return null;
+        }
+        $local = now(self::SCHEDULE_TZ);
+        foreach ([0, 1] as $addDay) {
+            foreach ($times as $t) {
+                $candidate = $local->copy()->addDays($addDay)->setTimeFromTimeString($t);
+                if ($candidate->greaterThan($local)) {
+                    return $candidate->utc();
+                }
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Evaluasi apakah scheduler harus mengeksekusi sinkronisasi sekarang berdasarkan setting.
      */
@@ -333,10 +370,10 @@ class RssSyncService
             return $diffMinutes >= $setting->interval_minutes;
         }
 
-        // 2. Mode Jam Spesifik Dinas (misal ["06:00", "12:00", "18:00"])
+        // 2. Mode Jam Spesifik Dinas (misal ["06:00", "12:00", "18:00"]) — jam dibaca dalam WIB, bukan UTC server.
         if ($setting->sync_mode === 'scheduled_times') {
             $times = (array) ($setting->scheduled_times ?? []);
-            $currentTimeStr = $now->format('H:i');
+            $currentTimeStr = $now->copy()->setTimezone(self::SCHEDULE_TZ)->format('H:i');
 
             if (in_array($currentTimeStr, $times, true)) {
                 // Cegah eksekusi berulang pada menit yang sama

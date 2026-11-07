@@ -32,9 +32,14 @@ class RssSyncController extends Controller
         $selectedPolda = $selectedPolda ?? $allPoldas->first();
         $poldaId = $selectedPolda ? $selectedPolda->id : null;
 
-        // Ambil konfigurasi (spesifik polda atau global)
+        // Ambil konfigurasi (spesifik polda atau global). JADWAL hanya dibaca dari global: satu mesin menyinkronkan
+        // seluruh Polda, jadi mode/interval/jam per Polda tidak pernah ditegakkan penjadwal.
         $setting = RssSyncSetting::forPolda($poldaId);
         $globalSetting = RssSyncSetting::forPolda(null);
+        [$tz, $tzLabel] = $this->displayTimezone($selectedPolda, $selectedCode);
+        $fmt = fn ($dt) => $dt ? $dt->copy()->setTimezone($tz)->translatedFormat('d M Y, H:i') . ' ' . $tzLabel : null;
+        $nextRun = app(RssSyncService::class)->nextRunAt($globalSetting);
+        $lastTick = \App\Support\ScheduledTasks::lastTick();
 
         // Sumber Feed RSS untuk Polda ini
         $feeds = MediaFeed::withCount('articles')
@@ -100,22 +105,32 @@ class RssSyncController extends Controller
             'selectedCode'   => $selectedCode,
             'setting'        => [
                 'id'                              => $setting->id,
-                'sync_mode'                       => $setting->sync_mode,
-                'interval_minutes'                => $setting->interval_minutes,
-                'scheduled_times'                 => $setting->scheduled_times ?: ['06:00', '12:00', '18:00'],
+                // Jadwal = pengaturan global (yang ditegakkan penjadwal).
+                'sync_mode'                       => $globalSetting->sync_mode,
+                'interval_minutes'                => $globalSetting->interval_minutes,
+                'scheduled_times'                 => $globalSetting->scheduled_times ?: ['06:00', '12:00', '18:00'],
                 'max_articles_per_feed'           => $setting->max_articles_per_feed,
                 'max_retained_articles_per_polda' => $setting->max_retained_articles_per_polda,
                 'auto_prune_days'                 => $setting->auto_prune_days,
                 'timeout_seconds'                 => $setting->timeout_seconds,
-                'is_active'                       => (bool) $setting->is_active,
-                'last_sync_at'                    => $setting->last_sync_at ? $setting->last_sync_at->format('d M Y, H:i:s') . ' WITA' : 'Belum pernah sinkron',
+                'is_active'                       => (bool) $globalSetting->is_active,
+                'last_sync_at'                    => $fmt($setting->last_sync_at) ?? 'Belum pernah sinkron',
                 'last_sync_status'                => $setting->last_sync_status ?: 'idle',
                 'last_sync_message'               => $setting->last_sync_message ?: 'Menunggu jadwal sinkronisasi berikutnya.',
                 'last_articles_count'             => $setting->last_articles_count,
             ],
             'globalSetting'  => [
-                'last_sync_at'     => $globalSetting->last_sync_at ? $globalSetting->last_sync_at->format('d M Y, H:i:s') . ' WITA' : '-',
+                'last_sync_at'     => $fmt($globalSetting->last_sync_at) ?? '-',
                 'last_sync_status' => $globalSetting->last_sync_status ?: 'idle',
+                'last_sync_message' => $globalSetting->last_sync_message,
+            ],
+            // Status jadwal otomatis yang benar-benar ditegakkan (global + cron).
+            'schedule'       => [
+                'next_run_at'      => $fmt($nextRun),
+                'scheduler_active' => $lastTick !== null && time() - $lastTick < 180,
+                'last_tick_at'     => $lastTick ? $fmt(\Illuminate\Support\Carbon::createFromTimestamp($lastTick)) : null,
+                'timezone_label'   => $tzLabel,
+                'can_edit'         => (bool) $request->user()?->isSuperAdmin(),
             ],
             'feeds'          => $feeds,
             'feedCategories' => $categories,
@@ -135,6 +150,24 @@ class RssSyncController extends Controller
             ],
             'recentLogs'     => $logs,
         ]);
+    }
+
+    /**
+     * Zona waktu tampilan: lingkup nasional → WIB; Polda → zona Polda. Waktu tersimpan dalam UTC.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function displayTimezone(?Polda $polda, ?string $code): array
+    {
+        $tz = ($this->aggregatesNational((string) $code) || ! $polda || in_array($polda->code, ['ALL', 'DIVHUMAS'], true))
+            ? 'Asia/Jakarta'
+            : ($polda->timezone ?: 'Asia/Makassar');
+
+        return [$tz, match ($tz) {
+            'Asia/Jakarta', 'Asia/Pontianak' => 'WIB',
+            'Asia/Jayapura' => 'WIT',
+            default => 'WITA',
+        }];
     }
 
     /**
@@ -159,21 +192,41 @@ class RssSyncController extends Controller
         $poldaId = $validated['polda_id'] ?? null;
         $applyToAll = ! empty($validated['apply_to_all_poldas']);
 
+        // Jadwal (mode/interval/jam/aktif) hanya ditegakkan dari pengaturan GLOBAL karena satu mesin menyinkronkan
+        // seluruh Polda. Karena berdampak nasional, hanya Super Admin yang dapat mengubahnya.
+        $scheduleNote = '';
+        $global = RssSyncSetting::forPolda(null);
+        $schedule = [
+            'sync_mode'        => $validated['sync_mode'],
+            'interval_minutes' => $validated['interval_minutes'],
+            'scheduled_times'  => $validated['scheduled_times'] ?? ['06:00', '12:00', '18:00'],
+            'is_active'        => $validated['is_active'],
+        ];
+        $scheduleChanged = $global->sync_mode !== $schedule['sync_mode']
+            || (int) $global->interval_minutes !== (int) $schedule['interval_minutes']
+            || array_values((array) $global->scheduled_times) !== array_values($schedule['scheduled_times'])
+            || (bool) $global->is_active !== (bool) $schedule['is_active'];
+        if ($scheduleChanged) {
+            if ($request->user()?->isSuperAdmin()) {
+                $global->update($schedule + ['updated_by' => auth()->id()]);
+                $scheduleNote = ' Jadwal sinkron nasional diperbarui.';
+            } else {
+                $scheduleNote = ' Jadwal sinkron nasional tidak diubah (hanya Super Admin).';
+            }
+        }
+
+        // Batas & retensi (bukan jadwal) tetap dapat disimpan per Polda atau untuk semua Polda.
         $dataToSave = [
-            'sync_mode'                       => $validated['sync_mode'],
-            'interval_minutes'                => $validated['interval_minutes'],
-            'scheduled_times'                 => $validated['scheduled_times'] ?? ['06:00', '12:00', '18:00'],
             'max_articles_per_feed'           => $validated['max_articles_per_feed'],
             'max_retained_articles_per_polda' => $validated['max_retained_articles_per_polda'],
             'auto_prune_days'                 => $validated['auto_prune_days'],
             'timeout_seconds'                 => $validated['timeout_seconds'],
-            'is_active'                       => $validated['is_active'],
             'updated_by'                      => auth()->id(),
         ];
 
         if ($applyToAll) {
-            // Terapkan ke setting global dan seluruh Polda yang ada
-            RssSyncSetting::updateOrCreate(['polda_id' => null], $dataToSave);
+            // Terapkan batas ke setting global dan seluruh Polda yang ada
+            RssSyncSetting::forPolda(null)->update($dataToSave);
             $allPoldas = Polda::all();
             foreach ($allPoldas as $p) {
                 RssSyncSetting::updateOrCreate(['polda_id' => $p->id], $dataToSave);
@@ -192,7 +245,7 @@ class RssSyncController extends Controller
             'details'    => "Konfigurasi otomasi sinkron RSS diperbarui untuk {$targetDesc}. Mode: {$validated['sync_mode']}.",
         ]);
 
-        return back()->with('success', "Konfigurasi otomasi sinkron RSS berhasil disimpan untuk {$targetDesc}!");
+        return back()->with('success', "Konfigurasi otomasi sinkron RSS berhasil disimpan untuk {$targetDesc}.{$scheduleNote}");
     }
 
     /**
