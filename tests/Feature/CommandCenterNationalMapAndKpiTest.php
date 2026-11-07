@@ -30,8 +30,9 @@ class CommandCenterNationalMapAndKpiTest extends TestCase
         $response->assertStatus(200);
         $response->assertInertia(fn ($page) => $page
             ->component('Dashboard')
-            ->has('nationalMapData')
-            ->has('polresStatuses')
+            ->has('situationMap.mode')
+            ->has('situationMap.regions')
+            ->has('situationMap.definitions')
             ->has('kpi.priority_issues')
             ->has('kpi.total_articles')
         );
@@ -77,13 +78,14 @@ class CommandCenterNationalMapAndKpiTest extends TestCase
 
         $response = $this->actingAs(User::first())->get('/');
         $response->assertInertia(fn ($page) => $page
-            ->where('nationalMapData', fn ($regions) => collect($regions)->contains(fn ($region) =>
+            ->where('situationMap.mode', 'national')
+            ->where('situationMap.regions', fn ($regions) => collect($regions)->count() === 38 && collect($regions)->contains(fn ($region) =>
                 $region['code'] === 'SULBAR'
                 && $region['latitude'] === -2.6718
                 && $region['longitude'] === 118.8872
                 && $region['status'] === 'BELUM ADA DATA'
-                && $region['score'] === null
-                && $region['latest_headline'] === null
+                && $region['articles_count'] === 0
+                && $region['articles'] === []
             ))
         );
     }
@@ -95,7 +97,8 @@ class CommandCenterNationalMapAndKpiTest extends TestCase
         \Illuminate\Support\Facades\Cache::flush();
 
         $this->actingAs($user)->get('/')->assertInertia(fn ($page) => $page
-            ->where('nationalMapData', fn ($regions) => collect($regions)->every(fn ($region) => $region['code'] === 'SULBAR'))
+            ->where('situationMap.mode', 'regional')
+            ->where('situationMap.regions', fn ($regions) => collect($regions)->every(fn ($region) => $region['level'] === 'polres'))
         );
     }
 

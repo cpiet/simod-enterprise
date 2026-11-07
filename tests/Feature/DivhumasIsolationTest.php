@@ -57,7 +57,9 @@ class DivhumasIsolationTest extends TestCase
             ->where('kpi.total_articles', 3)->where('kpi.field_reports', 3)
             ->where('socialStats.total_posts', 3)
             ->where('topIssues', fn ($rows) => collect($rows)->every(fn ($i) => str_contains($i['title'], 'DIVHUMAS')))
-            ->where('nationalMapData', fn ($regions) => ! collect($regions)->contains('code', 'SULBAR') && collect($regions)->contains('code', 'DIVHUMAS')));
+            ->where('situationMap.mode', 'national')
+            ->where('situationMap.total_articles', 3) // hanya berita Divhumas; berita Polda Sulbar tidak ikut dipetakan
+            ->where('situationMap.regions', fn ($regions) => collect($regions)->firstWhere('code', 'SULBAR')['articles_count'] === 0));
     }
 
     public function test_switching_to_sulbar_shows_only_sulbar_and_sulbar_users_never_see_divhumas(): void

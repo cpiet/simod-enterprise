@@ -45,7 +45,7 @@ const props = defineProps({
   selectedPolda: Object,
   selectedCode: String,
   isNational: Boolean,
-  nationalMapData: Array,
+  situationMap: { type: Object, default: () => ({ mode: 'national', regions: [] }) },
   latestMediaReport: Object,
   nationalBrief: { type: Object, default: null },
   nationalBriefEnabled: { type: Boolean, default: false },
@@ -54,7 +54,6 @@ const props = defineProps({
   socialStats: Object,
   topViralSocialPosts: Array,
   liveSocialPosts: Array,
-  polresStatuses: Array,
   satwilMatrix: { type: Array, default: () => [] },
   overallSituation: Object,
   topIssues: Array,
@@ -804,10 +803,10 @@ const getPlatformBadge = (platform) => {
     <!-- 3. MIDDLE GRID: PETA SITUASI NUSANTARA / SATWIL & SENTIMEN AI             -->
     <!-- ========================================================================= -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <SituationMap :national="nationalMapData" :regional="polresStatuses" :selected-code="selectedCode" />
+      <SituationMap :map="situationMap" />
 
-      <!-- Col 3: Sentimen 7 Hari & Top Viral / Isu (100% Dynamic) -->
-      <div class="space-y-6">
+      <!-- Baris di bawah peta: Tren sentimen 7 hari & sorotan (unggahan terpopuler / isu aktif) -->
+      <div class="lg:col-span-3 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         <!-- 7-Day Trend Chart -->
         <div class="rounded-3xl bg-[#0b1426] border border-slate-800 p-6 shadow-xl space-y-4">
           <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -852,7 +851,7 @@ const getPlatformBadge = (platform) => {
                 class="px-2.5 py-1 rounded-lg transition"
                 :class="activeTrendingTab === 'social' ? 'bg-amber-400 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'"
               >
-                🔥 Top Viral Medsos
+                Unggahan terpopuler (7 hari)
               </button>
               <button
                 type="button"
@@ -860,7 +859,7 @@ const getPlatformBadge = (platform) => {
                 class="px-2.5 py-1 rounded-lg transition"
                 :class="activeTrendingTab === 'issues' ? 'bg-amber-400 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'"
               >
-                🚨 {{ selectedCode === 'ALL' ? 'Top Isu Nasional' : 'Top Isu Daerah' }} ({{ topIssues?.length || 0 }})
+                Isu aktif teratas ({{ topIssues?.length || 0 }})
               </button>
             </div>
 
@@ -872,86 +871,59 @@ const getPlatformBadge = (platform) => {
             </Link>
           </div>
 
-          <!-- TAB 1: TOP VIRAL MEDSOS -->
+          <!-- TAB 1: UNGGAHAN TERPOPULER (metrik nyata: akun pantauan + radar) -->
           <div v-if="activeTrendingTab === 'social'" class="space-y-3">
-            <div
+            <a
               v-for="(post, idx) in topViralSocialPosts"
               :key="post.id || idx"
-              class="p-3 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-2 text-xs hover:border-slate-700 transition"
+              :href="post.url"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="block p-3 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-1.5 text-xs hover:border-amber-400/60 transition"
             >
               <div class="flex items-center justify-between gap-1">
                 <div class="flex items-center gap-1.5 min-w-0">
                   <span class="font-black text-amber-400 text-[11px]">#{{ idx + 1 }}</span>
-                  <span
-                    class="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border shrink-0"
-                    :class="getPlatformBadge(post.platform).color"
-                  >
-                    {{ getPlatformBadge(post.platform).label }}
-                  </span>
-                  <span class="text-[11px] font-bold text-slate-300 truncate">
-                    {{ post.author_handle || post.author_name }}
-                  </span>
+                  <span class="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border shrink-0" :class="getPlatformBadge(post.platform).color">{{ getPlatformBadge(post.platform).label }}</span>
+                  <span class="text-[11px] font-bold text-slate-300 truncate">{{ post.author }}</span>
                 </div>
-                <span class="font-mono text-[10px] text-rose-400 font-black bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20 shrink-0 flex items-center gap-0.5">
-                  <Flame class="w-2.5 h-2.5 text-rose-400" />
-                  {{ post.virality_score ?? '—' }}{{ post.virality_score != null ? '%' : '' }}
-                </span>
+                <span class="text-[10px] text-slate-500 shrink-0">{{ formatTimeAgo(post.posted_at) }}</span>
               </div>
-
-              <p class="font-medium text-slate-200 text-xs line-clamp-2 leading-snug">
-                {{ post.content }}
+              <p class="font-medium text-slate-200 text-xs line-clamp-2 leading-snug">{{ post.content }}</p>
+              <p class="flex items-center gap-3 text-[10px] text-slate-400">
+                <span class="flex items-center gap-1"><ThumbsUp class="w-3 h-3 text-emerald-400" />{{ formatNumber(post.likes) }}</span>
+                <span>{{ formatNumber(post.comments) }} komentar</span>
+                <span v-if="post.views != null" class="flex items-center gap-1"><Eye class="w-3 h-3 text-sky-400" />{{ formatNumber(post.views) }}</span>
               </p>
+            </a>
 
-              <div class="flex items-center justify-between pt-1 border-t border-slate-800/60 text-[10px] text-slate-400">
-                <div class="flex items-center gap-2.5">
-                  <span class="flex items-center gap-1">
-                    <Eye class="w-3 h-3 text-sky-400" />
-                    {{ formatNumber(post.views_count) }}
-                  </span>
-                  <span class="flex items-center gap-1">
-                    <ThumbsUp class="w-3 h-3 text-emerald-400" />
-                    {{ formatNumber(post.likes_count) }}
-                  </span>
-                </div>
-                <a
-                  :href="post.post_url"
-                  target="_blank"
-                  class="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 hover:underline"
-                >
-                  <span>Buka Post</span>
-                  <ExternalLink class="w-3 h-3" />
-                </a>
-              </div>
-            </div>
-
-            <div v-if="!topViralSocialPosts || topViralSocialPosts.length === 0" class="text-center py-6 text-slate-400 text-xs">
-              <Radio class="w-6 h-6 mx-auto mb-2 text-slate-600" />
-              <p>Belum ada postingan medsos viral tersimpan.</p>
-              <Link href="/social-intelligence" class="text-amber-400 hover:underline font-bold mt-1 inline-block">
-                Sinkronkan Apify Sekarang &rarr;
-              </Link>
+            <div v-if="!topViralSocialPosts || topViralSocialPosts.length === 0" class="text-center py-6 text-slate-400 text-xs space-y-1">
+              <Radio class="w-6 h-6 mx-auto mb-1 text-slate-600" />
+              <p>Belum ada unggahan bermetrik dalam 7 hari.</p>
+              <p class="text-[11px] text-slate-500">Tambahkan akun di Radar Media Sosial → Radar KOL agar suka/komentar nyata tercatat.</p>
+              <Link href="/social-intelligence?tab=kol" class="text-amber-400 hover:underline font-bold inline-block">Buka Pantau Akun &rarr;</Link>
             </div>
           </div>
 
           <!-- TAB 2: TOP ISU KAMTIBMAS -->
           <div v-else class="space-y-3">
-            <div
+            <Link
               v-for="(iss, idx) in topIssues"
               :key="iss.id || idx"
-              class="p-3 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-1 text-xs hover:border-slate-700 transition"
+              :href="`/issues/${iss.id}`"
+              class="block p-3 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-1 text-xs hover:border-amber-400/60 transition"
             >
-              <div class="flex items-center justify-between gap-1">
+              <div class="flex items-center gap-1.5 flex-wrap">
                 <span class="font-black text-amber-400 text-[11px]">#{{ idx + 1 }}</span>
-                <span class="px-2 py-0.2 rounded text-[9px] font-black uppercase bg-slate-800 text-slate-300">
-                  {{ iss.category }}
-                </span>
-                <span class="font-mono text-[10px] text-emerald-400 font-bold">Virality {{ iss.virality_score }}%</span>
+                <span class="px-2 py-0.5 rounded text-[9px] font-black uppercase" :class="{ critical: 'bg-rose-600 text-white', high: 'bg-rose-500/20 text-rose-300', medium: 'bg-amber-500/20 text-amber-300' }[iss.priority] || 'bg-slate-800 text-slate-300'">{{ { critical: 'Kritis', high: 'Tinggi', medium: 'Sedang', low: 'Rendah' }[iss.priority] || iss.priority }}</span>
+                <span class="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-slate-800 text-slate-300">{{ iss.category }}</span>
+                <span class="ml-auto text-[10px] text-slate-500">{{ iss.time }}</span>
               </div>
               <p class="font-bold text-white text-xs line-clamp-2 leading-snug">{{ iss.title }}</p>
-            </div>
+            </Link>
 
             <div v-if="!topIssues || topIssues.length === 0" class="text-center py-6 text-slate-400 text-xs">
-              <p>Belum ada isu prioritas terdaftar.</p>
+              <p>Tidak ada isu aktif.</p>
             </div>
           </div>
         </div>
@@ -1084,7 +1056,7 @@ const getPlatformBadge = (platform) => {
             <span class="text-emerald-400 font-bold">● Positif {{ socialStats?.sentiment?.positif || 0 }}%</span>
             <span class="text-slate-400 font-bold">● Netral {{ socialStats?.sentiment?.netral || 0 }}%</span>
             <span class="text-rose-400 font-bold">● Negatif {{ socialStats?.sentiment?.negatif || 0 }}%</span>
-            <span class="text-sky-400 font-bold">Interaksi: {{ formatNumber((socialStats?.views_count || 0) + (socialStats?.likes_count || 0)) }}</span>
+            <span class="text-sky-400 font-bold">Tayangan: {{ formatNumber(socialStats?.views_count) }} • Suka: {{ formatNumber(socialStats?.likes_count) }}</span>
           </div>
         </div>
       </div>
@@ -1109,7 +1081,7 @@ const getPlatformBadge = (platform) => {
               :class="activeStreamTab === 'media' ? 'bg-amber-400 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'"
             >
               <Newspaper class="w-3.5 h-3.5" />
-              <span>Radar Berita 29 RSS ({{ liveRadarArticles?.length || 0 }})</span>
+              <span>Berita terbaru ({{ liveRadarArticles?.length || 0 }})</span>
             </button>
           </div>
 
@@ -1154,6 +1126,7 @@ const getPlatformBadge = (platform) => {
               >
                 <img
                   :src="post.thumbnail_url"
+                  referrerpolicy="no-referrer"
                   :alt="post.author_name"
                   class="w-full h-full object-cover group-hover:scale-110 transition duration-300"
                   loading="lazy"
@@ -1199,6 +1172,7 @@ const getPlatformBadge = (platform) => {
               <a
                 :href="post.post_url"
                 target="_blank"
+                rel="noopener noreferrer"
                 class="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 hover:underline"
               >
                 <span>Lihat</span>
@@ -1227,11 +1201,9 @@ const getPlatformBadge = (platform) => {
               <span class="px-2 py-0.2 rounded text-[9px] font-black uppercase bg-slate-800 text-amber-400 border border-slate-700">
                 {{ art.source_name }}
               </span>
-              <span class="text-[10px] text-slate-400 font-mono">
-                {{ art.pub_date ? new Date(art.pub_date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WITA' : 'Baru saja' }}
-              </span>
+              <span class="text-[10px] text-slate-400 font-mono">{{ art.time }}</span>
             </div>
-            <a :href="art.url" target="_blank" class="block font-bold text-white hover:text-amber-400 transition leading-snug line-clamp-1">
+            <a :href="art.url" target="_blank" rel="noopener noreferrer" class="block font-bold text-white hover:text-amber-400 transition leading-snug line-clamp-2">
               {{ art.title }}
             </a>
             <p class="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">

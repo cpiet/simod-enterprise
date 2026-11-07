@@ -79,10 +79,15 @@ class DashboardController extends Controller
         }
 
         // 3. TOP 5 TRENDING ISSUES (100% Dynamic from DB - National or Specific Polda)
+        // Isu AKTIF teratas: prioritas (kritis → rendah) lalu terbaru. (Dulu diurutkan virality_score yang selalu 0.)
         $topIssues = Issue::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))
-            ->orderByDesc('virality_score')
+            ->whereIn('status', $activeIssueStatuses)
+            ->orderByRaw("CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END")
+            ->latest('id')
             ->limit(5)
-            ->get();
+            ->get(['id', 'title', 'category', 'priority', 'status', 'created_at'])
+            ->map(fn ($i) => ['id' => $i->id, 'title' => $i->title, 'category' => $i->category, 'priority' => $i->priority, 'status' => $i->status,
+                'time' => \App\Support\FastTime::ago($i->getRawOriginal('created_at'))]);
 
         // 4. RADAR MEDIA SOSIAL INTELLIGENCE (Dynamic from social_posts DB)
         $socialPostsQuery = SocialPost::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId));
@@ -100,8 +105,9 @@ class DashboardController extends Controller
         $socialNegCount = (clone $socialPostsQuery)->where('sentiment', 'negatif')->count();
 
         $socialKolsCount = (clone $socialPostsQuery)->where('is_kol', true)->count();
-        $totalSocialViews = (clone $socialPostsQuery)->sum('views_count');
-        $totalSocialLikes = (clone $socialPostsQuery)->sum('likes_count');
+        // null bila tidak satu pun unggahan membawa metrik (bukan 0).
+        $totalSocialViews = (clone $socialPostsQuery)->whereNotNull('views_count')->exists() ? (int) (clone $socialPostsQuery)->sum('views_count') : null;
+        $totalSocialLikes = (clone $socialPostsQuery)->whereNotNull('likes_count')->exists() ? (int) (clone $socialPostsQuery)->sum('likes_count') : null;
 
         $socialStats = [
             'total_posts'    => $totalSocialPosts,
@@ -117,11 +123,21 @@ class DashboardController extends Controller
             ],
         ];
 
-        // Top 5 Viral Social Media Posts
-        $topViralSocialPosts = SocialPost::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))
-            ->orderByDesc('virality_score')
-            ->limit(5)
-            ->get();
+        // Unggahan terpopuler 7 hari: hanya yang bermetrik NYATA (akun pantauan + radar), diurutkan suka+komentar+bagikan.
+        $engagement = fn ($likes, $comments, $shares) => (int) $likes + (int) $comments + (int) $shares;
+        $weekAgo = now()->subDays(7);
+        $fromAccounts = \App\Models\MonitoredSocialAccount::when(!$isNational, fn ($q) => $q->where('polda_id', $poldaId))->get()
+            ->flatMap(fn ($a) => collect($a->posts ?? [])->filter(fn ($p) => ! empty($p['posted_at']) && \Carbon\Carbon::parse($p['posted_at'])->gte($weekAgo) && ($p['likes'] ?? null) !== null)
+                ->map(fn ($p) => ['id' => 'acc-' . md5($p['url']), 'platform' => $a->platform, 'author' => $a->display_name ?: $a->username,
+                    'content' => $p['caption'], 'likes' => $p['likes'], 'comments' => $p['comments'] ?? null, 'views' => $p['views'] ?? null,
+                    'url' => $p['url'], 'posted_at' => $p['posted_at'], 'engagement' => $engagement($p['likes'], $p['comments'] ?? 0, $p['shares'] ?? 0)]));
+        $fromRadar = SocialPost::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))
+            ->whereNotNull('likes_count')->where('posted_at', '>=', $weekAgo)
+            ->orderByRaw('(COALESCE(likes_count,0) + COALESCE(comments_count,0) + COALESCE(shares_count,0)) DESC')->limit(10)->get()
+            ->map(fn ($p) => ['id' => 'post-' . $p->id, 'platform' => $p->platform, 'author' => $p->author_handle ?: $p->author_name,
+                'content' => $p->content, 'likes' => $p->likes_count, 'comments' => $p->comments_count, 'views' => $p->views_count,
+                'url' => $p->post_url, 'posted_at' => $p->posted_at?->toIso8601String(), 'engagement' => $engagement($p->likes_count, $p->comments_count, $p->shares_count)]);
+        $topViralSocialPosts = $fromAccounts->concat($fromRadar)->sortByDesc('engagement')->take(5)->values();
 
         // Latest 6 Real-time Social Posts Stream
         $liveSocialPosts = SocialPost::when(!$isNational, fn($q) => $q->where('polda_id', $poldaId))
@@ -148,7 +164,9 @@ class DashboardController extends Controller
             ->latest('pub_date')
             ->latest('id')
             ->limit(6)
-            ->get();
+            ->get(['id', 'title', 'summary', 'url', 'source_name', 'sentiment', 'pub_date'])
+            ->map(fn ($a) => ['id' => $a->id, 'title' => $a->title, 'summary' => $a->summary, 'url' => $a->url, 'source_name' => $a->source_name,
+                'sentiment' => $a->sentiment ?: 'netral', 'time' => \App\Support\FastTime::ago($a->getRawOriginal('pub_date'))]);
 
         $tz = $selectedPolda->timezone ?? ($isNational ? 'Asia/Jakarta' : 'Asia/Makassar');
         $tzSuffix = $tz === 'Asia/Jakarta' ? 'WIB' : ($tz === 'Asia/Jayapura' ? 'WIT' : 'WITA');
@@ -161,9 +179,17 @@ class DashboardController extends Controller
             'server_wita'        => now()->setTimezone($tz)->format('d M Y, H:i:s') . ' ' . $tzSuffix,
         ];
 
-        // 7. PETA NUSANTARA INDONESIA (Agregasi Berita Berbasis Database untuk Mabes & Nasional)
-        // Data peta nasional bersifat global dan berat (puluhan query LIKE); cache singkat 60 detik.
-        $nationalMapData = Cache::remember('simod.map.geographic.v2.'.($isNational ? 'national' : $poldaId), 60, fn () => $this->buildNationalMapData($isNational ? null : (int) $poldaId));
+        // 7. PETA SITUASI: tenant Divhumas/nasional → 38 provinsi dari pemberitaan 7 hari (SituationMapService);
+        // tenant Polda → titik Polres dari matriks Satwil (laporan isu + berita 7 hari per Polres).
+        $isDivhumasTenant = $isNational || $selectedCode === 'ALL' || $selectedPolda?->code === 'DIVHUMAS';
+        $situationMap = $isDivhumasTenant
+            ? ['mode' => 'national'] + app(\App\Services\SituationMapService::class)->national($isNational ? null : [(int) $poldaId])
+            : ['mode' => 'regional', 'regions' => $polresStatuses, 'days' => 7, 'definitions' => [
+                'ATENSI' => 'ada laporan isu aktif berprioritas tinggi/kritis',
+                'WASPADA' => 'ada laporan isu aktif (prioritas lain)',
+                'KONDUSIF' => 'ada laporan, seluruhnya sudah selesai/arsip',
+                'BELUM ADA DATA' => 'belum ada laporan (bukan berarti aman)',
+            ]];
 
         // 8. LATEST AI INTELLIGENCE REPORTS (Media Online & Media Sosial)
         // If national scope (selectedCode === 'ALL' or 'DIVHUMAS'), prioritize Divisi Humas Polri (Mabes) report
@@ -219,7 +245,7 @@ class DashboardController extends Controller
             'selectedPolda'        => $selectedPolda,
             'selectedCode'         => $selectedCode,
             'isNational'           => $isNational,
-            'nationalMapData'      => $nationalMapData,
+            'situationMap'         => $situationMap,
             'latestMediaReport'    => $latestMediaReport,
             'latestSocialReport'   => $latestSocialReport,
             'kpi'                  => [
@@ -237,7 +263,6 @@ class DashboardController extends Controller
             'socialStats'          => $socialStats,
             'topViralSocialPosts'  => $topViralSocialPosts,
             'liveSocialPosts'      => $liveSocialPosts,
-            'polresStatuses'       => $polresStatuses,
             'satwilMatrix'         => $satwilMatrix,
             'overallSituation'     => $overallSituation,
             'topIssues'            => $topIssues,
@@ -343,12 +368,17 @@ class DashboardController extends Controller
             foreach ($polresList as $p) {
                 $keyword = $p->placeKeyword();
                 $media = $mediaNeg = null;
+                $articles = [];
                 if ($keyword !== null) {
                     $like = \App\Support\NewsSearch::like($keyword);
                     $base = MediaArticle::where('polda_id', $selectedPolda->id)->where('pub_date', '>=', $since)
                         ->where(fn ($w) => $w->whereRaw("title LIKE ? ESCAPE '!'", [$like])->orWhereRaw("summary LIKE ? ESCAPE '!'", [$like]));
                     $media = (clone $base)->count();
                     $mediaNeg = (clone $base)->where('sentiment', 'negatif')->count();
+                    // 5 berita terbaru yang menyebut wilayah Polres ini (panel peta).
+                    $articles = (clone $base)->orderByDesc('pub_date')->limit(5)->get(['title', 'url', 'source_name', 'sentiment', 'pub_date'])
+                        ->map(fn ($a) => ['title' => $a->title, 'url' => $a->url, 'source' => $a->source_name, 'sentiment' => $a->sentiment ?: 'netral',
+                            'time' => \App\Support\FastTime::ago($a->getRawOriginal('pub_date'))])->all();
                 }
 
                 $rows[] = $make([
@@ -360,8 +390,8 @@ class DashboardController extends Controller
                     'tag_desc'   => $p->tag_desc,
                     'latitude'   => $p->latitude,
                     'longitude'  => $p->longitude,
-                    'map_x'      => $p->map_x ?? 50,
-                    'map_y'      => $p->map_y ?? 50,
+                    'articles'   => $articles,
+                    'search_q'   => $keyword !== null ? '"' . $keyword . '"' : null,
                 ], $agg->get($p->id), $media, $mediaNeg, $top->get($p->id));
             }
 
@@ -440,237 +470,5 @@ class DashboardController extends Controller
         }
 
         return ['days' => $out, 'pos' => $pos, 'neu' => $neu, 'neg' => $neg, 'prev_pos' => $prev['pos'], 'prev_neg' => $prev['neg']];
-    }
-
-    /**
-     * Membangun Agregasi Peta Situasi Kamtibmas Nusantara (Indonesia Map)
-     * Mengelompokkan berita aktual dari basis data media_articles ke 11 wilayah/Polda jajaran utama.
-     */
-    protected function buildNationalMapData(?int $scopePoldaId = null): array
-    {
-        $regions = [
-            [
-                'code'           => 'DIVHUMAS',
-                'latitude'       => -6.2088,
-                'longitude'      => 106.8456,
-                'name'           => 'Mabes Polri & Metro Jaya',
-                'short_name'     => 'Mabes / Metro Jaya',
-                'region'         => 'DKI Jakarta & Nasional',
-                'polda_id'       => 10,
-                'map_x'          => 29,
-                'map_y'          => 69,
-            ],
-            [
-                'code'           => 'SULBAR',
-                'latitude'       => -2.6718,
-                'longitude'      => 118.8872,
-                'name'           => 'Polda Sulawesi Barat',
-                'short_name'     => 'Polda Sulbar',
-                'region'         => 'Sulawesi Barat (6 Polres)',
-                'polda_id'       => 5,
-                'map_x'          => 52,
-                'map_y'          => 52,
-            ],
-            [
-                'code'           => 'SULSEL',
-                'latitude'       => -5.1477,
-                'longitude'      => 119.4327,
-                'name'           => 'Polda Sulawesi Selatan',
-                'short_name'     => 'Polda Sulsel',
-                'region'         => 'Sulawesi Selatan (Makassar)',
-                'polda_id'       => 7,
-                'map_x'          => 52,
-                'map_y'          => 67,
-            ],
-            [
-                'code'           => 'SULTRA',
-                'latitude'       => -3.9985,
-                'longitude'      => 122.5126,
-                'name'           => 'Polda Sulawesi Tenggara',
-                'short_name'     => 'Polda Sultra',
-                'region'         => 'Sulawesi Tenggara (Kendari)',
-                'polda_id'       => 8,
-                'map_x'          => 58,
-                'map_y'          => 63,
-            ],
-            [
-                'code'           => 'GORONTALO',
-                'latitude'       => 0.5435,
-                'longitude'      => 123.0568,
-                'name'           => 'Polda Gorontalo & Sulut',
-                'short_name'     => 'Polda Gorontalo',
-                'region'         => 'Gorontalo & Teluk Tomini',
-                'polda_id'       => 6,
-                'map_x'          => 58,
-                'map_y'          => 31,
-            ],
-            [
-                'code'           => 'KALTIM',
-                'latitude'       => -0.5022,
-                'longitude'      => 117.1537,
-                'name'           => 'Polda Kaltim & IKN Nusantara',
-                'short_name'     => 'Polda Kaltim / IKN',
-                'region'         => 'Kalimantan Timur & IKN',
-                'polda_id'       => 9,
-                'map_x'          => 45,
-                'map_y'          => 44,
-            ],
-            [
-                'code'           => 'SUMUT',
-                'latitude'       => 3.5952,
-                'longitude'      => 98.6722,
-                'name'           => 'Polda Sumut & Aceh',
-                'short_name'     => 'Polda Sumut',
-                'region'         => 'Sumatera Bagian Utara',
-                'keyword'        => 'Sumat',
-                'extra_keywords' => ['Aceh', 'Medan'],
-                'map_x'          => 12,
-                'map_y'          => 27,
-            ],
-            [
-                'code'           => 'JATENG',
-                'latitude'       => -6.9667,
-                'longitude'      => 110.4167,
-                'name'           => 'Polda Jateng & DIY',
-                'short_name'     => 'Polda Jateng',
-                'region'         => 'Jawa Tengah (Semarang/Solo)',
-                'keyword'        => 'Jawa Tengah',
-                'extra_keywords' => ['Semarang', 'Sukoharjo', 'Solo', 'Yogyakarta'],
-                'map_x'          => 36,
-                'map_y'          => 73,
-            ],
-            [
-                'code'           => 'JATIM',
-                'latitude'       => -7.2575,
-                'longitude'      => 112.7521,
-                'name'           => 'Polda Jawa Timur',
-                'short_name'     => 'Polda Jatim',
-                'region'         => 'Jawa Timur & Madura',
-                'keyword'        => 'Jawa Timur',
-                'extra_keywords' => ['Surabaya', 'Malang'],
-                'map_x'          => 41,
-                'map_y'          => 74,
-            ],
-            [
-                'code'           => 'BALI',
-                'latitude'       => -8.65,
-                'longitude'      => 115.2167,
-                'name'           => 'Polda Bali & NTB/NTT',
-                'short_name'     => 'Polda Bali / Nusra',
-                'region'         => 'Bali & Nusa Tenggara',
-                'keyword'        => 'Bali',
-                'extra_keywords' => ['Mataram', 'Kupang', 'Lombok'],
-                'map_x'          => 48,
-                'map_y'          => 78,
-            ],
-            [
-                'code'           => 'PAPUA',
-                'latitude'       => -2.5337,
-                'longitude'      => 140.7181,
-                'name'           => 'Polda Papua & Jajaran',
-                'short_name'     => 'Polda Papua',
-                'region'         => 'Papua & Papua Barat',
-                'keyword'        => 'Papua',
-                'extra_keywords' => ['Jayapura', 'Sorong', 'Merauke'],
-                'map_x'          => 84,
-                'map_y'          => 50,
-            ],
-        ];
-
-        $results = [];
-
-        // Tenant Divhumas: pin Mabes + wilayah yang dihitung dari kata kunci pada pemberitaan Divhumas sendiri;
-        // pin tenant Polda lain (mis. Sulbar) TIDAK ditampilkan agar data Polda tidak bocor ke tampilan Divhumas.
-        $divhumasId = (int) Polda::where('code', 'DIVHUMAS')->value('id');
-        $divhumasMode = $scopePoldaId !== null && $scopePoldaId === $divhumasId;
-
-        foreach ($regions as $r) {
-            $regionPoldaId = null;
-            if (isset($r['polda_id'])) {
-                $regionPoldaId = Polda::where('code', $r['code'])->value('id');
-                if (! $regionPoldaId || ($scopePoldaId !== null && (int) $regionPoldaId !== $scopePoldaId)) {
-                    continue;
-                }
-                $q = MediaArticle::where('polda_id', $regionPoldaId);
-            } else {
-                if ($scopePoldaId !== null && ! $divhumasMode) {
-                    continue;
-                }
-                $regionPoldaId = Polda::where('code', 'DIVHUMAS')->value('id');
-                if (! $regionPoldaId) {
-                    continue;
-                }
-                $kws = array_merge([$r['keyword']], $r['extra_keywords'] ?? []);
-                $q = MediaArticle::where('polda_id', $regionPoldaId)->where(function ($sub) use ($kws) {
-                    foreach ($kws as $kw) {
-                        $sub->orWhere('title', 'like', "%{$kw}%")->orWhere('summary', 'like', "%{$kw}%");
-                    }
-                });
-            }
-
-            // Satu query agregat menggantikan 4 query count terpisah per wilayah.
-            $agg = (clone $q)->selectRaw("count(*) as total, coalesce(sum(case when sentiment = 'positif' then 1 else 0 end), 0) as pos, coalesce(sum(case when sentiment = 'negatif' then 1 else 0 end), 0) as neg, coalesce(sum(case when sentiment = 'netral' then 1 else 0 end), 0) as neu")->first();
-            $total = (int) $agg->total;
-            $pos = (int) $agg->pos;
-            $neg = (int) $agg->neg;
-            $neu = (int) $agg->neu;
-            $latest = $total > 0 ? (clone $q)->latest('pub_date')->first() : null;
-
-            $posPct = $total > 0 ? (int) round(($pos / $total) * 100) : null;
-            $negPct = $total > 0 ? (int) round(($neg / $total) * 100) : null;
-            $neuPct = $total > 0 ? max(0, 100 - ($posPct + $negPct)) : null;
-
-            // Periksa Isu Terkait di Database
-            $issuesCount = Issue::where(function ($iq) use ($r, $regionPoldaId) {
-                if (isset($r['polda_id'])) {
-                    $iq->where('polda_id', $regionPoldaId);
-                } else {
-                    $iq->where('polda_id', $regionPoldaId)->where('title', 'like', "%{$r['name']}%");
-                }
-            })->whereNotIn('status', ['selesai'])->count();
-
-            // Status Kamtibmas / Opini
-            if ($total === 0 && $issuesCount === 0) {
-                $status = 'BELUM ADA DATA';
-                $color = 'slate';
-            } elseif (($negPct !== null && $negPct >= 15) || $issuesCount > 2) {
-                $status = 'ATENSI';
-                $color = 'rose';
-            } elseif ($negPct >= 8 || $total > 40 || $issuesCount > 0) {
-                $status = 'WASPADA';
-                $color = 'amber';
-            } else {
-                $status = 'KONDUSIF';
-                $color = 'emerald';
-            }
-
-            $results[] = [
-                'id'              => $r['code'],
-                'code'            => $r['code'],
-                'name'            => $r['name'],
-                'short_name'      => $r['short_name'],
-                'region'          => $r['region'],
-                'latitude'        => $r['latitude'],
-                'longitude'       => $r['longitude'],
-                'basis'           => isset($r['polda_id']) ? 'Tenant Polda' : 'Perkiraan kata kunci berita',
-                'map_x'           => $r['map_x'],
-                'map_y'           => $r['map_y'],
-                'articles_count'  => $total,
-                'issues_count'    => $issuesCount,
-                'sentiment'       => [
-                    'positif' => $posPct,
-                    'netral'  => $neuPct,
-                    'negatif' => $negPct,
-                ],
-                'score'           => $posPct === null ? null : "{$posPct}%",
-                'status'          => $status,
-                'color'           => $color,
-                'latest_headline' => $latest ? $latest->title : null,
-                'latest_source'   => $latest ? $latest->source_name : null,
-                'pub_date'        => $latest?->pub_date ? Carbon::parse($latest->pub_date)->diffForHumans() : null,
-            ];
-        }
-
-        return $results;
     }
 }

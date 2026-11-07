@@ -87,7 +87,7 @@ class CommandCenterRealDataTest extends TestCase
 
         $this->nationalPage()->assertInertia(fn (Assert $page) => $page
             ->has('satwilMatrix', 3)
-            ->where('polresStatuses', [])
+            ->where('situationMap.mode', 'national')
             ->where('satwilMatrix', function ($rows) {
                 $by = collect($rows)->keyBy('code');
 
@@ -121,7 +121,11 @@ class CommandCenterRealDataTest extends TestCase
         MediaArticle::create(['polda_id' => $this->sulbar->id, 'title' => 'Berita Mamuju dua minggu lalu', 'source_name' => 'P', 'category' => 'Umum', 'url' => 'https://t.test/old', 'summary' => 's', 'pub_date' => now()->subDays(14), 'sentiment' => 'negatif']);
 
         $this->actingAs($this->leader($this->sulbar))->get('/')->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->has('polresStatuses', 3)
+            ->where('situationMap.mode', 'regional')
+            ->has('situationMap.regions', 3)
+            ->where('situationMap.regions', fn ($rows) => collect($rows)->firstWhere('name', 'Polresta Mamuju')['articles'][0]['url'] !== null
+                && count(collect($rows)->firstWhere('name', 'Polresta Mamuju')['articles']) === 2
+                && collect($rows)->firstWhere('name', 'Polresta Mamuju')['search_q'] === '"Mamuju"')
             ->has('satwilMatrix', 4)
             ->where('satwilMatrix', function ($rows) {
                 $by = collect($rows)->keyBy('name');
