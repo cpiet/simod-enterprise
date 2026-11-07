@@ -350,6 +350,7 @@ class SocialIntelligenceController extends Controller
             // Ringkasan komentar yang sudah diambil (per URL unggahan), hanya tenant aktif.
             'commentDigests' => fn () => SocialCommentDigest::where('polda_id', $poldaId)->get()
                 ->mapWithKeys(fn ($d) => [$d->post_url => CommentDigestService::present($d)]),
+            'autoIntervalHours' => (int) config('simod.social_auto_interval_hours'),
             'monitoredAccounts' => MonitoredSocialAccount::where('polda_id', $poldaId)->orderBy('platform')->orderBy('username')->get()
                 ->map(fn ($account) => array_merge($account->toArray(), [
                     'profile_url' => $account->profileUrl(),
@@ -443,6 +444,42 @@ class SocialIntelligenceController extends Controller
         MonitoredSocialAccount::where('polda_id', $poldaId)->findOrFail($id)->delete();
 
         return response()->json(['message' => 'Akun dihapus dari daftar pantauan.']);
+    }
+
+    /**
+     * Sakelar "Pantau otomatis" (sinkron berkala oleh penjadwal, dibatasi run otomatis harian).
+     */
+    public function toggleAutoMonitor(Request $request, int $id)
+    {
+        [, , $poldaId] = $this->resolveActiveTenant($request);
+        $account = MonitoredSocialAccount::where('polda_id', $poldaId)->findOrFail($id);
+        $account->update(['auto_monitor' => $request->boolean('enabled')]);
+        AuditLog::log('social.auto_monitor', MonitoredSocialAccount::class, (string) $account->id, [
+            'platform' => $account->platform, 'username' => $account->username, 'enabled' => $account->auto_monitor,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'auto_monitor' => $account->auto_monitor,
+            'message' => $account->auto_monitor
+                ? 'Pantau otomatis aktif: akun disinkronkan tiap ' . (int) config('simod.social_auto_interval_hours') . ' jam.'
+                : 'Pantau otomatis dimatikan.',
+        ]);
+    }
+
+    /** Peringatan social listening tenant aktif untuk panel lonceng. */
+    public function alerts(Request $request, \App\Services\SocialAlertService $alerts)
+    {
+        [, , $poldaId] = $this->resolveActiveTenant($request);
+
+        return response()->json($poldaId ? $alerts->forUser($request->user(), $poldaId) : ['unread' => 0, 'items' => []]);
+    }
+
+    public function markAlertsSeen(Request $request)
+    {
+        $request->user()->forceFill(['alerts_seen_at' => now()])->save();
+
+        return response()->json(['success' => true, 'unread' => 0]);
     }
 
     /**

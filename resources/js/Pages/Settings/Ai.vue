@@ -63,8 +63,10 @@ const saveSuccessToast = ref(false);
 const saveToastMessage = ref('');
 
 const form = useForm({
-  gemini_api_key: props.setting?.raw_api_keys_text || '',
-  raw_api_keys_text: props.setting?.raw_api_keys_text || '',
+  // Kunci tersimpan TIDAK dikirim ke browser; kotak ini hanya untuk kunci baru.
+  gemini_api_key: '',
+  raw_api_keys_text: '',
+  keys_mode: 'replace',
   gemini_model: props.setting?.gemini_model || 'gemini-3.5-flash-lite',
   daily_user_limit: props.setting?.daily_user_limit ?? 40,
   web_search_enabled: props.setting?.web_search_enabled ?? true,
@@ -74,26 +76,20 @@ const form = useForm({
 
 // Apify Scraper Form State
 const apifyForm = useForm({
-  apify_api_token: props.socialSetting?.apify_api_token || '',
+  // Token tersimpan TIDAK dikirim ke browser; kosong = token tersimpan tetap.
+  apify_api_token: '',
+  tokens_mode: 'append',
+  clear_tokens: false,
   keywords_tracked: props.socialSetting?.keywords_tracked || 'Polri, Humas Polri, Polisi Presisi, Dumas Presisi',
-  accounts_tracked: props.socialSetting?.accounts_tracked || '@divisihumaspri, @humaspolri, @polripresisi, @halo_polisi',
-  sync_frequency: props.socialSetting?.sync_frequency || 'every_3_hours',
-  auto_sync_enabled: props.socialSetting?.auto_sync_enabled ?? true,
+  accounts_tracked: props.socialSetting?.accounts_tracked ?? '',
   apply_to_all_poldas: true,
 });
 
 const isTestingApify = ref(false);
 const apifyTestResult = ref(null);
-const showApifyRawToken = ref(false);
 
+// Kotak kosong → menguji token tersimpan di server (tanpa memperlihatkan token).
 const testApifyConnection = async () => {
-  if (!apifyForm.apify_api_token) {
-    apifyTestResult.value = {
-      success: false,
-      message: 'Masukkan Personal API Token Apify terlebih dahulu sebelum melakukan pengujian koneksi.',
-    };
-    return;
-  }
   isTestingApify.value = true;
   apifyTestResult.value = null;
   try {
@@ -115,19 +111,16 @@ const submitApifySettings = () => {
   apifyForm.post('/settings/ai/apify', {
     preserveScroll: true,
     onSuccess: () => {
+      apifyForm.apify_api_token = '';
+      apifyForm.clear_tokens = false;
       saveSuccessToast.value = true;
-      saveToastMessage.value = 'Konfigurasi Mesin Scraper Apify & Parameter Patroli Medsos Berhasil Disimpan!';
+      saveToastMessage.value = 'Konfigurasi Apify disimpan.';
       setTimeout(() => {
         saveSuccessToast.value = false;
       }, 5000);
     },
   });
 };
-
-const apifyTokensCount = computed(() => {
-  if (!apifyForm.apify_api_token) return 0;
-  return apifyForm.apify_api_token.split(/[\r\n,;]+/).map(t => t.trim()).filter(Boolean).length;
-});
 
 // Prompt Studio Form State & Computed Helpers
 const promptForm = useForm({
@@ -273,11 +266,6 @@ const hasKeyFormatWarning = computed(() => {
   return lines.some(l => l.includes(' ') || (l.startsWith('AIzaSy') && l.length !== 39));
 });
 
-const restoreSavedKeys = () => {
-  if (props.setting?.raw_api_keys_text) {
-    form.gemini_api_key = props.setting.raw_api_keys_text;
-  }
-};
 
 // Submit Form with Toast Notification
 const submitSettings = () => {
@@ -285,8 +273,9 @@ const submitSettings = () => {
   form.post('/settings/ai', {
     preserveScroll: true,
     onSuccess: () => {
+      form.gemini_api_key = '';
       saveSuccessToast.value = true;
-      saveToastMessage.value = `Konfigurasi AI, Multi-Key Pool (${parsedKeysCount.value || props.setting?.total_keys || 1} Kunci) & Jadwal Otomasi Berhasil Disimpan!`;
+      saveToastMessage.value = 'Konfigurasi AI disimpan.';
       setTimeout(() => {
         saveSuccessToast.value = false;
       }, 5000);
@@ -395,7 +384,7 @@ const submitSettings = () => {
             v-else-if="activeAiTab === 'apify'"
             type="button"
             @click="testApifyConnection"
-            :disabled="isTestingApify || !apifyForm.apify_api_token"
+            :disabled="isTestingApify"
             class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-amber-400/50 text-slate-200 text-xs font-bold transition cursor-pointer disabled:opacity-50 shadow-md"
           >
             <RotateCw v-if="isTestingApify" class="w-4 h-4 animate-spin text-amber-400" />
@@ -631,16 +620,6 @@ const submitSettings = () => {
                   </label>
                   <div class="flex items-center gap-2">
                     <button
-                      v-if="props.setting?.raw_api_keys_text && form.gemini_api_key !== props.setting.raw_api_keys_text"
-                      type="button"
-                      @click="restoreSavedKeys"
-                      class="text-[11px] text-amber-400 hover:text-amber-300 flex items-center gap-1 transition cursor-pointer font-bold"
-                      title="Pulihkan kunci tersimpan dari basis data"
-                    >
-                      <RotateCcw class="w-3.5 h-3.5" />
-                      <span>Pulihkan Kunci DB</span>
-                    </button>
-                    <button
                       type="button"
                       @click="showRawKeys = !showRawKeys"
                       class="text-[11px] text-slate-400 hover:text-amber-300 flex items-center gap-1 transition cursor-pointer"
@@ -664,8 +643,14 @@ const submitSettings = () => {
                       showRawKeys ? 'text-amber-300' : 'text-slate-300 [text-security:disc] [-webkit-text-security:disc]',
                       hasKeyFormatWarning ? 'border-rose-500 focus:border-rose-400 focus:ring-rose-400' : (form.gemini_api_key ? 'border-slate-700' : 'border-amber-500/50')
                     ]"
-                    placeholder="AIzaSy... (Kunci Utama 1)&#10;AIzaSy... (Kunci Cadangan 2)&#10;AIzaSy... (Kunci Cadangan 3)&#10;(Tempel 1 atau beberapa API key dipisahkan baris baru atau koma)"
+                    placeholder="Kosongkan bila tidak mengubah kunci. Tempel kunci BARU di sini (pisahkan baris baru atau koma)."
                   ></textarea>
+                  <div class="mt-1.5 flex flex-wrap items-center gap-3 text-[11px] text-slate-300">
+                    <span class="text-slate-400">Bila diisi:</span>
+                    <label class="inline-flex items-center gap-1.5 cursor-pointer"><input type="radio" value="append" v-model="form.keys_mode" class="accent-amber-400" /> Tambahkan ke daftar tersimpan</label>
+                    <label class="inline-flex items-center gap-1.5 cursor-pointer"><input type="radio" value="replace" v-model="form.keys_mode" class="accent-amber-400" /> Ganti seluruh daftar</label>
+                  </div>
+                  <p class="mt-1 text-[11px] text-slate-500">Demi keamanan, kunci tersimpan tidak pernah ditampilkan ulang di browser; lihat daftar tersamar di bawah.</p>
 
                   <!-- Real-time format warning -->
                   <div v-if="hasKeyFormatWarning" class="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-[11px] flex items-center gap-2 mt-1.5 animate-pulse">
@@ -1213,11 +1198,11 @@ const submitSettings = () => {
               <Key class="w-4 h-4 text-amber-400" />
             </div>
             <p class="text-lg md:text-xl font-black text-white font-mono flex items-baseline gap-1.5">
-              <span>{{ apifyTokensCount }}</span>
+              <span>{{ socialSetting?.total_tokens ?? 0 }}</span>
               <span class="text-xs text-slate-400 font-sans font-semibold">Akun Terdaftar</span>
             </p>
             <p class="text-[11px] font-mono truncate" :class="socialSetting?.has_token ? 'text-emerald-400' : 'text-amber-400'">
-              {{ socialSetting?.has_token ? `Aktif (${socialSetting.total_tokens || 1} Token Pool)` : 'Belum Dikonfigurasi' }}
+              {{ socialSetting?.has_token ? `Aktif (${socialSetting.total_tokens} token, failover)` : 'Belum Dikonfigurasi' }}
             </p>
           </div>
 
@@ -1235,17 +1220,17 @@ const submitSettings = () => {
             </p>
           </div>
 
-          <!-- Card 3: Frekuensi Otomasi -->
+          <!-- Card 3: Rem biaya Apify (ditegakkan ApifyClient) -->
           <div class="p-5 rounded-2xl bg-[#0b1426] border border-slate-800 shadow-lg space-y-1">
             <div class="flex items-center justify-between text-slate-400 text-xs font-bold">
-              <span>Frekuensi Crawl</span>
+              <span>Pengambilan Hari Ini</span>
               <Clock class="w-4 h-4 text-purple-400" />
             </div>
             <p class="text-sm md:text-base font-black text-white truncate font-mono">
-              {{ apifyForm.sync_frequency || 'every_3_hours' }}
+              {{ socialSetting?.runs_today ?? 0 }} / {{ socialSetting?.daily_runs_limit || '∞' }}
             </p>
-            <p class="text-[11px] text-emerald-400 font-medium truncate">
-              {{ apifyForm.auto_sync_enabled ? 'Otomasi Aktif di Latar Belakang' : 'Mode Sinkron Manual' }}
+            <p class="text-[11px] text-slate-400 truncate">
+              Rem biaya harian; otomatis maks. {{ socialSetting?.auto_runs_limit ?? 0 }} run
             </p>
           </div>
 
@@ -1282,7 +1267,7 @@ const submitSettings = () => {
                 <button
                   type="button"
                   @click="testApifyConnection"
-                  :disabled="isTestingApify || !apifyForm.apify_api_token"
+                  :disabled="isTestingApify"
                   class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 text-xs font-bold transition disabled:opacity-40 cursor-pointer"
                 >
                   <RefreshCw :class="['w-3.5 h-3.5', isTestingApify ? 'animate-spin' : '']" />
@@ -1290,33 +1275,31 @@ const submitSettings = () => {
                 </button>
               </div>
 
-              <!-- Token Pool Input -->
+              <!-- Token Pool Input: token tersimpan tidak pernah ditampilkan -->
               <div class="space-y-2">
-                <div class="flex items-center justify-between">
-                  <label class="text-xs font-bold text-slate-300">
-                    Daftar Personal API Token Apify (Pisahkan Koma atau Baris Baru):
-                  </label>
-                  <button
-                    type="button"
-                    @click="showApifyRawToken = !showApifyRawToken"
-                    class="text-[11px] text-slate-400 hover:text-white inline-flex items-center gap-1 cursor-pointer"
-                  >
-                    <Eye v-if="!showApifyRawToken" class="w-3.5 h-3.5" />
-                    <EyeOff v-else class="w-3.5 h-3.5" />
-                    <span>{{ showApifyRawToken ? 'Sembunyikan Token' : 'Lihat Token Mentah' }}</span>
-                  </button>
+                <p class="text-xs font-bold text-slate-300">Token tersimpan ({{ socialSetting?.total_tokens ?? 0 }}):</p>
+                <div v-if="socialSetting?.masked_tokens?.length" class="flex flex-wrap gap-1.5">
+                  <span v-for="(t, i) in socialSetting.masked_tokens" :key="i" class="px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 text-[11px] font-mono text-slate-200">#{{ i + 1 }} {{ t }}</span>
+                </div>
+                <p v-else class="text-[11px] text-amber-300">Belum ada token tersimpan.</p>
+
+                <label for="apify-new-tokens" class="text-xs font-bold text-slate-300 block pt-2">Tambah / ganti token (kosongkan bila tidak mengubah):</label>
+                <textarea
+                  id="apify-new-tokens"
+                  v-model="apifyForm.apify_api_token"
+                  rows="3"
+                  autocomplete="off"
+                  placeholder="apify_api_xxxxxxx (satu token per baris)"
+                  class="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-amber-400 leading-relaxed [-webkit-text-security:disc]"
+                ></textarea>
+                <div class="flex flex-wrap items-center gap-3 text-[11px] text-slate-300">
+                  <label class="inline-flex items-center gap-1.5 cursor-pointer"><input type="radio" value="append" v-model="apifyForm.tokens_mode" class="accent-amber-400" /> Tambahkan ke daftar</label>
+                  <label class="inline-flex items-center gap-1.5 cursor-pointer"><input type="radio" value="replace" v-model="apifyForm.tokens_mode" class="accent-amber-400" /> Ganti seluruh daftar</label>
+                  <label class="inline-flex items-center gap-1.5 cursor-pointer text-rose-300"><input type="checkbox" v-model="apifyForm.clear_tokens" class="accent-rose-500" /> Hapus semua token tersimpan</label>
                 </div>
 
-                <textarea
-                  v-model="apifyForm.apify_api_token"
-                  :type="showApifyRawToken ? 'text' : 'password'"
-                  rows="4"
-                  placeholder="apify_api_xxxxxxx1&#10;apify_api_xxxxxxx2 (masukkan beberapa token untuk rotasi kuota)"
-                  class="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-amber-400 leading-relaxed"
-                ></textarea>
-
                 <p class="text-[11px] text-slate-400 leading-relaxed">
-                  <strong class="text-amber-400">Smart Failover Pool:</strong> Sistem secara otomatis menggabungkan seluruh akun gratisan Apify yang dimasukkan di atas. Apabila kuota $5 akun pertama habis, sistem seketika beralih ke token berikutnya tanpa mengganggu operasional radar.
+                  <strong class="text-amber-400">Failover:</strong> token dicoba berurutan. Token yang ditolak, saldonya habis, atau dibatasi dilewati otomatis; token yang saldonya habis diistirahatkan 1 jam. "Uji Koneksi Token" tanpa isian menguji token tersimpan dan menampilkan pemakaian bulan ini.
                 </p>
               </div>
 
@@ -1342,7 +1325,9 @@ const submitSettings = () => {
                     <div>
                       <span class="text-slate-400 mr-2">#{{ i + 1 }}</span>
                       <strong class="text-white">{{ acc.username || acc.token_masked }}</strong>
-                      <span v-if="acc.email" class="text-slate-400 ml-1.5">({{ acc.email }})</span>
+                      <span class="text-slate-400 ml-1.5">{{ acc.token_masked }}</span>
+                      <span v-if="acc.usage_usd != null" class="text-slate-300 ml-1.5">· terpakai US${{ acc.usage_usd }}{{ acc.limit_usd != null ? ' dari ' + acc.limit_usd : '' }}</span>
+                      <span v-if="acc.resting" class="text-amber-300 ml-1.5">· diistirahatkan (saldo habis)</span>
                     </div>
                     <div class="flex items-center gap-2">
                       <span class="px-2 py-0.5 rounded text-[10px] bg-sky-500/20 text-sky-300 font-bold">
@@ -1380,7 +1365,7 @@ const submitSettings = () => {
                   <textarea
                     v-model="apifyForm.accounts_tracked"
                     rows="2"
-                    placeholder="@divisihumaspri, @humaspolri, @polripresisi, @halo_polisi, @ccicpolri"
+                    placeholder="Akun resmi yang ingin dicari lewat pencarian Google (Sinkron & Analisis), mis. @DivHumas_Polri"
                     class="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-amber-400"
                   ></textarea>
                 </div>
@@ -1391,40 +1376,11 @@ const submitSettings = () => {
           <!-- Right: Frequency & Governance Guards (1 col) -->
           <div class="space-y-6">
             <div class="p-6 rounded-3xl bg-[#0b1426] border border-slate-800 shadow-xl space-y-5">
-              <div class="border-b border-slate-800 pb-3 flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                  <Clock class="w-5 h-5 text-purple-400" />
-                  <h3 class="text-base font-bold text-white">Frekuensi &amp; Otomasi</h3>
-                </div>
-                <label class="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" v-model="apifyForm.auto_sync_enabled" class="sr-only peer">
-                  <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                </label>
-              </div>
-
-              <!-- Frequency Options -->
-              <div class="space-y-2">
-                <label class="text-xs font-bold text-slate-300">Pilih Interval Penarikan Data:</label>
-                <div class="grid grid-cols-1 gap-2">
-                  <button
-                    v-for="freq in [
-                      { val: 'every_hour', label: 'Tiap 1 Jam', desc: 'Pemantauan Intensif / Breaking' },
-                      { val: 'every_3_hours', label: 'Tiap 3 Jam', desc: 'Rekomendasi Operasional (Ideal)' },
-                      { val: 'every_6_hours', label: 'Tiap 6 Jam', desc: 'Pergantian Shift Piket' },
-                      { val: 'daily', label: 'Tiap 24 Jam', desc: 'Rekapitulasi Harian Pagi' },
-                    ]"
-                    :key="freq.val"
-                    type="button"
-                    @click="apifyForm.sync_frequency = freq.val"
-                    class="p-3 rounded-xl border text-left transition cursor-pointer"
-                    :class="apifyForm.sync_frequency === freq.val
-                      ? 'bg-amber-400 text-slate-950 border-amber-400 font-black shadow-md'
-                      : 'bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800'"
-                  >
-                    <div class="text-xs font-bold">{{ freq.label }}</div>
-                    <div class="text-[10px] opacity-80 font-medium">{{ freq.desc }}</div>
-                  </button>
-                </div>
+              <div class="border-b border-slate-800 pb-3">
+                <h3 class="text-base font-bold text-white">Penerapan &amp; Pemantauan Otomatis</h3>
+                <p class="mt-1 text-[11px] text-slate-400 leading-relaxed">
+                  Penarikan Apify tidak berjalan otomatis secara umum. Pemantauan berkala dipilih per akun di Radar Media Sosial → Radar KOL (sakelar "Pantau otomatis"), dibatasi {{ socialSetting?.auto_runs_limit ?? 0 }} run otomatis per hari.
+                </p>
               </div>
 
               <!-- Multi-Polda Global Checkbox -->

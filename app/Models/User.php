@@ -50,6 +50,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password'          => 'hashed',
             'is_active'         => 'boolean',
+            'alerts_seen_at'    => 'datetime', // batas "sudah dibaca" peringatan social listening
         ];
     }
 

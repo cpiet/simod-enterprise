@@ -67,6 +67,9 @@ Route::post('/social-intelligence/sync', [SocialIntelligenceController::class, '
 Route::post('/social-intelligence/accounts', [SocialIntelligenceController::class, 'addMonitoredAccount'])->middleware(['module:social_intelligence_sync', 'throttle:10,1']);
 Route::post('/social-intelligence/accounts/{id}/sync', [SocialIntelligenceController::class, 'syncMonitoredAccount'])->middleware(['module:social_intelligence_sync', 'throttle:10,1']);
 Route::delete('/social-intelligence/accounts/{id}', [SocialIntelligenceController::class, 'deleteMonitoredAccount'])->middleware('module:social_intelligence_sync');
+Route::post('/social-intelligence/accounts/{id}/auto', [SocialIntelligenceController::class, 'toggleAutoMonitor'])->middleware(['module:social_intelligence_sync', 'throttle:30,1']);
+Route::get('/social-intelligence/alerts', [SocialIntelligenceController::class, 'alerts'])->middleware(['module:social_intelligence_view', 'throttle:60,1']);
+Route::post('/social-intelligence/alerts/seen', [SocialIntelligenceController::class, 'markAlertsSeen'])->middleware('module:social_intelligence_view');
 Route::post('/social-intelligence/comments', [SocialIntelligenceController::class, 'fetchComments'])->middleware(['module:social_intelligence_sync', 'throttle:10,1']);
 Route::post('/social-intelligence/comments/{id}/summarize', [SocialIntelligenceController::class, 'summarizeComments'])->middleware(['module:social_intelligence_view', 'throttle:10,1']);
 Route::post('/social-intelligence/sync-trends', [SocialIntelligenceController::class, 'syncTrends'])->middleware(['module:social_intelligence_sync', 'throttle:10,1'])->name('social-intelligence.sync-trends');

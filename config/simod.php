@@ -21,6 +21,11 @@ return [
     // Rem biaya Apify: maksimum run Actor per hari (seluruh aplikasi; pantau akun + ringkasan komentar). 0 = tanpa batas.
     'apify_daily_runs' => (int) env('SIMOD_APIFY_DAILY_RUNS', 60),
 
+    // Pemantauan berkala akun prioritas ("Pantau otomatis"): maks. run otomatis per hari (bagian dari rem harian di
+    // atas, menyisakan jatah manual) dan selang sinkron per akun dalam jam.
+    'apify_auto_runs' => (int) env('SIMOD_APIFY_AUTO_RUNS', 20),
+    'social_auto_interval_hours' => (int) env('SIMOD_SOCIAL_AUTO_INTERVAL_HOURS', 6),
+
     // Token statis untuk endpoint API ingest (worker Python). Kosong = API ingest ditolak (fail-closed).
     'ingest_token' => env('INGEST_API_TOKEN', ''),
 ];

@@ -39,6 +39,11 @@ class ScheduledTasks
                 'why' => 'Menambah percakapan medsos dari sindikasi Google News tanpa biaya. Apify berbayar tetap manual.',
             ],
             [
+                'key' => 'social_accounts_auto', 'label' => 'Pantau otomatis akun prioritas (Apify)', 'command' => 'social:accounts-refresh',
+                'cadence' => 'Setiap jam (akun disinkron tiap 6 jam)', 'every' => 60, 'freq' => ['hourly'], 'overlap' => 50,
+                'why' => 'Menyinkronkan akun yang diberi sakelar "Pantau otomatis" dan membuat peringatan. Dibatasi SIMOD_APIFY_AUTO_RUNS run per hari.',
+            ],
+            [
                 'key' => 'public_trends', 'label' => 'Tren pencarian publik (Google Trends)', 'command' => 'social:trends-refresh',
                 'cadence' => 'Setiap jam', 'every' => 60, 'freq' => ['hourly'], 'overlap' => 10,
                 'why' => 'Memperbarui tren pencarian Indonesia di Radar Media Sosial → Tren (gratis, tanpa Apify).',

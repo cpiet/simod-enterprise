@@ -116,6 +116,30 @@ const switchTenant = (code) => {
   router.post('/tenant/switch', { code }, { preserveScroll: true });
 };
 
+// Panel notifikasi: antrean verifikasi + peringatan social listening (data nyata, per tenant, status baca per pengguna).
+const isBellOpen = ref(false);
+const alerts = ref({ unread: 0, items: [] });
+const canSeeSocial = computed(() => !!page.props.auth?.permissions?.social_intelligence_view);
+const loadAlerts = async () => {
+  if (!canSeeSocial.value || !window.axios) return;
+  try {
+    const { data } = await window.axios.get('/social-intelligence/alerts');
+    alerts.value = data;
+  } catch { /* panel tetap menampilkan antrean verifikasi */ }
+};
+const toggleBell = () => {
+  isBellOpen.value = !isBellOpen.value;
+  if (isBellOpen.value) loadAlerts();
+};
+const markAlertsSeen = async () => {
+  try {
+    await window.axios.post('/social-intelligence/alerts/seen');
+    alerts.value = { unread: 0, items: alerts.value.items.map((a) => ({ ...a, unread: false })) };
+  } catch { /* abaikan */ }
+};
+const alertTime = (iso) => (iso ? new Date(iso).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
+const ALERT_TYPE = { kamtibmas: 'Kata kunci kamtibmas', topik: 'Topik Atensi', lonjakan: 'Lonjakan keterlibatan', komentar_negatif: 'Komentar negatif' };
+
 // Merged global & page metrics for accurate dynamic badges across all routes
 const displayMetrics = computed(() => {
   return {
@@ -198,6 +222,7 @@ watch(
 
 onMounted(() => {
   initTheme();
+  loadAlerts(); // hitungan peringatan belum dibaca untuk lencana lonceng
   window.addEventListener('simod-toast', (e) => {
     if (e.detail?.message) {
       triggerToast(e.detail.message, e.detail.type || 'success');
@@ -814,20 +839,54 @@ const switchRole = (newRole) => {
             </span>
           </button>
 
-          <!-- Notification Bell -->
-          <Link
-            href="/verification-queue"
-            class="relative p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition"
-            title="Antrean Verifikasi Siaga"
-          >
-            <Bell class="w-4 h-4" />
-            <span
-              v-if="metrics.pending_verify > 0"
-              class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center animate-pulse"
+          <!-- Panel Notifikasi: antrean verifikasi + peringatan social listening -->
+          <div class="relative">
+            <button
+              type="button"
+              @click="toggleBell"
+              :aria-expanded="isBellOpen"
+              class="relative p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition cursor-pointer"
+              title="Notifikasi"
             >
-              {{ metrics.pending_verify }}
-            </span>
-          </Link>
+              <Bell class="w-4 h-4" />
+              <span
+                v-if="(metrics.pending_verify || 0) + (alerts.unread || 0) > 0"
+                class="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center"
+              >
+                {{ (metrics.pending_verify || 0) + (alerts.unread || 0) }}
+              </span>
+            </button>
+            <div v-if="isBellOpen" class="absolute right-0 mt-2 w-[min(380px,calc(100vw-24px))] max-h-[70vh] overflow-y-auto rounded-2xl bg-[#0b1426] border border-slate-700/80 shadow-2xl p-2 z-50 text-left">
+              <Link href="/verification-queue" @click="isBellOpen = false" class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl hover:bg-slate-800/70 text-xs">
+                <span class="font-bold text-slate-200">Antrean verifikasi laporan</span>
+                <span class="px-2 py-0.5 rounded-full font-black" :class="metrics.pending_verify > 0 ? 'bg-rose-500 text-white' : 'bg-slate-800 text-slate-400'">{{ metrics.pending_verify || 0 }}</span>
+              </Link>
+              <template v-if="canSeeSocial">
+                <div class="flex items-center justify-between px-3 pt-2 pb-1 border-t border-slate-800 mt-1">
+                  <span class="text-[10px] font-black uppercase tracking-wider text-slate-400">Peringatan media sosial</span>
+                  <button v-if="alerts.unread > 0" type="button" @click="markAlertsSeen" class="text-[10px] font-bold text-amber-400 hover:underline cursor-pointer">Tandai sudah dibaca</button>
+                </div>
+                <p v-if="!alerts.items.length" class="px-3 py-3 text-[11px] text-slate-400">Belum ada peringatan. Peringatan muncul dari akun pantauan di Radar Media Sosial → Radar KOL.</p>
+                <a
+                  v-for="a in alerts.items"
+                  :key="a.id"
+                  :href="a.post_url || '#'"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="block px-3 py-2 rounded-xl hover:bg-slate-800/70"
+                >
+                  <p class="flex items-center gap-1.5 text-[10px] font-bold">
+                    <span class="w-1.5 h-1.5 rounded-full" :class="a.unread ? 'bg-rose-500' : 'bg-slate-600'"></span>
+                    <span :class="a.severity === 'tinggi' ? 'text-rose-300' : 'text-amber-300'">{{ ALERT_TYPE[a.type] || a.type }}</span>
+                    <span class="text-slate-500 font-normal">· {{ alertTime(a.created_at) }}</span>
+                  </p>
+                  <p class="text-xs font-bold text-slate-100 leading-snug mt-0.5">{{ a.title }}</p>
+                  <p v-if="a.body" class="text-[11px] text-slate-400 leading-snug line-clamp-2">{{ a.body }}</p>
+                </a>
+                <Link href="/social-intelligence?tab=kol" @click="isBellOpen = false" class="block px-3 py-2 text-[11px] font-bold text-amber-400 hover:underline">Buka Radar KOL &amp; akun pantauan →</Link>
+              </template>
+            </div>
+          </div>
 
           <!-- User Profile Dropdown -->
           <div class="relative">

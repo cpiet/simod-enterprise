@@ -71,6 +71,7 @@ const props = defineProps({
   kolProfiles: Array,
   monitoredAccounts: { type: Array, default: () => [] },
   commentDigests: { type: Object, default: () => ({}) },
+  autoIntervalHours: { type: Number, default: null },
   trendingHashtags: Array,
   trendingByPlatform: Object,
   publicTrends: Object,
@@ -132,6 +133,19 @@ const removeAccount = async (account) => {
   } catch {
     accountError.value = true;
     accountMessage.value = 'Akun tidak dapat dihapus.';
+  }
+};
+const autoIntervalHours = computed(() => props.autoIntervalHours ?? 6);
+const toggleAuto = async (account, enabled) => {
+  try {
+    const { data } = await axios.post(`/social-intelligence/accounts/${account.id}/auto`, { enabled });
+    account.auto_monitor = data.auto_monitor;
+    accountError.value = false;
+    accountMessage.value = data.message;
+  } catch (error) {
+    accountError.value = true;
+    accountMessage.value = error.response?.data?.message || 'Pengaturan pantau otomatis gagal disimpan.';
+    reloadAccounts();
   }
 };
 const syncAllAccounts = async () => {
@@ -2433,6 +2447,10 @@ const getBuzzerRiskClass = (level) => {
             </button>
             <div class="flex items-center gap-2">
               <a :href="account.profile_url" target="_blank" rel="noopener noreferrer" class="rounded-lg border border-slate-300 dark:border-slate-700 px-2.5 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:border-amber-400" :aria-label="`Buka profil ${account.username} di ${getPlatformBadge(account.platform).label}`">Profil ↗</a>
+              <label v-if="canSync" class="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold cursor-pointer" :class="account.auto_monitor ? 'border-emerald-400 text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/10' : 'border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300'" :title="`Sinkron otomatis tiap ${autoIntervalHours} jam + peringatan`">
+                <input type="checkbox" :checked="account.auto_monitor" :disabled="!instagramReady" @change="toggleAuto(account, $event.target.checked)" class="accent-emerald-500" />
+                <span>Pantau otomatis</span>
+              </label>
               <template v-if="canSync">
                 <button type="button" :disabled="accountBusy || !instagramReady" @click="syncAccount(account)" class="rounded-lg border border-slate-300 dark:border-slate-700 px-2.5 py-1.5 text-xs font-bold text-slate-800 dark:text-slate-200 hover:border-amber-400 disabled:opacity-50 cursor-pointer">{{ accountBusy ? 'Memproses...' : 'Sinkronkan' }}</button>
                 <button type="button" :disabled="accountBusy" @click="removeAccount(account)" class="rounded-lg border border-rose-200 dark:border-rose-900 px-2.5 py-1.5 text-xs font-bold text-rose-700 dark:text-rose-400 cursor-pointer">Hapus</button>

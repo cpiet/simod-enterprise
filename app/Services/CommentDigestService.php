@@ -23,7 +23,7 @@ class CommentDigestService
         'sih', 'kok', 'deh', 'nih', 'tuh', 'kan', 'lah', 'pun', 'para', 'oleh', 'dalam', 'dgn', 'utk', 'the', 'and', 'for', 'you', 'this',
         'that', 'are', 'with', 'http', 'https', 'com', 'www'];
 
-    public function __construct(private ApifyClient $apify) {}
+    public function __construct(private ApifyClient $apify, private SocialAlertService $alerts) {}
 
     public function fetch(MonitoredSocialAccount $account, string $postUrl): array
     {
@@ -67,6 +67,8 @@ class CommentDigestService
                 'fetched_at' => now(),
             ]
         );
+
+        $this->alerts->fromDigest($digest);
 
         return [
             'success' => true,

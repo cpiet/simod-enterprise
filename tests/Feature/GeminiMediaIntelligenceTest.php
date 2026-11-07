@@ -76,8 +76,6 @@ class GeminiMediaIntelligenceTest extends TestCase
             'apify_api_token'     => 'apify_token_test_123',
             'keywords_tracked'    => 'Polri, Kapolri, Humas Presisi',
             'accounts_tracked'    => '@divisihumaspri, @humaspolri',
-            'sync_frequency'      => 'every_hour',
-            'auto_sync_enabled'   => true,
             'apply_to_all_poldas' => true,
         ]);
 
@@ -86,7 +84,6 @@ class GeminiMediaIntelligenceTest extends TestCase
 
         $this->assertDatabaseHas('social_settings', [
             'apify_api_token'  => 'apify_token_test_123',
-            'sync_frequency'   => 'every_hour',
         ]);
 
         $this->assertDatabaseHas('audit_logs', [

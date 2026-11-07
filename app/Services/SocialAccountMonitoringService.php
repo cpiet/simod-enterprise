@@ -29,7 +29,7 @@ class SocialAccountMonitoringService
         'facebook' => '/^[A-Za-z0-9.\-]{2,80}$/',
     ];
 
-    public function __construct(private ApifyClient $apify) {}
+    public function __construct(private ApifyClient $apify, private SocialAlertService $alerts) {}
 
     /** Bentuk baku username untuk disimpan (IG & TikTok tidak peka huruf besar/kecil). */
     public static function normalizeUsername(string $platform, string $raw): string
@@ -69,6 +69,7 @@ class SocialAccountMonitoringService
                 return $this->fail($account, 'empty', $problem ?? 'Tidak ada unggahan akun yang dapat diverifikasi. Data sebelumnya tetap tersedia jika ada.');
             }
             usort($posts, fn ($a, $b) => strcmp($b['posted_at'] ?? '', $a['posted_at'] ?? ''));
+            $previousUrls = array_column($account->posts ?? [], 'url');
             $account->update([
                 'display_name' => $profile['name'] ?? $account->display_name,
                 'profile' => array_filter(['followers' => $profile['followers'] ?? null, 'verified' => $profile['verified'] ?? null], fn ($v) => $v !== null) ?: null,
@@ -78,7 +79,9 @@ class SocialAccountMonitoringService
                 'last_error' => null,
             ]);
 
-            return ['success' => true, 'message' => count($posts) . ' unggahan ' . $this->label($account) . ' berhasil disinkronkan.'];
+            $newAlerts = $this->alerts->fromSync($account->fresh(), $previousUrls);
+
+            return ['success' => true, 'new_alerts' => $newAlerts, 'message' => count($posts) . ' unggahan ' . $this->label($account) . ' berhasil disinkronkan.' . ($newAlerts ? " {$newAlerts} peringatan baru." : '')];
         } catch (\Throwable $e) {
             report($e);
 

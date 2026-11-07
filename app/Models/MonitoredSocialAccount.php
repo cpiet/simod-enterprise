@@ -14,9 +14,9 @@ class MonitoredSocialAccount extends Model
 
     protected $table = 'monitored_social_accounts';
 
-    protected $fillable = ['polda_id', 'platform', 'username', 'display_name', 'profile', 'posts', 'last_synced_at', 'sync_status', 'last_error'];
+    protected $fillable = ['polda_id', 'platform', 'auto_monitor', 'username', 'display_name', 'profile', 'posts', 'last_synced_at', 'sync_status', 'last_error'];
 
-    protected $casts = ['posts' => 'array', 'profile' => 'array', 'last_synced_at' => 'datetime'];
+    protected $casts = ['posts' => 'array', 'profile' => 'array', 'last_synced_at' => 'datetime', 'auto_monitor' => 'boolean'];
 
     /** Tautan profil publik akun di platformnya. */
     public function profileUrl(): string

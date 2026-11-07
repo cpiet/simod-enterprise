@@ -48,7 +48,6 @@ class AiSettingController extends Controller
         foreach ($allKeys as $idx => $k) {
             $keysDetail[] = [
                 'index'      => $idx + 1,
-                'raw'        => $k,
                 'masked'     => $geminiService->maskApiKey($k),
                 'is_primary' => $idx === 0,
             ];
@@ -64,14 +63,15 @@ class AiSettingController extends Controller
         $apifyTokens = $apifyService->parseTokens($apifyRaw);
 
         $socialSettingData = [
+            // Rahasia tidak pernah dikirim ke browser: hanya jumlah & bentuk tersamar (AGENTS §3.3.6).
             'has_token'         => !empty($apifyTokens),
-            'apify_api_token'   => $apifyRaw,
             'total_tokens'      => count($apifyTokens),
             'masked_tokens'     => array_map(fn($t) => $apifyService->maskToken($t), $apifyTokens),
             'keywords_tracked'  => $socialSetting->keywords_tracked ?: 'Polri, Humas Polri, Polisi Presisi, Dumas Presisi',
-            'accounts_tracked'  => $socialSetting->accounts_tracked ?: '@divisihumaspri, @humaspolri, @polripresisi, @halo_polisi',
-            'sync_frequency'    => $socialSetting->sync_frequency ?: 'every_3_hours',
-            'auto_sync_enabled' => (bool) ($socialSetting->auto_sync_enabled ?? true),
+            'accounts_tracked'  => $socialSetting->accounts_tracked ?: '',
+            'daily_runs_limit'  => (int) config('simod.apify_daily_runs'),
+            'auto_runs_limit'   => (int) config('simod.apify_auto_runs'),
+            'runs_today'        => (int) \Illuminate\Support\Facades\Cache::get('simod.apify_runs.' . now()->format('Ymd'), 0),
             'last_synced_at'    => $socialSetting->last_synced_at ? $socialSetting->last_synced_at->diffForHumans() : 'Belum pernah sinkron',
         ];
 
@@ -98,8 +98,6 @@ class AiSettingController extends Controller
             'setting'        => [
                 'has_api_key'               => !empty($rawApiKey),
                 'masked_api_key'            => $maskedKey,
-                'raw_api_keys_text'         => implode("\n", $allKeys),
-                'api_keys_pool'             => $allKeys,
                 'keys_detail'               => $keysDetail,
                 'total_keys'                => count($allKeys),
                 'gemini_model'              => $activeModel,
@@ -141,6 +139,7 @@ class AiSettingController extends Controller
         $validated = $request->validate([
             'gemini_api_key'          => 'nullable|string',
             'api_keys_pool'           => 'nullable',
+            'keys_mode'               => 'nullable|in:replace,append',
             'gemini_model'            => 'required|string|in:gemini-3.5-flash-lite,gemini-flash-lite-latest,gemini-3.8-flash,gemini-3.1-pro-preview,gemini-2.5-pro,gemini-1.5-pro,gemini-2.5-flash,gemini-1.5-flash',
             'daily_user_limit'        => 'nullable|integer|min:0|max:1000',
             'web_search_enabled'      => 'nullable|boolean',
@@ -181,6 +180,10 @@ class AiSettingController extends Controller
 
         // Only update API keys if user submitted non-empty keys, or keep existing ones
         if (!empty($parsedKeys)) {
+            // "append" menambah kunci baru ke daftar tersimpan; bawaan "replace" mengganti seluruh daftar.
+            if (($validated['keys_mode'] ?? 'replace') === 'append') {
+                $parsedKeys = array_values(array_unique(array_merge($aiSetting->getCleanKeysList(), $parsedKeys)));
+            }
             $updateData['api_keys_pool'] = $parsedKeys;
             $updateData['gemini_api_key'] = $parsedKeys[0];
         }
@@ -332,23 +335,33 @@ class AiSettingController extends Controller
     {
         $validated = $request->validate([
             'apify_api_token'     => 'nullable|string',
+            'tokens_mode'         => 'nullable|in:replace,append',
+            'clear_tokens'        => 'nullable|boolean',
             'keywords_tracked'    => 'nullable|string',
             'accounts_tracked'    => 'nullable|string',
-            'sync_frequency'      => 'nullable|string',
-            'auto_sync_enabled'   => 'nullable|boolean',
             'apply_to_all_poldas' => 'nullable|boolean',
         ]);
 
         [$selectedCode, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
         $selectedPolda = $selectedPolda ?? Polda::first();
 
+        $apifyService = new ApifySyncService();
+        $existing = SocialSetting::where('polda_id', $selectedPolda->id)->value('apify_api_token') ?: '';
+        $newTokens = $apifyService->parseTokens($validated['apify_api_token'] ?? '');
+
         $updateData = [
-            'apify_api_token'   => $validated['apify_api_token'] ?? '',
             'keywords_tracked'  => $validated['keywords_tracked'] ?? 'Polri, Humas Polri, Polisi Presisi, Dumas Presisi',
-            'accounts_tracked'  => $validated['accounts_tracked'] ?? '@divisihumaspri, @humaspolri, @polripresisi, @halo_polisi',
-            'sync_frequency'    => $validated['sync_frequency'] ?? 'every_3_hours',
-            'auto_sync_enabled' => (bool) ($validated['auto_sync_enabled'] ?? true),
+            'accounts_tracked'  => $validated['accounts_tracked'] ?? '',
         ];
+        // Kotak token kosong TIDAK menghapus token tersimpan (dulu menghapus semuanya). Hapus hanya bila diminta eksplisit.
+        if ($request->boolean('clear_tokens')) {
+            $updateData['apify_api_token'] = '';
+        } elseif ($newTokens) {
+            $merged = ($validated['tokens_mode'] ?? 'replace') === 'append'
+                ? array_values(array_unique(array_merge($apifyService->parseTokens($existing), $newTokens)))
+                : $newTokens;
+            $updateData['apify_api_token'] = implode("\n", $merged);
+        }
 
         SocialSetting::updateOrCreate(
             ['polda_id' => $selectedPolda->id],
@@ -362,8 +375,7 @@ class AiSettingController extends Controller
             }
         }
 
-        $apifyService = new ApifySyncService();
-        $tokensCount = count($apifyService->parseTokens($updateData['apify_api_token']));
+        $tokensCount = count($apifyService->parseTokens(SocialSetting::where('polda_id', $selectedPolda->id)->value('apify_api_token') ?: ''));
 
         AuditLog::create([
             'user_id'    => auth()->id(),
@@ -373,13 +385,12 @@ class AiSettingController extends Controller
                 'polda_id'            => $selectedPolda->id,
                 'polda_code'          => $selectedPolda->code,
                 'tokens_count'        => $tokensCount,
-                'sync_frequency'      => $updateData['sync_frequency'],
-                'auto_sync_enabled'   => $updateData['auto_sync_enabled'],
+                'tokens_changed'      => array_key_exists('apify_api_token', $updateData),
                 'apply_to_all_poldas' => (bool) ($validated['apply_to_all_poldas'] ?? false),
             ]),
         ]);
 
-        return back()->with('success', "✓ Konfigurasi Mesin Scraper Apify ({$tokensCount} Akun) & Parameter Patroli Medsos Berhasil Disimpan!");
+        return back()->with('success', "Konfigurasi Apify disimpan ({$tokensCount} token tersimpan).");
     }
 
     /**
@@ -387,9 +398,24 @@ class AiSettingController extends Controller
      */
     public function testApify(Request $request, ApifySyncService $service): JsonResponse
     {
-        $token = $request->input('apify_api_token');
-        $result = $service->testConnection($token);
+        [, $selectedPolda] = $this->resolveActiveTenant($request);
+        $client = app(\App\Services\ApifyClient::class);
+        $tokens = $service->parseTokens((string) $request->input('apify_api_token'));
+        $source = 'baru';
+        if (! $tokens) {
+            $tokens = $client->tokensFor($selectedPolda?->id);
+            $source = 'tersimpan';
+        }
+        if (! $tokens) {
+            return response()->json(['success' => false, 'message' => 'Belum ada token Apify untuk diuji.', 'accounts' => []], 400);
+        }
+        $accounts = $client->health($tokens);
+        $ok = collect($accounts)->where('status', 'connected')->count();
 
-        return response()->json($result, $result['success'] ? 200 : 400);
+        return response()->json([
+            'success'  => $ok > 0,
+            'message'  => "{$ok} dari " . count($accounts) . " token {$source} aktif." . ($ok < count($accounts) ? ' Token yang ditolak dilewati otomatis oleh failover.' : ''),
+            'accounts' => $accounts,
+        ], $ok > 0 ? 200 : 400);
     }
 }

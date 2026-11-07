@@ -1,6 +1,6 @@
 # 🧭 22. Peta Kode & Sumber Kebenaran (Source of Truth)
 
-Dokumen ini adalah **peta tunggal** antara dokumentasi dan kode SIMOD Enterprise. Seluruh angka di sini diverifikasi langsung dari repositori pada **5 November 2026** (baseline `php artisan test`: **321 tests, 2634 assertions, PASS**; 129 rute; 39 tabel; 20 kunci RBAC).
+Dokumen ini adalah **peta tunggal** antara dokumentasi dan kode SIMOD Enterprise. Seluruh angka di sini diverifikasi langsung dari repositori pada **5 November 2026** (baseline `php artisan test`: **329 tests, 2671 assertions, PASS**; 129 rute; 39 tabel; 20 kunci RBAC).
 
 > [!IMPORTANT]
 > **Aturan emas:** bila dokumen lain bertentangan dengan dokumen ini atau dengan kode, **kode yang benar**. Perbarui dokumennya, bukan sebaliknya. Dokumen berstatus *snapshot historis* (angka test/berita lama) ditandai eksplisit di dokumennya masing-masing.
@@ -233,7 +233,7 @@ Temuan saat menyelaraskan dokumen dengan kode (5 Nov 2026), beserta status perba
 
 `tests/Feature` memuat 36 berkas (plus `tests/Unit/ExampleTest.php`): `AiModelSelectionTest` (6), `AiQuotaAndSavingsTest` (9), `CommandCenterRefreshTest` (5), `GeminiQuotaFallbackTest` (2), `CommandCenterNationalMapAndKpiTest` (5 test), `DatabaseBackupTest`, `DivhumasNationalFeedsTest`, `DynamicMenuAndSecurityAuditTest`, `EndToEndAuditStressTest`, `EnterpriseFullSuiteTest`, `ExampleTest`, `GeminiMediaIntelligenceTest`, `InstagramAccountMonitoringTest` (2 test), `MediaTopicDossierTest`, `NewsCleanupTest`, `PersonaliaAuthorityTest` (6 test), `RolePermissionMatrixTest`, `RssSyncTest`, `SadewaChatTest` (7 test), `SecurityCenterTest`, `SocialIntelligenceTest` (12 test), `TenantSecurityTest` (3 test), `AdminSystemEnforcementTest` (4 test: lockout login, batas sesi, ganti kata sandi, halaman mock terhapus), `TenantOverrideProtectionTest` (4 test: tenant tidak dapat dialihkan klien), `AuthHardeningTest` (9 test: gerbang login, kredensial, simulasi peran, token ingest), `ModulePermissionEnforcementTest` (6 test: penegakan RBAC server-side).
 
-Baseline wajib sebelum dan sesudah perubahan: `php artisan test` → **321 passed (2634 assertions)** dan `npm.cmd run build` tanpa galat. Helper test: `$this->actingAsSuperAdmin()` (`tests/TestCase.php`).
+Baseline wajib sebelum dan sesudah perubahan: `php artisan test` → **329 passed (2671 assertions)** dan `npm.cmd run build` tanpa galat. Helper test: `$this->actingAsSuperAdmin()` (`tests/TestCase.php`).
 
 ---
 
@@ -253,3 +253,4 @@ Baseline wajib sebelum dan sesudah perubahan: `php artisan test` → **321 passe
 7. Tab Tren Radar Media Sosial, sinkron medsos gratis terjadwal, pencarian internet SADEWA (`web_search_enabled`), dan penanda unggahan Instagram menonjol: doc 33. Tagar/jam puncak/awan kata tidak lagi punya data bawaan buatan.
 8. Metodologi sentimen (satu aturan `NewsSentiment` untuk berita & medsos, alasan per item lewat popup `SentimentInfo.vue`) dan pembersihan data medsos karangan (metrik `null` = tidak diketahui): doc 34.
 9. Pantau akun lintas platform (`monitored_social_accounts`), failover Apify (`ApifyClient`), Ringkasan Komentar (`social_comment_digests`): doc 35.
+10. Peringatan social listening (`social_alerts`, lonceng header), pantau otomatis akun prioritas (`social:accounts-refresh`), dan halaman Mesin Intelijen AI tanpa kunci/token mentah: doc 36.

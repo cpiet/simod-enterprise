@@ -34,6 +34,44 @@ class ApifyClient
     }
 
     /**
+     * Kesehatan setiap token (endpoint gratis Apify): akun, paket, pemakaian bulan ini, dan status istirahat.
+     * Token hanya dikembalikan dalam bentuk tersamar.
+     *
+     * @param  array<int, string>  $tokens
+     * @return array<int, array<string, mixed>>
+     */
+    public function health(array $tokens): array
+    {
+        $out = [];
+        foreach ($tokens as $i => $token) {
+            $row = ['index' => $i + 1, 'token_masked' => $this->tokens->maskToken($token), 'status' => 'galat', 'username' => null, 'plan' => null,
+                'usage_usd' => null, 'limit_usd' => null, 'resting' => Cache::has('simod.apify_token_rest.' . sha1($token))];
+            try {
+                $me = Http::withToken($token)->timeout(15)->get('https://api.apify.com/v2/users/me');
+                if ($me->status() === 401 || $me->status() === 403) {
+                    $row['status'] = 'ditolak';
+                } elseif ($me->successful()) {
+                    $row['status'] = 'connected';
+                    $row['username'] = $me->json('data.username');
+                    $row['plan'] = $me->json('data.plan.id');
+                    $lim = Http::withToken($token)->timeout(15)->get('https://api.apify.com/v2/users/me/limits');
+                    if ($lim->successful()) {
+                        $usage = $lim->json('data.current.monthlyUsageUsd');
+                        $max = $lim->json('data.limits.maxMonthlyUsageUsd');
+                        $row['usage_usd'] = is_numeric($usage) ? round((float) $usage, 3) : null;
+                        $row['limit_usd'] = is_numeric($max) ? (float) $max : null;
+                    }
+                }
+            } catch (\Throwable) {
+                $row['status'] = 'galat';
+            }
+            $out[] = $row;
+        }
+
+        return $out;
+    }
+
+    /**
      * @param  array<string, mixed>  $input
      * @return array{success: bool, items?: array, message?: string, status?: string, token_index?: int}
      */
