@@ -3,7 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
-use App\Models\MonitoredInstagramAccount;
+use App\Models\MonitoredSocialAccount;
+use App\Models\SocialCommentDigest;
 use App\Models\Polda;
 use App\Models\Polres;
 use App\Models\SocialIntelligenceReport;
@@ -13,7 +14,8 @@ use App\Models\SocialSetting;
 use App\Services\ApifySyncService;
 use App\Services\PublicTrendsService;
 use App\Services\GeminiService;
-use App\Services\InstagramAccountMonitoringService;
+use App\Services\CommentDigestService;
+use App\Services\SocialAccountMonitoringService;
 use App\Services\SocialSyndicationService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -345,8 +347,14 @@ class SocialIntelligenceController extends Controller
             'selectedCase'        => $selectedCase,
             'metrics'             => $metrics,
             'kolProfiles'         => $kolProfiles,
-            'monitoredInstagramAccounts' => MonitoredInstagramAccount::where('polda_id', $poldaId)->orderBy('username')->get()
-                ->map(fn ($account) => array_merge($account->toArray(), ['posts' => \App\Support\InstagramHighlights::annotate($account->posts ?? [])]))
+            // Ringkasan komentar yang sudah diambil (per URL unggahan), hanya tenant aktif.
+            'commentDigests' => fn () => SocialCommentDigest::where('polda_id', $poldaId)->get()
+                ->mapWithKeys(fn ($d) => [$d->post_url => CommentDigestService::present($d)]),
+            'monitoredAccounts' => MonitoredSocialAccount::where('polda_id', $poldaId)->orderBy('platform')->orderBy('username')->get()
+                ->map(fn ($account) => array_merge($account->toArray(), [
+                    'profile_url' => $account->profileUrl(),
+                    'posts' => \App\Support\InstagramHighlights::annotate($account->posts ?? []),
+                ]))
                 ->values(),
             'trendingHashtags'    => fn () => $trending()['trendingHashtags'],
             'trendingByPlatform'  => fn () => $trending()['trendingByPlatform'],
@@ -397,30 +405,89 @@ class SocialIntelligenceController extends Controller
         ];
     }
 
-    public function addInstagramAccount(Request $request, InstagramAccountMonitoringService $monitor, ApifySyncService $apify)
+    /**
+     * Tambah akun pantauan (Instagram/TikTok/X/YouTube/Halaman Facebook) lalu langsung sinkronkan.
+     */
+    public function addMonitoredAccount(Request $request, SocialAccountMonitoringService $monitor)
     {
-        $request->merge(['username' => strtolower(ltrim(trim((string) $request->input('username')), '@'))]);
-        $validated = $request->validate(['username' => ['required', 'string', 'max:30', 'regex:/^[a-z0-9._]+$/']]);
+        $platform = (string) $request->input('platform', 'instagram');
+        abort_unless(in_array($platform, MonitoredSocialAccount::PLATFORMS, true), 422, 'Platform tidak dikenal.');
+        $request->merge(['username' => SocialAccountMonitoringService::normalizeUsername($platform, (string) $request->input('username'))]);
+        $validated = $request->validate(
+            ['username' => ['required', 'string', 'max:100', 'regex:' . SocialAccountMonitoringService::USERNAME_RULES[$platform]]],
+            ['username.regex' => 'Format username tidak sesuai untuk platform ini.']
+        );
         [, , $poldaId] = $this->resolveActiveTenant($request);
         abort_unless($poldaId, 422, 'Pilih tenant sebelum menambah akun pantauan.');
-        $account = MonitoredInstagramAccount::firstOrCreate(['polda_id' => $poldaId, 'username' => $validated['username']]);
-        $result = $monitor->sync($account, $apify);
+
+        $account = MonitoredSocialAccount::whereRaw('LOWER(username) = ?', [strtolower($validated['username'])])
+            ->where('polda_id', $poldaId)->where('platform', $platform)->first()
+            ?? MonitoredSocialAccount::create(['polda_id' => $poldaId, 'platform' => $platform, 'username' => $validated['username'], 'sync_status' => 'pending']);
+        $result = $monitor->sync($account);
+
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
-    public function syncInstagramAccount(Request $request, int $id, InstagramAccountMonitoringService $monitor, ApifySyncService $apify)
+    public function syncMonitoredAccount(Request $request, int $id, SocialAccountMonitoringService $monitor)
     {
         [, , $poldaId] = $this->resolveActiveTenant($request);
-        $account = MonitoredInstagramAccount::where('polda_id', $poldaId)->findOrFail($id);
-        $result = $monitor->sync($account, $apify);
+        $account = MonitoredSocialAccount::where('polda_id', $poldaId)->findOrFail($id);
+        $result = $monitor->sync($account);
+
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
-    public function deleteInstagramAccount(Request $request, int $id)
+    public function deleteMonitoredAccount(Request $request, int $id)
     {
         [, , $poldaId] = $this->resolveActiveTenant($request);
-        MonitoredInstagramAccount::where('polda_id', $poldaId)->findOrFail($id)->delete();
+        MonitoredSocialAccount::where('polda_id', $poldaId)->findOrFail($id)->delete();
+
         return response()->json(['message' => 'Akun dihapus dari daftar pantauan.']);
+    }
+
+    /**
+     * Ringkasan Komentar: ambil komentar asli unggahan akun pantauan (tenant aktif) dan nilai sentimennya.
+     */
+    public function fetchComments(Request $request, CommentDigestService $digests)
+    {
+        $validated = $request->validate(['account_id' => 'required|integer', 'post_url' => 'required|string|max:500']);
+        [, , $poldaId] = $this->resolveActiveTenant($request);
+        $account = MonitoredSocialAccount::where('polda_id', $poldaId)->findOrFail($validated['account_id']);
+        $result = $digests->fetch($account, $validated['post_url']);
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    /**
+     * Ringkasan opini oleh SADEWA atas komentar yang sudah diambil. Melewati AiQuota; tidak diulang bila komentar sama.
+     */
+    public function summarizeComments(Request $request, int $id, GeminiService $gemini)
+    {
+        [, $selectedPolda, $poldaId] = $this->resolveActiveTenant($request);
+        $digest = SocialCommentDigest::where('polda_id', $poldaId)->findOrFail($id);
+        if (! $digest->total) {
+            return response()->json(['success' => false, 'message' => 'Belum ada komentar untuk diringkas.'], 422);
+        }
+        // Penghematan kuota: komentar belum diambil ulang sejak ringkasan terakhir → tidak diringkas ulang (kecuali force=1).
+        if ($digest->ai_summary && ! $request->boolean('force') && $digest->summarized_at && $digest->fetched_at && $digest->summarized_at->gte($digest->fetched_at)) {
+            return response()->json(['success' => true, 'skipped' => true, 'message' => 'Komentar belum berubah sejak ringkasan terakhir.', 'digest' => CommentDigestService::present($digest)]);
+        }
+
+        $user = $request->user();
+        $quota = app(\App\Services\AiQuota::class);
+        if ($denied = $quota->denial($user, $poldaId)) {
+            return response()->json(['success' => false, 'message' => $denied], 429);
+        }
+        $polda = $selectedPolda ?? Polda::find($poldaId);
+        $result = $gemini->summarizeComments($polda, $digest->platform, (string) $digest->post_caption, $digest->comments ?? [],
+            ['positif' => $digest->positif, 'netral' => $digest->netral, 'negatif' => $digest->negatif]);
+        $quota->finish($user, $poldaId, 'comment_summary', $result);
+        if (! $result['success']) {
+            return response()->json(['success' => false, 'message' => $result['message'] ?? 'Ringkasan gagal.'], 422);
+        }
+        $digest->update(['ai_summary' => $result['reply'], 'ai_model' => $result['model'] ?? null, 'summarized_at' => now()]);
+
+        return response()->json(['success' => true, 'message' => 'Ringkasan SADEWA selesai.', 'digest' => CommentDigestService::present($digest->fresh())]);
     }
 
     /**

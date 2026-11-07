@@ -89,10 +89,10 @@ class NavigationSweepTest extends TestCase
 
         $this->actingAs($leader)->get('/social-intelligence')->assertInertia(fn (Assert $p) => $p->where('instagramReady', false));
 
-        $res = $this->actingAs($leader)->postJson('/social-intelligence/instagram-accounts', ['username' => '@mohmahfudmd']);
+        $res = $this->actingAs($leader)->postJson('/social-intelligence/accounts', ['username' => '@mohmahfudmd']);
         $res->assertStatus(422);
         $this->assertStringContainsString('Token Apify belum diatur', $res->json('message'));
-        $this->assertStringContainsString('Token Apify', (string) \App\Models\MonitoredInstagramAccount::first()->last_error);
+        $this->assertStringContainsString('Token Apify', (string) \App\Models\MonitoredSocialAccount::first()->last_error);
     }
 
     public function test_every_parameterless_get_route_renders_without_server_error(): void

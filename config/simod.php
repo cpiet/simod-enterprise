@@ -18,6 +18,9 @@ return [
     // Sinkron otomatis radar medsos lapis gratis (sindikasi Google News, tanpa Apify) tiap 30 menit lewat penjadwal.
     'social_auto_sync' => (bool) env('SIMOD_SOCIAL_AUTO_SYNC', true),
 
+    // Rem biaya Apify: maksimum run Actor per hari (seluruh aplikasi; pantau akun + ringkasan komentar). 0 = tanpa batas.
+    'apify_daily_runs' => (int) env('SIMOD_APIFY_DAILY_RUNS', 60),
+
     // Token statis untuk endpoint API ingest (worker Python). Kosong = API ingest ditolak (fail-closed).
     'ingest_token' => env('INGEST_API_TOKEN', ''),
 ];

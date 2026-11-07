@@ -63,9 +63,12 @@ Route::post('/media-intelligence/topics/dismiss-suggestion', [MediaIntelligenceC
 Route::get('/social-intelligence', [SocialIntelligenceController::class, 'index'])->middleware('module:social_intelligence_view')->name('social-intelligence.index');
 Route::post('/social-intelligence/{id}/bookmark', [SocialIntelligenceController::class, 'toggleBookmark'])->middleware('module:social_intelligence_view')->name('social-intelligence.bookmark');
 Route::post('/social-intelligence/sync', [SocialIntelligenceController::class, 'sync'])->middleware(['module:social_intelligence_sync', 'throttle:10,1'])->name('social-intelligence.sync');
-Route::post('/social-intelligence/instagram-accounts', [SocialIntelligenceController::class, 'addInstagramAccount'])->middleware(['module:social_intelligence_sync', 'throttle:10,1']);
-Route::post('/social-intelligence/instagram-accounts/{id}/sync', [SocialIntelligenceController::class, 'syncInstagramAccount'])->middleware(['module:social_intelligence_sync', 'throttle:10,1']);
-Route::delete('/social-intelligence/instagram-accounts/{id}', [SocialIntelligenceController::class, 'deleteInstagramAccount'])->middleware('module:social_intelligence_sync');
+// Pantau Akun lintas platform & Ringkasan Komentar (Apify berbayar → izin sinkron; ringkasan AI → kuota AI).
+Route::post('/social-intelligence/accounts', [SocialIntelligenceController::class, 'addMonitoredAccount'])->middleware(['module:social_intelligence_sync', 'throttle:10,1']);
+Route::post('/social-intelligence/accounts/{id}/sync', [SocialIntelligenceController::class, 'syncMonitoredAccount'])->middleware(['module:social_intelligence_sync', 'throttle:10,1']);
+Route::delete('/social-intelligence/accounts/{id}', [SocialIntelligenceController::class, 'deleteMonitoredAccount'])->middleware('module:social_intelligence_sync');
+Route::post('/social-intelligence/comments', [SocialIntelligenceController::class, 'fetchComments'])->middleware(['module:social_intelligence_sync', 'throttle:10,1']);
+Route::post('/social-intelligence/comments/{id}/summarize', [SocialIntelligenceController::class, 'summarizeComments'])->middleware(['module:social_intelligence_view', 'throttle:10,1']);
 Route::post('/social-intelligence/sync-trends', [SocialIntelligenceController::class, 'syncTrends'])->middleware(['module:social_intelligence_sync', 'throttle:10,1'])->name('social-intelligence.sync-trends');
 Route::post('/social-intelligence/track-keyword', [SocialIntelligenceController::class, 'trackKeyword'])->middleware(['module:social_intelligence_sync', 'throttle:10,1'])->name('social-intelligence.track-keyword');
 Route::post('/social-intelligence/analyze-ai', [SocialIntelligenceController::class, 'analyzeAI'])->middleware(['module:social_intelligence_view', 'throttle:10,1'])->name('social-intelligence.analyze-ai');

@@ -44,6 +44,7 @@ Dokumentasi ini memandu arsitektur, seluruh perintah CLI, modul operasional, int
 | **32** | [32. Audit Total Pra-Unggah](32-audit-total-pra-deploy.md) | Hasil audit UI/UX, multi-hosting, white-label AI, kode mati, dan keamanan sebelum deploy; daftar temuan terbuka. |
 | **33** | [33. Tren Pencarian, SADEWA Cari Internet & Pantauan Banyak KOL](33-tren-pencarian-sadewa-internet-dan-pantauan-banyak-kol.md) | Tab Tren tanpa data karangan + tren pencarian Google nyata, sinkron medsos gratis terjadwal, SADEWA mencari di internet tanpa membocorkan data internal, dan tampilan banyak akun Instagram dengan penanda unggahan menonjol. |
 | **34** | [34. Metodologi Sentimen & Data Medsos Jujur](34-metodologi-sentimen-dan-data-medsos-jujur.md) | Dasar label positif/netral/negatif (satu aturan `NewsSentiment` untuk berita & medsos), popup alasan per item, pembersihan metrik/akun/tagar/waktu karangan pada data medsos, dan angka cadangan palsu di Radar Media Online. |
+| **35** | [35. Social Listening Lintas Platform, Failover Apify & Ringkasan Komentar](35-social-listening-lintas-platform-failover-apify-dan-ringkasan-komentar.md) | Pantau akun Instagram/TikTok/X/YouTube/Halaman Facebook, failover token Apify + rem biaya harian, dan Ringkasan Komentar (komentar asli + sentimen + ringkasan SADEWA). |
 
 > **Konvensi:** bila ada perbedaan antara dokumen dan kode, rujukan yang berlaku adalah [doc 22](22-peta-kode-dan-sumber-kebenaran.md) dan kode itu sendiri. Dokumen bertanda *snapshot historis* (angka test/berita lama) tidak diperbarui otomatis.
 

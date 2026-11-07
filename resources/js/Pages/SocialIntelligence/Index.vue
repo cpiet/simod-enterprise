@@ -4,6 +4,7 @@ import { router, Link, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import AiQuotaBadge from '../../Components/AiQuotaBadge.vue';
 import SentimentInfo from '@/Components/SentimentInfo.vue';
+import { renderSafeMarkdown } from '@/utils/safeMarkdown';
 import EnterpriseLayout from '@/Layouts/EnterpriseLayout.vue';
 import {
   Bot,
@@ -68,7 +69,8 @@ const props = defineProps({
   casePosts: { type: Object, default: null },
   metrics: Object,
   kolProfiles: Array,
-  monitoredInstagramAccounts: { type: Array, default: () => [] },
+  monitoredAccounts: { type: Array, default: () => [] },
+  commentDigests: { type: Object, default: () => ({}) },
   trendingHashtags: Array,
   trendingByPlatform: Object,
   publicTrends: Object,
@@ -88,58 +90,113 @@ const page = usePage();
 const permissions = computed(() => page.props.auth?.permissions || {});
 const canSync = computed(() => !!permissions.value.social_intelligence_sync);
 const canCreateIssue = computed(() => !!permissions.value.issues_create);
-const instagramUsername = ref('');
-const instagramBusy = ref(false);
-const instagramMessage = ref('');
-const instagramError = ref(false);
-const syncInstagram = async (account = null) => {
-  if (instagramBusy.value || (!account && !instagramUsername.value.trim())) return;
-  instagramBusy.value = true;
-  instagramMessage.value = '';
+// Pantau Akun lintas platform (Apify, failover token di server).
+const ACCOUNT_PLATFORMS = [
+  { id: 'instagram', label: 'Instagram', placeholder: 'Username Instagram, mis. mohmahfudmd', hint: 'Akun publik Instagram.' },
+  { id: 'tiktok', label: 'TikTok', placeholder: 'Username TikTok, mis. divisihumaspolri', hint: 'Akun TikTok publik; akun privat tidak dapat diambil.' },
+  { id: 'x', label: 'X (Twitter)', placeholder: 'Username X, mis. DivHumas_Polri', hint: 'Retweet tidak dihitung sebagai unggahan akun.' },
+  { id: 'youtube', label: 'YouTube', placeholder: 'Handle kanal tanpa @, mis. KompasTV', hint: 'Handle kanal (youtube.com/@handle). Hanya video, tanpa Shorts/siaran langsung.' },
+  { id: 'facebook', label: 'Facebook (Halaman)', placeholder: 'Nama Halaman di URL, mis. KompasTV', hint: 'Hanya Halaman (Page) publik; profil pribadi tidak dapat dipantau.' },
+];
+const accountPlatform = ref('instagram');
+const accountUsername = ref('');
+const accountBusy = ref(false);
+const accountMessage = ref('');
+const accountError = ref(false);
+const accountPlatformMeta = computed(() => ACCOUNT_PLATFORMS.find((x) => x.id === accountPlatform.value) || ACCOUNT_PLATFORMS[0]);
+const reloadAccounts = () => router.reload({ only: ['monitoredAccounts', 'commentDigests'], preserveScroll: true });
+const syncAccount = async (account = null) => {
+  if (accountBusy.value || (!account && !accountUsername.value.trim())) return;
+  accountBusy.value = true;
+  accountMessage.value = '';
   try {
     const response = account
-      ? await axios.post(`/social-intelligence/instagram-accounts/${account.id}/sync`)
-      : await axios.post('/social-intelligence/instagram-accounts', { username: instagramUsername.value });
-    instagramMessage.value = response.data.message;
-    instagramError.value = false;
-    if (!account) instagramUsername.value = '';
+      ? await axios.post(`/social-intelligence/accounts/${account.id}/sync`)
+      : await axios.post('/social-intelligence/accounts', { platform: accountPlatform.value, username: accountUsername.value });
+    accountMessage.value = response.data.message;
+    accountError.value = false;
+    if (!account) accountUsername.value = '';
   } catch (error) {
-    instagramError.value = true;
-    instagramMessage.value = error.response?.data?.errors?.username?.[0] || error.response?.data?.message || 'Sinkronisasi gagal. Silakan coba lagi.';
+    accountError.value = true;
+    accountMessage.value = error.response?.data?.errors?.username?.[0] || error.response?.data?.message || 'Sinkronisasi gagal. Silakan coba lagi.';
   } finally {
-    router.reload({ only: ['monitoredInstagramAccounts'], preserveScroll: true });
-    instagramBusy.value = false;
+    reloadAccounts();
+    accountBusy.value = false;
   }
 };
-const removeInstagram = async (account) => {
-  if (!confirm(`Hapus @${account.username} dari daftar pantauan?`)) return;
+const removeAccount = async (account) => {
+  if (!confirm(`Hapus ${account.username} (${getPlatformBadge(account.platform).label}) dari daftar pantauan?`)) return;
   try {
-    await axios.delete(`/social-intelligence/instagram-accounts/${account.id}`);
-    router.reload({ only: ['monitoredInstagramAccounts'], preserveScroll: true });
+    await axios.delete(`/social-intelligence/accounts/${account.id}`);
+    reloadAccounts();
   } catch {
-    instagramError.value = true;
-    instagramMessage.value = 'Akun tidak dapat dihapus.';
+    accountError.value = true;
+    accountMessage.value = 'Akun tidak dapat dihapus.';
   }
 };
-const syncAllInstagram = async () => {
-  if (instagramBusy.value) return;
-  instagramBusy.value = true;
-  instagramMessage.value = '';
+const syncAllAccounts = async () => {
+  if (accountBusy.value) return;
+  accountBusy.value = true;
+  accountMessage.value = '';
   let ok = 0;
   let failed = 0;
-  for (const account of props.monitoredInstagramAccounts) {
+  for (const account of props.monitoredAccounts) {
     try {
-      await axios.post(`/social-intelligence/instagram-accounts/${account.id}/sync`);
+      await axios.post(`/social-intelligence/accounts/${account.id}/sync`);
       ok++;
     } catch {
       failed++;
     }
   }
-  instagramError.value = failed > 0 && ok === 0;
-  instagramMessage.value = `${ok} akun berhasil disinkronkan${failed ? `, ${failed} gagal (lihat keterangan pada tiap akun)` : ''}.`;
-  router.reload({ only: ['monitoredInstagramAccounts'], preserveScroll: true });
-  instagramBusy.value = false;
+  accountError.value = failed > 0 && ok === 0;
+  accountMessage.value = `${ok} akun berhasil disinkronkan${failed ? `, ${failed} gagal (lihat keterangan pada tiap akun)` : ''}.`;
+  reloadAccounts();
+  accountBusy.value = false;
 };
+
+// Ringkasan Komentar per unggahan: komentar asli + sentimen aturan; ringkasan SADEWA atas permintaan.
+const digests = ref({ ...(props.commentDigests || {}) });
+watch(() => props.commentDigests, (v) => { digests.value = { ...digests.value, ...(v || {}) }; });
+const commentOpen = ref(new Set());
+const commentBusy = ref({});
+const commentNotice = ref({});
+const toggleComments = (post) => {
+  const next = new Set(commentOpen.value);
+  next.has(post.url) ? next.delete(post.url) : next.add(post.url);
+  commentOpen.value = next;
+};
+const fetchComments = async (account, post) => {
+  if (commentBusy.value[post.url]) return;
+  commentBusy.value = { ...commentBusy.value, [post.url]: 'fetch' };
+  commentNotice.value = { ...commentNotice.value, [post.url]: null };
+  try {
+    const { data } = await axios.post('/social-intelligence/comments', { account_id: account.id, post_url: post.url });
+    digests.value = { ...digests.value, [post.url]: data.digest };
+    commentNotice.value = { ...commentNotice.value, [post.url]: { error: false, text: data.message } };
+    commentOpen.value = new Set([...commentOpen.value, post.url]);
+  } catch (error) {
+    commentNotice.value = { ...commentNotice.value, [post.url]: { error: true, text: error.response?.data?.message || 'Komentar gagal diambil.' } };
+  } finally {
+    commentBusy.value = { ...commentBusy.value, [post.url]: null };
+  }
+};
+const summarizeDigest = async (post, force = false) => {
+  const digest = digests.value[post.url];
+  if (!digest || commentBusy.value[post.url]) return;
+  commentBusy.value = { ...commentBusy.value, [post.url]: 'ai' };
+  try {
+    const { data } = await axios.post(`/social-intelligence/comments/${digest.id}/summarize`, { force: force ? 1 : 0 });
+    digests.value = { ...digests.value, [post.url]: data.digest };
+    commentNotice.value = { ...commentNotice.value, [post.url]: { error: false, text: data.message } };
+  } catch (error) {
+    commentNotice.value = { ...commentNotice.value, [post.url]: { error: true, text: error.response?.data?.message || 'Ringkasan gagal.' } };
+  } finally {
+    commentBusy.value = { ...commentBusy.value, [post.url]: null };
+  }
+};
+const digestComments = (d) => [...(d?.comments || [])].sort((a, b) => ({ negatif: 0, positif: 1, netral: 2 }[a.sentiment] - { negatif: 0, positif: 1, netral: 2 }[b.sentiment]) || ((b.likes ?? 0) - (a.likes ?? 0)));
+const pct = (n, total) => (total ? Math.round((n / total) * 100) : 0);
+
 // Ringkasan dihitung dari unggahan tersimpan; metrik yang tidak tersedia tidak ikut dirata-rata.
 const instagramStats = (account) => {
   const avg = (key) => {
@@ -150,9 +207,10 @@ const instagramStats = (account) => {
   return { avgLikes: avg('likes'), avgComments: avg('comments'), latest: latest ? new Date(latest).toLocaleDateString('id-ID', { dateStyle: 'medium' }) : '—' };
 };
 const monitorKol = (kol) => {
-  instagramUsername.value = String(kol.author_handle || '').replace(/^@/, '');
+  if (ACCOUNT_PLATFORMS.some((x) => x.id === kol.platform)) accountPlatform.value = kol.platform;
+  accountUsername.value = String(kol.author_handle || '').replace(/^@/, '');
   activeTab.value = 'kol';
-  document.getElementById('instagram-monitor-username')?.focus();
+  document.getElementById('account-monitor-username')?.focus();
 };
 const instagramDate = (date) => date ? new Date(date).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : 'Waktu tidak tersedia';
 
@@ -168,6 +226,12 @@ const kolPlatformTabs = computed(() => {
 const visibleKols = computed(() => (props.kolProfiles || []).filter((k) => kolPlatform.value === 'all' || k.platform === kolPlatform.value));
 
 const igSearch = ref('');
+const igPlatform = ref('all');
+const igPlatformTabs = computed(() => {
+  const counts = {};
+  for (const a of props.monitoredAccounts) counts[a.platform] = (counts[a.platform] || 0) + 1;
+  return Object.keys(counts).map((id) => ({ id, label: getPlatformBadge(id).label, count: counts[id] }));
+});
 const igSort = ref('latest');
 const igHighlightOnly = ref(false);
 const igExpanded = ref(new Set());
@@ -183,8 +247,9 @@ const igHighlights = (account) => (account.posts || []).filter((p) => p.highligh
 const igIsNew = (account) => igLatestTime(account) > 0 && Date.now() - igLatestTime(account) < DAY_MS;
 const igAccounts = computed(() => {
   const q = igSearch.value.trim().toLowerCase().replace(/^@/, '');
-  const list = props.monitoredInstagramAccounts.filter((a) => {
+  const list = props.monitoredAccounts.filter((a) => {
     if (igHighlightOnly.value && !igHighlights(a).length) return false;
+    if (igPlatform.value !== 'all' && a.platform !== igPlatform.value) return false;
     return !q || a.username.toLowerCase().includes(q) || (a.display_name || '').toLowerCase().includes(q);
   });
   const sorters = {
@@ -196,7 +261,7 @@ const igAccounts = computed(() => {
   return [...list].sort(sorters[igSort.value] || sorters.latest);
 });
 const igSummary = computed(() => {
-  const accounts = props.monitoredInstagramAccounts;
+  const accounts = props.monitoredAccounts;
   const weekAgo = Date.now() - 7 * DAY_MS;
   const top = [...accounts].filter((a) => igEngagement(a) > 0).sort((a, b) => igEngagement(b) - igEngagement(a))[0];
   return {
@@ -204,10 +269,10 @@ const igSummary = computed(() => {
     week: accounts.reduce((n, a) => n + (a.posts || []).filter((p) => p.posted_at && new Date(p.posted_at).getTime() >= weekAgo).length, 0),
     highlights: accounts.reduce((n, a) => n + igHighlights(a).length, 0),
     errors: accounts.filter((a) => a.last_error).length,
-    top: top ? `@${top.username}` : null,
+    top: top ? `${top.username} (${getPlatformBadge(top.platform).label})` : null,
   };
 });
-const igIsOpen = (account) => props.monitoredInstagramAccounts.length === 1 || igExpanded.value.has(account.id);
+const igIsOpen = (account) => props.monitoredAccounts.length === 1 || igExpanded.value.has(account.id);
 const igToggle = (account) => {
   const next = new Set(igExpanded.value);
   next.has(account.id) ? next.delete(account.id) : next.add(account.id);
@@ -2279,15 +2344,11 @@ const getBuzzerRiskClass = (level) => {
       <section class="rounded-3xl bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm space-y-4">
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div class="min-w-0">
-            <h2 class="text-base font-black text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
-              <span>Pantau Akun</span>
-              <span class="px-2 py-0.5 rounded-md text-[11px] font-black text-white bg-linear-to-r from-pink-500 via-rose-500 to-amber-500">Instagram</span>
-            </h2>
-            <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">Unggahan publik terbaru dari akun <b>Instagram</b> tokoh atau KOL pilihan (hingga 12 unggahan per sinkronisasi, diambil lewat Apify, dilakukan manual). Hanya data publik; suka/komentar yang tidak tersedia ditampilkan apa adanya.</p>
-            <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Pantauan per akun baru tersedia untuk Instagram. Unggahan dari X, TikTok, YouTube, dan Facebook masuk lewat <b>Radar Percakapan</b> dan Direktori KOL di bawah, lengkap dengan label platformnya.</p>
+            <h2 class="text-base font-black text-slate-900 dark:text-white">Pantau Akun Lintas Platform</h2>
+            <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">Unggahan publik terbaru akun tokoh, KOL, atau institusi pilihan di <b>Instagram, TikTok, X, YouTube, dan Halaman Facebook</b> (hingga 12 unggahan per sinkronisasi, lewat Apify, dilakukan manual). Satu tokoh dapat dipantau di beberapa platform. Metrik yang tidak disediakan platform ditampilkan "—".</p>
           </div>
-          <button v-if="canSync && instagramReady && monitoredInstagramAccounts.length > 1" type="button" :disabled="instagramBusy" @click="syncAllInstagram" class="shrink-0 rounded-xl border border-slate-300 dark:border-slate-700 px-3.5 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 hover:border-amber-400 disabled:opacity-50 cursor-pointer">
-            {{ instagramBusy ? 'Memproses...' : `Sinkronkan semua (${monitoredInstagramAccounts.length})` }}
+          <button v-if="canSync && instagramReady && monitoredAccounts.length > 1" type="button" :disabled="accountBusy" @click="syncAllAccounts" class="shrink-0 rounded-xl border border-slate-300 dark:border-slate-700 px-3.5 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 hover:border-amber-400 disabled:opacity-50 cursor-pointer">
+            {{ accountBusy ? 'Memproses...' : `Sinkronkan semua (${monitoredAccounts.length})` }}
           </button>
         </div>
 
@@ -2295,31 +2356,38 @@ const getBuzzerRiskClass = (level) => {
           <strong>Token Apify belum diatur.</strong> Sinkronisasi akun belum dapat dijalankan. Administrator mengisinya di <em>Keamanan &amp; Pemeliharaan → Mesin Intelijen AI</em>.
         </div>
 
-        <form v-if="canSync" class="flex flex-col sm:flex-row gap-2" @submit.prevent="syncInstagram()">
-          <label for="instagram-monitor-username" class="sr-only">Username Instagram</label>
-          <input id="instagram-monitor-username" v-model="instagramUsername" maxlength="31" autocomplete="off" placeholder="Username Instagram, contoh: @mohmahfudmd" class="flex-1 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-400" />
-          <button type="submit" :disabled="instagramBusy || !instagramReady || !instagramUsername.trim()" class="rounded-xl bg-amber-400 hover:bg-amber-300 px-4 py-2 text-sm font-bold text-slate-950 disabled:opacity-50 cursor-pointer">{{ instagramBusy ? 'Menyinkronkan...' : 'Tambah & sinkronkan' }}</button>
+        <form v-if="canSync" class="space-y-1.5" @submit.prevent="syncAccount()">
+          <div class="flex flex-col sm:flex-row gap-2">
+            <label for="account-monitor-platform" class="sr-only">Platform</label>
+            <select id="account-monitor-platform" v-model="accountPlatform" class="sm:w-48 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
+              <option v-for="pl in ACCOUNT_PLATFORMS" :key="pl.id" :value="pl.id">{{ pl.label }}</option>
+            </select>
+            <label for="account-monitor-username" class="sr-only">Username</label>
+            <input id="account-monitor-username" v-model="accountUsername" maxlength="100" autocomplete="off" :placeholder="accountPlatformMeta.placeholder" class="flex-1 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-400" />
+            <button type="submit" :disabled="accountBusy || !instagramReady || !accountUsername.trim()" class="rounded-xl bg-amber-400 hover:bg-amber-300 px-4 py-2 text-sm font-bold text-slate-950 disabled:opacity-50 cursor-pointer">{{ accountBusy ? 'Menyinkronkan...' : 'Tambah & sinkronkan' }}</button>
+          </div>
+          <p class="text-[11px] text-slate-500 dark:text-slate-400">{{ accountPlatformMeta.hint }} Boleh menempel tautan profil utuh.</p>
         </form>
         <p v-else class="text-xs text-slate-500 dark:text-slate-400">Menambah atau menyinkronkan akun memerlukan izin sinkron Radar Media Sosial. Anda dapat melihat hasil yang sudah ada.</p>
 
-        <p v-if="instagramMessage" role="status" class="text-xs font-semibold" :class="instagramError ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'">{{ instagramMessage }}</p>
-        <p v-if="!monitoredInstagramAccounts.length" class="rounded-xl bg-slate-50 dark:bg-slate-900 p-4 text-sm text-slate-600 dark:text-slate-400">Belum ada akun dalam daftar pantauan wilayah ini. Tambahkan username publik, mis. <span class="font-mono">@mohmahfudmd</span>.</p>
+        <p v-if="accountMessage" role="status" class="text-xs font-semibold" :class="accountError ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'">{{ accountMessage }}</p>
+        <p v-if="!monitoredAccounts.length" class="rounded-xl bg-slate-50 dark:bg-slate-900 p-4 text-sm text-slate-600 dark:text-slate-400">Belum ada akun dalam daftar pantauan wilayah ini. Pilih platform lalu masukkan username publik, mis. Instagram <span class="font-mono">mohmahfudmd</span> atau X <span class="font-mono">DivHumas_Polri</span>.</p>
 
         <!-- Ringkasan & alat bantu: muncul bila sudah ada akun -->
-        <div v-if="monitoredInstagramAccounts.length" class="grid grid-cols-2 lg:grid-cols-4 gap-2 text-center">
+        <div v-if="monitoredAccounts.length" class="grid grid-cols-2 lg:grid-cols-4 gap-2 text-center">
           <div class="rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2.5"><p class="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">Akun dipantau</p><p class="text-base font-black text-slate-900 dark:text-white">{{ igSummary.accounts }}</p></div>
           <div class="rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2.5"><p class="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">Unggahan 7 hari</p><p class="text-base font-black text-slate-900 dark:text-white">{{ igSummary.week }}</p></div>
           <div class="rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2.5"><p class="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">Unggahan menonjol</p><p class="text-base font-black" :class="igSummary.highlights ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'">{{ igSummary.highlights }}</p></div>
           <div class="rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2.5"><p class="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">Keterlibatan tertinggi</p><p class="text-sm font-black text-slate-900 dark:text-white truncate">{{ igSummary.top ?? '—' }}</p></div>
         </div>
-        <p v-if="monitoredInstagramAccounts.length" class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+        <p v-if="monitoredAccounts.length" class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
           <strong class="text-slate-700 dark:text-slate-300">Menonjol</strong> = keterlibatan (suka + komentar) minimal 2× median unggahan akun itu sendiri (perlu ≥ 4 unggahan bermetrik), atau keterangan unggahan memuat kata kunci kamtibmas. Bukan penilaian AI; tetap perlu ditinjau.
         </p>
 
-        <div v-if="monitoredInstagramAccounts.length > 1" class="flex flex-wrap items-center gap-2">
+        <div v-if="monitoredAccounts.length > 1" class="flex flex-wrap items-center gap-2">
           <div class="relative flex-1 min-w-[180px]">
             <Search class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
-            <input v-model="igSearch" type="search" placeholder="Cari akun…" aria-label="Cari akun Instagram" class="w-full pl-8 pr-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-400" />
+            <input v-model="igSearch" type="search" placeholder="Cari akun…" aria-label="Cari akun pantauan" class="w-full pl-8 pr-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-400" />
           </div>
           <label class="sr-only" for="ig-sort">Urutkan akun</label>
           <select id="ig-sort" v-model="igSort" class="py-1.5 px-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-amber-400">
@@ -2328,23 +2396,28 @@ const getBuzzerRiskClass = (level) => {
             <option value="engagement">Keterlibatan tertinggi</option>
             <option value="name">Nama (A–Z)</option>
           </select>
+          <select v-if="igPlatformTabs.length > 1" v-model="igPlatform" aria-label="Saring platform" class="py-1.5 px-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-amber-400">
+            <option value="all">Semua platform ({{ monitoredAccounts.length }})</option>
+            <option v-for="t in igPlatformTabs" :key="t.id" :value="t.id">{{ t.label }} ({{ t.count }})</option>
+          </select>
           <button type="button" @click="igHighlightOnly = !igHighlightOnly" :aria-pressed="igHighlightOnly" class="px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer" :class="igHighlightOnly ? 'bg-rose-500 text-white border-rose-500' : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:border-rose-400'">
             Hanya yang menonjol
           </button>
-          <span class="text-[11px] text-slate-500 dark:text-slate-400">{{ igAccounts.length }} dari {{ monitoredInstagramAccounts.length }} akun</span>
+          <span class="text-[11px] text-slate-500 dark:text-slate-400">{{ igAccounts.length }} dari {{ monitoredAccounts.length }} akun</span>
         </div>
-        <p v-if="monitoredInstagramAccounts.length && !igAccounts.length" class="text-xs text-slate-500 dark:text-slate-400 p-3">Tidak ada akun yang cocok dengan filter.</p>
+        <p v-if="monitoredAccounts.length && !igAccounts.length" class="text-xs text-slate-500 dark:text-slate-400 p-3">Tidak ada akun yang cocok dengan filter.</p>
 
         <article v-for="account in igAccounts" :key="account.id" class="rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
           <!-- Baris ringkas: klik untuk membuka -->
           <div class="flex flex-wrap items-center gap-3 p-3.5" :class="igIsOpen(account) ? 'border-b border-slate-200 dark:border-slate-800' : ''">
-            <button type="button" @click="igToggle(account)" :aria-expanded="igIsOpen(account)" :disabled="monitoredInstagramAccounts.length === 1" class="flex items-center gap-3 min-w-0 flex-1 text-left cursor-pointer disabled:cursor-default">
+            <button type="button" @click="igToggle(account)" :aria-expanded="igIsOpen(account)" :disabled="monitoredAccounts.length === 1" class="flex items-center gap-3 min-w-0 flex-1 text-left cursor-pointer disabled:cursor-default">
               <div class="w-10 h-10 rounded-full bg-linear-to-tr from-amber-400 to-rose-400 text-slate-950 font-black flex items-center justify-center shrink-0">{{ (account.display_name || account.username).charAt(0).toUpperCase() }}</div>
               <div class="min-w-0 flex-1">
                 <p class="flex items-center gap-1.5 flex-wrap">
-                  <span class="font-bold text-sm text-slate-900 dark:text-white truncate">{{ account.display_name || 'Akun Instagram' }}</span>
-                  <span class="px-1.5 py-0.5 rounded text-[10px] font-black text-white bg-linear-to-r from-pink-500 via-rose-500 to-amber-500">Instagram</span>
-                  <span class="text-[11px] font-mono text-slate-500 dark:text-slate-400">@{{ account.username }}</span>
+                  <span class="font-bold text-sm text-slate-900 dark:text-white truncate">{{ account.display_name || account.username }}</span>
+                  <span class="px-1.5 py-0.5 rounded text-[10px] font-black" :class="getPlatformBadge(account.platform).class">{{ getPlatformBadge(account.platform).label }}</span>
+                  <span class="text-[11px] font-mono text-slate-500 dark:text-slate-400">{{ account.platform === 'facebook' ? '' : '@' }}{{ account.username }}</span>
+                  <span v-if="account.profile?.followers != null" class="text-[11px] text-slate-500 dark:text-slate-400">· {{ formatNumber(account.profile.followers) }} {{ account.platform === 'youtube' ? 'pelanggan' : 'pengikut' }}</span>
                   <span v-if="igIsNew(account)" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">Baru 24 jam</span>
                   <span v-if="igHighlights(account).length" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-300">{{ igHighlights(account).length }} menonjol</span>
                   <span v-if="account.last_error" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">Sinkron gagal</span>
@@ -2356,13 +2429,13 @@ const getBuzzerRiskClass = (level) => {
                   · terbaru {{ instagramStats(account).latest }}
                 </p>
               </div>
-              <ChevronDown v-if="monitoredInstagramAccounts.length > 1" class="w-4 h-4 text-slate-400 shrink-0 transition-transform" :class="igIsOpen(account) ? 'rotate-180' : ''" />
+              <ChevronDown v-if="monitoredAccounts.length > 1" class="w-4 h-4 text-slate-400 shrink-0 transition-transform" :class="igIsOpen(account) ? 'rotate-180' : ''" />
             </button>
             <div class="flex items-center gap-2">
-              <a :href="`https://www.instagram.com/${account.username}/`" target="_blank" rel="noopener noreferrer" class="rounded-lg border border-slate-300 dark:border-slate-700 px-2.5 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:border-amber-400" :aria-label="`Buka profil @${account.username} di Instagram`">Instagram ↗</a>
+              <a :href="account.profile_url" target="_blank" rel="noopener noreferrer" class="rounded-lg border border-slate-300 dark:border-slate-700 px-2.5 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:border-amber-400" :aria-label="`Buka profil ${account.username} di ${getPlatformBadge(account.platform).label}`">Profil ↗</a>
               <template v-if="canSync">
-                <button type="button" :disabled="instagramBusy || !instagramReady" @click="syncInstagram(account)" class="rounded-lg border border-slate-300 dark:border-slate-700 px-2.5 py-1.5 text-xs font-bold text-slate-800 dark:text-slate-200 hover:border-amber-400 disabled:opacity-50 cursor-pointer">{{ instagramBusy ? 'Memproses...' : 'Sinkronkan' }}</button>
-                <button type="button" :disabled="instagramBusy" @click="removeInstagram(account)" class="rounded-lg border border-rose-200 dark:border-rose-900 px-2.5 py-1.5 text-xs font-bold text-rose-700 dark:text-rose-400 cursor-pointer">Hapus</button>
+                <button type="button" :disabled="accountBusy || !instagramReady" @click="syncAccount(account)" class="rounded-lg border border-slate-300 dark:border-slate-700 px-2.5 py-1.5 text-xs font-bold text-slate-800 dark:text-slate-200 hover:border-amber-400 disabled:opacity-50 cursor-pointer">{{ accountBusy ? 'Memproses...' : 'Sinkronkan' }}</button>
+                <button type="button" :disabled="accountBusy" @click="removeAccount(account)" class="rounded-lg border border-rose-200 dark:border-rose-900 px-2.5 py-1.5 text-xs font-bold text-rose-700 dark:text-rose-400 cursor-pointer">Hapus</button>
               </template>
             </div>
           </div>
@@ -2375,25 +2448,87 @@ const getBuzzerRiskClass = (level) => {
 
             <p v-if="!account.posts?.length" class="text-xs text-slate-600 dark:text-slate-400">Belum ada unggahan yang dapat ditampilkan.</p>
             <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-              <a v-for="post in igVisiblePosts(account)" :key="post.url" :href="post.url" target="_blank" rel="noopener noreferrer" class="flex gap-3 rounded-xl border p-3 hover:border-amber-400 transition" :class="post.highlight ? 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-300 dark:border-rose-900/70' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800'">
-                <div class="w-20 h-20 rounded-lg bg-slate-200 dark:bg-slate-800 shrink-0 overflow-hidden flex items-center justify-center text-slate-500">
-                  <img v-if="post.thumb" :src="post.thumb" alt="" referrerpolicy="no-referrer" loading="lazy" class="w-full h-full object-cover" @error="$event.target.style.display = 'none'" />
-                  <Play v-else-if="post.type === 'video'" class="w-5 h-5" />
-                  <Share2 v-else class="w-5 h-5" />
+              <div v-for="post in igVisiblePosts(account)" :key="post.url" class="rounded-xl border p-3 transition" :class="post.highlight ? 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-300 dark:border-rose-900/70' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800'">
+                <a :href="post.url" target="_blank" rel="noopener noreferrer" class="flex gap-3 group">
+                  <div class="w-20 h-20 rounded-lg bg-slate-200 dark:bg-slate-800 shrink-0 overflow-hidden flex items-center justify-center text-slate-500">
+                    <img v-if="post.thumb" :src="post.thumb" alt="" referrerpolicy="no-referrer" loading="lazy" class="w-full h-full object-cover" @error="$event.target.style.display = 'none'" />
+                    <Play v-else-if="post.type === 'video'" class="w-5 h-5" />
+                    <Share2 v-else class="w-5 h-5" />
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                      {{ instagramDate(post.posted_at) }}
+                      <span v-if="post.type" class="ml-1 px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-[10px] font-bold uppercase">{{ { image: 'Foto', video: 'Video', sidecar: 'Album', text: 'Teks' }[post.type] }}</span>
+                    </p>
+                    <p v-if="post.highlight" class="mt-1 text-[11px] font-bold text-rose-700 dark:text-rose-300">Menonjol: {{ igHighlightText(post.highlight) }}</p>
+                    <p class="mt-1 text-sm text-slate-800 dark:text-slate-200 line-clamp-3 group-hover:text-amber-700 dark:group-hover:text-amber-300">{{ post.caption || 'Unggahan tanpa keterangan teks.' }}</p>
+                    <p class="mt-1.5 text-[11px] text-slate-600 dark:text-slate-400">
+                      Suka: {{ formatNumber(post.likes) }} · Komentar: {{ formatNumber(post.comments) }}<span v-if="post.views != null"> · Tayang: {{ formatNumber(post.views) }}</span><span v-if="post.shares != null"> · Bagikan: {{ formatNumber(post.shares) }}</span>
+                    </p>
+                    <p v-if="post.hashtags?.length" class="mt-1 text-[11px] text-amber-700 dark:text-amber-400 truncate">{{ post.hashtags.map((h) => '#' + h.replace(/^#/, '')).join(' ') }}</p>
+                  </div>
+                </a>
+
+                <!-- Ringkasan Komentar -->
+                <div class="mt-2.5 pt-2.5 border-t border-slate-200 dark:border-slate-800 space-y-2">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <button v-if="digests[post.url]" type="button" @click="toggleComments(post)" :aria-expanded="commentOpen.has(post.url)" class="text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:text-amber-600 cursor-pointer">
+                      {{ commentOpen.has(post.url) ? 'Sembunyikan' : 'Lihat' }} ringkasan {{ digests[post.url].total }} komentar
+                    </button>
+                    <button v-if="canSync && instagramReady" type="button" :disabled="!!commentBusy[post.url]" @click="fetchComments(account, post)" class="text-[11px] font-bold text-amber-700 dark:text-amber-400 hover:underline disabled:opacity-50 cursor-pointer">
+                      {{ commentBusy[post.url] === 'fetch' ? 'Mengambil komentar…' : (digests[post.url] ? 'Ambil ulang komentar' : 'Ringkasan komentar') }}
+                    </button>
+                    <span v-if="digests[post.url]?.fetched_at" class="text-[10px] text-slate-500 dark:text-slate-400">diambil {{ instagramDate(digests[post.url].fetched_at) }}</span>
+                  </div>
+                  <p v-if="commentNotice[post.url]" class="text-[11px] font-semibold" :class="commentNotice[post.url].error ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'">{{ commentNotice[post.url].text }}</p>
+
+                  <div v-if="digests[post.url] && commentOpen.has(post.url)" class="space-y-2.5">
+                    <template v-if="digests[post.url].total">
+                      <div>
+                        <div class="flex h-2 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800" role="img" :aria-label="`Sentimen komentar: ${digests[post.url].positif} positif, ${digests[post.url].netral} netral, ${digests[post.url].negatif} negatif`">
+                          <div class="bg-emerald-500" :style="{ width: pct(digests[post.url].positif, digests[post.url].total) + '%' }"></div>
+                          <div class="bg-slate-400 dark:bg-slate-600" :style="{ width: pct(digests[post.url].netral, digests[post.url].total) + '%' }"></div>
+                          <div class="bg-rose-500" :style="{ width: pct(digests[post.url].negatif, digests[post.url].total) + '%' }"></div>
+                        </div>
+                        <p class="mt-1 text-[11px] text-slate-600 dark:text-slate-400 flex flex-wrap items-center gap-x-2">
+                          <span class="text-emerald-700 dark:text-emerald-400 font-bold">{{ digests[post.url].positif }} positif</span>
+                          <span>{{ digests[post.url].netral }} netral</span>
+                          <span class="text-rose-700 dark:text-rose-400 font-bold">{{ digests[post.url].negatif }} negatif</span>
+                          <span>dari {{ digests[post.url].total }} komentar</span>
+                          <SentimentInfo variant="icon" kind="social" :lexicon="sentimentLexicon" />
+                        </p>
+                      </div>
+                      <p v-if="digests[post.url].top_words?.length" class="text-[11px] text-slate-600 dark:text-slate-400">
+                        <b class="text-slate-700 dark:text-slate-300">Sering disebut:</b>
+                        <span v-for="w in digests[post.url].top_words" :key="w.word" class="ml-1 inline-block px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800">{{ w.word }} ({{ w.count }})</span>
+                      </p>
+
+                      <div class="rounded-lg bg-white dark:bg-[#0b1426] border border-slate-200 dark:border-slate-800 p-2.5">
+                        <div class="flex items-center justify-between gap-2">
+                          <p class="text-[11px] font-black text-slate-800 dark:text-slate-100">Ringkasan opini SADEWA</p>
+                          <button type="button" :disabled="!!commentBusy[post.url]" @click="summarizeDigest(post, !!digests[post.url].ai_summary)" class="text-[11px] font-bold text-amber-700 dark:text-amber-400 hover:underline disabled:opacity-50 cursor-pointer">
+                            {{ commentBusy[post.url] === 'ai' ? 'Meringkas…' : (digests[post.url].ai_summary ? 'Ringkas ulang' : 'Ringkas dengan SADEWA') }}
+                          </button>
+                        </div>
+                        <div v-if="digests[post.url].ai_summary" class="mt-1.5 text-[12px] text-slate-700 dark:text-slate-200 leading-relaxed sadewa-markdown-body" v-html="renderSafeMarkdown(digests[post.url].ai_summary)"></div>
+                        <p v-else class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Belum diringkas. Ringkasan memakai 1 permintaan dari batas AI harian Anda.</p>
+                      </div>
+
+                      <ul class="space-y-1 max-h-64 overflow-y-auto pr-1">
+                        <li v-for="(c, ci) in digestComments(digests[post.url])" :key="ci" class="text-[11px] leading-snug flex gap-2">
+                          <span class="mt-1 w-2 h-2 rounded-full shrink-0" :class="c.sentiment === 'negatif' ? 'bg-rose-500' : (c.sentiment === 'positif' ? 'bg-emerald-500' : 'bg-slate-400')" :title="`${c.sentiment}: ${c.reason}`"></span>
+                          <span class="min-w-0">
+                            <span class="font-bold text-slate-700 dark:text-slate-300">{{ c.author || 'anonim' }}</span>
+                            <span class="text-slate-700 dark:text-slate-300"> {{ c.text }}</span>
+                            <span v-if="c.likes" class="text-slate-500"> · {{ formatNumber(c.likes) }} suka</span>
+                          </span>
+                        </li>
+                      </ul>
+                    </template>
+                    <p v-else class="text-[11px] text-slate-500 dark:text-slate-400">Belum ada komentar publik pada unggahan ini.</p>
+                  </div>
                 </div>
-                <div class="min-w-0 flex-1">
-                  <p class="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
-                    {{ instagramDate(post.posted_at) }}
-                    <span v-if="post.type" class="ml-1 px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-[10px] font-bold uppercase">{{ { image: 'Foto', video: 'Video', sidecar: 'Album' }[post.type] }}</span>
-                  </p>
-                  <p v-if="post.highlight" class="mt-1 text-[11px] font-bold text-rose-700 dark:text-rose-300">Menonjol: {{ igHighlightText(post.highlight) }}</p>
-                  <p class="mt-1 text-sm text-slate-800 dark:text-slate-200 line-clamp-3">{{ post.caption || 'Unggahan tanpa keterangan teks.' }}</p>
-                  <p class="mt-1.5 text-[11px] text-slate-600 dark:text-slate-400">
-                    Suka: {{ post.likes == null ? 'Tidak tersedia' : formatNumber(post.likes) }} · Komentar: {{ post.comments == null ? 'Tidak tersedia' : formatNumber(post.comments) }}<span v-if="post.views != null"> · Tayang: {{ formatNumber(post.views) }}</span>
-                  </p>
-                  <p v-if="post.hashtags?.length" class="mt-1 text-[11px] text-amber-700 dark:text-amber-400 truncate">{{ post.hashtags.map((h) => '#' + h.replace(/^#/, '')).join(' ') }}</p>
-                </div>
-              </a>
+              </div>
             </div>
             <button v-if="(account.posts?.length ?? 0) > IG_PREVIEW" type="button" @click="igToggleAll(account)" class="text-xs font-bold text-amber-700 dark:text-amber-400 hover:underline cursor-pointer">
               {{ igShowAll.has(account.id) ? 'Tampilkan lebih sedikit' : `Lihat semua ${account.posts.length} unggahan` }}
@@ -2470,7 +2605,7 @@ const getBuzzerRiskClass = (level) => {
                 <ChevronRight class="w-3.5 h-3.5" />
               </button>
               <button
-                v-if="canSync && kol.platform === 'instagram' && kol.author_handle"
+                v-if="canSync && ACCOUNT_PLATFORMS.some((x) => x.id === kol.platform) && kol.author_handle"
                 @click="monitorKol(kol)"
                 type="button"
                 class="text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-amber-600 cursor-pointer"

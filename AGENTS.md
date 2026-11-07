@@ -24,7 +24,7 @@ Bahasa kerja proyek: **Bahasa Indonesia** (UI, pesan galat, komentar, dokumentas
 | Basis data | MySQL/MariaDB `simod_enterprise` (Laragon); **SQLite in-memory** khusus test |
 | Sesi / cache / antrean | Driver `database` |
 | AI | Google Gemini (`app/Services/GeminiService.php`), dibatasi `app/Services/AiQuota.php` |
-| Scraper eksternal | Apify (`ApifySyncService`), worker Python `scraper/` → `POST /api/v1/ingest/*` |
+| Scraper eksternal | Apify (`ApifyClient` = failover token + rem harian `SIMOD_APIFY_DAILY_RUNS`; `ApifySyncService`, `SocialAccountMonitoringService`, `CommentDigestService`), worker Python `scraper/` → `POST /api/v1/ingest/*` |
 
 Lingkungan lokal: Windows 11 + Laragon, vhost `http://simod-enterprise.test`. Folder proyek bisa berbeda antar komputer (mis. `D:\Foto\laragon\www\simod-enterprise` atau `D:\laragon\www\simod-enterprise`); jangan menulis path absolut di kode maupun di tautan dokumen. Gunakan path relatif.
 
@@ -222,6 +222,7 @@ Daftar lengkap ada di [`docs/README.md`](docs/README.md). Yang paling sering dib
 | Demo Divhumas + Sulbar, deploy Hostinger | [31](docs/31-demo-divhumas-sulbar-dan-panduan-deploy-hostinger.md) |
 | Tren pencarian, SADEWA cari internet, pantauan banyak KOL | [33](docs/33-tren-pencarian-sadewa-internet-dan-pantauan-banyak-kol.md) |
 | Metodologi sentimen, popup alasan, data medsos jujur | [34](docs/34-metodologi-sentimen-dan-data-medsos-jujur.md) |
+| Social listening lintas platform, failover Apify, ringkasan komentar | [35](docs/35-social-listening-lintas-platform-failover-apify-dan-ringkasan-komentar.md) |
 | Radar Media Online, RSS, Topik Atensi | [03](docs/03-modul-media-intelligence-dan-rss.md), [10](docs/10-daftar-rss-feed-resmi-sulbar.md), [14](docs/14-katalog-rss-media-online-nasional.md), [18](docs/18-optimalisasi-ux-dossier-dan-arsitektur-4-pilar-media-intelligence.md), [23](docs/23-optimalisasi-performa-dan-ux-radar-media-online.md) |
 | Radar Media Sosial | [11](docs/11-modul-radar-media-sosial-apify.md), [19](docs/19-optimalisasi-radar-media-sosial-dan-sintesis-ai-sadewa.md), [25](docs/25-peta-grafik-dan-pantauan-instagram.md) |
 | Isu, tugas, publikasi, administrasi | [24](docs/24-penyederhanaan-isu-tugas-publikasi-dan-administrasi.md), [04](docs/04-modul-manajemen-isu-dan-ews.md), [05](docs/05-modul-publikasi-dan-siaran-pers.md), [06](docs/06-modul-disposisi-tugas-dan-audit-trail.md) |

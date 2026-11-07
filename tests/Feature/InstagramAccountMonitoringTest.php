@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\MonitoredInstagramAccount;
+use App\Models\MonitoredSocialAccount;
 use App\Models\Polda;
 use App\Models\SocialSetting;
 use App\Models\User;
@@ -26,13 +26,13 @@ class InstagramAccountMonitoringTest extends TestCase
         ], 201)]);
 
         $this->actingAs($user)->withSession(['active_polda_code' => 'SULBAR'])
-            ->postJson('/social-intelligence/instagram-accounts', ['username' => '@mohmahfudmd'])
+            ->postJson('/social-intelligence/accounts', ['username' => '@mohmahfudmd'])
             ->assertOk()->assertJson(['success' => true]);
-        $account = MonitoredInstagramAccount::firstOrFail();
+        $account = MonitoredSocialAccount::firstOrFail();
         $this->assertCount(1, $account->posts);
         $this->assertNull($account->posts[0]['likes']);
         $this->assertSame(9, $account->posts[0]['comments']);
-        Http::assertSent(fn ($request) => str_contains($request->url(), 'maxTotalChargeUsd=0.05') && $request['resultsLimit'] === 12);
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'maxTotalChargeUsd=0.5') && $request['resultsLimit'] === 12 && str_contains($request->url(), 'apify~instagram-scraper'));
     }
 
     public function test_failed_sync_preserves_previous_data_and_cross_tenant_access_is_denied(): void
@@ -41,12 +41,12 @@ class InstagramAccountMonitoringTest extends TestCase
         $other = Polda::create(['name' => 'Jateng', 'code' => 'JATENG', 'is_active' => true]);
         $user = User::factory()->create(['polda_id' => $polda->id, 'role' => 'polda_leader']);
         SocialSetting::create(['polda_id' => $polda->id, 'apify_api_token' => 'test-token']);
-        $account = MonitoredInstagramAccount::create(['polda_id' => $polda->id, 'username' => 'test', 'posts' => [['url' => 'https://www.instagram.com/p/old/']], 'sync_status' => 'success']);
-        $foreign = MonitoredInstagramAccount::create(['polda_id' => $other->id, 'username' => 'foreign']);
+        $account = MonitoredSocialAccount::create(['polda_id' => $polda->id, 'username' => 'test', 'posts' => [['url' => 'https://www.instagram.com/p/old/']], 'sync_status' => 'success']);
+        $foreign = MonitoredSocialAccount::create(['polda_id' => $other->id, 'username' => 'foreign']);
         Http::fake(['api.apify.com/*' => Http::response([], 201)]);
 
-        $this->actingAs($user)->postJson('/social-intelligence/instagram-accounts/'.$foreign->id.'/sync')->assertNotFound();
-        $this->actingAs($user)->postJson('/social-intelligence/instagram-accounts/'.$account->id.'/sync')->assertStatus(422);
+        $this->actingAs($user)->postJson('/social-intelligence/accounts/'.$foreign->id.'/sync')->assertNotFound();
+        $this->actingAs($user)->postJson('/social-intelligence/accounts/'.$account->id.'/sync')->assertStatus(422);
         $this->assertSame('empty', $account->fresh()->sync_status);
         $this->assertCount(1, $account->fresh()->posts);
     }

@@ -8,27 +8,13 @@ import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import axios from 'axios';
 import AiQuotaBadge from './AiQuotaBadge.vue';
 import { Link, usePage } from '@inertiajs/vue3';
-import { Marked } from 'marked';
+import { safeMarked as md } from '@/utils/safeMarkdown';
 import {
   Bot, X, Send, Square, MoreHorizontal, Plus, History, Volume2, VolumeX, Copy, Check,
   RotateCcw, Trash2, ArrowLeft, ExternalLink, MessageSquareText, Newspaper, Share2, ClipboardList, ChevronRight, Globe,
 } from 'lucide-vue-next';
 
-// Parser markdown terisolasi dan aman: HTML mentah dari model/data dilepas, hanya tautan http(s) yang aktif.
-const escapeHtml = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const md = new Marked({
-  gfm: true,
-  breaks: true,
-  renderer: {
-    html: ({ text }) => escapeHtml(text),
-    image: () => '',
-    link({ href, tokens }) {
-      const inner = this.parser.parseInline(tokens);
-      if (!/^https?:\/\//i.test(href || '')) return inner;
-      return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${inner}</a>`;
-    },
-  },
-});
+// Parser markdown aman (HTML mentah dilepas, hanya tautan http(s) aktif): resources/js/utils/safeMarkdown.js
 const renderMarkdown = (text) => {
   if (!text) return '';
   return md.parse(text).replace(/\[([MSIE]\d{1,3})\]/g, '<sup class="sdw-cite">$1</sup>');

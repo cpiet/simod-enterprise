@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\MonitoredInstagramAccount;
+use App\Models\MonitoredSocialAccount;
 use App\Models\Polda;
 use App\Models\User;
 use App\Support\InstagramHighlights;
@@ -52,15 +52,15 @@ class InstagramHighlightsTest extends TestCase
     {
         $polda = Polda::create(['code' => 'SULBAR', 'name' => 'Polda Sulbar', 'zone' => 'WITA', 'is_active' => true]);
         $other = Polda::create(['code' => 'JATIM', 'name' => 'Polda Jatim', 'zone' => 'WIB', 'is_active' => true]);
-        MonitoredInstagramAccount::create(['polda_id' => $polda->id, 'username' => 'tokoh', 'posts' => [$this->igPost(1, 0, 'Polisi patroli malam')]]);
-        MonitoredInstagramAccount::create(['polda_id' => $other->id, 'username' => 'lain', 'posts' => []]);
+        MonitoredSocialAccount::create(['polda_id' => $polda->id, 'username' => 'tokoh', 'posts' => [$this->igPost(1, 0, 'Polisi patroli malam')]]);
+        MonitoredSocialAccount::create(['polda_id' => $other->id, 'username' => 'lain', 'posts' => []]);
         $user = User::factory()->create(['role' => 'polda_leader', 'polda_id' => $polda->id]);
 
         $this->actingAs($user)->get('/social-intelligence?tab=kol')->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('monitoredInstagramAccounts', 1)
-                ->where('monitoredInstagramAccounts.0.username', 'tokoh')
-                ->where('monitoredInstagramAccounts.0.posts.0.highlight.keywords', ['polisi'])
+                ->has('monitoredAccounts', 1)
+                ->where('monitoredAccounts.0.username', 'tokoh')
+                ->where('monitoredAccounts.0.posts.0.highlight.keywords', ['polisi'])
             );
     }
 }
